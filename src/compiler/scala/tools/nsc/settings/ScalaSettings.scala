@@ -67,6 +67,8 @@ trait ScalaSettings extends AbsScalaSettings
   val future        = BooleanSetting    ("-Xfuture", "Turn on future language features.")
   val genPhaseGraph = StringSetting     ("-Xgenerate-phase-graph", "file", "Generate the phase graphs (outputs .dot files) to fileX.dot.", "")
   val XlogImplicits = BooleanSetting    ("-Xlog-implicits", "Show more detail on why some implicits are not applicable.")
+  val logImplicitConv = BooleanSetting  ("-Xlog-implicit-conversions", "Print a message whenever an implicit conversion is inserted.")
+  val logReflectiveCalls = BooleanSetting("-Xlog-reflective-calls", "Print a message when a reflective method call is generated")
   val maxClassfileName = IntSetting     ("-Xmax-classfile-name", "Maximum filename length for generated classes", 255, Some((72, 255)), _ => None)
   val Xmigration    = VersionSetting    ("-Xmigration", "version", "Warn about constructs whose behavior has changed since <version>.", Version(2,9))
   val nouescape     = BooleanSetting    ("-Xno-uescape", "Disable handling of \\u unicode escapes.")
