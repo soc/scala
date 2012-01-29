@@ -801,7 +801,7 @@ self: ParIterableLike[T, Repr, Sequential] =>
 
   override def toList: List[T] = seq.toList
 
-  override def toIndexedSeq[U >: T]: collection.immutable.IndexedSeq[U] = seq.toIndexedSeq[U]
+  override def toIndexedSeq: collection.immutable.IndexedSeq[T] = seq.toIndexedSeq
 
   override def toStream: Stream[T] = seq.toStream
 
@@ -895,7 +895,8 @@ self: ParIterableLike[T, Repr, Sequential] =>
     @volatile var result: R1 = null.asInstanceOf[R1]
     def map(r: R): R1
     def leaf(prevr: Option[R1]) = {
-      result = map(executeAndWaitResult(inner))
+      val initialResult = executeAndWaitResult(inner)
+      result = map(initialResult)
     }
     private[parallel] override def signalAbort() {
       inner.signalAbort
