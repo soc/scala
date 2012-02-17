@@ -14,6 +14,7 @@ import io.{ SourceReader, AbstractFile, Path }
 import reporters.{ Reporter, ConsoleReporter }
 import util.{ Exceptional, ClassPath, MergedClassPath, Statistics, StatisticsInfo, ScalaClassLoader, returning }
 import scala.reflect.internal.util.{ NoPosition, SourceFile, NoSourceFile, BatchSourceFile, ScriptSourceFile }
+// import util.{ NoPosition, Exceptional, ClassPath, MergedClassPath, SourceFile, NoSourceFile, Statistics, StatisticsInfo, BatchSourceFile, ScriptSourceFile, ScalaClassLoader, returning, CountingCache }
 import scala.reflect.internal.pickling.{ PickleBuffer, PickleFormat }
 import settings.{ AestheticSettings }
 import symtab.{ Flags, SymbolTable, SymbolLoaders, SymbolTrackers }
@@ -149,7 +150,12 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
   /** Some statistics (normally disabled) set with -Ystatistics */
   object statistics extends {
     val global: Global.this.type = Global.this
-  } with StatisticsInfo
+  } with StatisticsInfo {
+    private[this] val caches = mutable.HashMap[String, CountingCache[_,_]]()
+    def cache[T, R](label: String)(impl: T => R): T => R = {
+      caches.getOrElseUpdate(label, new CountingCache[T, R](label)(impl)).asInstanceOf[T => R]
+    }
+  }
 
   /** Print tree in detailed form */
   object nodePrinters extends {
@@ -1092,7 +1098,7 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
 
   /** The currently active run
    */
-  def currentRun: Run              = curRun
+  def currentRun: Run = curRun
   def currentUnit: CompilationUnit = if (currentRun eq null) NoCompilationUnit else currentRun.currentUnit
   def currentSource: SourceFile    = if (currentUnit.exists) currentUnit.source else lastSeenSourceFile
 
