@@ -468,10 +468,12 @@ abstract class ExplicitOuter extends InfoTransform
             }
           }
           super.transform(
-            treeCopy.Template(tree, parents, self,
-                          if (newDefs.isEmpty) decls else decls ::: newDefs.toList)
+            deriveTemplate(tree)(decls => 
+              if (newDefs.isEmpty) decls
+              else decls ::: newDefs.toList
+            )
           )
-        case DefDef(mods, name, tparams, vparamss, tpt, rhs) =>
+        case DefDef(_, _, _, vparamss, _, rhs) =>
           if (sym.isClassConstructor) {
             rhs match {
               case Literal(_) =>
@@ -484,7 +486,7 @@ abstract class ExplicitOuter extends InfoTransform
                       sym.newValueParameter(nme.OUTER, sym.pos) setInfo outerField(clazz).info
                     ((ValDef(outerParam) setType NoType) :: vparamss.head) :: vparamss.tail
                   } else vparamss
-                super.transform(treeCopy.DefDef(tree, mods, name, tparams, vparamss1, tpt, rhs))
+                super.transform(copyDefDef(tree)(vparamss = vparamss1))
             }
           } else
             super.transform(tree)
@@ -517,7 +519,7 @@ abstract class ExplicitOuter extends InfoTransform
           super.transform(treeCopy.Apply(tree, sel, outerVal :: args))
 
         // entry point for pattern matcher translation
-        case mch: Match =>
+        case mch: Match if (!opt.virtPatmat) => // don't use old pattern matcher as fallback when the user wants the virtualizing one
           matchTranslation(mch)
 
         case _ =>

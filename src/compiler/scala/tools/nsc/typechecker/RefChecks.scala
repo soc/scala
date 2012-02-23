@@ -276,10 +276,13 @@ abstract class RefChecks extends InfoTransform with reflect.internal.transform.R
        *  of class `clazz` are met.
        */
       def checkOverride(member: Symbol, other: Symbol) {
+        debuglog("Checking validity of %s overriding %s".format(member.fullLocationString, other.fullLocationString))
+        
         def memberTp = self.memberType(member)
         def otherTp  = self.memberType(other)
         def noErrorType = other.tpe != ErrorType && member.tpe != ErrorType
         def isRootOrNone(sym: Symbol) = sym == RootClass || sym == NoSymbol
+        def isNeitherInClass = (member.owner != clazz) && (other.owner != clazz)
         def objectOverrideErrorMsg = (
           "overriding " + other.fullLocationString + " with " + member.fullLocationString + ":\n" +
           "an overriding object must conform to the overridden object's class bound" +
@@ -381,7 +384,14 @@ abstract class RefChecks extends InfoTransform with reflect.internal.transform.R
             overrideError("cannot override final member");
             // synthetic exclusion needed for (at least) default getters.
           } else if (!other.isDeferred && !member.isAnyOverride && !member.isSynthetic) {
-            overrideError("needs `override' modifier");
+              if (isNeitherInClass && !(other.owner isSubClass member.owner))
+                emitOverrideError(
+                  clazz + " inherits conflicting members:\n  "
+                    + infoStringWithLocation(other) + "  and\n  " + infoStringWithLocation(member)
+                    + "\n(Note: this can be resolved by declaring an override in " + clazz + ".)"
+                )
+              else
+                overrideError("needs `override' modifier")
           } else if (other.isAbstractOverride && other.isIncompleteIn(clazz) && !member.isAbstractOverride) {
             overrideError("needs `abstract override' modifiers")
           } else if (member.isAnyOverride && (other hasFlag ACCESSOR) && other.accessed.isVariable && !other.accessed.isLazy) {
@@ -1441,26 +1451,6 @@ abstract class RefChecks extends InfoTransform with reflect.internal.transform.R
 
           transform(qual)
 
-      case Apply(Select(New(tpt), name), args)
-      if (tpt.tpe.typeSymbol == ArrayClass && args.length >= 2) =>
-        unit.deprecationWarning(tree.pos,
-          "new Array(...) with multiple dimensions has been deprecated; use Array.ofDim(...) instead")
-        val manif = {
-          var etpe = tpt.tpe
-          for (_ <- args) { etpe = etpe.typeArgs.headOption.getOrElse(NoType) }
-          if (etpe == NoType) {
-            unit.error(tree.pos, "too many dimensions for array creation")
-            Literal(Constant(null))
-          } else {
-            localTyper.getManifestTree(tree, etpe, false)
-          }
-        }
-        val newResult = localTyper.typedPos(tree.pos) {
-          new ApplyToImplicitArgs(gen.mkMethodCall(ArrayModule, nme.ofDim, args), List(manif))
-        }
-        currentApplication = tree
-        newResult
-
       case Apply(fn, args) =>
         checkSensible(tree.pos, fn, args)
         currentApplication = tree
@@ -1537,12 +1527,9 @@ abstract class RefChecks extends InfoTransform with reflect.internal.transform.R
         // inside annotations.
         applyRefchecksToAnnotations(tree)
         var result: Tree = tree match {
-          case DefDef(mods, name, tparams, vparams, tpt, EmptyTree) if tree.symbol.hasAnnotation(NativeAttr) =>
-            tree.symbol.resetFlag(DEFERRED)
-            transform(treeCopy.DefDef(
-              tree, mods, name, tparams, vparams, tpt,
-              typed(gen.mkSysErrorCall("native method stub"))
-            ))
+          case DefDef(_, _, _, _, _, EmptyTree) if sym hasAnnotation NativeAttr =>
+            sym resetFlag DEFERRED
+            transform(deriveDefDef(tree)(_ => typed(gen.mkSysErrorCall("native method stub"))))
 
           case ValDef(_, _, _, _) | DefDef(_, _, _, _, _, _) =>
             checkDeprecatedOvers(tree)
@@ -1560,8 +1547,7 @@ abstract class RefChecks extends InfoTransform with reflect.internal.transform.R
             checkOverloadedRestrictions(currentOwner)
             val bridges = addVarargBridges(currentOwner)
             checkAllOverrides(currentOwner)
-            if (bridges.nonEmpty) treeCopy.Template(tree, parents, self, body ::: bridges)
-            else tree
+            if (bridges.nonEmpty) deriveTemplate(tree)(_ ::: bridges) else tree
 
           case dc@TypeTreeWithDeferredRefCheck() => assert(false, "adapt should have turned dc: TypeTreeWithDeferredRefCheck into tpt: TypeTree, with tpt.original == dc"); dc
           case tpt@TypeTree() =>

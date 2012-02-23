@@ -99,6 +99,7 @@ trait StdNames extends NameManglers { self: SymbolTable =>
     val MODULE_VAR_SUFFIX: NameType  = "$module"
     val ROOT: NameType               = "<root>"
     val PACKAGE: NameType            = "package"
+    val SPECIALIZED_SUFFIX: NameType = "$sp"
 
     // value types (and AnyRef) are all used as terms as well
     // as (at least) arguments to the @specialize annotation.
@@ -259,6 +260,8 @@ trait StdNames extends NameManglers { self: SymbolTable =>
       case _  => newTermName("x$" + i)
     }
     
+    val ??? = encode("???")
+    
     val wrapRefArray: NameType     = "wrapRefArray"
     val wrapByteArray: NameType    = "wrapByteArray"
     val wrapShortArray: NameType   = "wrapShortArray"
@@ -330,6 +333,7 @@ trait StdNames extends NameManglers { self: SymbolTable =>
     val freeValue : NameType           = "freeValue"
     val genericArrayOps: NameType      = "genericArrayOps"
     val get: NameType                  = "get"
+    val getOrElse: NameType            = "getOrElse"
     val hasNext: NameType              = "hasNext"
     val hashCode_ : NameType           = if (forMSIL) "GetHashCode" else "hashCode"
     val hash_ : NameType               = "hash"

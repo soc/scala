@@ -65,7 +65,10 @@ abstract class LambdaLift extends InfoTransform {
     /** The set of symbols that need to be renamed. */
     private val renamable = newSymSet
 
-    private val renamableImplClasses = mutable.HashMap[Name, Symbol]() withDefaultValue NoSymbol
+    // (trait, name) -> owner
+    private val localTraits      = mutable.HashMap[(Symbol, Name), Symbol]()
+    // (owner, name) -> implClass
+    private val localImplClasses = mutable.HashMap[(Symbol, Name), Symbol]()
 
     /** A flag to indicate whether new free variables have been found */
     private var changedFreeVars: Boolean = _
@@ -167,8 +170,13 @@ abstract class LambdaLift extends InfoTransform {
               // arrangements, and then have separate methods which attempt to compensate
               // for that failure. There should be exactly one method for any given
               // entity which always gives the right answer.
-              if (sym.isImplClass) renamableImplClasses(nme.interfaceName(sym.name)) = sym
-              else renamable addEntry sym
+              if (sym.isImplClass)
+                localImplClasses((sym.owner, nme.interfaceName(sym.name))) = sym
+              else {
+                renamable addEntry sym
+                if (sym.isTrait)
+                  localTraits((sym, sym.name)) = sym.owner
+              }
             }
           case DefDef(_, _, _, _, _, _) =>
             if (sym.isLocal) {
@@ -237,14 +245,21 @@ abstract class LambdaLift extends InfoTransform {
 
         debuglog("renaming impl class in step with %s: %s => %s".format(traitSym, originalImplName, implSym.name))
       }
-
+      
       for (sym <- renamable) {
         // If we renamed a trait from Foo to Foo$1, we must rename the implementation
         // class from Foo$class to Foo$1$class.  (Without special consideration it would
-        // become Foo$class$1 instead.)
-        val implClass = if (sym.isTrait) renamableImplClasses(sym.name) else NoSymbol
-        if ((implClass ne NoSymbol) && (sym.owner == implClass.owner)) renameTrait(sym, implClass)
-        else renameSym(sym)
+        // become Foo$class$1 instead.) Since the symbols are being renamed out from
+        // under us, and there's no reliable link between trait symbol and impl symbol,
+        // we have maps from ((trait, name)) -> owner and ((owner, name)) -> impl.
+        localTraits remove ((sym, sym.name)) match {
+          case None        => renameSym(sym)
+          case Some(owner) =>
+            localImplClasses remove ((owner, sym.name)) match {
+              case Some(implSym)  => renameTrait(sym, implSym)
+              case _              => renameSym(sym) // pure interface, no impl class
+            }
+        }
       }
 
       atPhase(phase.next) {
@@ -305,12 +320,13 @@ abstract class LambdaLift extends InfoTransform {
       case Some(ps) =>
         val freeParams = ps map (p => ValDef(p) setPos tree.pos setType NoType)
         tree match {
-          case DefDef(mods, name, tparams, vparamss, tpt, rhs) =>
+          case DefDef(_, _, _, vparams :: _, _, _) =>
             val addParams = cloneSymbols(ps).map(_.setFlag(PARAM))
             sym.updateInfo(
               lifted(MethodType(sym.info.params ::: addParams, sym.info.resultType)))
-            treeCopy.DefDef(tree, mods, name, tparams, List(vparamss.head ++ freeParams), tpt, rhs)
-          case ClassDef(mods, name, tparams, impl @ Template(parents, self, body)) =>
+            
+            copyDefDef(tree)(vparamss = List(vparams ++ freeParams))
+          case ClassDef(mods, name, tparams, impl) =>
             // Disabled attempt to to add getters to freeParams
             // this does not work yet. Problem is that local symbols need local names
             // and references to local symbols need to be transformed into
@@ -322,8 +338,7 @@ abstract class LambdaLift extends InfoTransform {
             //   DefDef(getter, rhs) setPos tree.pos setType NoType
             // }
             // val newDefs = if (sym.isTrait) freeParams ::: (ps map paramGetter) else freeParams
-            treeCopy.ClassDef(tree, mods, name, tparams,
-                              treeCopy.Template(impl, parents, self, body ::: freeParams))
+            treeCopy.ClassDef(tree, mods, name, tparams, deriveTemplate(impl)(_ ::: freeParams))
         }
       case None =>
         tree
@@ -405,7 +420,7 @@ abstract class LambdaLift extends InfoTransform {
               case Try(block, catches, finalizer) =>
                 Try(refConstr(block), catches map refConstrCase, finalizer)
               case _ => 
-                Apply(Select(New(TypeTree(sym.tpe)), nme.CONSTRUCTOR), List(expr))
+                New(sym, expr)
             }
             def refConstrCase(cdef: CaseDef): CaseDef = 
               CaseDef(cdef.pat, cdef.guard, refConstr(cdef.body))
@@ -465,17 +480,16 @@ abstract class LambdaLift extends InfoTransform {
     /** Transform statements and add lifted definitions to them. */
     override def transformStats(stats: List[Tree], exprOwner: Symbol): List[Tree] = {
       def addLifted(stat: Tree): Tree = stat match {
-        case ClassDef(mods, name, tparams, impl @ Template(parents, self, body)) =>
+        case ClassDef(mods, name, tparams, impl) =>
           val lifted = liftedDefs get stat.symbol match {
             case Some(xs) => xs reverseMap addLifted
             case _        => log("unexpectedly no lifted defs for " + stat.symbol) ; Nil
           }
-          val result = treeCopy.ClassDef(
-            stat, mods, name, tparams, treeCopy.Template(impl, parents, self, body ::: lifted))
-          liftedDefs -= stat.symbol
-          result
-        case DefDef(mods, name, tp, vp, tpt, Block(Nil, expr)) if !stat.symbol.isConstructor =>
-          treeCopy.DefDef(stat, mods, name, tp, vp, tpt, expr)
+          try treeCopy.ClassDef(stat, mods, name, tparams, deriveTemplate(impl)(_ ::: lifted))
+          finally liftedDefs -= stat.symbol
+
+        case DefDef(_, _, _, _, _, Block(Nil, expr)) if !stat.symbol.isConstructor =>
+          deriveDefDef(stat)(_ => expr)
         case _ =>
           stat
       }
