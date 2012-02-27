@@ -888,6 +888,7 @@ abstract class RefChecks extends InfoTransform with reflect.internal.transform.R
           case NoType => ;
           case NoPrefix => ;
           case ThisType(_) => ;
+          case SuperType(_, _) => ;
           case ConstantType(_) => ;
           // case DeBruijnIndex(_, _) => ;
           case SingleType(pre, sym) =>
