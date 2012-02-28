@@ -570,26 +570,6 @@ object Test8 {
 }
 
 //############################################################################
-// Test code
-
-object Test {
-  def main(args: Array[String]) {
-    Test1_scala
-    Test2_immutable
-    Test3_mutable
-    Test4_xml
-    Test5
-    Test6
-    Test7
-    Test8
-    Test9_parallel
-  }
-}
-
-//############################################################################
-
-
-//############################################################################
 // Test classes in package "scala.collection.parallel" and subpackages
 object Test9_parallel {
   import scala.collection.parallel._
@@ -648,3 +628,23 @@ object Test9_parallel {
       throw e
   }
 }
+
+
+//############################################################################
+// Test code
+
+object Test {
+  def main(args: Array[String]) {
+    Test1_scala
+    Test2_immutable
+    Test3_mutable
+    Test4_xml
+    Test5
+    Test6
+    Test7
+    Test8
+    Test9_parallel
+  }
+}
+
+//############################################################################

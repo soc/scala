@@ -145,7 +145,9 @@ class Power[ReplValsImpl <: ReplVals : Manifest](val intp: IMain, replVals: Repl
     // First we create the ReplVals instance and bind it to $r
     intp.bind("$r", replVals)
     // Then we import everything from $r.
-    intp interpret ("import " + intp.pathToTerm("$r") + "._")
+    intp stickily {
+      intp interpret ("import " + intp.pathToTerm("$r") + "._")
+    }
     // And whatever else there is to do.
     init.lines foreach (intp interpret _)
   }

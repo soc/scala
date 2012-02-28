@@ -13,8 +13,9 @@ import scala.reflect.internal.Chars
 trait MemberHandlers {
   val intp: IMain
 
-  import intp.{ Request, global, naming }
+  import intp.{ Request, global, naming, isStickyName }
   import global._
+  import definitions.{ AnyClass, ObjectClass }
   import naming._
 
   private def codegenln(leadingPlus: Boolean, xs: String*): String = codegen(leadingPlus, (xs ++ Array("\n")): _*)
@@ -49,6 +50,14 @@ trait MemberHandlers {
       ivt.importVars.toList
     }
   }
+
+  // Members of Any or AnyRef cannot be imported because the inherited version
+  // always takes precedence.
+  lazy val unimportableNames: Set[Name] = (
+    AnyClass.info.nonPrivateMembers.map(_.name).toSet ++
+    ObjectClass.info.nonPrivateMembers.map(_.name)
+  )
+  def importableMembers(tp: Type) = tp.nonPrivateMembers filterNot (sym => unimportableNames(sym.name))
 
   def chooseHandler(member: Tree): MemberHandler = member match {
     case member: DefDef        => new DefHandler(member)
@@ -85,9 +94,11 @@ trait MemberHandlers {
     def definesType     = Option.empty[TypeName]
 
     lazy val referencedNames = ImportVarsTraverser(member)
-    def importedNames        = List[Name]()
-    def definedNames         = definesTerm.toList ++ definesType.toList
-    def definedOrImported    = definedNames ++ importedNames
+    def importedNames          = List[Name]()
+    def definedNames           = definesTerm.toList ++ definesType.toList
+    def definedOrImportedNames = definedNames ++ importedNames distinct
+
+    def importedSymbols: List[Symbol] = Nil
 
     def extraCodeToEvaluate(req: Request): String = ""
     def resultExtractionCode(req: Request): String = ""
@@ -195,21 +206,24 @@ trait MemberHandlers {
 
     /** Whether anything imported is implicit .*/
     def importsImplicit = implicitSymbols.nonEmpty
-
     def implicitSymbols = importedSymbols filter (_.isImplicit)
-    def importedSymbols = individualSymbols ++ wildcardSymbols
+    override def importedSymbols = individualSymbols ++ wildcardSymbols
 
+    def isImportable(sym: Symbol) = (ObjectClass.tpe nonPrivateMember sym.name) == NoSymbol
     lazy val individualSymbols: List[Symbol] =
-      beforePickler(individualNames map (targetType nonPrivateMember _))
-
+      beforePickler(individualNames map (targetType nonPrivateMember _) filter isImportable)
+    
     lazy val wildcardSymbols: List[Symbol] =
       if (importsWildcard) beforePickler(targetType.nonPrivateMembers)
       else Nil
 
     /** Complete list of names imported by a wildcard */
-    lazy val wildcardNames: List[Name]   = wildcardSymbols map (_.name)
-    lazy val individualNames: List[Name] = selectorRenames filterNot (_ == nme.USCOREkw) flatMap (_.bothNames)
-
+    lazy val wildcardNames: List[Name]   = (
+      wildcardSymbols map (_.name) filterNot isStickyName
+    )
+    lazy val individualNames: List[Name] = (
+      selectorRenames filterNot (_ == nme.USCOREkw) flatMap (_.bothNames) filterNot isStickyName
+    )
     /** The names imported by this statement */
     override lazy val importedNames: List[Name] = wildcardNames ++ individualNames
     lazy val importsSymbolNamed: Set[String] = importedNames map (_.toString) toSet

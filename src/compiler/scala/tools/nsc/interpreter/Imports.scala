@@ -68,7 +68,7 @@ trait Imports {
    */
   def importedSymbolsBySource: List[(Symbol, List[Symbol])] = {
     val lang    = languageWildcardSyms map (sym => (sym, membersAtPickler(sym)))
-    val session = importHandlers filter (_.targetType != NoType) map { mh =>
+    val session = importHandlers filterNot (_.targetType eq NoType) map { mh =>
       (mh.targetType.typeSymbol, mh.importedSymbols)
     }
 

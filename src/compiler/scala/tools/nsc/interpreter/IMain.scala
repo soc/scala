@@ -191,6 +191,10 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
     getClassIfDefined, getModuleIfDefined, getRequiredModule, getRequiredClass
   }
 
+  implicit lazy val powerNameOrdering: Ordering[Name]     = Ordering[String] on (_.toString)
+  implicit lazy val powerSymbolOrdering: Ordering[Symbol] = Ordering[Name] on (_.name)
+  implicit lazy val powerTypeOrdering: Ordering[Type]     = Ordering[Symbol] on (_.typeSymbol)
+
   private implicit def privateTreeOps(t: Tree): List[Tree] = {
     (new Traversable[Tree] {
       def foreach[U](f: Tree => U): Unit = t foreach { x => f(x) ; () }
@@ -350,14 +354,11 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
   def flatName(id: String)    = optFlatName(id) getOrElse id
   def optFlatName(id: String) = requestForIdent(id) map (_ fullFlatName id)
 
-  def allDefinedNames = definedNameMap.keys.toList sortBy (_.toString)
+  def allDefinedNames = stickyNames.keys.toList ++ definedNameMap.keys.toList sorted
   def pathToType(id: String): String = pathToName(newTypeName(id))
   def pathToTerm(id: String): String = pathToName(newTermName(id))
-  def pathToName(name: Name): String = {
-    if (definedNameMap contains name)
-      definedNameMap(name) fullPath name
-    else name.toString
-  }
+  def pathToName(name: Name): String =
+    requestForName(name) map (_ fullPath name) getOrElse ("" + name)
 
   /** Most recent tree handled which wasn't wholly synthetic. */
   private def mostRecentlyHandledTree: Option[Tree] = {
@@ -370,20 +371,20 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
     None
   }
 
-  /** Stubs for work in progress. */
-  def handleTypeRedefinition(name: TypeName, old: Request, req: Request) = {
-    for (t1 <- old.simpleNameOfType(name) ; t2 <- req.simpleNameOfType(name)) {
-      repldbg("Redefining type '%s'\n  %s -> %s".format(name, t1, t2))
-    }
-  }
-
-  def handleTermRedefinition(name: TermName, old: Request, req: Request) = {
-    for (t1 <- old.compilerTypeOf get name ; t2 <- req.compilerTypeOf get name) {
-      // Printing the types here has a tendency to cause assertion errors, like
-      //   assertion failed: fatal: <refinement> has owner value x, but a class owner is required
-      // so DBG is by-name now to keep it in the family.  (It also traps the assertion error,
-      // but we don't want to unnecessarily risk hosing the compiler's internal state.)
-      repldbg("Redefining term '%s'\n  %s -> %s".format(name, t1, t2))
+  def handleRedefinition(name: Name, old: Request, req: Request) = {
+    name match {
+      case name: TypeName =>
+        for (t1 <- old.simpleNameOfType(name) ; t2 <- req.simpleNameOfType(name)) {
+          repldbg("Redefining type '%s'\n  %s -> %s".format(name, t1, t2))
+        }
+      case name: TermName =>
+        for (t1 <- old.compilerTypeOf get name ; t2 <- req.compilerTypeOf get name) {
+          // Printing the types here has a tendency to cause assertion errors, like
+          //   assertion failed: fatal: <refinement> has owner value x, but a class owner is required
+          // so DBG is by-name now to keep it in the family.  (It also traps the assertion error,
+          // but we don't want to unnecessarily risk hosing the compiler's internal state.)
+          repldbg("Redefining term '%s'\n  %s -> %s".format(name, t1, t2))
+        }
     }
   }
 
@@ -392,7 +393,12 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
       return
 
     prevRequests += req
-    req.referencedNames foreach (x => referencedNameMap(x) = req)
+    req.referencedNames foreach { name =>
+      stickyNames get name match {
+        case Some(n)  => replwarn("Sticky name `" + name + "` rewritten.")
+        case _        => referencedNameMap(name) = req
+      }
+    }
 
     // warning about serially defining companions.  It'd be easy
     // enough to just redefine them together but that may not always
@@ -410,11 +416,22 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
 
     // Updating the defined name map
     req.definedNames foreach { name =>
-      if (definedNameMap contains name) {
-        if (name.isTypeName) handleTypeRedefinition(name.toTypeName, definedNameMap(name), req)
-        else handleTermRedefinition(name.toTermName, definedNameMap(name), req)
+      val exists = definedNameMap contains name
+      if (exists && !isStickyMode)
+        echo("Can't displace sticky value `" + name + "`.")
+      else {
+        if (exists)
+          handleRedefinition(name, definedNameMap(name), req)
+        if (isStickyMode)
+          updateSticky(name, req)
+
+        definedNameMap(name) = req
       }
-      definedNameMap(name) = req
+    }
+    if (isStickyMode) {
+      req.importedNames foreach { name =>
+        updateSticky(name, req)
+      }
     }
   }
 
@@ -646,8 +663,9 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
   }
   def directBind(name: String, boundType: String, value: Any): IR.Result = {
     val result = bind(name, boundType, value)
-    if (result == IR.Success)
-      directlyBoundNames += newTermName(name)
+    // if (result == IR.Success)
+    //   directlyBoundNames += newTermName(name)
+
     result
   }
   def directBind(p: NamedParam): IR.Result                       = directBind(p.name, p.tpe, p.value)
@@ -844,7 +862,8 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
     val handlers: List[MemberHandler] = trees map (memberHandlers chooseHandler _)
 
     /** all (public) names defined by these statements */
-    val definedNames = handlers flatMap (_.definedNames)
+    val definedNames  = handlers flatMap (_.definedNames) //filterNot isStickyName
+    val importedNames = handlers flatMap (_.importedNames) //filterNot isStickyName
 
     /** list of names used by this expression */
     val referencedNames: List[Name] = handlers flatMap (_.referencedNames)
@@ -852,13 +871,17 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
     /** def and val names */
     def termNames = handlers flatMap (_.definesTerm)
     def typeNames = handlers flatMap (_.definesType)
-    def definedOrImported = handlers flatMap (_.definedOrImported)
+    def definedOrImportedNames = definedNames ++ importedNames distinct
+    def definedOrImportedSymbols = (
+         definedSymbols.values.toList
+      ++ handlers.flatMap(_.importedSymbols)
+    )
 
     /** Code to import bound names from previous lines - accessPath is code to
       * append to objectName to access anything bound by request.
       */
     val ComputedImports(importsPreamble, importsTrailer, accessPath) =
-      importsCode(referencedNames.toSet)
+      importsCode(referencedNames.toSet filterNot isStickyName)
 
     /** Code to access a variable with the specified name */
     def fullPath(vname: String) = (
@@ -1025,14 +1048,14 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
 
   def requestForName(name: Name): Option[Request] = {
     assert(definedNameMap != null, "definedNameMap is null")
-    definedNameMap get name
+    (stickyNames get name) orElse (definedNameMap get name)
   }
 
   def requestForIdent(line: String): Option[Request] =
     requestForName(newTermName(line)) orElse requestForName(newTypeName(line))
 
   def requestHistoryForName(name: Name): List[Request] =
-    prevRequests.toList.reverse filter (_.definedNames contains name)
+    prevRequests.reverseIterator filter (_.definedNames contains name) toList
 
   def definitionForName(name: Name): Option[MemberHandler] =
     requestForName(name) flatMap { req =>
@@ -1093,12 +1116,13 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
 
   def definedTerms   = onlyTerms(allDefinedNames) filterNot isInternalTermName
   def definedTypes   = onlyTypes(allDefinedNames)
-  def definedSymbols = prevRequests.toSet flatMap ((x: Request) => x.definedSymbols.values)
+  def stickySymbols  = stickyNames.toList flatMap { case (name, req) => req.definedOrImportedSymbols find (_.name == name) }
+  def definedSymbols = prevRequests.reverseIterator flatMap (_.definedSymbols.values)
 
   // Terms with user-given names (i.e. not res0 and not synthetic)
-  def namedDefinedTerms = definedTerms filterNot (x => isUserVarName("" + x) || directlyBoundNames(x))
+  def namedDefinedTerms = definedTerms filterNot (x => isUserVarName("" + x) || (stickyNames contains x))
 
-  private def findName(name: Name) = definedSymbols find (_.name == name)
+  private def findName(name: Name) = (stickySymbols ++ definedSymbols) find (_.name == name)
 
   /** Translate a repl-defined identifier into a Symbol.
    */
@@ -1113,20 +1137,32 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
     val termname = newTypeName(name)
     findName(termname) getOrElse getModuleIfDefined(termname)
   }
+  private var isStickyMode = false
+  def sticky = stickyNames.keys.toList.sorted filterNot (_ startsWith "$")
+  def stickily[T](body: => T): T = {
+    val saved = isStickyMode
+    isStickyMode = true
+    try body
+    finally isStickyMode = saved
+  }
+  private def updateSticky(name: Name, req: Request) {
+    echo("Sticky: " + name)
+    stickyNames(name) = req
+  }
   def types[T: ClassManifest] : Symbol = types(classManifest[T].erasure.getName)
   def terms[T: ClassManifest] : Symbol = terms(classManifest[T].erasure.getName)
   def apply[T: ClassManifest] : Symbol = apply(classManifest[T].erasure.getName)
 
   /** the previous requests this interpreter has processed */
-  private lazy val prevRequests       = mutable.ListBuffer[Request]()
-  private lazy val referencedNameMap  = mutable.Map[Name, Request]()
-  private lazy val definedNameMap     = mutable.Map[Name, Request]()
-  private lazy val directlyBoundNames = mutable.Set[Name]()
-  protected def prevRequestList       = prevRequests.toList
-  private def allHandlers             = prevRequestList flatMap (_.handlers)
-  def allSeenTypes                    = prevRequestList flatMap (_.typeOf.values.toList) distinct
-  def allImplicits                    = allHandlers filter (_.definesImplicit) flatMap (_.definedNames)
-  def importHandlers                  = allHandlers collect { case x: ImportHandler => x }
+  private lazy val prevRequests      = mutable.ListBuffer[Request]()
+  private lazy val referencedNameMap = mutable.Map[Name, Request]()
+  private lazy val definedNameMap    = mutable.Map[Name, Request]()
+  private lazy val stickyNames       = mutable.Map[Name, Request]()
+  protected def prevRequestList      = prevRequests.toList
+  private def allHandlers            = prevRequestList flatMap (_.handlers)
+  def allSeenTypes                   = prevRequestList flatMap (_.typeOf.values.toList) distinct
+  def allImplicits                   = allHandlers filter (_.definesImplicit) flatMap (_.definedNames)
+  def importHandlers                 = allHandlers collect { case x: ImportHandler => x }
 
   def visibleTermNames: List[Name] = definedTerms ++ importedTerms distinct
 
@@ -1135,6 +1171,8 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
 
   /** Parse the ScalaSig to find type aliases */
   def aliasForType(path: String) = ByteCode.aliasForType(path)
+  
+  def isStickyName(name: Name) = stickyNames contains name
 
   def withoutUnwrapping(op: => Unit): Unit = {
     val saved = isettings.unwrapStrings

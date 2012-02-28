@@ -344,6 +344,60 @@ trait Definitions extends reflect.api.StandardDefinitions {
     def isVarArgsList(params: List[Symbol])  = params.nonEmpty && isRepeatedParamType(params.last.tpe)
     def isVarArgTypes(formals: List[Type])   = formals.nonEmpty && isRepeatedParamType(formals.last)
 
+    // All package symbols found underneath the given package symbol.
+    def allPackages(sym: Symbol): List[Symbol] = {
+      val packages = sym.moduleClass.info.nonPrivateMembers.filter(_.isPackage)
+      packages ++ (packages flatMap allPackages)
+    }
+    // All classes found at the given level or below.
+    def allClasses(sym: Symbol): List[Symbol] = {
+      allPackages(sym) flatMap (_.info.nonPrivateMembers filter (_.isClass))
+    }
+    def allStandaloneClasses(sym: Symbol) = {
+      allClasses(sym) filter { s =>
+        !s.name.toString.contains("$") && {
+          try s.initialize
+          catch { case _ => System.err.println("Squashing exception initializing " + s.name) }
+
+          (
+               s.owner.isPackageClass
+            && !s.isDeferred
+            && !s.isAbstractClass
+            && !s.isTrait
+            && s.isPublic
+            && s.primaryConstructor.isPublic
+            && (s.primaryConstructor != NoSymbol)
+            && (s.primaryConstructor.paramss.flatten forall (s => { s.initialize ; true }))
+          )
+        }
+      }
+    }
+    def usableType(tp: Type): Type = {
+      tp map { t =>
+        if (t.typeSymbol.isTypeParameterOrSkolem) usableType(t.typeSymbol.info.bounds.hi)
+        else t
+      }
+    }
+    def usableParam(sym: Symbol) = {
+      val tsym = sym.tpe.typeSymbol
+
+      if (tsym.isTypeParameterOrSkolem) "java.lang.String"
+      else if (tsym.isAbstractType) usableType(sym.info.bounds.hi)
+      else usableType(sym.tpe)
+    }
+
+    def constructions(name: String): List[String] = constructions(name, x => "zero[" + usableParam(x) + "]")
+    def constructions(name: String, f: Symbol => String): List[String] = {
+      (
+        allStandaloneClasses(getRequiredModule("scala.collection"))
+          map (_.primaryConstructor)
+          map (x => "new " + x.info.finalResultType.typeConstructor +
+            x.paramss.map(ps => ps map (p => f(p)) mkString ("(", ", ", ")")).mkString("")
+          )
+      )
+    }
+    def demo() = constructions("scala.collection") foreach println
+
     def hasRepeatedParam(tp: Type): Boolean = tp match {
       case MethodType(formals, restpe) => isScalaVarArgs(formals) || hasRepeatedParam(restpe)
       case PolyType(_, restpe)         => hasRepeatedParam(restpe)
