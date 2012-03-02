@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+#
+# You can use this like you'd started the repl in power
+# mode and it was awaiting your input, e.g.
+#
+#   powerscript 'Nil.tpe_.member("map")'
+
+scalaRunner=/scala/inst/3/bin/scala
+runFunction=scala.tools.nsc.interpreter.ILoop.run
+powerModeOpts="-nc"
+
+if [[ $# -eq 0 ]]; then
+  echo "Usage: $(basename $0) <scala code>"
+  echo "  The given code will be executed in a power mode repl."
+  echo "  Example: $(basename $0) 'Nil.tpe_.members >'"
+  exit 1
+fi
+
+newSettings=$(cat <<EOM
+{ val s = new scala.tools.nsc.Settings() ; s.nowarn.value = true ; s }
+EOM
+)
+
+run-in-power-mode () {
+  "$scalaRunner" -nowarn \
+    $SCALA_OPTS \
+    $powerModeOpts \
+    -Dscala.repl.power \
+    -e "Console println $runFunction(\"\"\"$*\"\"\", $newSettings)"
+}
+
+# A hack to implement dropWhile (_ != last-line-of-boilerplate-noise)
+print=0
+printFn () {
+  while read line; do
+    if (( $print )); then
+      printf "%s\n" "$line"
+    elif [[ "$line" =~ total.init.time ]]; then
+      print=1
+    fi
+  done
+
+  exit 0
+}
+
+# here we go
+run-in-power-mode "$@" | printFn | grep -v '^scala>\s*$'

@@ -1,0 +1,959 @@
+diff --git a/build.xml b/build.xml
+index 5aa0555..acc88aa 100644
+--- a/build.xml
++++ b/build.xml
+@@ -71,7 +71,7 @@
+            <manifest>
+                 <attribute name="Class-Path" value="scala-library.jar"/>
+             </manifest>
+-	    <service type="javax.script.ScriptEngineFactory" provider="scala.tools.nsc.Interpreter$Factory"/>
++	    <service type="javax.script.ScriptEngineFactory" provider="scala.tools.nsc.interpreter.IMain$Factory"/>
+            <zipfileset includes="ch/" src="${scala.compiler}"/>
+         </jar>
+         <jar destfile="${dist.dir}/scala-library.jar" manifest="manifest.mf">
+diff --git a/nbproject/project.properties b/nbproject/project.properties
+index aa89a00..6d1d768 100644
+--- a/nbproject/project.properties
++++ b/nbproject/project.properties
+@@ -53,7 +53,7 @@ run.classpath=\
+ # Space-separated list of JVM arguments used when running the project
+ # (you may also define separate properties like run-sys-prop.name=value instead of -Dname=value
+ # or test-sys-prop.name=value to set system properties for unit tests):
+-run.jvmargs=-Xss1m -Xms32m -Xmx512m
++run.jvmargs=-Xss1m -Xms32m -Xmx768m
+ run.test.classpath=\
+     ${javac.test.classpath}:\
+     ${build.test.classes.dir}
+diff --git a/src/scala/tools/nsc/Interpreter.scala b/src/scala/tools/nsc/Interpreter.scala
+index 434f19f..63d1e16 100644
+--- a/src/scala/tools/nsc/Interpreter.scala
++++ b/src/scala/tools/nsc/Interpreter.scala
+@@ -9,4 +9,4 @@ import java.io._
+ class Interpreter(settings: Settings, out: PrintWriter) extends IMain(settings, out) {
+   def this(settings: Settings) = this(settings, new NewLinePrintWriter(new ConsoleWriter, true))
+   def this() = this(new Settings())
+-}
+\ No newline at end of file
++}
+diff --git a/src/scala/tools/nsc/interpreter/AbstractFileClassLoader.scala b/src/scala/tools/nsc/interpreter/AbstractFileClassLoader.scala
+index 21a330e..88ef381 100644
+--- a/src/scala/tools/nsc/interpreter/AbstractFileClassLoader.scala
++++ b/src/scala/tools/nsc/interpreter/AbstractFileClassLoader.scala
+@@ -5,6 +5,9 @@
+ package scala.tools.nsc
+ package interpreter
+
++import java.net.URL
++import java.security.cert.Certificate
++import java.security.{ProtectionDomain, CodeSource}
+ import scala.tools.nsc.io.{ File, AbstractFile }
+ import util.ScalaClassLoader
+ import java.net.URL
+@@ -38,6 +41,10 @@ class AbstractFileClassLoader(root: AbstractFile, parent: ClassLoader)
+     }
+   }
+
++  lazy val protectionDomain = new ProtectionDomain(new CodeSource(new URL(path), null.asInstanceOf[Array[Certificate]]), null, this, null)
++
++  def path = classOf[ScalaObject].getResource("/scala/ScalaObject.class").getPath match { case s => s.substring(0, s.lastIndexOf('!')) }
++
+   override def getResourceAsStream(name: String) = findAbstractFile(name) match {
+     case null => super.getResourceAsStream(name)
+     case file => file.input
+@@ -49,7 +56,7 @@ class AbstractFileClassLoader(root: AbstractFile, parent: ClassLoader)
+   override def findClass(name: String): JClass = {
+     val bytes = classBytes(name)
+     if (bytes.isEmpty) throw new ClassNotFoundException(name)
+-    else defineClass(name, bytes, 0, bytes.length)
++    else defineClass(name, bytes, 0, bytes.length, protectionDomain)
+   }
+   // Don't know how to construct an URL for something which exists only in memory
+   // override def getResource(name: String): URL = findAbstractFile(name) match {
+diff --git a/src/scala/tools/nsc/interpreter/IMain.scala b/src/scala/tools/nsc/interpreter/IMain.scala
+index 99659d1..1a88614 100644
+--- a/src/scala/tools/nsc/interpreter/IMain.scala
++++ b/src/scala/tools/nsc/interpreter/IMain.scala
+@@ -7,9 +7,12 @@ package scala.tools.nsc
+ package interpreter
+
+ import Predef.{ println => _, _ }
+-import java.io.{ PrintWriter }
++import java.io.{ PrintWriter, StringWriter, Reader }
+ import java.lang.reflect
+ import java.net.URL
++import java.util.Arrays
++import javax.script.{AbstractScriptEngine, Bindings, ScriptContext, ScriptEngine, ScriptEngineFactory, ScriptException, SimpleBindings, CompiledScript, Compilable}
++import scala.reflect.BeanProperty
+ import util.{ Set => _, _ }
+ import io.{ AbstractFile, VirtualDirectory }
+ import reporters.{ ConsoleReporter, Reporter }
+@@ -57,26 +60,29 @@ import IMain._
+  *  @author Moez A. Abdel-Gawad
+  *  @author Lex Spoon
+  */
+-class IMain(val settings: Settings, protected val out: PrintWriter) extends Imports {
++class IMain(@BeanProperty val factory: ScriptEngineFactory, val settings: Settings, protected val out: PrintWriter) extends AbstractScriptEngine(new SimpleBindings) with Compilable with Imports {
+   imain =>
+-
++
+   /** construct an interpreter that reports to Console */
++  def this(settings: Settings, out: PrintWriter) = this(null, settings, out)
++  def this(factory: ScriptEngineFactory, settings: Settings) = this(factory, settings, new NewLinePrintWriter(new ConsoleWriter, true))
+   def this(settings: Settings) = this(settings, new NewLinePrintWriter(new ConsoleWriter, true))
++  def this(factory: ScriptEngineFactory) = this(factory, new Settings())
+   def this() = this(new Settings())
+
+   /** whether to print out result lines */
+   private[nsc] var printResults: Boolean = true
+-
++
+   /** whether to print errors */
+   private[nsc] var totalSilence: Boolean = false
+
+   private val RESULT_OBJECT_PREFIX = "RequestResult$"
+-
++
+   lazy val formatting: Formatting = new Formatting {
+     val prompt = Properties.shellPromptString
+   }
+   import formatting._
+-
++
+   /** directory to save .class files to */
+   val virtualDirectory = new VirtualDirectory("(memory)", None) {
+     private def pp(root: io.AbstractFile, indentLevel: Int) {
+@@ -92,7 +98,7 @@ class IMain(val settings: Settings, protected val out: PrintWriter) extends Impo
+   /** reporter */
+   lazy val reporter: ConsoleReporter = new IMain.ReplReporter(this)
+   import reporter.{ printMessage, withoutTruncating }
+-
++
+   // not sure if we have some motivation to print directly to console
+   private def echo(msg: String) { Console println msg }
+
+@@ -146,7 +152,7 @@ class IMain(val settings: Settings, protected val out: PrintWriter) extends Impo
+     try result
+     finally _initializeComplete = result
+   }
+-
++
+   // set up initialization future
+   private var _isInitialized: () => Boolean = null
+   def initialize() = synchronized {
+@@ -183,12 +189,12 @@ class IMain(val settings: Settings, protected val out: PrintWriter) extends Impo
+   //   val intp: imain.type = imain
+   // } with Dossiers { }
+   // import dossiers._
+-
++
+   lazy val memberHandlers = new {
+     val intp: imain.type = imain
+   } with MemberHandlers
+   import memberHandlers._
+-
++
+   def atPickler[T](op: => T): T = atPhase(currentRun.picklerPhase)(op)
+   def afterTyper[T](op: => T): T = atPhase(currentRun.typerPhase.next)(op)
+
+@@ -208,18 +214,18 @@ class IMain(val settings: Settings, protected val out: PrintWriter) extends Impo
+     try operation
+     finally totalSilence = saved
+   }
+-
++
+   def quietRun[T](code: String) = beQuietDuring(interpret(code))
+
+   /** whether to bind the lastException variable */
+   private var bindLastException = true
+-
++
+   /** A string representing code to be wrapped around all lines. */
+   private var _executionWrapper: String = ""
+   def executionWrapper = _executionWrapper
+   def setExecutionWrapper(code: String) = _executionWrapper = code
+   def clearExecutionWrapper() = _executionWrapper = ""
+-
++
+   /** Temporarily stop binding lastException */
+   def withoutBindingLastException[T](operation: => T): T = {
+     val wasBinding = bindLastException
+@@ -228,7 +234,7 @@ class IMain(val settings: Settings, protected val out: PrintWriter) extends Impo
+       operation
+     }
+   }
+-
++
+   protected def createLineManager(): Line.Manager = new Line.Manager
+   lazy val lineManager = createLineManager()
+
+@@ -242,7 +248,7 @@ class IMain(val settings: Settings, protected val out: PrintWriter) extends Impo
+     settings.exposeEmptyPackage.value = true
+     new Global(settings, reporter)
+   }
+-
++
+   /** the compiler's classpath, as URL's */
+   lazy val compilerClasspath: List[URL] = new PathResolver(settings) asURLs
+
+@@ -288,7 +294,7 @@ class IMain(val settings: Settings, protected val out: PrintWriter) extends Impo
+   }
+   private def loadByName(s: String): JClass =
+     (classLoader tryToInitializeClass s) getOrElse sys.error("Failed to load expected class: '" + s + "'")
+-
++
+   protected def parentClassLoader: ClassLoader =
+     settings.explicitParentLoader.getOrElse( this.getClass.getClassLoader() )
+
+@@ -328,7 +334,7 @@ class IMain(val settings: Settings, protected val out: PrintWriter) extends Impo
+     }
+     None
+   }
+-
++
+   /** Stubs for work in progress. */
+   def handleTypeRedefinition(name: TypeName, old: Request, req: Request) = {
+     for (t1 <- old.simpleNameOfType(name) ; t2 <- req.simpleNameOfType(name)) {
+@@ -396,7 +402,7 @@ class IMain(val settings: Settings, protected val out: PrintWriter) extends Impo
+       else                      Some(trees)
+     }
+   }
+-
++
+   def isParseable(line: String): Boolean = {
+     beSilentDuring {
+       parse(line) match {
+@@ -424,7 +430,7 @@ class IMain(val settings: Settings, protected val out: PrintWriter) extends Impo
+   /** Build a request from the user. `trees` is `line` after being parsed.
+    */
+   private def buildRequest(line: String, trees: List[Tree]): Request = new Request(line, trees)
+-
++
+   private def requestFromLine(line: String, synthetic: Boolean): Either[IR.Result, Request] = {
+     val trees = parse(indentCode(line)) match {
+       case None         => return Left(IR.Incomplete)
+@@ -440,7 +446,7 @@ class IMain(val settings: Settings, protected val out: PrintWriter) extends Impo
+     if (trees.size == 1) trees.head match {
+       case _:Assign                         => // we don't want to include assignments
+       case _:TermTree | _:Ident | _:Select  => // ... but do want these as valdefs.
+-        requestFromLine("val %s =\n%s".format(varName, line), synthetic) match {
++        requestFromLine("def %s =\n%s".format(varName, line), synthetic) match {
+           case Right(req) => return Right(req withOriginalLine line)
+           case x          => return x
+         }
+@@ -466,9 +472,80 @@ class IMain(val settings: Settings, protected val out: PrintWriter) extends Impo
+    *  @return     ...
+    */
+   def interpret(line: String): IR.Result = interpret(line, false)
+-  def interpret(line: String, synthetic: Boolean): IR.Result = {
+-    def loadAndRunReq(req: Request) = {
++  def interpret(line: String, synthetic: Boolean): IR.Result = compile(line, synthetic) match {
++    case Left(result) => result
++    case Right(req)   => new WrappedRequest(req).interpret(synthetic)
++  }
++
++  private def compile(line: String, synthetic: Boolean): Either[IR.Result, Request] = {
++    if (global == null) Left(IR.Error)
++    else requestFromLine(line, synthetic) match {
++      case Left(result) => Left(result)
++      case Right(req)   =>
++       // null indicates a disallowed statement type; otherwise compile and
++       // fail if false (implying e.g. a type error)
++       if (req == null || !req.compile) Left(IR.Error) else Right(req)
++    }
++  }
++
++  var code = ""
++  var bound = false
++  @throws(classOf[ScriptException])
++  def compile(script: String): CompiledScript = {
++    if (!bound) {
++      quietBind("bindings", getBindings(ScriptContext.ENGINE_SCOPE))
++      bound = true
++    }
++    val cat = code + script
++    compile(cat, false) match {
++      case Left(result) => result match {
++        case IR.Incomplete => {
++          code = cat + "\n"
++          new CompiledScript {
++            def eval(context: ScriptContext): Object = null
++            def getEngine: ScriptEngine = IMain.this
++          }
++        }
++        case _ => {
++          code = ""
++          throw new ScriptException("compile-time error")
++        }
++      }
++      case Right(req)   => {
++        code = ""
++        new WrappedRequest(req)
++      }
++    }
++  }
++
++  @throws(classOf[ScriptException])
++  def compile(reader: Reader): CompiledScript = {
++    val writer = new StringWriter()
++    var c = reader.read()
++    while(c != -1) {
++      writer.write(c)
++      c = reader.read()
++    }
++    reader.close()
++    compile(writer.toString())
++  }
++
++  private class WrappedRequest(val req: Request) extends CompiledScript {
++    @throws(classOf[ScriptException])
++    def eval(context: ScriptContext): Object = beQuietDuring {
++      interpret(false) match {
++       case IR.Success =>
++         try req.getEvalTyped[Object] orNull
++         catch { case e: Exception => throw new ScriptException(e) }
++       case _ => throw new ScriptException("run-time error")
++      }
++    }
++
++    def interpret(synthetic: Boolean): IR.Result = loadAndRunReq(synthetic)
++
++    def loadAndRunReq(synthetic: Boolean) = {
+       val (result, succeeded) = req.loadAndRun
++
+       /** To our displeasure, ConsoleReporter offers only printMessage,
+        *  which tacks a newline on the end.  Since that breaks all the
+        *  output checking, we have to take one off to balance.
+@@ -492,16 +569,8 @@ class IMain(val settings: Settings, protected val out: PrintWriter) extends Impo
+         IR.Error
+       }
+     }
+-
+-    if (global == null) IR.Error
+-    else requestFromLine(line, synthetic) match {
+-      case Left(result) => result
+-      case Right(req)   =>
+-        // null indicates a disallowed statement type; otherwise compile and
+-        // fail if false (implying e.g. a type error)
+-        if (req == null || !req.compile) IR.Error
+-        else loadAndRunReq(req)
+-    }
++
++    def getEngine: ScriptEngine = IMain.this
+   }
+
+   /** Bind a specified name to a specified value.  The name may
+@@ -559,7 +628,7 @@ class IMain(val settings: Settings, protected val out: PrintWriter) extends Impo
+   def close() {
+     reporter.flush()
+   }
+-
++
+   /** Here is where we:
+    *
+    *  1) Read some source code, and put it in the "read" object.
+@@ -626,7 +695,7 @@ class IMain(val settings: Settings, protected val out: PrintWriter) extends Impo
+     private var lastRun: Run = _
+     private def evalMethod(name: String) = {
+       val methods = evalClass.getMethods filter (_.getName == name)
+-      assert(methods.size == 1, "Internal error - eval object method " + name + " is overloaded: " + methods)
++      assert(methods.size <= 1, "Internal error - eval object method " + name + " is overloaded: " + Arrays.asList(methods))
+       methods.head
+     }
+     private def compileAndSaveRun(label: String, code: String) = {
+@@ -703,7 +772,7 @@ class IMain(val settings: Settings, protected val out: PrintWriter) extends Impo
+         else handlers.last.definesTerm match {
+           case Some(vname) if typeOf contains vname =>
+             """
+-            |lazy val $result = {
++            |def $result = {
+             |  $export
+             |  %s
+             |}""".stripMargin.format(fullPath(vname))
+@@ -847,6 +916,16 @@ class IMain(val settings: Settings, protected val out: PrintWriter) extends Impo
+     override def toString = "Request(line=%s, %s trees)".format(line, trees.size)
+   }
+
++  def createBindings: Bindings = new SimpleBindings
++
++  @throws(classOf[ScriptException])
++  def eval(script: String, context: ScriptContext): Object = compile(script).eval(context)
++
++  @throws(classOf[ScriptException])
++  def eval(reader: Reader, context: ScriptContext): Object = compile(reader).eval(context)
++
++  override def finalize = close
++
+   /** Returns the name of the most recent interpreter result.
+    *  Mostly this exists so you can conveniently invoke methods on
+    *  the previous result.
+@@ -904,7 +983,7 @@ class IMain(val settings: Settings, protected val out: PrintWriter) extends Impo
+       (nonAnon, tpe)
+     }
+   }
+-
++
+   def runtimeTypeOfTerm(id: String): Option[Type] = {
+     for {
+       tpe <- typeOfTerm(id)
+@@ -917,7 +996,7 @@ class IMain(val settings: Settings, protected val out: PrintWriter) extends Impo
+       runtimeSym.info
+     }
+   }
+-
++
+   // XXX literals.
+   // 1) Identifiers defined in the repl.
+   // 2) A path loadable via getModule.
+@@ -978,17 +1057,17 @@ class IMain(val settings: Settings, protected val out: PrintWriter) extends Impo
+
+   /** Another entry point for tab-completion, ids in scope */
+   def unqualifiedIds = visibleTermNames map (_.toString) filterNot (_ contains "$") sorted
+-
++
+   /** Parse the ScalaSig to find type aliases */
+   def aliasForType(path: String) = ByteCode.aliasForType(path)
+-
++
+   def withoutUnwrapping(op: => Unit): Unit = {
+     val saved = isettings.unwrapStrings
+     isettings.unwrapStrings = false
+     try op
+     finally isettings.unwrapStrings = saved
+   }
+-
++
+   def symbolDefString(sym: Symbol) = {
+     TypeStrings.quieter(
+       afterTyper(sym.defString),
+@@ -996,7 +1075,7 @@ class IMain(val settings: Settings, protected val out: PrintWriter) extends Impo
+       sym.owner.fullName + "."
+     )
+   }
+-
++
+   def showCodeIfDebugging(code: String) {
+     /** Secret bookcase entrance for repl debuggers: end the line
+      *  with "// show" and see what's going on.
+@@ -1019,6 +1098,48 @@ class IMain(val settings: Settings, protected val out: PrintWriter) extends Impo
+
+ /** Utility methods for the Interpreter. */
+ object IMain {
++  class Factory extends ScriptEngineFactory {
++    @BeanProperty
++    val engineName = "Scala Interpreter"
++
++    @BeanProperty
++    val engineVersion = "1.0"
++
++    @BeanProperty
++    val extensions: JList[String] = Arrays.asList("scala")
++
++    @BeanProperty
++    val languageName = "Scala"
++
++    @BeanProperty
++    val languageVersion = "2.8.0.final"
++
++    def getMethodCallSyntax(obj: String, m: String, args: String*): String = null
++
++    @BeanProperty
++    val mimeTypes: JList[String] = Arrays.asList("application/x-scala")
++
++    @BeanProperty
++    val names: JList[String] = Arrays.asList("scala")
++
++    def getOutputStatement(toDisplay: String): String = null
++
++    def getParameter(key: String): Object = key match {
++      case ScriptEngine.ENGINE => engineName
++      case ScriptEngine.ENGINE_VERSION => engineVersion
++      case ScriptEngine.LANGUAGE => languageName
++      case ScriptEngine.LANGUAGE_VERSION => languageVersion
++      case ScriptEngine.NAME => names.get(0)
++      case _ => null
++    }
++
++    def getProgram(statements: String*): String = null
++
++    def getScriptEngine: ScriptEngine = new IMain(this, new Settings() {
++       usemanifestcp.value = true
++      })
++  }
++
+   // The two name forms this is catching are the two sides of this assignment:
+   //
+   // $line3.$read.$iw.$iw.Bippy =
+@@ -1026,7 +1147,7 @@ object IMain {
+   private def removeLineWrapper(s: String) = s.replaceAll("""\$line\d+[./]\$(read|eval|print)[$.]""", "")
+   private def removeIWPackages(s: String)  = s.replaceAll("""\$(iw|read|eval|print)[$.]""", "")
+   def stripString(s: String)               = removeIWPackages(removeLineWrapper(s))
+-
++
+   trait CodeAssembler[T] {
+     def preamble: String
+     def generate: T => String
+@@ -1038,7 +1159,7 @@ object IMain {
+       code println postamble
+     }
+   }
+-
++
+   trait StrippingWriter {
+     def isStripping: Boolean
+     def stripImpl(str: String): String
+@@ -1048,7 +1169,7 @@ object IMain {
+     def maxStringLength: Int
+     def isTruncating: Boolean
+     def truncate(str: String): String = {
+-      if (isTruncating && str.length > maxStringLength)
++      if (isTruncating && maxStringLength > 0 && str.length > maxStringLength)
+         (str take maxStringLength - 3) + "..."
+       else str
+     }
+@@ -1058,7 +1179,7 @@ object IMain {
+              with StrippingWriter
+              with TruncatingWriter {
+     self =>
+-
++
+     def clean(str: String): String = truncate(strip(str))
+     override def write(str: String) = super.write(clean(str))
+   }
+diff --git a/src/scala/tools/nsc/interpreter/ISettings.scala b/src/scala/tools/nsc/interpreter/ISettings.scala
+index bd22b0a..38c4c29 100644
+--- a/src/scala/tools/nsc/interpreter/ISettings.scala
++++ b/src/scala/tools/nsc/interpreter/ISettings.scala
+@@ -24,7 +24,7 @@ class ISettings(intp: IMain) {
+    *  more than this number of characters, then the printout is
+    *  truncated.
+    */
+-  var maxPrintString = 800
++  var maxPrintString = 0
+
+   /** The maximum number of completion candidates to print for tab
+    *  completion without requiring confirmation.
+diff --git a/src/scala/tools/nsc/io/AbstractFile.scala b/src/scala/tools/nsc/io/AbstractFile.scala
+index b44d52a..c3a63f0 100644
+--- a/src/scala/tools/nsc/io/AbstractFile.scala
++++ b/src/scala/tools/nsc/io/AbstractFile.scala
+@@ -7,7 +7,7 @@
+ package scala.tools.nsc
+ package io
+
+-import java.io.{ FileOutputStream, IOException, InputStream, OutputStream, BufferedOutputStream }
++import java.io.{ FileOutputStream, IOException, InputStream, OutputStream, BufferedOutputStream, ByteArrayOutputStream }
+ import java.net.URL
+ import PartialFunction._
+
+@@ -40,10 +40,11 @@ object AbstractFile {
+    * @param file ...
+    * @return     ...
+    */
+-  def getDirectory(file: File): AbstractFile =
++  def getDirectory(file: File): AbstractFile = try {
+     if (file.isDirectory) new PlainFile(file)
+     else if (file.isFile && Path.isJarOrZip(file)) ZipArchive fromFile file
+     else null
++  } catch { case ex: SecurityException => null }
+
+   /**
+    * If the specified URL exists and is a readable zip or jar archive,
+@@ -57,6 +58,8 @@ object AbstractFile {
+     if (url == null || !Path.isJarOrZip(url.getPath)) null
+     else ZipArchive fromURL url
+   }
++
++  def getResources(url: URL): AbstractFile = ZipArchive fromManifestURL url
+ }
+
+ /**
+@@ -149,16 +152,28 @@ abstract class AbstractFile extends AnyRef with Iterable[AbstractFile] {
+   @throws(classOf[IOException])
+   def toByteArray: Array[Byte] = {
+     val in = input
+-    var rest = sizeOption.get
+-    val arr = new Array[Byte](rest)
+-    while (rest > 0) {
+-      val res = in.read(arr, arr.length - rest, rest)
+-      if (res == -1)
+-        throw new IOException("read error")
+-      rest -= res
++    sizeOption match {
++      case Some(size) =>
++        var rest = size
++        val arr = new Array[Byte](rest)
++        while (rest > 0) {
++          val res = in.read(arr, arr.length - rest, rest)
++          if (res == -1)
++            throw new IOException("read error")
++          rest -= res
++        }
++        in.close()
++        arr
++      case None =>
++        val out = new ByteArrayOutputStream()
++        var c = in.read()
++        while(c != -1) {
++          out.write(c)
++          c = in.read()
++        }
++        in.close()
++        out.toByteArray()
+     }
+-    in.close()
+-    arr
+   }
+
+   /** Returns all abstract subfiles of this abstract directory. */
+diff --git a/src/scala/tools/nsc/io/Path.scala b/src/scala/tools/nsc/io/Path.scala
+index adc7753..f1c3134 100644
+--- a/src/scala/tools/nsc/io/Path.scala
++++ b/src/scala/tools/nsc/io/Path.scala
+@@ -56,10 +56,11 @@ object Path {
+
+   def apply(segments: Seq[String]): Path = apply(segments mkString JFile.separator)
+   def apply(path: String): Path = apply(new JFile(path))
+-  def apply(jfile: JFile): Path =
++  def apply(jfile: JFile): Path = try {
+     if (jfile.isFile) new File(jfile)
+     else if (jfile.isDirectory) new Directory(jfile)
+     else new Path(jfile)
++  } catch { case ex: SecurityException => new Path(jfile) }
+
+   /** Avoiding any shell/path issues by only using alphanumerics. */
+   private[io] def randomPrefix = alphanumeric take 6 mkString
+@@ -182,11 +183,11 @@ class Path private[io] (val jfile: JFile) {
+   // Boolean tests
+   def canRead = jfile.canRead()
+   def canWrite = jfile.canWrite()
+-  def exists = jfile.exists()
++  def exists = try jfile.exists() catch { case ex: SecurityException => false }
+   def notExists = try !jfile.exists() catch { case ex: SecurityException => false }
+
+-  def isFile = jfile.isFile()
+-  def isDirectory = jfile.isDirectory()
++  def isFile = try jfile.isFile() catch { case ex: SecurityException => false }
++  def isDirectory = try jfile.isDirectory() catch { case ex: SecurityException => false }
+   def isAbsolute = jfile.isAbsolute()
+   def isHidden = jfile.isHidden()
+   def isSymlink = {
+diff --git a/src/scala/tools/nsc/io/ZipArchive.scala b/src/scala/tools/nsc/io/ZipArchive.scala
+index ead833d..4d896a1 100644
+--- a/src/scala/tools/nsc/io/ZipArchive.scala
++++ b/src/scala/tools/nsc/io/ZipArchive.scala
+@@ -9,11 +9,13 @@ package io
+
+ import java.net.URL
+ import java.util.Enumeration
+-import java.io.{ IOException, InputStream, BufferedInputStream, ByteArrayInputStream }
++import java.util.jar.Manifest
++import java.io.{ IOException, InputStream, BufferedInputStream, ByteArrayInputStream, FilterInputStream }
+ import java.util.zip.{ ZipEntry, ZipFile, ZipInputStream }
+ import PartialFunction._
+
+ import scala.collection.mutable.{ Map, HashMap }
++import scala.collection.JavaConversions.{asScalaIterator,enumerationAsScalaIterator}
+ import annotation.tailrec
+
+ /**
+@@ -45,6 +47,8 @@ object ZipArchive {
+    * Returns an abstract directory backed by the specified archive.
+    */
+   def fromURL(url: URL): AbstractFile = new URLZipArchive(url)
++
++  def fromManifestURL(url: URL): AbstractFile = new ManifestResources(url)
+
+   private[io] trait ZipTrav extends Traversable[ZipEntry] {
+     def zis: () => ZipInputStream
+@@ -74,6 +78,13 @@ object ZipArchive {
+       finally in.close()
+     }
+   }
++
++  private[io] class ManifestEntryTraversableClass(in: InputStream) extends Iterable[ZipEntry] with ZipTrav {
++    val zis = () => null    // not valid for this type
++
++    val manifest: Manifest = new Manifest(in)
++    def iterator = manifest.getEntries().keySet().iterator().map(new ZipEntry(_))
++  }
+ }
+ import ZipArchive.ZipTrav
+
+@@ -92,12 +103,12 @@ private[io] trait ZipContainer extends AbstractFile {
+   protected def DirEntryConstructor: (AbstractFile, String, String) => DirEntryInterface
+   protected def FileEntryConstructor: (SourceType, String, String, ZipEntry) => FileEntryInterface
+   protected def ZipTravConstructor: CreationType => ZipTrav
+-
++
+   protected[io] trait EntryInterface extends VirtualFile {
+     def name: String
+     def path: String
+   }
+-
++
+   protected[io] trait DirEntryInterface extends EntryInterface {
+     def source: SourceType
+     val entries: Map[String, EntryInterface] = new HashMap()
+@@ -114,14 +125,18 @@ private[io] trait ZipContainer extends AbstractFile {
+       entries.getOrElse(slashName, null)
+     }
+   }
+-
++
+   protected[io] trait FileEntryInterface extends EntryInterface {
+     def entry: ZipEntry
+
+     override def lastModified: Long = entry.getTime()
+-    override def sizeOption = Some(entry.getSize().toInt)
++
++    override def sizeOption = entry.getSize().toInt match {
++      case n if (n < 0) => None
++      case n => Some(n)
++    }
+   }
+-
++
+   class ZipRootCreator(f: ZipRootCreator => SourceType) {
+     val root = DirEntryConstructor(ZipContainer.this, "<root>", "/")
+
+@@ -129,7 +144,9 @@ private[io] trait ZipContainer extends AbstractFile {
+     val dirs = HashMap[String, DirEntryInterface]("/" -> root)
+     val traverser = ZipTravConstructor(creationSource)
+     private[this] var _parent: DirEntryInterface = _
++    private[this] var _path: String = _
+     def parent = _parent
++    def path = _path
+
+     def addEntry(entry: ZipEntry) {
+       val path = entry.getName
+@@ -140,6 +157,7 @@ private[io] trait ZipContainer extends AbstractFile {
+       else {
+         val (home, name) = splitPath(path)
+         _parent = getDir(dirs, home)
++        _path = path
+         _parent.entries(name) = FileEntryConstructor(f(this), name, path, entry)
+       }
+     }
+@@ -165,7 +183,7 @@ private[io] trait ZipContainer extends AbstractFile {
+    */
+   override def lookupName(name: String, directory: Boolean): AbstractFile =
+     root.lookupName(name, directory)
+-
++
+   /** Returns an abstract file with the given name. It does not
+    *  check that it exists.
+    */
+@@ -249,11 +267,7 @@ final class ZipArchive(file: File, val archive: ZipFile) extends PlainFile(file)
+
+   class ZipFileIterable(z: ZipFile) extends Iterable[ZipEntry] with ZipTrav {
+     def zis: () => ZipInputStream = null    // not valid for this type
+-    def iterator = new Iterator[ZipEntry] {
+-      val enum    = z.entries()
+-      def hasNext = enum.hasMoreElements
+-      def next    = enum.nextElement
+-    }
++    def iterator = enumerationAsScalaIterator(z.entries())
+   }
+ }
+
+@@ -315,3 +329,64 @@ final class URLZipArchive(url: URL) extends AbstractFile with ZipContainer {
+     new ByteArrayInputStream(bytes.toSeq.toArray)
+   }
+ }
++
++final class ManifestResources(url: URL) extends AbstractFile with ZipContainer
++{
++  type SourceType   = InputStream
++  type CreationType = InputStream
++
++  protected lazy val creationSource = input
++  protected lazy val root = new ZipRootCreator(x => resourceInputStream(x.path))()
++
++  protected def DirEntryConstructor   = (_, name, path) => new DirEntry(name, path)
++  protected def FileEntryConstructor  = new FileEntry(_, _, _, _)
++  protected def ZipTravConstructor    = new ZipArchive.ManifestEntryTraversableClass(_)
++
++  def name = path
++  def path: String = url.getPath() match { case s => s.substring(0, s.lastIndexOf('!')) }
++  def input: InputStream = url.openStream()
++  def absolute: AbstractFile = this
++  def lastModified: Long =
++    try url.openConnection().getLastModified()
++    catch { case _: IOException => 0 }
++
++  /** Methods we don't support but have to implement because of the design */
++  def file: JFile = null
++  def create: Unit = unsupported
++  def delete: Unit = unsupported
++  def output = unsupported
++  def container = unsupported
++
++  abstract class Entry(name: String, path: String) extends VirtualFile(name, path) {
++    final override def path = "%s(%s)".format(ManifestResources.this, super.path)
++    override def container = ManifestResources.this
++  }
++  final class DirEntry(name: String, path: String) extends Entry(name, path) with DirEntryInterface {
++    def source = input
++  }
++  final class FileEntry(
++    val in: InputStream,
++    name: String,
++    path: String,
++    val entry: ZipEntry
++  ) extends Entry(name, path) with FileEntryInterface
++  {
++    override def input = in
++  }
++
++  /** Private methods **/
++  private def resourceInputStream(path: String): InputStream = {
++    new FilterInputStream(null) {
++      override def read(): Int = {
++        if(in == null) in = classOf[ScalaObject].getResourceAsStream("/" + path);
++        if(in == null) throw new RuntimeException("/" + path + " not found")
++        super.read();
++      }
++
++      override def close(): Unit = {
++        super.close();
++        in = null;
++      }
++    }
++  }
++}
+diff --git a/src/scala/tools/nsc/settings/MutableSettings.scala b/src/scala/tools/nsc/settings/MutableSettings.scala
+index adeda37..883e47f 100644
+--- a/src/scala/tools/nsc/settings/MutableSettings.scala
++++ b/src/scala/tools/nsc/settings/MutableSettings.scala
+@@ -245,7 +245,8 @@ class MutableSettings(val errorFn: String => Unit) extends AbsSettings with Scal
+       else if (allowJar && dir == null && Path.isJarOrZip(name, false))
+         new PlainFile(Path(name))
+       else
+-        throw new FatalError(name + " does not exist or is not a directory")
++//      throw new FatalError(name + " does not exist or is not a directory")
++        dir
+     )
+
+     /** Set the single output directory. From now on, all files will
+diff --git a/src/scala/tools/nsc/settings/StandardScalaSettings.scala b/src/scala/tools/nsc/settings/StandardScalaSettings.scala
+index 0553021..34aeb00 100644
+--- a/src/scala/tools/nsc/settings/StandardScalaSettings.scala
++++ b/src/scala/tools/nsc/settings/StandardScalaSettings.scala
+@@ -43,6 +43,7 @@ trait StandardScalaSettings {
+   val unchecked =      BooleanSetting ("-unchecked", "Enable detailed unchecked (erasure) warnings.")
+   val uniqid =         BooleanSetting ("-uniqid", "Uniquely tag all identifiers in debugging output.")
+   val usejavacp =      BooleanSetting ("-usejavacp", "Utilize the java.class.path in classpath resolution.")
++  val usemanifestcp =  BooleanSetting ("-usemanifestcp", "Utilize the manifest in classpath resolution.")
+   val verbose =        BooleanSetting ("-verbose", "Output messages about what the compiler is doing.")
+   val version =        BooleanSetting ("-version", "Print product version and exit.")
+
+diff --git a/src/scala/tools/nsc/util/ClassPath.scala b/src/scala/tools/nsc/util/ClassPath.scala
+index 49db032..86e670b 100644
+--- a/src/scala/tools/nsc/util/ClassPath.scala
++++ b/src/scala/tools/nsc/util/ClassPath.scala
+@@ -13,6 +13,7 @@ import io.{ File, Directory, Path, Jar, AbstractFile, ClassAndJarInfo }
+ import scala.tools.util.StringOps.splitWhere
+ import Jar.isJarOrZip
+ import File.pathSeparator
++import scala.collection.JavaConversions.enumerationAsScalaIterator
+
+ /** <p>
+  *    This module provides star expansion of '-classpath' option arguments, behaves the same as
+@@ -106,7 +107,7 @@ object ClassPath {
+     val dir = Option(AbstractFile getDirectory extdir) getOrElse (return Nil)
+     dir filter (_.isClassContainer) map (dir.sfile.get / _.name path) toList
+   }
+-
++
+   /** A useful name filter. */
+   def isTraitImplementation(name: String) = name endsWith "$class.class"
+
+@@ -145,7 +146,7 @@ object ClassPath {
+     def classesAtAllURLS(path: String): List[ClassPath[T]] =
+       (path split " ").toList flatMap classesAtURL
+
+-    def classesAtURL(spec: String) =
++    def classesAtURL(spec: String) =
+       for (url <- specToURL(spec).toList ; location <- Option(AbstractFile getURL url)) yield
+         newClassPath(location)
+
+@@ -156,8 +157,13 @@ object ClassPath {
+     private def classesInPathImpl(path: String, expand: Boolean) =
+       for (file <- expandPath(path, expand) ; dir <- Option(AbstractFile getDirectory file)) yield
+         newClassPath(dir)
++
++    def classesInManifest(used: Boolean) =
++      if (used) for (url <- manifests) yield newClassPath(AbstractFile getResources url) else Nil
+   }
+-
++
++  def manifests = classOf[ScalaObject].getClassLoader().getResources("META-INF/MANIFEST.MF").toList
++
+   class JavaContext extends ClassPathContext[AbstractFile] {
+     def toBinaryName(rep: AbstractFile) = {
+       assert(rep.name endsWith ".class", rep.name)
+@@ -318,7 +324,10 @@ class SourcePath[T](dir: AbstractFile, val context: ClassPathContext[T]) extends
+ class DirectoryClassPath(val dir: AbstractFile, val context: ClassPathContext[AbstractFile]) extends ClassPath[AbstractFile] {
+   def name = dir.name
+   override def origin = dir.underlyingSource map (_.path)
+-  def asURLs = dir.sfile.toList map (_.toURL)
++  def asURLs = dir.sfile.toList map (_.toURL) match {
++    case Nil => (new URL(name))::Nil
++    case list => list
++  }
+   def asClasspathString = dir.path
+   val sourcepaths: List[AbstractFile] = Nil
+
+@@ -331,7 +340,7 @@ class DirectoryClassPath(val dir: AbstractFile, val context: ClassPathContext[Ab
+     if (f.isDirectory && validPackage(f.name)) List(new DirectoryClassPath(f, context))
+     else Nil
+   } toList
+-
++
+   override def toString() = "directory classpath: "+ dir
+ }
+
+diff --git a/src/scala/tools/util/PathResolver.scala b/src/scala/tools/util/PathResolver.scala
+index 140282f..d010677 100644
+--- a/src/scala/tools/util/PathResolver.scala
++++ b/src/scala/tools/util/PathResolver.scala
+@@ -42,17 +42,17 @@ object PathResolver {
+     /** Environment variables which java pays attention to so it
+      *  seems we do as well.
+      */
+-    def classPathEnv        =  envOrElse("CLASSPATH", "")
+-    def sourcePathEnv       =  envOrElse("SOURCEPATH", "")
++    def classPathEnv        = try envOrElse("CLASSPATH", "") catch { case ex: SecurityException => "" }
++    def sourcePathEnv       = try envOrElse("SOURCEPATH", "") catch { case ex: SecurityException => "" }
+
+-    def javaBootClassPath   = propOrElse("sun.boot.class.path", searchForBootClasspath)
+-    def javaExtDirs         = propOrEmpty("java.ext.dirs")
+-    def scalaHome           = propOrEmpty("scala.home")
+-    def scalaExtDirs        = propOrEmpty("scala.ext.dirs")
++    def javaBootClassPath   = try propOrElse("sun.boot.class.path", searchForBootClasspath) catch { case ex: SecurityException => "" }
++    def javaExtDirs         = try propOrEmpty("java.ext.dirs") catch { case ex: SecurityException => "" }
++    def scalaHome           = try propOrEmpty("scala.home") catch { case ex: SecurityException => "" }
++    def scalaExtDirs        = try propOrEmpty("scala.ext.dirs") catch { case ex: SecurityException => "" }
+
+     /** The java classpath and whether to use it. */
+     def javaUserClassPath   = propOrElse("java.class.path", "")
+-    def useJavaClassPath    = propOrFalse("scala.usejavacp")
++    def useJavaClassPath    = try propOrFalse("scala.usejavacp") catch { case ex: SecurityException => false }
+
+     override def toString = """
+       |object Environment {
+@@ -182,6 +182,7 @@ class PathResolver(settings: Settings, context: JavaContext) {
+   object Calculated {
+     def scalaHome           = Defaults.scalaHome
+     def useJavaClassPath    = settings.usejavacp.value || Defaults.useJavaClassPath
++    def useManifestClassPath: Boolean = settings.usemanifestcp.value
+     def javaBootClassPath   = cmdLineOrElse("javabootclasspath", Defaults.javaBootClassPath)
+     def javaExtDirs         = cmdLineOrElse("javaextdirs", Defaults.javaExtDirs)
+     def javaUserClassPath   = if (useJavaClassPath) Defaults.javaUserClassPath else ""
+@@ -200,6 +201,7 @@ class PathResolver(settings: Settings, context: JavaContext) {
+       classesInPath(scalaBootClassPath),            // 4. The Scala boot class path.
+       contentsOfDirsInPath(scalaExtDirs),           // 5. The Scala extension class path.
+       classesInExpandedPath(userClassPath),         // 6. The Scala application class path.
++      classesInManifest(useManifestClassPath),      // 8. The Manifest class path.
+       sourcesInPath(sourcePath)                     // 7. The Scala source path.
+     )

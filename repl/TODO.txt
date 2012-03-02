@@ -1,0 +1,4 @@
+Enumerate the use cases
+
+allow for git-repl
+sbt

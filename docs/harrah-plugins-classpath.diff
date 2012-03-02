@@ -1,0 +1,48 @@
+diff --git a/src/compiler/scala/tools/nsc/plugins/Plugin.scala b/src/compiler/scala/tools/nsc/plugins/Plugin.scala
+index 5281ffe..3533298 100644
+--- a/src/compiler/scala/tools/nsc/plugins/Plugin.scala
++++ b/src/compiler/scala/tools/nsc/plugins/Plugin.scala
+@@ -129,6 +129,7 @@ object Plugin {
+    */
+   def loadAllFrom(
+     jars: List[Path],
++    extraJars: List[Path],
+     dirs: List[Path],
+     ignoring: List[String]): List[AnyClass] =
+   {
+@@ -140,7 +141,7 @@ object Plugin {
+       if !(ignoring contains pdesc.name)
+     } yield entry)).distinct
+
+-    val loader = loaderFor(alljars)
++    val loader = loaderFor((extraJars ::: alljars).distinct)
+     alljars map (loadFrom(_, loader)) flatten
+   }
+
+diff --git a/src/compiler/scala/tools/nsc/plugins/Plugins.scala b/src/compiler/scala/tools/nsc/plugins/Plugins.scala
+index 89b76d1..58724ce 100644
+--- a/src/compiler/scala/tools/nsc/plugins/Plugins.scala
++++ b/src/compiler/scala/tools/nsc/plugins/Plugins.scala
+@@ -25,8 +25,9 @@ trait Plugins {
+    */
+   protected def loadRoughPluginsList(): List[Plugin] = {
+     val jars = settings.plugin.value map Path.apply
++    val extraJars = util.ClassPath.toPaths(settings.pluginscp.value)
+     val dirs = (settings.pluginsDir.value split File.pathSeparator).toList map Path.apply
+-    val classes = Plugin.loadAllFrom(jars, dirs, settings.disable.value)
++    val classes = Plugin.loadAllFrom(jars, extraJars, dirs, settings.disable.value)
+
+     // Lach plugin must only be instantiated once. A common pattern
+     // is to register annotation checkers during object construction, so
+diff --git a/src/compiler/scala/tools/nsc/settings/ScalaSettings.scala b/src/compiler/scala/tools/nsc/settings/ScalaSettings.scala
+index 5ca4e76..1352624 100644
+--- a/src/compiler/scala/tools/nsc/settings/ScalaSettings.scala
++++ b/src/compiler/scala/tools/nsc/settings/ScalaSettings.scala
+@@ -66,6 +66,7 @@ trait ScalaSettings extends AbsScalaSettings with StandardScalaSettings {
+   val showPlugins   = BooleanSetting    ("-Xplugin-list", "Print a synopsis of loaded plugins.")
+   val require       = MultiStringSetting("-Xplugin-require", "plugin", "Abort unless the given plugin(s) are available.")
+   val pluginsDir    = StringSetting     ("-Xpluginsdir", "path", "Path to search compiler plugins.", Defaults.scalaPluginPath)
++  val pluginscp     = PathSetting       ("-Xpluginscp", "Extra classpath entries for compiler plugins.", "")
+   val Xprint        = PhasesSetting     ("-Xprint", "Print out program after")
+   val writeICode    = BooleanSetting    ("-Xprint-icode", "Log internal icode to *.icode files.")
+   val Xprintpos     = BooleanSetting    ("-Xprint-pos", "Print tree positions, as offsets.")
