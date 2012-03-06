@@ -53,23 +53,23 @@ abstract class CPSAnnotationChecker extends CPSUtils {
       if ((annots1 corresponds annots2)(_.atp <:< _.atp))
         return true
 
-      // Need to handle uninstantiated type vars specially: 
-      
+      // Need to handle uninstantiated type vars specially:
+
       // g map (x => x)  with expected type List[Int] @cps
       // results in comparison ?That <:< List[Int] @cps
-      
+
       // Instantiating ?That to an annotated type would fail during
       // transformation.
-      
+
       // Instead we force-compare tpe1 <:< tpe2.withoutAnnotations
       // to trigger instantiation of the TypeVar to the base type
-      
+
       // This is a bit unorthodox (we're only supposed to look at
       // annotations here) but seems to work.
-      
+
       if (!annots2.isEmpty && !tpe1.isGround)
         return tpe1 <:< tpe2.withoutAnnotations
-      
+
       false
     }
 
@@ -336,29 +336,31 @@ abstract class CPSAnnotationChecker extends CPSUtils {
     def single(xs: List[AnnotationInfo]) = xs match {
       case List(x) => x
       case _ =>
-        global.globalError("not a single cps annotation: " + xs)// FIXME: error message
+        global.globalError("not a single cps annotation: " + xs)
         xs(0)
     }
+    
+    def emptyOrSingleList(xs: List[AnnotationInfo]) = if (xs.isEmpty) Nil else List(single(xs))
 
     def transChildrenInOrder(tree: Tree, tpe: Type, childTrees: List[Tree], byName: List[Tree]) = {
       def inspect(t: Tree): List[AnnotationInfo] = {
         if (t.tpe eq null) Nil else {
           val extra: List[AnnotationInfo] = t.tpe match {
             case _: MethodType | _: PolyType | _: OverloadedType =>
-            // method types, poly types and overloaded types do not obtain cps annotions by propagat
-            // need to reconstruct transitively from their children.
-            t match {
-              case Select(qual, name) => inspect(qual)
-              case Apply(fun, args) => (fun::args) flatMap inspect
-              case TypeApply(fun, args) => (fun::args) flatMap inspect
-              case _ => Nil
-            }
+              // method types, poly types and overloaded types do not obtain cps annotions by propagation
+              // need to reconstruct transitively from their children.
+              t match {
+                case Select(qual, name) => inspect(qual)
+                case Apply(fun, args) => (fun::(transArgList(fun,args).flatten)) flatMap inspect
+                case TypeApply(fun, args) => (fun::(transArgList(fun,args).flatten)) flatMap inspect
+                case _ => Nil
+              }
             case _ => Nil
           }
-      
+
           val types = cpsParamAnnotation(t.tpe)
           // TODO: check that it has been adapted and if so correctly
-          extra ++ (if (types.isEmpty) Nil else List(single(types)))
+          extra ++ emptyOrSingleList(types)
         }
       }
       val children = childTrees flatMap inspect

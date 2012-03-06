@@ -121,7 +121,7 @@ trait Trees extends api.Trees { self: SymbolTable =>
         new ChangeOwnerTraverser(oldOwner, newOwner) apply t
       }
     }
-    
+
     def substTreeSyms(pairs: (Symbol, Symbol)*): Tree = {
       val list  = pairs.toList
       val subst = new TreeSymSubstituter(list map (_._1), list map (_._2))
@@ -230,16 +230,17 @@ trait Trees extends api.Trees { self: SymbolTable =>
   def Bind(sym: Symbol, body: Tree): Bind =
     Bind(sym.name, body) setSymbol sym
 
-  /** 0-1 argument list new, based on a symbol or type.
-   */
-  def New(sym: Symbol, args: Tree*): Tree =
-    New(sym.tpe, args: _*)
+  def Try(body: Tree, cases: (Tree, Tree)*): Try =
+    Try(body, cases.toList map { case (pat, rhs) => CaseDef(pat, EmptyTree, rhs) }, EmptyTree)
 
-  def New(tpe: Type, args: Tree*): Tree =
-    New(TypeTree(tpe), List(args.toList))
+  def Throw(tpe: Type, args: Tree*): Throw =
+    Throw(New(tpe, args: _*))
 
   def Apply(sym: Symbol, args: Tree*): Tree =
     Apply(Ident(sym), args.toList)
+
+  def New(sym: Symbol, args: Tree*): Tree =
+    New(sym.tpe, args: _*)
 
   def Super(sym: Symbol, mix: TypeName): Tree = Super(This(sym), mix)
 

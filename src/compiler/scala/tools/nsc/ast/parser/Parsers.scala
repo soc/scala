@@ -38,7 +38,7 @@ trait ParsersCommon extends ScannersCommon {
     def freshTypeName(prefix: String): TypeName
     def deprecationWarning(off: Int, msg: String): Unit
     def accept(token: Int): Int
-  
+
     /** Methods inParensOrError and similar take a second argument which, should
      *  the next token not be the expected opener (e.g. LPAREN) will be returned
      *  instead of the contents of the groupers.  However in all cases accept(LPAREN)
@@ -658,7 +658,8 @@ self =>
             DocDef(doc, t) setPos {
               if (t.pos.isDefined) {
                 val pos = doc.pos.withEnd(t.pos.endOrPoint)
-                if (t.pos.isOpaqueRange) pos else pos.makeTransparent
+                // always make the position transparent
+                pos.makeTransparent
               } else {
                 t.pos
               }
@@ -1141,7 +1142,7 @@ self =>
     private def interpolatedString(): Tree = atPos(in.offset) {
       val start = in.offset
       val interpolator = in.name
-      
+
       val partsBuf = new ListBuffer[Tree]
       val exprBuf = new ListBuffer[Tree]
       in.nextToken()
@@ -1153,7 +1154,7 @@ self =>
         }
       }
       if (in.token == STRINGLIT) partsBuf += literal()
-      
+
       val t1 = atPos(o2p(start)) { Ident(nme.StringContext) }
       val t2 = atPos(start) { Apply(t1, partsBuf.toList) }
       t2 setPos t2.pos.makeTransparent
@@ -1423,15 +1424,14 @@ self =>
     def implicitClosure(start: Int, location: Int): Tree = {
       val param0 = convertToParam {
         atPos(in.offset) {
-          var paramexpr: Tree = Ident(ident())
-          if (in.token == COLON) {
-            in.nextToken()
-            paramexpr = Typed(paramexpr, typeOrInfixType(location))
+          Ident(ident()) match {
+            case expr if in.token == COLON  =>
+              in.nextToken() ; Typed(expr, typeOrInfixType(location))
+            case expr => expr
           }
-          paramexpr
         }
       }
-      val param = treeCopy.ValDef(param0, param0.mods | Flags.IMPLICIT, param0.name, param0.tpt, param0.rhs)
+      val param = copyValDef(param0)(mods = param0.mods | Flags.IMPLICIT)
       atPos(start, in.offset) {
         accept(ARROW)
         Function(List(param), if (location != InBlock) expr() else block())
@@ -2689,8 +2689,8 @@ self =>
         val (self, body) = templateBody(true)
         if (in.token == WITH && self.isEmpty) {
           val earlyDefs: List[Tree] = body flatMap {
-            case vdef @ ValDef(mods, name, tpt, rhs) if !mods.isDeferred =>
-              List(treeCopy.ValDef(vdef, mods | Flags.PRESUPER, name, tpt, rhs))
+            case vdef @ ValDef(mods, _, _, _) if !mods.isDeferred =>
+              List(copyValDef(vdef)(mods = mods | Flags.PRESUPER))
             case tdef @ TypeDef(mods, name, tparams, rhs) =>
               List(treeCopy.TypeDef(tdef, mods | Flags.PRESUPER, name, tparams, rhs))
             case stat if !stat.isEmpty =>

@@ -126,7 +126,7 @@ abstract class Constructors extends Transform with ast.TreeDSL {
 
         if (from.name != nme.OUTER) result
         else localTyper.typedPos(to.pos) {
-          IF (from OBJ_EQ NULL) THEN THROW(NullPointerExceptionClass) ELSE result
+          IF (from OBJ_EQ NULL) THEN Throw(NullPointerExceptionClass.tpe) ELSE result
         }
       }
 
@@ -226,11 +226,11 @@ abstract class Constructors extends Transform with ast.TreeDSL {
           tree match {
             case DefDef(_, _, _, _, _, body)
             if (tree.symbol.isOuterAccessor && tree.symbol.owner == clazz && clazz.isEffectivelyFinal) =>
-              log("outerAccessors += " + tree.symbol.fullName)
+              debuglog("outerAccessors += " + tree.symbol.fullName)
               outerAccessors ::= ((tree.symbol, body))
             case Select(_, _) =>
               if (!mustbeKept(tree.symbol)) {
-                log("accessedSyms += " + tree.symbol.fullName)
+                debuglog("accessedSyms += " + tree.symbol.fullName)
                 accessedSyms addEntry tree.symbol
               }
               super.traverse(tree)
@@ -515,7 +515,7 @@ abstract class Constructors extends Transform with ast.TreeDSL {
         }
 
       def delayedInitCall(closure: Tree) = localTyper.typedPos(impl.pos) {
-        gen.mkMethodCall(This(clazz), delayedInitMethod, Nil, List(New(closure.symbol, This(clazz))))
+        gen.mkMethodCall(This(clazz), delayedInitMethod, Nil, List(New(closure.symbol.tpe, This(clazz))))
       }
 
       /** Return a pair consisting of (all statements up to and including superclass and trait constr calls, rest) */
@@ -565,8 +565,8 @@ abstract class Constructors extends Transform with ast.TreeDSL {
 
     override def transform(tree: Tree): Tree =
       tree match {
-        case ClassDef(mods, name, tparams, impl) if !tree.symbol.isInterface && !isValueClass(tree.symbol) =>
-          treeCopy.ClassDef(tree, mods, name, tparams, transformClassTemplate(impl))
+        case ClassDef(_,_,_,_) if !tree.symbol.isInterface && !isValueClass(tree.symbol) =>
+          deriveClassDef(tree)(transformClassTemplate)
         case _ =>
           super.transform(tree)
       }

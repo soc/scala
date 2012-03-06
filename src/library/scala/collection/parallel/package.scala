@@ -46,8 +46,16 @@ package object parallel {
       else new ThreadPoolTaskSupport
     } else new ThreadPoolTaskSupport
 
-  val tasksupport = getTaskSupport
-
+  val defaultTaskSupport: TaskSupport = getTaskSupport
+  
+  def setTaskSupport[Coll](c: Coll, t: TaskSupport): Coll = {
+    c match {
+      case pc: ParIterableLike[_, _, _] => pc.tasksupport = t
+      case _ => // do nothing
+    }
+    c
+  }
+  
   /* implicit conversions */
 
   implicit def factory2ops[From, Elem, To](bf: CanBuildFrom[From, Elem, To]) = new FactoryOps[From, Elem, To] {
@@ -114,7 +122,7 @@ package parallel {
   }
 
   /* classes */
-  
+
   trait CombinerFactory[U, Repr] {
     /** Provides a combiner used to construct a collection. */
     def apply(): Combiner[U, Repr]
@@ -126,7 +134,7 @@ package parallel {
      */
     def doesShareCombiners: Boolean
   }
-  
+
   /** Composite throwable - thrown when multiple exceptions are thrown at the same time. */
   final case class CompositeThrowable(
     val throwables: Set[Throwable]
@@ -201,18 +209,18 @@ package parallel {
   //self: EnvironmentPassingCombiner[Elem, To] =>
     protected var buckets: Array[UnrolledBuffer[Buck]] @uncheckedVariance = new Array[UnrolledBuffer[Buck]](bucketnumber)
     protected var sz: Int = 0
-    
+
     def size = sz
-    
+
     def clear() = {
       buckets = new Array[UnrolledBuffer[Buck]](bucketnumber)
       sz = 0
     }
-    
+
     def beforeCombine[N <: Elem, NewTo >: To](other: Combiner[N, NewTo]) {}
-    
+
     def afterCombine[N <: Elem, NewTo >: To](other: Combiner[N, NewTo]) {}
-    
+
     def combine[N <: Elem, NewTo >: To](other: Combiner[N, NewTo]): Combiner[N, NewTo] = {
       if (this eq other) this
       else other match {
