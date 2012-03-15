@@ -43,8 +43,7 @@ trait Contexts { self: Analyzer =>
    *  - if option `-Yno-imports` is given, nothing is imported
    *  - if the unit is java defined, only `java.lang` is imported
    *  - if option `-Yno-predef` is given, if the unit body has an import of Predef
-   *    among its leading imports, or if the tree is [[scala.ScalaObject]]
-   *    or [[scala.Predef]], `Predef` is not imported.
+   *    among its leading imports, or if the tree is [[scala.Predef]], `Predef` is not imported.
    */
   protected def rootImports(unit: CompilationUnit): List[Symbol] = {
     import definitions._
@@ -312,13 +311,14 @@ trait Contexts { self: Analyzer =>
       unit.error(pos, if (checking) "\n**** ERROR DURING INTERNAL CHECKING ****\n" + msg else msg)
 
     def issue(err: AbsTypeError) {
-      if (settings.debug.value) println("issue error: " + err.errMsg)
+      debugwarn("issue error: " + err.errMsg)
       if (reportErrors) unitError(err.errPos, addDiagString(err.errMsg))
       else if (bufferErrors) { buffer += err }
       else throw new TypeError(err.errPos, err.errMsg)
     }
 
     def issueAmbiguousError(pre: Type, sym1: Symbol, sym2: Symbol, err: AbsTypeError) {
+      debugwarn("issue ambiguous error: " + err.errMsg)
       if (ambiguousErrors) {
         if (!pre.isErroneous && !sym1.isErroneous && !sym2.isErroneous)
           unitError(err.errPos, err.errMsg)
@@ -327,6 +327,7 @@ trait Contexts { self: Analyzer =>
     }
 
     def issueAmbiguousError(err: AbsTypeError) {
+      debugwarn("issue ambiguous error: " + err.errMsg)
       if (ambiguousErrors)
         unitError(err.errPos, addDiagString(err.errMsg))
       else if (bufferErrors) { buffer += err }

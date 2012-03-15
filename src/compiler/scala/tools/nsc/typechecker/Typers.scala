@@ -604,6 +604,7 @@ trait Typers extends Modes with Adaptations with PatMatVirtualiser {
      *  1. Check that non-function pattern expressions are stable
      *  2. Check that packages and static modules are not used as values
      *  3. Turn tree type into stable type if possible and required by context.
+     *  4. Give getClass calls a more precise type based on the type of the target of the call.
      */
     private def stabilize(tree: Tree, pre: Type, mode: Int, pt: Type): Tree = {
       if (tree.symbol.isOverloaded && !inFunMode(mode))
@@ -627,7 +628,18 @@ trait Typers extends Modes with Adaptations with PatMatVirtualiser {
         if (sym.isStable && pre.isStable && !isByNameParamType(tree.tpe) &&
             (isStableContext(tree, mode, pt) || sym.isModule && !sym.isMethod))
           tree.setType(singleType(pre, sym))
-        else tree
+        // To fully benefit from special casing the return type of
+        // getClass, we have to catch it immediately so expressions
+        // like x.getClass().newInstance() are typed with the type of x.
+        else if (  tree.symbol.name == nme.getClass_
+                && tree.tpe.params.isEmpty
+                // TODO: If the type of the qualifier is inaccessible, we can cause private types
+                // to escape scope here, e.g. pos/t1107.  I'm not sure how to properly handle this
+                // so for now it requires the type symbol be public.
+                && pre.typeSymbol.isPublic)
+          tree setType MethodType(Nil, getClassReturnType(pre))
+        else
+          tree
       }
     }
 
@@ -852,6 +864,33 @@ trait Typers extends Modes with Adaptations with PatMatVirtualiser {
         }
       }
 
+      /**
+       * To deal with the type slack between actual (run-time) types and statically known types, for each abstract type T,
+       * reflect its variance as a skolem that is upper-bounded by T (covariant position), or lower-bounded by T (contravariant).
+       *
+       * Consider the following example:
+       *
+       *  class AbsWrapperCov[+A]
+       *  case class Wrapper[B](x: Wrapped[B]) extends AbsWrapperCov[B]
+       *
+       *  def unwrap[T](x: AbsWrapperCov[T]): Wrapped[T] = x match {
+       *    case Wrapper(wrapped) => // Wrapper's type parameter must not be assumed to be equal to T, it's *upper-bounded* by it
+       *      wrapped // : Wrapped[_ <: T]
+       *  }
+       *
+       * this method should type check if and only if Wrapped is covariant in its type parameter
+       *
+       * when inferring Wrapper's type parameter B from x's type AbsWrapperCov[T],
+       * we must take into account that x's actual type is AbsWrapperCov[Tactual] forSome {type Tactual <: T}
+       * as AbsWrapperCov is covariant in A -- in other words, we must not assume we know T exactly, all we know is its upper bound
+       *
+       * since method application is the only way to generate this slack between run-time and compile-time types (TODO: right!?),
+       * we can simply replace skolems that represent method type parameters as seen from the method's body
+       * by other skolems that are (upper/lower)-bounded by that type-parameter skolem
+       * (depending on the variance position of the skolem in the statically assumed type of the scrutinee, pt)
+       *
+       * see test/files/../t5189*.scala
+       */
       def adaptConstrPattern(): Tree = { // (5)
         val extractor = tree.symbol.filter(sym => reallyExists(unapplyMember(sym.tpe)))
         if (extractor != NoSymbol) {
@@ -865,7 +904,32 @@ trait Typers extends Modes with Adaptations with PatMatVirtualiser {
             val tree1 = TypeTree(clazz.primaryConstructor.tpe.asSeenFrom(prefix, clazz.owner))
               .setOriginal(tree)
 
-            inferConstructorInstance(tree1, clazz.typeParams, pt)
+            val skolems = new mutable.ListBuffer[TypeSymbol]
+            object variantToSkolem extends VariantTypeMap {
+              def apply(tp: Type) = mapOver(tp) match {
+                case TypeRef(NoPrefix, tpSym, Nil) if variance != 0 && tpSym.isTypeParameterOrSkolem && tpSym.owner.isTerm =>
+                  val bounds = if (variance == 1) TypeBounds.upper(tpSym.tpe) else TypeBounds.lower(tpSym.tpe)
+                  val skolem = context.owner.newExistentialSkolem(tpSym, tpSym, unit.freshTypeName("?"+tpSym.name), bounds)
+                  // println("mapping "+ tpSym +" to "+ skolem + " : "+ bounds +" -- pt= "+ pt)
+                  skolems += skolem
+                  skolem.tpe
+                case tp1 => tp1
+              }
+            }
+
+            // have to open up the existential and put the skolems in scope
+            // can't simply package up pt in an ExistentialType, because that takes us back to square one (List[_ <: T] == List[T] due to covariance)
+            val ptSafe   = variantToSkolem(pt) // TODO: pt.skolemizeExistential(context.owner, tree) ?
+            val freeVars = skolems.toList
+
+            // use "tree" for the context, not context.tree: don't make another CaseDef context,
+            // as instantiateTypeVar's bounds would end up there
+            val ctorContext = context.makeNewScope(tree, context.owner)
+            freeVars foreach ctorContext.scope.enter
+            newTyper(ctorContext).infer.inferConstructorInstance(tree1, clazz.typeParams, ptSafe)
+
+            // tree1's type-slack skolems will be deskolemized (to the method type parameter skolems)
+            // once the containing CaseDef has been type checked (see typedCase)
             tree1
           } else {
             tree
@@ -1202,8 +1266,36 @@ trait Typers extends Modes with Adaptations with PatMatVirtualiser {
       }
     }
 
+    private def validateDerivedValueClass(clazz: Symbol, body: List[Tree]) = {
+      if (clazz.isTrait)
+        unit.error(clazz.pos, "only classes (not traits) are allowed to extend AnyVal")
+      if (!clazz.isStatic)
+        unit.error(clazz.pos, "value class may not be a "+
+          (if (clazz.owner.isTerm) "local class" else "member of another class"))
+      val constr = clazz.primaryConstructor
+      if ((constr hasFlag (PRIVATE | PROTECTED)) || constr.privateWithin != NoSymbol)
+        unit.error(constr.pos, "value class must have public primary constructor")
+      clazz.info.decls.toList.filter(acc => acc.isMethod && (acc hasFlag PARAMACCESSOR)) match {
+        case List(acc) =>
+          def isUnderlyingAcc(sym: Symbol) =
+            sym == acc || acc.hasAccessorFlag && sym == acc.accessed
+          if (acc.accessBoundary(clazz) != RootClass)
+            unit.error(acc.pos, "value class needs to have a publicly accessible val parameter")
+          for (stat <- body)
+            if (!treeInfo.isAllowedInUniversalTrait(stat) && !isUnderlyingAcc(stat.symbol))
+              unit.error(stat.pos,
+                if (stat.symbol hasFlag PARAMACCESSOR) "illegal parameter for value class"
+                else "this statement is not allowed in value class: "+stat)
+        case x =>
+          unit.error(clazz.pos, "value class needs to have exactly one public val parameter")
+      }
+      for (tparam <- clazz.typeParams)
+        if (tparam hasAnnotation definitions.SpecializedClass)
+          unit.error(tparam.pos, "type parameter of value class may not be specialized")
+    }
+
     def parentTypes(templ: Template): List[Tree] =
-      if (templ.parents.isEmpty) List()
+      if (templ.parents.isEmpty) List(TypeTree(AnyRefClass.tpe))
       else try {
         val clazz = context.owner
         // Normalize supertype and mixins so that supertype is always a class, not a trait.
@@ -1215,9 +1307,11 @@ trait Typers extends Modes with Adaptations with PatMatVirtualiser {
           val supertpt1 = typedType(supertpt)
           if (!supertpt1.isErrorTyped) {
             mixins = supertpt1 :: mixins
-            supertpt = TypeTree(supertpt1.tpe.parents.head) setPos supertpt.pos.focus
+            supertpt = TypeTree(supertpt1.tpe.firstParent) setPos supertpt.pos.focus
           }
         }
+        if (supertpt.tpe.typeSymbol == AnyClass && firstParent.isTrait)
+          supertpt.tpe = AnyRefClass.tpe
 
         // Determine
         //  - supertparams: Missing type parameters from supertype
@@ -1307,12 +1401,15 @@ trait Typers extends Modes with Adaptations with PatMatVirtualiser {
               else xs
             )
         }
+
         fixDuplicates(supertpt :: mixins) mapConserve (tpt => checkNoEscaping.privates(clazz, tpt))
       }
       catch {
         case ex: TypeError =>
           // fallback in case of cyclic errors
           // @H none of the tests enter here but I couldn't rule it out
+          log("Type error calculating parents in template " + templ)
+          log("Error: " + ex)
           ParentTypesError(templ, ex)
           List(TypeTree(AnyRefClass.tpe))
       }
@@ -1349,13 +1446,12 @@ trait Typers extends Modes with Adaptations with PatMatVirtualiser {
           if (psym.isFinal)
             pending += ParentFinalInheritanceError(parent, psym)
 
-          if (psym.isSealed && !phase.erasedTypes) {
-            // AnyVal is sealed, but we have to let the value classes through manually
-            if (context.unit.source.file == psym.sourceFile || isValueClass(context.owner))
+          if (psym.isSealed && !phase.erasedTypes)
+            if (context.unit.source.file == psym.sourceFile)
               psym addChild context.owner
             else
               pending += ParentSealedInheritanceError(parent, psym)
-          }
+
           if (!(selfType <:< parent.tpe.typeOfThis) &&
               !phase.erasedTypes &&
               !context.owner.isSynthetic &&   // don't check synthetic concrete classes for virtuals (part of DEVIRTUALIZE)
@@ -1421,6 +1517,10 @@ trait Typers extends Modes with Adaptations with PatMatVirtualiser {
         _.typedTemplate(cdef.impl, parentTypes(cdef.impl))
       }
       val impl2 = finishMethodSynthesis(impl1, clazz, context)
+      if (clazz.isTrait && clazz.info.parents.nonEmpty && clazz.info.firstParent.normalize.typeSymbol == AnyClass)
+        for (stat <- impl2.body)
+          if (!treeInfo.isAllowedInUniversalTrait(stat))
+            unit.error(stat.pos, "this statement is not allowed in universal trait extending from class Any: "+stat)
       if ((clazz != ClassfileAnnotationClass) &&
           (clazz isNonBottomSubClass ClassfileAnnotationClass))
         restrictionWarning(cdef.pos, unit,
@@ -1537,6 +1637,7 @@ trait Typers extends Modes with Adaptations with PatMatVirtualiser {
 
       if ((clazz isSubClass ClassfileAnnotationClass) && !clazz.owner.isPackageClass)
         unit.error(clazz.pos, "inner classes cannot be classfile annotations")
+
       if (!phase.erasedTypes && !clazz.info.resultType.isError) // @S: prevent crash for duplicated type members
         checkFinitary(clazz.info.resultType.asInstanceOf[ClassInfoType])
 
@@ -1545,6 +1646,10 @@ trait Typers extends Modes with Adaptations with PatMatVirtualiser {
         else templ.body flatMap rewrappingWrapperTrees(namer.finishGetterSetter(Typer.this, _))
 
       val body1 = typedStats(body, templ.symbol)
+
+      if (clazz.isDerivedValueClass)
+        validateDerivedValueClass(clazz, body1)
+
       treeCopy.Template(templ, parents1, self1, body1) setType clazz.tpe
     }
 
@@ -1797,8 +1902,11 @@ trait Typers extends Modes with Adaptations with PatMatVirtualiser {
           transformedOrTyped(ddef.rhs, EXPRmode, tpt1.tpe)
         }
 
-      if (meth.isPrimaryConstructor && meth.isClassConstructor && !isPastTyper && !reporter.hasErrors)
+      if (meth.isPrimaryConstructor && meth.isClassConstructor && !isPastTyper && !reporter.hasErrors && !meth.owner.isSubClass(AnyValClass)) {
+        // At this point in AnyVal there is no supercall, which will blow up
+        // in computeParamAliases; there's nothing to be computed for Anyval anyway.
         computeParamAliases(meth.owner, vparamss1, rhs1)
+      }
       if (tpt1.tpe.typeSymbol != NothingClass && !context.returnsSeen && rhs1.tpe.typeSymbol != NothingClass)
         rhs1 = checkDead(rhs1)
 
@@ -1986,15 +2094,35 @@ trait Typers extends Modes with Adaptations with PatMatVirtualiser {
       val guard1: Tree = if (cdef.guard == EmptyTree) EmptyTree
                          else typed(cdef.guard, BooleanClass.tpe)
       var body1: Tree = typed(cdef.body, pt)
-      if (!context.savedTypeBounds.isEmpty) {
-        body1.tpe = context.restoreTypeBounds(body1.tpe)
-        if (isFullyDefined(pt) && !(body1.tpe <:< pt)) {
-          // @M no need for pt.normalize here, is done in erasure
+
+      val contextWithTypeBounds = context.nextEnclosing(_.tree.isInstanceOf[CaseDef])
+      if (contextWithTypeBounds.savedTypeBounds nonEmpty) {
+        body1.tpe = contextWithTypeBounds restoreTypeBounds body1.tpe
+
+        // insert a cast if something typechecked under the GADT constraints,
+        // but not in real life (i.e., now that's we've reset the method's type skolems'
+        //   infos back to their pre-GADT-constraint state)
+        if (isFullyDefined(pt) && !(body1.tpe <:< pt))
           body1 = typedPos(body1.pos)(gen.mkCast(body1, pt))
+
+      }
+
+//    body1 = checkNoEscaping.locals(context.scope, pt, body1)
+      val treeWithSkolems = treeCopy.CaseDef(cdef, pat1, guard1, body1) setType body1.tpe
+
+      // undo adaptConstrPattern's evil deeds, as they confuse the old pattern matcher
+      // TODO: Paul, can we do the deskolemization lazily in the old pattern matcher
+      object deskolemizeOnce extends TypeMap {
+        def apply(tp: Type): Type = mapOver(tp) match {
+          case TypeRef(pre, sym, args) if sym.isExistentialSkolem && sym.deSkolemize.isSkolem && sym.deSkolemize.owner.isTerm =>
+            typeRef(NoPrefix, sym.deSkolemize, args)
+          case tp1 => tp1
         }
       }
-//    body1 = checkNoEscaping.locals(context.scope, pt, body1)
-      treeCopy.CaseDef(cdef, pat1, guard1, body1) setType body1.tpe
+
+      new TypeMapTreeSubstituter(deskolemizeOnce).traverse(treeWithSkolems)
+
+      treeWithSkolems // now without skolems, actually
     }
 
     def typedCases(cases: List[CaseDef], pattp: Type, pt: Type): List[CaseDef] =
@@ -2531,8 +2659,11 @@ trait Typers extends Modes with Adaptations with PatMatVirtualiser {
               /** This is translating uses of List() into Nil.  This is less
                *  than ideal from a consistency standpoint, but it shouldn't be
                *  altered without due caution.
+               *  ... this also causes bootstrapping cycles if List_apply is
+               *  forced during kind-arity checking, so it is guarded by additional
+               *  tests to ensure we're sufficiently far along.
                */
-              if (fun.symbol == List_apply && args.isEmpty && !forInteractive)
+              if (args.isEmpty && !forInteractive && fun.symbol.isInitialized && ListModule.hasCompleteInfo && (fun.symbol == List_apply))
                 atPos(tree.pos)(gen.mkNil setType restpe)
               else
                 constfold(treeCopy.Apply(tree, fun, args1) setType ifPatternSkipFormals(restpe))
@@ -3070,7 +3201,7 @@ trait Typers extends Modes with Adaptations with PatMatVirtualiser {
           // as we don't know which alternative to choose... here we do
           map2Conserve(args, tparams) {
             //@M! the polytype denotes the expected kind
-            (arg, tparam) => typedHigherKindedType(arg, mode, polyType(tparam.typeParams, AnyClass.tpe))
+            (arg, tparam) => typedHigherKindedType(arg, mode, GenPolyType(tparam.typeParams, AnyClass.tpe))
           }
         } else // @M: there's probably something wrong when args.length != tparams.length... (triggered by bug #320)
          // Martin, I'm using fake trees, because, if you use args or arg.map(typedType),
@@ -3672,16 +3803,11 @@ trait Typers extends Modes with Adaptations with PatMatVirtualiser {
           }
         }
 
-        val owntype =
-          if (mix.isEmpty) {
-            if ((mode & SUPERCONSTRmode) != 0)
-              if (clazz.info.parents.isEmpty) AnyRefClass.tpe // can happen due to cyclic references ==> #1036
-              else clazz.info.parents.head
-            else intersectionType(clazz.info.parents)
-          } else {
-            findMixinSuper(clazz.tpe)
-          }
-
+        val owntype = (
+          if (!mix.isEmpty) findMixinSuper(clazz.tpe)
+          else if ((mode & SUPERCONSTRmode) != 0) clazz.info.firstParent
+          else intersectionType(clazz.info.parents)
+        )
         treeCopy.Super(tree, qual1, mix) setType SuperType(clazz.thisType, owntype)
       }
 
@@ -3802,7 +3928,7 @@ trait Typers extends Modes with Adaptations with PatMatVirtualiser {
           if (settings.warnSelectNullable.value && isPotentialNullDeference && unit != null)
             unit.warning(tree.pos, "potential null pointer dereference: "+tree)
 
-          val selection = result match {
+          result match {
             // could checkAccessible (called by makeAccessible) potentially have skipped checking a type application in qual?
             case SelectFromTypeTree(qual@TypeTree(), name) if qual.tpe.typeArgs nonEmpty => // TODO: somehow the new qual is not checked in refchecks
               treeCopy.SelectFromTypeTree(
@@ -3824,22 +3950,6 @@ trait Typers extends Modes with Adaptations with PatMatVirtualiser {
             case _ =>
               result
           }
-          // To fully benefit from special casing the return type of
-          // getClass, we have to catch it immediately so expressions
-          // like x.getClass().newInstance() are typed with the type of x.
-          val isRefinableGetClass = (
-            !selection.isErrorTyped
-            && selection.symbol.name == nme.getClass_
-            && selection.tpe.params.isEmpty
-            // TODO: If the type of the qualifier is inaccessible, we can cause private types
-            // to escape scope here, e.g. pos/t1107.  I'm not sure how to properly handle this
-            // so for now it requires the type symbol be public.
-            && qual.tpe.typeSymbol.isPublic
-          )
-          if (isRefinableGetClass)
-            selection setType MethodType(Nil, erasure.getClassReturnType(qual.tpe))
-          else
-            selection
         }
       }
 
@@ -4081,7 +4191,7 @@ trait Typers extends Modes with Adaptations with PatMatVirtualiser {
                 // if symbol hasn't been fully loaded, can't check kind-arity
               else map2Conserve(args, tparams) { (arg, tparam) =>
                 //@M! the polytype denotes the expected kind
-                typedHigherKindedType(arg, mode, polyType(tparam.typeParams, AnyClass.tpe))
+                typedHigherKindedType(arg, mode, GenPolyType(tparam.typeParams, AnyClass.tpe))
               }
             val argtypes = args1 map (_.tpe)
 
@@ -4249,7 +4359,7 @@ trait Typers extends Modes with Adaptations with PatMatVirtualiser {
         case Typed(expr0, tpt @ Ident(tpnme.WILDCARD_STAR))  =>
           val expr = typed(expr0, onlyStickyModes(mode), WildcardType)
           def subArrayType(pt: Type) =
-            if (isValueClass(pt.typeSymbol) || !isFullyDefined(pt)) arrayType(pt)
+            if (isPrimitiveValueClass(pt.typeSymbol) || !isFullyDefined(pt)) arrayType(pt)
             else {
               val tparam = context.owner freshExistential "" setInfo TypeBounds.upper(pt)
               newExistentialType(List(tparam), arrayType(tparam.tpe))
@@ -4294,7 +4404,7 @@ trait Typers extends Modes with Adaptations with PatMatVirtualiser {
           // @M maybe the well-kindedness check should be done when checking the type arguments conform to the type parameters' bounds?
           val args1 = if (sameLength(args, tparams)) map2Conserve(args, tparams) {
                         //@M! the polytype denotes the expected kind
-                        (arg, tparam) => typedHigherKindedType(arg, mode, polyType(tparam.typeParams, AnyClass.tpe))
+                        (arg, tparam) => typedHigherKindedType(arg, mode, GenPolyType(tparam.typeParams, AnyClass.tpe))
                       } else {
                       //@M  this branch is correctly hit for an overloaded polymorphic type. It also has to handle erroneous cases.
                       // Until the right alternative for an overloaded method is known, be very liberal,
@@ -4614,6 +4724,7 @@ trait Typers extends Modes with Adaptations with PatMatVirtualiser {
 	        // AnyRef, but the AnyRef type alias is entered after the scala package is
 	        // loaded and completed, so that ScalaObject is unpickled while AnyRef is not
 	        // yet defined )
+	        // !!! TODO - revisit now that ScalaObject is gone.
 	        result setType(restpe)
 	      } else { // must not normalize: type application must be (bounds-)checked (during RefChecks), see #2208
 	        // during uncurry (after refchecks), all types are normalized
