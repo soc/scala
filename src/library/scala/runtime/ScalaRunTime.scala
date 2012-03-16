@@ -37,22 +37,24 @@ import ScalaRunTimeHelper._
  *  outside the API and subject to change or removal without notice.
  */
 object ScalaRunTime extends ScalaRunTimeInterface {
-  private[this] var _impl: ScalaRunTimeInterface = null
-  private def newRunTimeInstance() = System.getProperty("scala.runtime.class") match {
-    case null => new StandardScalaRunTime
-    case name =>
-      Console.err.println("Creating instance of " + name + " for ScalaRunTime.")
-      Class.forName(name).newInstance().asInstanceOf[ScalaRunTimeInterface]
-  }
+  private[this] var runtime: ScalaRunTimeInterface = null
+  private def newRunTimeInstance() = new StandardScalaRunTime
   private def impl = {
-    if (_impl eq null)
-      _impl = newRunTimeInstance()
+    if (runtime eq null)
+      runtime = newRunTimeInstance()
 
-    _impl
+    runtime
   }
-  def setRunTime(impl: ScalaRunTimeInterface) = {
-    _impl = impl
-  }
+  def getRunTime = runtime
+  def setRunTime(impl: ScalaRunTimeInterface) = runtime = impl
+  // This works, but disabled for now.
+  //
+  // private def newRunTimeInstance() = System.getProperty("scala.runtime.class") match {
+  //   case null => new StandardScalaRunTime
+  //   case name =>
+  //     Console.err.println("Creating instance of " + name + " for ScalaRunTime.")
+  //     Class.forName(name).newInstance().asInstanceOf[ScalaRunTimeInterface]
+  // }
 
   // Arrays
   def isArray(x: Any, atLevel: Int): Boolean           = impl.isArray(x, atLevel)
