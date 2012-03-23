@@ -174,14 +174,7 @@ abstract class TreeBuilder {
   }
 
   /** Create tree representing (unencoded) binary operation expression or pattern. */
-  def makeBinop(isExpr: Boolean, left: Tree, op: TermName, right: Tree, opPos: Position, targs: List[Tree] = Nil): Tree = {
-    require(isExpr || targs.isEmpty, ((left, op, targs, right)))
-
-    def mkSel(t: Tree) = {
-      val sel = atPos(opPos union t.pos)(Select(stripParens(t), op.encode))
-      if (targs.isEmpty) sel else atPos(left.pos)(TypeApply(sel, targs))
-    }
-
+  def makeBinop(isExpr: Boolean, left: Tree, op: TermName, right: Tree, opPos: Position): Tree = {
     def mkNamed(args: List[Tree]) =
       if (isExpr) args map {
         case a @ Assign(id @ Ident(name), rhs) =>
@@ -194,17 +187,14 @@ abstract class TreeBuilder {
     }
     if (isExpr) {
       if (treeInfo.isLeftAssoc(op)) {
-        Apply(mkSel(left), arguments)
-      }
-      else {
+        Apply(atPos(opPos union left.pos) { Select(stripParens(left), op.encode) }, arguments)
+      } else {
         val x = freshTermName()
         Block(
           List(ValDef(Modifiers(SYNTHETIC), x, TypeTree(), stripParens(left))),
-          Apply(mkSel(right), List(Ident(x)))
-        )
+          Apply(atPos(opPos union right.pos) { Select(stripParens(right), op.encode) }, List(Ident(x))))
       }
-    }
-    else {
+    } else {
       Apply(Ident(op.encode), stripParens(left) :: arguments)
     }
   }
@@ -216,7 +206,7 @@ abstract class TreeBuilder {
   def makeNew(parents: List[Tree], self: ValDef, stats: List[Tree], argss: List[List[Tree]],
               npos: Position, cpos: Position): Tree =
     if (parents.isEmpty)
-      makeNew(List(atPos(npos union cpos)(scalaAnyRefConstr)), self, stats, argss, npos, cpos)
+      makeNew(List(scalaAnyRefConstr), self, stats, argss, npos, cpos)
     else if (parents.tail.isEmpty && stats.isEmpty)
       atPos(npos union cpos) { New(parents.head, argss) }
     else {
@@ -272,29 +262,25 @@ abstract class TreeBuilder {
     else if (stats.length == 1) stats.head
     else Block(stats.init, stats.last)
 
+  def makeFilter(tree: Tree, condition: Tree, scrutineeName: String): Tree = {
+    val cases = List(
+      CaseDef(condition, EmptyTree, Literal(Constant(true))),
+      CaseDef(Ident(nme.WILDCARD), EmptyTree, Literal(Constant(false)))
+    )
+    val matchTree = makeVisitor(cases, false, scrutineeName)
+
+    atPos(tree.pos)(Apply(Select(tree, nme.withFilter), matchTree :: Nil))
+  }
+
   /** Create tree for for-comprehension generator <val pat0 <- rhs0> */
   def makeGenerator(pos: Position, pat: Tree, valeq: Boolean, rhs: Tree): Enumerator = {
     val pat1 = patvarTransformer.transform(pat)
     val rhs1 =
-      if (valeq) rhs
-      else matchVarPattern(pat1) match {
-        case Some(_) =>
-          rhs
-        case None =>
-          atPos(rhs.pos) {
-            Apply(
-              Select(rhs, nme.filter),
-              List(
-                makeVisitor(
-                  List(
-                    CaseDef(pat1.duplicate, EmptyTree, Literal(Constant(true))),
-                    CaseDef(Ident(nme.WILDCARD), EmptyTree, Literal(Constant(false)))),
-                  false,
-                  nme.CHECK_IF_REFUTABLE_STRING
-                )))
-          }
-      }
-    if (valeq) ValEq(pos, pat1, rhs1) else ValFrom(pos, pat1, rhs1)
+      if (valeq || treeInfo.isVariablePattern(pat)) rhs
+      else makeFilter(rhs, pat1.duplicate, nme.CHECK_IF_REFUTABLE_STRING)
+
+    if (valeq) ValEq(pos, pat1, rhs1)
+    else ValFrom(pos, pat1, rhs1)
   }
 
   def makeParam(pname: TermName, tpe: Tree) =
