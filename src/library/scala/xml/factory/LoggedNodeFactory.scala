@@ -12,15 +12,15 @@ package factory
 /** This class logs what the nodefactory is actually doing.
  *  If you want to see what happens during loading, use it like this:
 {{{
-object testLogged extends Application {
+object testLogged extends App {
   val x = new scala.xml.parsing.NoBindingFactoryAdapter
         with scala.xml.factory.LoggedNodeFactory[scala.xml.Elem]
         with scala.util.logging.ConsoleLogger
 
-  Console.println("Start")
-  val doc = x.load(new java.net.URL("http://lampsvn.epfl.ch/svn-repos/scala/scala/trunk/build.xml"))
-  Console.println("End")
-  Console.println(doc)
+  println("Start")
+  val doc = x.load(new java.net.URL("https://raw.github.com/scala/scala/083970b21ff2fa272ff2cfb26e571682d32f5e84/build.xml"))
+  println("End")
+  println(doc)
 }
 }}}
  *
