@@ -114,7 +114,7 @@ trait ContextErrors {
 
   import ErrorUtils._
 
-  trait TyperContextErrors {
+  trait TyperContextErrors extends api.ScalaTyperErrors[Unit] {
     self: Typer =>
 
     import infer.setError
