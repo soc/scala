@@ -2255,7 +2255,7 @@ self =>
         }
         val nameOffset = in.offset
         // TODO AM: freshName(o2p(in.skipToken()), "_$$"), will need to update test suite
-        val pname: TypeName = wildcardOrIdent().toTypeName
+        val pname = identForType()
         val param = atPos(start, nameOffset) {
           val tparams = typeParamClauseOpt(pname, null) // @M TODO null --> no higher-order context bounds for now
           TypeDef(mods, pname, tparams, typeBounds())

@@ -1,0 +1,12 @@
+t5606.scala:1: warning: case classes without a parameter list have been deprecated;
+use either case objects or case classes with `()' as parameter list.
+case class CaseTest[_](someData:String)
+                                       ^
+t5606.scala:1: error: identifier expected but '_' found.
+case class CaseTest[_](someData:String)
+                    ^
+t5606.scala:1: error: ']' expected but eof found.
+case class CaseTest[_](someData:String)
+                                       ^
+one warning found
+two errors found
