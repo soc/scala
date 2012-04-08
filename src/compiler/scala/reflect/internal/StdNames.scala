@@ -283,13 +283,13 @@ trait StdNames extends NameManglers { self: SymbolTable =>
     val TYPE_ : NameType               = "TYPE"
     val TypeTree: NameType             = "TypeTree"
     val UNIT : NameType                = "UNIT"
-    val _isDefinedAt: NameType         = "_isDefinedAt"
     val add_ : NameType                = "add"
     val annotation: NameType           = "annotation"
     val anyValClass: NameType          = "anyValClass"
     val append: NameType               = "append"
     val apply: NameType                = "apply"
     val applyDynamic: NameType         = "applyDynamic"
+    val applyOrElse: NameType          = "applyOrElse"
     val args : NameType                = "args"
     val argv : NameType                = "argv"
     val arrayValue: NameType           = "arrayValue"
@@ -357,7 +357,6 @@ trait StdNames extends NameManglers { self: SymbolTable =>
     val main: NameType                 = "main"
     val map: NameType                  = "map"
     val mirror : NameType              = "mirror"
-    val missingCase: NameType          = "missingCase"
     val ne: NameType                   = "ne"
     val newArray: NameType             = "newArray"
     val newScopeWith: NameType         = "newScopeWith"
@@ -529,6 +528,9 @@ trait StdNames extends NameManglers { self: SymbolTable =>
      */
     def expandedName(name: TermName, base: Symbol, separator: String = EXPAND_SEPARATOR_STRING): TermName =
       newTermNameCached(base.fullName('$') + separator + name)
+
+    def isModuleVarName(name: Name): Boolean =
+      stripAnonNumberSuffix(name) endsWith MODULE_VAR_SUFFIX
 
     def moduleVarName(name: TermName): TermName =
       newTermNameCached("" + name + MODULE_VAR_SUFFIX)

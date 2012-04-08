@@ -138,26 +138,55 @@ trait Definitions extends reflect.api.StandardDefinitions {
     // symbols related to packages
     var emptypackagescope: Scope = null //debug
 
-    // This is the package _root_.  The actual root cannot be referenced at
-    // the source level, but _root_ is essentially a function () => <root>.
-    lazy val RootPackage: Symbol = {
-      val rp = (
-        NoSymbol.newValue(nme.ROOTPKG, NoPosition, FINAL | MODULE | PACKAGE | JAVA)
-          setInfo NullaryMethodType(RootClass.tpe)
-      )
-      RootClass.sourceModule = rp
-      rp
+    // TODO - having these as objects means they elude the attempt to
+    // add synchronization in SynchronizedSymbols.  But we should either
+    // flip on object overrides or find some other accomodation, because
+    // lazy vals are unnecessarily expensive relative to objects and it
+    // is very beneficial for a handful of bootstrap symbols to have
+    // first class identities
+    sealed trait WellKnownSymbol extends Symbol {
+      this initFlags TopLevelCreationFlags
     }
+    // Features common to RootClass and RootPackage, the roots of all
+    // type and term symbols respectively.
+    sealed trait RootSymbol extends WellKnownSymbol {
+      final override def isRootSymbol = true
+      override def owner              = NoSymbol
+      override def typeOfThis         = thisSym.tpe
+    }
+    // This is the package _root_.  The actual root cannot be referenced at
+    // the source level, but _root_ is essentially a function => <root>.
+    final object RootPackage extends PackageSymbol(NoSymbol, NoPosition, nme.ROOTPKG) with RootSymbol {
+      this setInfo NullaryMethodType(RootClass.tpe)
+      RootClass.sourceModule = this
 
-    // This is the actual root of everything, including the package _root_.
-    lazy val RootClass: ModuleClassSymbol = (
-      NoSymbol.newModuleClassSymbol(tpnme.ROOT, NoPosition, FINAL | MODULE | PACKAGE | JAVA)
-        setInfo rootLoader
-    )
+      override def isRootPackage = true
+    }
+    // This is <root>, the actual root of everything except the package _root_.
+    // <root> and _root_ (RootPackage and RootClass) should be the only "well known"
+    // symbols owned by NoSymbol.  All owner chains should go through RootClass,
+    // although it is probable that some symbols are created as direct children
+    // of NoSymbol to ensure they will not be stumbled upon.  (We should designate
+    // a better encapsulated place for that.)
+    final object RootClass extends PackageClassSymbol(NoSymbol, NoPosition, tpnme.ROOT) with RootSymbol {
+      this setInfo rootLoader
+
+      override def isRoot            = true
+      override def isEffectiveRoot   = true
+      override def isStatic          = true
+      override def isNestedClass     = false
+      override def ownerOfNewSymbols = EmptyPackageClass
+    }
     // The empty package, which holds all top level types without given packages.
-    lazy val EmptyPackage       = RootClass.newPackage(nme.EMPTY_PACKAGE_NAME, NoPosition, FINAL)
-    lazy val EmptyPackageClass  = EmptyPackage.moduleClass
-
+    final object EmptyPackage extends PackageSymbol(RootClass, NoPosition, nme.EMPTY_PACKAGE_NAME) with WellKnownSymbol {
+      override def isEmptyPackage = true
+    }
+    final object EmptyPackageClass extends PackageClassSymbol(RootClass, NoPosition, tpnme.EMPTY_PACKAGE_NAME) with WellKnownSymbol {
+      override def isEffectiveRoot     = true
+      override def isEmptyPackageClass = true
+    }
+    // It becomes tricky to create dedicated objects for other symbols because
+    // of initialization order issues.
     lazy val JavaLangPackage      = getModule(sn.JavaLang)
     lazy val JavaLangPackageClass = JavaLangPackage.moduleClass
     lazy val ScalaPackage         = getModule(nme.scala_)
@@ -359,10 +388,10 @@ trait Definitions extends reflect.api.StandardDefinitions {
     def isCastSymbol(sym: Symbol)          = sym == Any_asInstanceOf || sym == Object_asInstanceOf
 
     def isJavaVarArgsMethod(m: Symbol)       = m.isMethod && isJavaVarArgs(m.info.params)
-    def isJavaVarArgs(params: List[Symbol])  = params.nonEmpty && isJavaRepeatedParamType(params.last.tpe)
-    def isScalaVarArgs(params: List[Symbol]) = params.nonEmpty && isScalaRepeatedParamType(params.last.tpe)
-    def isVarArgsList(params: List[Symbol])  = params.nonEmpty && isRepeatedParamType(params.last.tpe)
-    def isVarArgTypes(formals: List[Type])   = formals.nonEmpty && isRepeatedParamType(formals.last)
+    def isJavaVarArgs(params: Seq[Symbol])  = params.nonEmpty && isJavaRepeatedParamType(params.last.tpe)
+    def isScalaVarArgs(params: Seq[Symbol]) = params.nonEmpty && isScalaRepeatedParamType(params.last.tpe)
+    def isVarArgsList(params: Seq[Symbol])  = params.nonEmpty && isRepeatedParamType(params.last.tpe)
+    def isVarArgTypes(formals: Seq[Type])   = formals.nonEmpty && isRepeatedParamType(formals.last)
 
     def hasRepeatedParam(tp: Type): Boolean = tp match {
       case MethodType(formals, restpe) => isScalaVarArgs(formals) || hasRepeatedParam(restpe)
@@ -524,26 +553,54 @@ trait Definitions extends reflect.api.StandardDefinitions {
         else nme.genericWrapArray
     }
 
-    def tupleField(n: Int, j: Int) = getMember(TupleClass(n), nme.productAccessorName(j))
-    def isTupleType(tp: Type): Boolean = isTupleType(tp, false)
-    def isTupleTypeOrSubtype(tp: Type): Boolean = isTupleType(tp, true)
-      private def isTupleType(tp: Type, subtypeOK: Boolean) = tp.normalize match {
-        case TypeRef(_, sym, args) if args.nonEmpty =>
-          val len = args.length
-          len <= MaxTupleArity && {
-            val tsym = TupleClass(len)
-            (sym == tsym) || (subtypeOK && !tp.isHigherKinded && sym.isSubClass(tsym))
-          }
-        case _ => false
-      }
+    @deprecated("Use isTupleType", "2.10.0")
+    def isTupleTypeOrSubtype(tp: Type): Boolean = isTupleType(tp)
 
-      def tupleType(elems: List[Type]) = {
-        val len = elems.length
-        if (len <= MaxTupleArity) {
-          val sym = TupleClass(len)
-          typeRef(sym.typeConstructor.prefix, sym, elems)
-        } else NoType
+    def tupleField(n: Int, j: Int) = getMember(TupleClass(n), nme.productAccessorName(j))
+    def isTupleSymbol(sym: Symbol) = TupleClass contains unspecializedSymbol(sym)
+
+    def unspecializedSymbol(sym: Symbol): Symbol = {
+      if (sym hasFlag SPECIALIZED) {
+        // add initialization from its generic class constructor
+        val genericName = nme.unspecializedName(sym.name)
+        val member = sym.owner.info.decl(genericName.toTypeName)
+        member
       }
+      else sym
+    }
+
+    // Checks whether the given type is true for the given condition,
+    // or if it is a specialized subtype of a type for which it is true.
+    //
+    // Origins notes:
+    // An issue was introduced with specialization in that the implementation
+    // of "isTupleType" in Definitions relied upon sym == TupleClass(elems.length).
+    // This test is untrue for specialized tuples, causing mysterious behavior
+    // because only some tuples are specialized.
+    def isPossiblySpecializedType(tp: Type)(cond: Type => Boolean) = {
+      cond(tp) || (tp match {
+        case TypeRef(pre, sym, args) if sym hasFlag SPECIALIZED =>
+          cond(tp baseType unspecializedSymbol(sym))
+        case _ =>
+          false
+      })
+    }
+    // No normalization.
+    def isTupleTypeDirect(tp: Type) = isPossiblySpecializedType(tp) {
+      case TypeRef(_, sym, args) if args.nonEmpty =>
+        val len = args.length
+        len <= MaxTupleArity && sym == TupleClass(len)
+      case _ => false
+    }
+    def isTupleType(tp: Type) = isTupleTypeDirect(tp.normalize)
+
+    def tupleType(elems: List[Type]) = {
+      val len = elems.length
+      if (len <= MaxTupleArity) {
+        val sym = TupleClass(len)
+        typeRef(sym.typeConstructor.prefix, sym, elems)
+      } else NoType
+    }
 
     lazy val ProductRootClass: Symbol = getRequiredClass("scala.Product")
       def Product_productArity = getMember(ProductRootClass, nme.productArity)
@@ -808,7 +865,8 @@ trait Definitions extends reflect.api.StandardDefinitions {
     // boxed classes
     lazy val ObjectRefClass         = getRequiredClass("scala.runtime.ObjectRef")
     lazy val VolatileObjectRefClass = getRequiredClass("scala.runtime.VolatileObjectRef")
-    lazy val BoxesRunTimeClass      = getRequiredModule("scala.runtime.BoxesRunTime")
+    lazy val BoxesRunTimeModule     = getRequiredModule("scala.runtime.BoxesRunTime")
+    lazy val BoxesRunTimeClass      = BoxesRunTimeModule.moduleClass
     lazy val BoxedNumberClass       = getClass(sn.BoxedNumber)
     lazy val BoxedCharacterClass    = getClass(sn.BoxedCharacter)
     lazy val BoxedBooleanClass      = getClass(sn.BoxedBoolean)
@@ -818,6 +876,9 @@ trait Definitions extends reflect.api.StandardDefinitions {
     lazy val BoxedLongClass         = getRequiredClass("java.lang.Long")
     lazy val BoxedFloatClass        = getRequiredClass("java.lang.Float")
     lazy val BoxedDoubleClass       = getRequiredClass("java.lang.Double")
+
+    lazy val Boxes_isNumberOrBool = getDecl(BoxesRunTimeClass, nme.isBoxedNumberOrBoolean)
+    lazy val Boxes_isNumber       = getDecl(BoxesRunTimeClass, nme.isBoxedNumber)
 
     lazy val BoxedUnitClass         = getRequiredClass("scala.runtime.BoxedUnit")
     lazy val BoxedUnitModule        = getRequiredModule("scala.runtime.BoxedUnit")
@@ -935,12 +996,24 @@ trait Definitions extends reflect.api.StandardDefinitions {
       else findNamedMember(segs.tail, root.info member segs.head)
 
     def getMember(owner: Symbol, name: Name): Symbol = {
-      if (owner == NoSymbol) NoSymbol
-      else owner.info.nonPrivateMember(name) match {
-        case NoSymbol => throw new FatalError(owner + " does not have a member " + name)
-        case result   => result
+      getMemberIfDefined(owner, name) orElse {
+        throw new FatalError(owner + " does not have a member " + name)
       }
     }
+    def getMemberIfDefined(owner: Symbol, name: Name): Symbol =
+      owner.info.nonPrivateMember(name)
+
+    /** Using getDecl rather than getMember may avoid issues with
+     *  OverloadedTypes turning up when you don't want them, if you
+     *  know the method in question is uniquely declared in the given owner.
+     */
+    def getDecl(owner: Symbol, name: Name): Symbol = {
+      getDeclIfDefined(owner, name) orElse {
+        throw new FatalError(owner + " does not have a decl " + name)
+      }
+    }
+    def getDeclIfDefined(owner: Symbol, name: Name): Symbol =
+      owner.info.nonPrivateDecl(name)
     
     def packageExists(packageName: String): Boolean =
       getModuleIfDefined(packageName).isPackage
@@ -1090,8 +1163,13 @@ trait Definitions extends reflect.api.StandardDefinitions {
     def init() {
       if (isInitialized) return
 
+      // Still fiddling with whether it's cleaner to do some of this setup here
+      // or from constructors.  The latter approach tends to invite init order issues.
       EmptyPackageClass setInfo ClassInfoType(Nil, newPackageScope(EmptyPackageClass), EmptyPackageClass)
       EmptyPackage setInfo EmptyPackageClass.tpe
+
+      connectModuleToClass(EmptyPackage, EmptyPackageClass)
+      connectModuleToClass(RootPackage, RootClass)
 
       RootClass.info.decls enter EmptyPackage
       RootClass.info.decls enter RootPackage

@@ -134,16 +134,6 @@ abstract class SpecializeTypes extends InfoTransform with TypingTransformers {
     case _                                        => false
   }
 
-  def unspecializedSymbol(sym: Symbol): Symbol = {
-    if (sym hasFlag SPECIALIZED) {
-      // add initialization from its generic class constructor
-      val genericName = nme.unspecializedName(sym.name)
-      val member = sym.owner.info.decl(genericName.toTypeName)
-      member
-    }
-    else NoSymbol
-  }
-
   object TypeEnv {
     /** Return a new type environment binding specialized type parameters of sym to
      *  the given args. Expects the lists to have the same length.
@@ -523,8 +513,8 @@ abstract class SpecializeTypes extends InfoTransform with TypingTransformers {
       
       val sClass = clazz.owner.newClass(clazzName, clazz.pos, (clazz.flags | SPECIALIZED) & ~CASE)
 
-      def cloneInSpecializedClass(member: Symbol, flagFn: Long => Long) =
-        member.cloneSymbol(sClass, flagFn(member.flags | SPECIALIZED))
+      def cloneInSpecializedClass(member: Symbol, flagFn: Long => Long, newName: Name = null) =
+        member.cloneSymbol(sClass, flagFn(member.flags | SPECIALIZED), newName)
 
       sClass.sourceFile = clazz.sourceFile
       currentRun.symSource(sClass) = clazz.sourceFile // needed later on by mixin
@@ -736,7 +726,7 @@ abstract class SpecializeTypes extends InfoTransform with TypingTransformers {
         else if (m.isClass) {
           val specClass: Symbol = cloneInSpecializedClass(m, x => x)
           typeEnv(specClass) = fullEnv
-          specClass.name = specializedName(specClass, fullEnv).toTypeName
+          specClass setName specializedName(specClass, fullEnv).toTypeName
           enterMember(specClass)
           debuglog("entered specialized class " + specClass.fullName)
           info(specClass) = SpecializedInnerClass(m, fullEnv)
@@ -814,7 +804,7 @@ abstract class SpecializeTypes extends InfoTransform with TypingTransformers {
           val env          = mapAnyRefsInSpecSym(env0, sym, specMember)
           val (keys, vals) = env.toList.unzip
 
-          specMember.name = specializedName(sym, env)
+          specMember setName specializedName(sym, env)
           // debuglog("%s normalizes to %s%s".format(sym, specMember,
           //   if (tps.isEmpty) "" else " with params " + tps.mkString(", ")))
 
@@ -892,10 +882,11 @@ abstract class SpecializeTypes extends InfoTransform with TypingTransformers {
 
   /** Return the specialized overload of `m`, in the given environment. */
   private def specializedOverload(owner: Symbol, sym: Symbol, env: TypeEnv): Symbol = {
+    val newFlags = (sym.flags | SPECIALIZED) & ~(DEFERRED | CASEACCESSOR | ACCESSOR | LAZY)
     // this method properly duplicates the symbol's info
-    val specMember  = sym.cloneSymbol(owner, (sym.flags | SPECIALIZED) & ~(DEFERRED | CASEACCESSOR | ACCESSOR | LAZY))
-    specMember.name = specializedName(sym, env)
-    specMember modifyInfo (info => subst(env, info.asSeenFrom(owner.thisType, sym.owner)))
+    ( sym.cloneSymbol(owner, newFlags, specializedName(sym, env))
+        modifyInfo (info => subst(env, info.asSeenFrom(owner.thisType, sym.owner)))
+    )
   }
 
   /** For each method m that overrides an inherited method m', add a special
