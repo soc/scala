@@ -1,0 +1,35 @@
+I assume you already know how to embed the Scala interpreter so I will focus on sandboxing.
+
+Interpreted code can be sandboxed with java security manager and custom permissions. This method relies on the fact that intepreter does not set code source location, so it must be updated if interpreter is changed to provide those values. Here is a gist of it:
+
+
+Policy.setPolicy(new InterpretedPolicy());
+System.setSecurityManager(new SecurityManager());
+
+*****************************************************************************
+
+import java.security.AllPermission
+import java.security.CodeSource
+import java.security.Permissions
+import java.security.Policy
+import java.security.ProtectionDomain
+
+class InterpretedPolicy extends Policy {
+  private val allPermissions = new Permissions
+  allPermissions.add(new AllPermission)
+  allPermissions.setReadOnly
+
+  private val noPermissions = new Permissions
+  noPermissions.setReadOnly
+
+  override def getPermissions(codesource: CodeSource) = {
+    if (codesource.getLocation == null) noPermissions
+    else allPermissions
+  }
+
+  override def getPermissions(domain: ProtectionDomain) = {
+    if (domain.getCodeSource.getLocation == null) noPermissions
+    else allPermissions
+  }
+}
+
