@@ -398,11 +398,13 @@ class ModelFactory(val global: Global, val settings: doc.Settings) {
     else if (bSym.isPackage)
       makeTemplate(bSym.owner) match {
         case inPkg: PackageImpl => makePackage(bSym, inPkg) getOrElse (new NoDocTemplateImpl(bSym, inPkg))
+        case inNoDocTpl: NoDocTemplateImpl => new NoDocTemplateImpl(bSym, inNoDocTpl)
         case _ => throw new Error("'" + bSym + "' must be in a package")
       }
     else if (templateShouldDocument(bSym))
       makeTemplate(bSym.owner) match {
         case inDTpl: DocTemplateImpl => makeDocTemplate(bSym, inDTpl)
+        case inNoDocTpl: NoDocTemplateImpl => new NoDocTemplateImpl(bSym, inNoDocTpl)
         case _ => throw new Error("'" + bSym + "' must be in documentable template")
       }
     else
@@ -693,9 +695,9 @@ class ModelFactory(val global: Global, val settings: doc.Settings) {
           nameBuffer append '⇒'
           appendType0(result)
         /* Polymorphic types */
-        case PolyType(tparams, result) => assert(tparams nonEmpty)
+        case PolyType(tparams, result) => assert(tparams.nonEmpty)
 //          throw new Error("Polymorphic type '" + tpe + "' cannot be printed as a type")
-          def typeParamsToString(tps: List[Symbol]): String = if(tps isEmpty) "" else
+          def typeParamsToString(tps: List[Symbol]): String = if (tps.isEmpty) "" else
             tps.map{tparam =>
               tparam.varianceString + tparam.name + typeParamsToString(tparam.typeParams)
             }.mkString("[", ", ", "]")

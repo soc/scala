@@ -97,7 +97,7 @@ trait Types extends api.Types { self: SymbolTable =>
    */
   private final val propagateParameterBoundsToTypeVars = sys.props contains "scalac.debug.prop-constraints"
 
-  protected val enableTypeVarExperimentals = settings.Xexperimental.value || settings.YvirtPatmat.value
+  protected val enableTypeVarExperimentals = settings.Xexperimental.value || !settings.XoldPatmat.value
 
   /** Empty immutable maps to avoid allocations. */
   private val emptySymMap   = immutable.Map[Symbol, Symbol]()
@@ -266,6 +266,35 @@ trait Types extends api.Types { self: SymbolTable =>
     def typeArguments = typeArgs
     def erasure = transformedType(this)
     def substituteTypes(from: List[Symbol], to: List[Type]): Type = subst(from, to)
+
+    // [Eugene] to be discussed and refactored
+    def isConcrete = {
+      def notConcreteSym(sym: Symbol) =
+        sym.isAbstractType && !sym.isExistential
+
+      def notConcreteTpe(tpe: Type): Boolean = tpe match {
+        case ThisType(_) => false
+        case SuperType(_, _) => false
+        case SingleType(pre, sym) => notConcreteSym(sym)
+        case ConstantType(_) => false
+        case TypeRef(_, sym, args) => notConcreteSym(sym) || (args exists (arg => notConcreteTpe(arg)))
+        case RefinedType(_, _) => false
+        case ExistentialType(_, _) => false
+        case AnnotatedType(_, tp, _) => notConcreteTpe(tp)
+        case _ => true
+      }
+
+      !notConcreteTpe(this)
+    }
+
+    // [Eugene] is this comprehensive?
+    // the only thingies that we want to splice are: 1) type parameters, 2) type members
+    // the thingies that we don't want to splice are: 1) concrete types (obviously), 2) existential skolems
+    // this check seems to cover them all, right?
+    // todo. after we discuss this, move the check to subclasses
+    def isSpliceable = {
+      this.isInstanceOf[TypeRef] && typeSymbol.isAbstractType && !typeSymbol.isExistential
+    }
   }
 
   /** The base class for all types */
@@ -712,7 +741,9 @@ trait Types extends api.Types { self: SymbolTable =>
 
     /** Returns all parts of this type which satisfy predicate `p` */
     def filter(p: Type => Boolean): List[Type] = new FilterTypeCollector(p) collect this
-    def withFilter(p: Type => Boolean) = new FilterTypeCollector(p) {
+    def withFilter(p: Type => Boolean) = new FilterMapForeach(p)
+
+    class FilterMapForeach(p: Type => Boolean) extends FilterTypeCollector(p){
       def foreach[U](f: Type => U): Unit = collect(Type.this) foreach f
       def map[T](f: Type => T): List[T]  = collect(Type.this) map f
     }
@@ -2051,7 +2082,7 @@ trait Types extends api.Types { self: SymbolTable =>
         // TODO: is there another way a typeref's symbol can refer to a symbol defined in its pre?
         case _                                           => sym
       }
-
+    override def kind = "AliasTypeRef"
   }
 
   trait AbstractTypeRef extends NonClassTypeRef {
@@ -2104,6 +2135,7 @@ trait Types extends api.Types { self: SymbolTable =>
     override def bounds   = thisInfo.bounds
     // def transformInfo(tp: Type): Type = appliedType(tp.asSeenFrom(pre, sym.owner), typeArgsOrDummies)
     override protected[Types] def baseTypeSeqImpl: BaseTypeSeq = transform(bounds.hi).baseTypeSeq prepend this
+    override def kind = "AbstractTypeRef"
   }
 
   /** A class for named types of the form
@@ -2145,7 +2177,7 @@ trait Types extends api.Types { self: SymbolTable =>
          sym.isPackageClass
       || pre.isGround && args.forall(_.isGround)
     )
-    
+
     def etaExpand: Type = {
       // must initialise symbol, see test/files/pos/ticket0137.scala
       val tpars = initializedTypeParams
@@ -2518,39 +2550,46 @@ trait Types extends api.Types { self: SymbolTable =>
     override def skolemizeExistential(owner: Symbol, origin: AnyRef) =
       deriveType(quantified, tparam => (owner orElse tparam.owner).newExistentialSkolem(tparam, origin))(underlying)
 
-    private def wildcardArgsString(available: Set[Symbol], args: List[Type]): List[String] = args match {
-      case TypeRef(_, sym, _) :: args1 if (available contains sym) =>
-        ("_"+sym.infoString(sym.info)) :: wildcardArgsString(available - sym, args1)
-      case arg :: args1 if !(quantified exists (arg contains _)) =>
-        arg.toString :: wildcardArgsString(available, args1)
-      case _ =>
-        List()
+    private def wildcardArgsString(qset: Set[Symbol], args: List[Type]): List[String] = args map {
+      case TypeRef(_, sym, _) if (qset contains sym) =>
+        "_"+sym.infoString(sym.info)
+      case arg =>
+        arg.toString
     }
+
     /** An existential can only be printed with wildcards if:
      *   - the underlying type is a typeref
-     *   - where there is a 1-to-1 correspondence between underlying's typeargs and quantified
-     *   - and none of the existential parameters is referenced from anywhere else in the type
-     *   - and none of the existential parameters are singleton types
+     *   - every quantified variable appears at most once as a type argument and
+     *     nowhere inside a type argument
+     *   - no quantified type argument contains a quantified variable in its bound
+     *   - the typeref's symbol is not itself quantified
+     *   - the prefix is not quanitified
      */
-    private def isRepresentableWithWildcards = !settings.debug.value && {
+    def isRepresentableWithWildcards = {
       val qset = quantified.toSet
-      !qset.exists(_.isSingletonExistential) && (underlying match {
-        case TypeRef(_, sym, args) =>
-          sameLength(args, quantified) && {
-            args forall { arg =>
-              qset(arg.typeSymbol) && !qset.exists(arg.typeSymbol.info.bounds contains _)
-            }
+      underlying match {
+        case TypeRef(pre, sym, args) =>
+          def isQuantified(tpe: Type): Boolean = {
+            (tpe exists (t => qset contains t.typeSymbol)) ||
+            tpe.typeSymbol.isRefinementClass && (tpe.parents exists isQuantified)
           }
+          val (wildcardArgs, otherArgs) = args partition (arg => qset contains arg.typeSymbol)
+          wildcardArgs.distinct == wildcardArgs &&
+          !(otherArgs exists (arg => isQuantified(arg))) &&
+          !(wildcardArgs exists (arg => isQuantified(arg.typeSymbol.info.bounds))) &&
+          !(qset contains sym) &&
+          !isQuantified(pre)
         case _ => false
-      })
     }
+    }
+
     override def safeToString: String = {
       def clauses = {
         val str = quantified map (_.existentialToString) mkString (" forSome { ", "; ", " }")
         if (settings.explaintypes.value) "(" + str + ")" else str
       }
       underlying match {
-        case TypeRef(pre, sym, args) if isRepresentableWithWildcards =>
+        case TypeRef(pre, sym, args) if !settings.debug.value && isRepresentableWithWildcards =>
           "" + TypeRef(pre, sym, Nil) + wildcardArgsString(quantified.toSet, args).mkString("[", ", ", "]")
         case MethodType(_, _) | NullaryMethodType(_) | PolyType(_, _) =>
           "(" + underlying + ")" + clauses
@@ -2754,7 +2793,7 @@ trait Types extends api.Types { self: SymbolTable =>
       zippedArgs map { case (p, a) => p.name + "=" + a } mkString (origin + "[", ", ", "]")
     )
   }
-  
+
   trait UntouchableTypeVar extends TypeVar {
     override def untouchable = true
     override def isGround = true
