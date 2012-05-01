@@ -100,8 +100,39 @@ class MainGenericRunner {
   }
 }
 
+abstract class PreloadThread(preloadClasses: Array[String]) extends Thread {
+  def this(preloadClasses: String) = this(preloadClasses.trim split "\\s+")
+
+  final val max    = preloadClasses.length
+  private def log(msg: String) = System.err.println(msg)
+  override def run() {
+    var i      = 0
+    // val loader = getClass.getClassLoader match {
+    //   case null => ClassLoader.getSystemClassLoader
+    //   case cl   => cl
+    // }
+    while (i < max) {
+      val t = getClass.getName.split("[.]").last
+      val clazz = preloadClasses(i)
+      // log(t + " is preloading " + clazz)
+      // try loader loadClass clazz
+      try Class forName clazz
+      catch {
+        case x: LinkageError           => log("Failed to load " + clazz)
+        case x: ClassNotFoundException => log("Not found: " + clazz)
+      }
+      i += 1
+    }
+  }
+}
+
 object MainGenericRunner extends MainGenericRunner {
   def main(args: Array[String]) {
+    println("Starting main")
+    (new PreloadThread1).start()
+    (new PreloadThread2).start()
+    (new PreloadThread3).start()
+
     if (!process(args))
       sys.exit(1)
   }
