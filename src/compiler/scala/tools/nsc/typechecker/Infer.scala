@@ -174,7 +174,7 @@ trait Infer {
    *  Implicit parameters are skipped.
    *  This method seems to be performance critical.
    */
-  def normalize(tp: Type): Type = tp match {
+  def normalize(tp: Type): Type = printResult("normalize(" + tp + ")")(tp match {
     case mt @ MethodType(params, restpe) if mt.isImplicit =>
       normalize(restpe)
     case mt @ MethodType(params, restpe) if !restpe.isDependent =>
@@ -185,7 +185,7 @@ trait Infer {
       newExistentialType(tparams, normalize(qtpe))
     case tp1 =>
       tp1 // @MAT aliases already handled by subtyping
-  }
+  })
 
   private val stdErrorClass = RootClass.newErrorClass(tpnme.ERROR)
   private val stdErrorValue = stdErrorClass.newErrorValue(nme.ERROR)
@@ -354,7 +354,7 @@ trait Infer {
       def addTypeParam(bounds: TypeBounds): Type = {
         val tparam = context.owner.newExistential(newTypeName("_"+tparams.size), context.tree.pos.focus) setInfo bounds
         tparams += tparam
-        tparam.tpe
+        tparam.tpeHK
       }
       val tp1 = tp map {
         case WildcardType =>
@@ -462,7 +462,7 @@ trait Infer {
 
       object Undets {
         def unapply(m: Result): Some[(List[Symbol], List[Type], List[Symbol])] = Some(toLists{
-          val (ok, nok) = m.map{case (p, a) => (p, a.getOrElse(null))}.partition(_._2 ne null)
+          val (ok, nok) = m.map{case (p, a) => (p, a.orNull)}.partition(_._2 ne null)
           val (okArgs, okTparams) = ok.unzip
           (okArgs, okTparams, nok.keys)
         })
@@ -470,7 +470,7 @@ trait Infer {
 
       object AllArgsAndUndets {
         def unapply(m: Result): Some[(List[Symbol], List[Type], List[Type], List[Symbol])] = Some(toLists{
-          val (ok, nok) = m.map{case (p, a) => (p, a.getOrElse(null))}.partition(_._2 ne null)
+          val (ok, nok) = m.map{ case (p, a) => (p, a.orNull) }.partition(_._2 ne null)
           val (okArgs, okTparams) = ok.unzip
           (okArgs, okTparams, m.values.map(_.getOrElse(NothingClass.tpe)), nok.keys)
         })
