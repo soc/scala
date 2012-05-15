@@ -4,10 +4,6 @@ package runtime
 trait Infrastructure {
   self: Context =>
 
-  val forJVM: Boolean = mirror.forJVM
-
-  val forMSIL: Boolean = mirror.forMSIL
-
   val forInteractive: Boolean = mirror.forInteractive
 
   val forScaladoc: Boolean = mirror.forScaladoc

@@ -10,7 +10,6 @@ import java.io.File.pathSeparator
 import scala.tools.nsc.doc.DocFactory
 import scala.tools.nsc.reporters.ConsoleReporter
 import scala.tools.nsc.util.FakePos
-import Properties.msilLibPath
 
 /** The main class for scaladoc, a front-end for the Scala compiler
  *  that generates documentation from source files.
@@ -42,9 +41,6 @@ class ScalaDoc {
     else if (docSettings.help.value || !hasFiles)
       reporter.echo(command.usageMsg)
     else try {
-      if (docSettings.target.value == "msil")
-        msilLibPath foreach (x => docSettings.assemrefs.value += (pathSeparator + x))
-
       new DocFactory(reporter, docSettings) document command.files
     }
     catch {

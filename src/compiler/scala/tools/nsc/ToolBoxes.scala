@@ -55,9 +55,6 @@ trait ToolBoxes { self: Global =>
     private lazy val importer = libraryClasspathMirror.mkImporter(self).asInstanceOf[libraryClasspathMirror.Importer { val from: self.type }]
 
     private lazy val libraryClasspathMirror = {
-      if (self.forMSIL)
-        throw new UnsupportedOperationException("Scala reflection not available on this platform")
-
       val libraryClassLoader = {
         val classpath = self.classPath.asURLs
         var loader: ClassLoader = ScalaClassLoader.fromURLs(classpath, self.getClass.getClassLoader)

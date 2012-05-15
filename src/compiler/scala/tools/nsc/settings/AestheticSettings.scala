@@ -33,7 +33,5 @@ trait AestheticSettings {
   def virtPatmat      = !settings.XoldPatmat.value
 
   /** Derived values */
-  def jvm           = target startsWith "jvm"
-  def msil          = target == "msil"
   def verboseDebug  = debug && verbose
 }

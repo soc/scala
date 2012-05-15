@@ -24,7 +24,7 @@ import ast.parser._
 import typechecker._
 import transform._
 import backend.icode.{ ICodes, GenICode, ICodeCheckers }
-import backend.{ ScalaPrimitives, Platform, MSILPlatform, JavaPlatform }
+import backend.{ ScalaPrimitives, Platform, JavaPlatform }
 import backend.jvm.{GenJVM, GenASM}
 import backend.opt.{ Inliners, InlineExceptionHandlers, ClosureElimination, DeadCodeElimination }
 import backend.icode.analysis._
@@ -68,9 +68,7 @@ class Global(var currentSettings: Settings, var reporter: Reporter) extends Symb
 
   type ThisPlatform = Platform { val global: Global.this.type }
 
-  lazy val platform: ThisPlatform =
-    if (forMSIL) new { val global: Global.this.type = Global.this } with MSILPlatform
-    else new { val global: Global.this.type = Global.this } with JavaPlatform
+  lazy val platform: ThisPlatform = new { val global: Global.this.type = Global.this } with JavaPlatform
 
   def classPath: ClassPath[platform.BinaryRepr] = platform.classPath
   def rootLoader: LazyType = platform.rootLoader
@@ -643,7 +641,7 @@ class Global(var currentSettings: Settings, var reporter: Reporter) extends Symb
   object terminal extends {
     val global: Global.this.type = Global.this
     val phaseName = "terminal"
-    val runsAfter = List("jvm", "msil")
+    val runsAfter = List("jvm")
     val runsRightAfter = None
   } with SubComponent {
     private var cache: Option[GlobalPhase] = None
@@ -1605,14 +1603,6 @@ class Global(var currentSettings: Settings, var reporter: Reporter) extends Symb
       }
     })
   }
-  // In order to not outright break code which overrides onlyPresentation (like sbt 0.7.5.RC0)
-  // I restored and deprecated it.  That would be enough to avoid the compilation
-  // failure, but the override wouldn't accomplish anything.  So now forInteractive
-  // and forScaladoc default to onlyPresentation, which is the same as defaulting
-  // to false except in old code.  The downside is that this leaves us calling a
-  // deprecated method: but I see no simple way out, so I leave it for now.
-  def forJVM           = opt.jvm
-  override def forMSIL = opt.msil
   def forInteractive   = onlyPresentation
   def forScaladoc      = onlyPresentation
   def createJavadoc    = false

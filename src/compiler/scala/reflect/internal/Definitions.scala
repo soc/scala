@@ -711,7 +711,7 @@ trait Definitions extends reflect.api.StandardDefinitions {
     lazy val ObjectArray   = arrayType(ObjectClass.tpe)
 
     def ClassType(arg: Type) =
-      if (phase.erasedTypes || forMSIL) ClassClass.tpe
+      if (phase.erasedTypes) ClassClass.tpe
       else appliedType(ClassClass, arg)
 
     def vmClassType(arg: Type): Type = ClassType(arg)
@@ -1329,32 +1329,5 @@ trait Definitions extends reflect.api.StandardDefinitions {
 
       isInitialized = true
     } //init
-
-    var nbScalaCallers: Int = 0
-    def newScalaCaller(delegateType: Type): Symbol = {
-      assert(forMSIL, "scalaCallers can only be created if target is .NET")
-      // object: reference to object on which to call (scala-)method
-      val paramTypes: List[Type] = List(ObjectClass.tpe)
-      val name = newTermName("$scalaCaller$$" + nbScalaCallers)
-      // tparam => resultType, which is the resultType of PolyType, i.e. the result type after applying the
-      // type parameter =-> a MethodType in this case
-      // TODO: set type bounds manually (-> MulticastDelegate), see newTypeParam
-      val newCaller = enterNewMethod(DelegateClass, name, paramTypes, delegateType, FINAL | STATIC)
-      // val newCaller = newPolyMethod(DelegateClass, name,
-      // tparam => MethodType(paramTypes, tparam.typeConstructor)) setFlag (FINAL | STATIC)
-      Delegate_scalaCallers = Delegate_scalaCallers ::: List(newCaller)
-      nbScalaCallers += 1
-      newCaller
-    }
-
-    // def addScalaCallerInfo(scalaCaller: Symbol, methSym: Symbol, delType: Type) {
-    // assert(Delegate_scalaCallers contains scalaCaller)
-    // Delegate_scalaCallerInfos += (scalaCaller -> (methSym, delType))
-    // }
-
-    def addScalaCallerInfo(scalaCaller: Symbol, methSym: Symbol) {
-      assert(Delegate_scalaCallers contains scalaCaller)
-      Delegate_scalaCallerTargets += (scalaCaller -> methSym)
-    }
   }
 }

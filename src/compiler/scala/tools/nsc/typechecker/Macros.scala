@@ -586,9 +586,6 @@ trait Macros extends Traces {
    *  Loads classes from -Xmacro-primary-classpath, or from -cp if the option is not specified.
    */
   private lazy val primaryMirror: Mirror = {
-    if (global.forMSIL)
-      throw new UnsupportedOperationException("Scala reflection not available on this platform")
-
     val libraryClassLoader = {
       if (settings.XmacroPrimaryClasspath.value != "") {
         macroLogVerbose("primary macro mirror: initializing from -Xmacro-primary-classpath: %s".format(settings.XmacroPrimaryClasspath.value))
@@ -617,9 +614,6 @@ trait Macros extends Traces {
    *  Loads classes from -Xmacro-fallback-classpath aka "macro fallback classpath".
    */
   private lazy val fallbackMirror: Mirror = {
-    if (global.forMSIL)
-      throw new UnsupportedOperationException("Scala reflection not available on this platform")
-
     val fallbackClassLoader = {
       macroLogVerbose("fallback macro mirror: initializing from -Xmacro-fallback-classpath: %s".format(settings.XmacroFallbackClasspath.value))
       val classpath = toURLs(settings.XmacroFallbackClasspath.value)

@@ -1124,7 +1124,7 @@ abstract class RefChecks extends InfoTransform with reflect.internal.transform.R
             nonSensiblyNeq()
         }
         else if (isNumeric(receiver)) {
-          if (!isNumeric(actual) && !forMSIL)
+          if (!isNumeric(actual))
             if (isUnit(actual) || isBoolean(actual) || !isMaybeValue(actual))   // 5 == "abc"
               nonSensiblyNeq()
         }

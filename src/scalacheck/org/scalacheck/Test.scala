@@ -156,7 +156,6 @@ object Test {
    *  the test results. */
   def check(prms: Params, p: Prop): Result = {
     import prms._
-    import actors.Futures.future
 
     assertParams(prms)
     if(workers > 1)
@@ -166,7 +165,12 @@ object Test {
     val sizeStep = (maxSize-minSize) / (minSuccessfulTests: Float)
     var stop = false
 
-    def worker(workerdIdx: Int) = future {
+    def mkWorker(body: => Result) = {
+      val callable = new java.util.concurrent.Callable[Result] { override def call() = body }
+      new java.util.concurrent.FutureTask(callable)
+    }
+
+    def worker(workerdIdx: Int) = mkWorker {
       var n = 0
       var d = 0
       var size = minSize + (workerdIdx*sizeStep*iterations)
@@ -217,9 +221,9 @@ object Test {
 
     val start = System.currentTimeMillis
     val results = for(i <- 0 until workers) yield worker(i)
-    val r = results.reduceLeft(mergeResults)()
+    val r = results.map(x => x.get _).reduceLeft(mergeResults)()
     stop = true
-    results foreach (_.apply())
+    results foreach (_.get())
     val timedRes = r.copy(time = System.currentTimeMillis-start)
     prms.testCallback.onTestResult("", timedRes)
     timedRes

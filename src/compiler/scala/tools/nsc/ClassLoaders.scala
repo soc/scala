@@ -5,16 +5,10 @@ import util.ScalaClassLoader
 trait ClassLoaders { self: Global =>
 
   def staticClass(fullname: String) = {
-    if (self.forMSIL)
-      throw new UnsupportedOperationException("Scala reflection not available on this platform")
-
     getClass(newTypeName(fullname))
   }
 
   def staticModule(fullname: String) = {
-    if (self.forMSIL)
-      throw new UnsupportedOperationException("Scala reflection not available on this platform")
-
     getModule(newTermName(fullname))
   }
 
