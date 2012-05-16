@@ -8,7 +8,7 @@
 
 package scala.runtime
 
-import scala.collection.{ Seq, IndexedSeq, TraversableView, AbstractIterator }
+import scala.collection.{ Seq, IndexedSeq, AbstractIterator }
 import scala.collection.mutable.WrappedArray
 import scala.collection.immutable.{ StringLike, NumericRange, List, Stream, Nil, :: }
 import scala.collection.generic.{ Sorted }
@@ -312,8 +312,6 @@ object ScalaRunTime {
       case _: Sorted[_, _]  => true
       // StringBuilder(a, b, c) and similar not so attractive
       case _: StringLike[_] => true
-      // Don't want to evaluate any elements in a view
-      case _: TraversableView[_, _] => true
       // Don't want to a) traverse infinity or b) be overly helpful with peoples' custom
       // collections which may have useful toString methods - ticket #3710
       // or c) print AbstractFiles which are somehow also Iterable[AbstractFile]s.

@@ -158,7 +158,7 @@ class Tester(ntests: Int, inputs: Array[SourceFile], settings: Settings) {
     otherTest()
     def errorCount() = compiler.ask(() => reporter.ERROR.count)
 //    println("\nhalf test round: "+errorCount())
-    changes.view.reverse foreach (_.insertAll())
+    changes.reverse foreach (_.insertAll())
     otherTest()
     println("done test round: "+errorCount())
     if (errorCount() != 0)

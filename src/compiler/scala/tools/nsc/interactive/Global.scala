@@ -423,7 +423,7 @@ class Global(settings: Settings, _reporter: Reporter, projectName: String = "")
       case None => "<None>"
     }
 
-    source.content.view.drop(start).take(length).mkString+" : "+source.path+" ("+start+", "+end+
+    source.content.iterator.drop(start).take(length).mkString+" : "+source.path+" ("+start+", "+end+
     ")\n\nlocateTree:\n"+sw.toString+"\n\naskTypeAt:\n"+typ+"\n\ncompletion:\n"+completion
   }
 
