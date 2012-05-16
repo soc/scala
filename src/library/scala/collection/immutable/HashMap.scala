@@ -11,7 +11,6 @@ package immutable
 
 import generic._
 import annotation.unchecked.{ uncheckedVariance=> uV }
-import parallel.immutable.ParHashMap
 
 /** This class implements immutable maps using a hash trie.
  *
@@ -37,7 +36,6 @@ class HashMap[A, +B] extends AbstractMap[A, B]
                         with Map[A, B]
                         with MapLike[A, B, HashMap[A, B]]
                         with Serializable
-                        with CustomParallelizable[(A, B), ParHashMap[A, B]]
 {
   override def size: Int = 0
 
@@ -90,9 +88,6 @@ class HashMap[A, +B] extends AbstractMap[A, B]
   def merge[B1 >: B](that: HashMap[A, B1], merger: Merger[B1] = null): HashMap[A, B1] = merge0(that, 0, merger)
 
   protected def merge0[B1 >: B](that: HashMap[A, B1], level: Int, merger: Merger[B1]): HashMap[A, B1] = that
-
-  override def par = ParHashMap.fromTrie(this)
-
 }
 
 /** $factoryInfo

@@ -40,8 +40,7 @@ import scala.annotation.tailrec
 trait IndexedSeqLike[+A, +Repr] extends Any with SeqLike[A, Repr] {
   self =>
 
-  def seq: IndexedSeq[A]
-  override def hashCode() = util.MurmurHash3.seqHash(seq)  // TODO - can we get faster via "indexedSeqHash" ?
+  override def hashCode() = util.MurmurHash3.seqHash(this.toSeq)  // TODO - can we get faster via "indexedSeqHash" ?
 
   override protected[this] def thisCollection: IndexedSeq[A] = this.asInstanceOf[IndexedSeq[A]]
   override protected[this] def toCollection(repr: Repr): IndexedSeq[A] = repr.asInstanceOf[IndexedSeq[A]]

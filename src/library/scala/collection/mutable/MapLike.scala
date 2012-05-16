@@ -12,7 +12,6 @@ package mutable
 
 import generic._
 import annotation.{migration, bridge}
-import parallel.mutable.ParMap
 
 /** A template trait for mutable maps.
  *  $mapNote
@@ -47,7 +46,6 @@ trait MapLike[A, B, +This <: MapLike[A, B, This] with Map[A, B]]
      with Growable[(A, B)]
      with Shrinkable[A]
      with Cloneable[This]
-     with Parallelizable[(A, B), ParMap[A, B]]
 { self =>
 
   import scala.collection.Traversable
@@ -58,8 +56,6 @@ trait MapLike[A, B, +This <: MapLike[A, B, This] with Map[A, B]]
    *    Overrides `MapLike` implementation for better efficiency.
    */
   override protected[this] def newBuilder: Builder[(A, B), This] = empty
-
-  protected[this] override def parCombiner = ParMap.newCombiner[A, B]
 
   /** Adds a new key/value pair to this map and optionally returns previously bound value.
    *  If the map already contains a
@@ -138,8 +134,8 @@ trait MapLike[A, B, +This <: MapLike[A, B, This] with Map[A, B]]
    *  @return       a new map containing mappings of this map and those provided by `xs`.
    */
   @migration("`++` creates a new map. Use `++=` to add an element to this map and return that map itself.", "2.8.0")
-  override def ++[B1 >: B](xs: GenTraversableOnce[(A, B1)]): Map[A, B1] =
-    clone().asInstanceOf[Map[A, B1]] ++= xs.seq
+  override def ++[B1 >: B](xs: TraversableOnce[(A, B1)]): Map[A, B1] =
+    clone().asInstanceOf[Map[A, B1]] ++= xs
 
   /** Removes a key from this map, returning the value associated previously
    *  with that key as an option.
@@ -209,7 +205,7 @@ trait MapLike[A, B, +This <: MapLike[A, B, This] with Map[A, B]]
    * @param p  The test predicate
    */
   def retain(p: (A, B) => Boolean): this.type = {
-    for ((k, v) <- this.seq ; if !p(k, v))
+    for ((k, v) <- this ; if !p(k, v))
       this -= k
 
     this
@@ -243,5 +239,5 @@ trait MapLike[A, B, +This <: MapLike[A, B, This] with Map[A, B]]
    *                  with a key equal to a key from `xs`.
    */
   @migration("`--` creates a new map. Use `--=` to remove an element from this map and return that map itself.", "2.8.0")
-  override def --(xs: GenTraversableOnce[A]): This = clone() --= xs.seq
+  override def --(xs: TraversableOnce[A]): This = clone() --= xs
 }

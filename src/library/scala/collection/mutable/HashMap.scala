@@ -10,7 +10,6 @@ package scala.collection
 package mutable
 
 import generic._
-import scala.collection.parallel.mutable.ParHashMap
 
 /** This class implements mutable maps using a hashtable.
  *
@@ -41,7 +40,6 @@ extends AbstractMap[A, B]
    with Map[A, B]
    with MapLike[A, B, HashMap[A, B]]
    with HashTable[A, DefaultEntry[A, B]]
-   with CustomParallelizable[(A, B), ParHashMap[A, B]]
    with Serializable
 {
   initWithContents(contents)
@@ -53,8 +51,6 @@ extends AbstractMap[A, B]
   override def size: Int = tableSize
 
   def this() = this(null)
-
-  override def par = new ParHashMap[A, B](hashTableContents)
 
   // contains and apply overridden to avoid option allocations.
   override def contains(key: A) = findEntry(key) != null

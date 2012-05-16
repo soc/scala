@@ -48,9 +48,7 @@ trait LinearSeqLike[+A, +Repr <: LinearSeqLike[A, Repr]] extends SeqLike[A, Repr
   override protected[this] def thisCollection: LinearSeq[A] = this.asInstanceOf[LinearSeq[A]]
   override protected[this] def toCollection(repr: Repr): LinearSeq[A] = repr.asInstanceOf[LinearSeq[A]]
 
-  def seq: LinearSeq[A]
-
-  override def hashCode() = util.MurmurHash3.seqHash(seq) // TODO - can we get faster via "linearSeqHash" ?
+  override def hashCode() = util.MurmurHash3.seqHash(this.toSeq) // TODO - can we get faster via "linearSeqHash" ?
 
   override /*IterableLike*/
   def iterator: Iterator[A] = new AbstractIterator[A] {
@@ -71,7 +69,7 @@ trait LinearSeqLike[+A, +Repr <: LinearSeqLike[A, Repr]] extends SeqLike[A, Repr
     }
   }
 
-  @tailrec override final def corresponds[B](that: GenSeq[B])(p: (A,B) => Boolean): Boolean = {
+  @tailrec override final def corresponds[B](that: Seq[B])(p: (A,B) => Boolean): Boolean = {
     if (this.isEmpty) that.isEmpty
     else that.nonEmpty && p(head, that.head) && (tail corresponds that.tail)(p)
   }

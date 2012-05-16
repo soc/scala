@@ -27,7 +27,7 @@ object Iterator {
    */
   implicit def IteratorCanBuildFrom[A] = new TraversableOnce.BufferedCanBuildFrom[A, Iterator] {
     def bufferToColl[B](coll: ArrayBuffer[B]) = coll.iterator
-    def traversableToColl[B](t: GenTraversable[B]) = t.toIterator
+    def traversableToColl[B](t: Traversable[B]) = t.toIterator
   }
 
   /** The iterator which produces no values. */
@@ -227,8 +227,6 @@ import Iterator.empty
 trait Iterator[+A] extends TraversableOnce[A] {
   self =>
 
-  def seq: Iterator[A] = this
-
   /** Tests whether this iterator can provide another element.
    *
    *  @return  `true` if a subsequent call to `next` will yield an element,
@@ -335,7 +333,7 @@ trait Iterator[+A] extends TraversableOnce[A] {
    *  @usecase def ++(that: => Iterator[A]): Iterator[A]
    *    @inheritdoc
    */
-  def ++[B >: A](that: => GenTraversableOnce[B]): Iterator[B] = new AbstractIterator[B] {
+  def ++[B >: A](that: => TraversableOnce[B]): Iterator[B] = new AbstractIterator[B] {
     // optimize a little bit to prevent n log n behavior.
     private var cur : Iterator[B] = self
     private var selfExhausted : Boolean = false
@@ -362,7 +360,7 @@ trait Iterator[+A] extends TraversableOnce[A] {
    *           `f` to each value produced by this iterator and concatenating the results.
    *  @note    Reuse: $consumesAndProducesIterator
    */
-  def flatMap[B](f: A => GenTraversableOnce[B]): Iterator[B] = new AbstractIterator[B] {
+  def flatMap[B](f: A => TraversableOnce[B]): Iterator[B] = new AbstractIterator[B] {
     private var cur: Iterator[B] = empty
     def hasNext: Boolean =
       cur.hasNext || self.hasNext && { cur = f(self.next).toIterator; hasNext }
@@ -402,7 +400,7 @@ trait Iterator[+A] extends TraversableOnce[A] {
    *                   `p(x, y)` is `true` for all corresponding elements `x` of this iterator
    *                   and `y` of `that`, otherwise `false`
    */
-  def corresponds[B](that: GenTraversableOnce[B])(p: (A, B) => Boolean): Boolean = {
+  def corresponds[B](that: TraversableOnce[B])(p: (A, B) => Boolean): Boolean = {
     val that0 = that.toIterator
     while (hasNext && that0.hasNext)
       if (!p(next, that0.next)) return false

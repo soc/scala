@@ -22,7 +22,7 @@ import language.higherKinds
  *  @define coll  collection
  *  @define Coll  `CC`
  */
-abstract class GenericCompanion[+CC[X] <: GenTraversable[X]] {
+abstract class GenericCompanion[+CC[X] <: Traversable[X]] {
   /** The underlying collection type with unknown element type */
   type Coll = CC[_]
 

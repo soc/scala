@@ -10,7 +10,6 @@ package scala.collection
 package immutable
 
 import generic._
-import parallel.immutable.ParMap
 
 /**
  *  A generic template for immutable maps from keys of type `A`
@@ -45,12 +44,8 @@ import parallel.immutable.ParMap
  *  @define Coll immutable.Map
  *  @define coll immutable map
  */
-trait MapLike[A, +B, +This <: MapLike[A, B, This] with Map[A, B]]
-  extends scala.collection.MapLike[A, B, This]
-     with Parallelizable[(A, B), ParMap[A, B]]
-{ self =>
-
-  protected[this] override def parCombiner = ParMap.newCombiner[A, B]
+trait MapLike[A, +B, +This <: MapLike[A, B, This] with Map[A, B]] extends scala.collection.MapLike[A, B, This] {
+  self =>
 
   /** A new immutable map containing updating this map with a given key/value mapping.
    *  @param    key the key
@@ -82,8 +77,8 @@ trait MapLike[A, +B, +This <: MapLike[A, B, This] with Map[A, B]]
    *  @param xs      the traversable object consisting of key-value pairs.
    *  @return        a new immutable map with the bindings of this map and those from `xs`.
    */
-  override def ++[B1 >: B](xs: GenTraversableOnce[(A, B1)]): immutable.Map[A, B1] =
-    ((repr: immutable.Map[A, B1]) /: xs.seq) (_ + _)
+  override def ++[B1 >: B](xs: TraversableOnce[(A, B1)]): immutable.Map[A, B1] =
+    ((repr: immutable.Map[A, B1]) /: xs) (_ + _)
 
   /** Filters this map by retaining only keys satisfying a predicate.
    *  @param  p   the predicate used to test keys

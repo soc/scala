@@ -196,40 +196,4 @@ object MurmurHash3 extends MurmurHash3 {
   def seqHash(xs: collection.Seq[_]): Int    = orderedHash(xs, seqSeed)
   def mapHash(xs: collection.Map[_, _]): Int = unorderedHash(xs, mapSeed)
   def setHash(xs: collection.Set[_]): Int    = unorderedHash(xs, setSeed)
-
-  /** All this trouble and foreach still appears faster.
-   *  Leaving in place in case someone would like to investigate further.
-   */
-  /**
-  def linearSeqHash(xs: collection.LinearSeq[_], seed: Int): Int = {
-    var n = 0
-    var h = seed
-    var elems = xs
-    while (elems.nonEmpty) {
-      h = mix(h, elems.head.##)
-      n += 1
-      elems = elems.tail
-    }
-    finalizeHash(h, n)
-  }
-
-  def indexedSeqHash(xs: collection.IndexedSeq[_], seed: Int): Int = {
-    var n = 0
-    var h = seed
-    val len = xs.length
-    while (n < len) {
-      h = mix(h, xs(n).##)
-      n += 1
-    }
-    finalizeHash(h, n)
-  }
-  */
-
-  @deprecated("Use unorderedHash", "2.10.0")
-  final def symmetricHash[T](xs: collection.GenTraversableOnce[T], seed: Int = symmetricSeed): Int =
-    unorderedHash(xs.seq, seed)
-
-  @deprecated("Use orderedHash", "2.10.0")
-  final def traversableHash[T](xs: collection.GenTraversableOnce[T], seed: Int = traversableSeed): Int =
-    orderedHash(xs.seq, seed)
 }

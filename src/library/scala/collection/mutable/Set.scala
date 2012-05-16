@@ -22,13 +22,11 @@ import generic._
  *  @define Coll `mutable.Set`
  *  @define coll mutable set
  */
-trait Set[A] extends Iterable[A]
-//                with GenSet[A]
+trait Set[A] extends mutable.Iterable[A]
                 with scala.collection.Set[A]
                 with GenericSetTemplate[A, Set]
                 with SetLike[A, Set[A]] {
   override def companion: GenericCompanion[Set] = Set
-  override def seq: Set[A] = this
 }
 
 /** $factoryInfo

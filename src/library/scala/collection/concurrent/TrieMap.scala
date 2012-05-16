@@ -9,16 +9,11 @@
 package scala.collection
 package concurrent
 
-
-
 import java.util.concurrent.atomic._
 import collection.immutable.{ ListMap => ImmutableListMap }
-import collection.parallel.mutable.ParTrieMap
 import generic._
 import annotation.tailrec
 import annotation.switch
-
-
 
 private[collection] final class INode[K, V](bn: MainNode[K, V], g: Gen) extends INodeBase[K, V](g) {
   import INodeBase._
@@ -630,7 +625,6 @@ private[concurrent] case class RDCSS_Descriptor[K, V](old: INode[K, V], expected
 final class TrieMap[K, V] private (r: AnyRef, rtupd: AtomicReferenceFieldUpdater[TrieMap[K, V], AnyRef])
 extends scala.collection.concurrent.Map[K, V]
    with scala.collection.mutable.MapLike[K, V, TrieMap[K, V]]
-   with CustomParallelizable[(K, V), ParTrieMap[K, V]]
    with Serializable
 {
   import TrieMap.computeHash
@@ -755,12 +749,6 @@ extends scala.collection.concurrent.Map[K, V]
   }
 
   def string = RDCSS_READ_ROOT().string(0)
-
-  /* public methods */
-
-  override def seq = this
-
-  override def par = new ParTrieMap(this)
 
   override def empty: TrieMap[K, V] = new TrieMap[K, V]
 

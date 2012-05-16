@@ -6,13 +6,10 @@
 **                          |/                                          **
 \*                                                                      */
 
-
-
 package scala.collection
 package mutable
 
 import generic._
-import collection.parallel.mutable.ParHashSet
 
 /** This class implements mutable sets using a hashtable.
  *
@@ -44,7 +41,6 @@ extends AbstractSet[A]
    with GenericSetTemplate[A, HashSet]
    with SetLike[A, HashSet[A]]
    with FlatHashTable[A]
-   with CustomParallelizable[A, ParHashSet[A]]
    with Serializable
 {
   initWithContents(contents)
@@ -60,8 +56,6 @@ extends AbstractSet[A]
   def += (elem: A): this.type = { addEntry(elem); this }
 
   def -= (elem: A): this.type = { removeEntry(elem); this }
-
-  override def par = new ParHashSet(hashTableContents)
 
   override def add(elem: A): Boolean = addEntry(elem)
 

@@ -26,15 +26,12 @@ import generic._
  * @since 1
  */
 trait Map[A, +B] extends Iterable[(A, B)]
-//                    with GenMap[A, B]
                     with scala.collection.Map[A, B]
                     with MapLike[A, B, Map[A, B]] { self =>
 
   override def empty: Map[A, B] = Map.empty
   override def toMap[T, U](implicit ev: (A, B) <:< (T, U)): immutable.Map[T, U] =
     self.asInstanceOf[immutable.Map[T, U]]
-
-  override def seq: Map[A, B] = this
 
   /** The same map with a given default function.
    *  Note: `get`, `contains`, `iterator`, `keys`, etc are not affected by `withDefault`.

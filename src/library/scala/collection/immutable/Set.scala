@@ -6,13 +6,10 @@
 **                          |/                                          **
 \*                                                                      */
 
-
-
 package scala.collection
 package immutable
 
 import generic._
-import parallel.immutable.ParSet
 
 /** A generic trait for immutable sets.
  *  $setNote
@@ -25,16 +22,12 @@ import parallel.immutable.ParSet
  *  @define coll immutable set
  */
 trait Set[A] extends Iterable[A]
-//                with GenSet[A]
                 with scala.collection.Set[A]
                 with GenericSetTemplate[A, Set]
                 with SetLike[A, Set[A]]
-                with Parallelizable[A, ParSet[A]]
 {
   override def companion: GenericCompanion[Set] = Set
   override def toSet[B >: A]: Set[B] = this.asInstanceOf[Set[B]]
-  override def seq: Set[A] = this
-  protected override def parCombiner = ParSet.newCombiner[A] // if `immutable.SetLike` gets introduced, please move this there!
 }
 
 /** $factoryInfo

@@ -12,7 +12,6 @@ package mutable
 import generic._
 import script._
 import annotation.{ migration, bridge }
-import parallel.mutable.ParSet
 
 /** A template trait for mutable sets of type `mutable.Set[A]`.
  *  @tparam A    the type of the elements of the set
@@ -59,7 +58,6 @@ trait SetLike[A, +This <: SetLike[A, This] with Set[A]]
      with Growable[A]
      with Shrinkable[A]
      with Cloneable[mutable.Set[A]]
-     with Parallelizable[A, ParSet[A]]
 { self =>
 
   /** A common implementation of `newBuilder` for all mutable sets
@@ -67,8 +65,6 @@ trait SetLike[A, +This <: SetLike[A, This] with Set[A]]
    *  for better efficiency.
    */
   override protected[this] def newBuilder: Builder[A, This] = empty
-
-  protected[this] override def parCombiner = ParSet.newCombiner[A]
 
   /** Adds an element to this $coll.
    *
@@ -127,7 +123,7 @@ trait SetLike[A, +This <: SetLike[A, This] with Set[A]]
    */
   def clear() { foreach(-=) }
 
-  override def clone(): This = empty ++= repr.seq
+  override def clone(): This = empty ++= repr
 
   /** The result when this set is used as a builder
    *  @return  the set representation itself.
@@ -168,7 +164,7 @@ trait SetLike[A, +This <: SetLike[A, This] with Set[A]]
    *  @return          a new set consisting of elements of this set and those in `xs`.
    */
   @migration("`++` creates a new set. Use `++=` to add elements to this set and return that set itself.", "2.8.0")
-  override def ++(xs: GenTraversableOnce[A]): This = clone() ++= xs.seq
+  override def ++(xs: TraversableOnce[A]): This = clone() ++= xs
 
   /** Creates a new set consisting of all the elements of this set except `elem`.
    *
@@ -199,7 +195,7 @@ trait SetLike[A, +This <: SetLike[A, This] with Set[A]]
    *                  elements from `xs`.
    */
   @migration("`--` creates a new set. Use `--=` to remove elements from this set and return that set itself.", "2.8.0")
-  override def --(xs: GenTraversableOnce[A]): This = clone() --= xs.seq
+  override def --(xs: TraversableOnce[A]): This = clone() --= xs
 
   /** Send a message to this scriptable object.
    *

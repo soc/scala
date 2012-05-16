@@ -221,7 +221,7 @@ trait BufferLike[A, +This <: BufferLike[A, This] with Buffer[A]]
    *  @return       a new collection consisting of all the elements of this collection and `xs`.
    */
   @migration("`++` creates a new buffer. Use `++=` to add an element from this buffer and return that buffer itself.", "2.8.0")
-  def ++(xs: GenTraversableOnce[A]): This = clone() ++= xs.seq
+  def ++(xs: TraversableOnce[A]): This = clone() ++= xs
 
   /** Creates a new collection with all the elements of this collection except `elem`.
    *
@@ -251,5 +251,5 @@ trait BufferLike[A, +This <: BufferLike[A, This] with Buffer[A]]
    *                  those in `xs`
    */
   @migration("`--` creates a new buffer. Use `--=` to remove an element from this buffer and return that buffer itself.", "2.8.0")
-  override def --(xs: GenTraversableOnce[A]): This = clone() --= xs.seq
+  override def --(xs: TraversableOnce[A]): This = clone() --= xs
 }
