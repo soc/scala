@@ -14,7 +14,7 @@ package scala
  *  when parameterizing code on types. For instance, the specialized
  *  annotation is passed a sequence of types on which to specialize:
  *  {{{
- *     class Tuple1[@specialized(Unit, Int, Double) T]
+ *     class Tuple1[T]
  *  }}}
  *
  */

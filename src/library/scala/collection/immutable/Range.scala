@@ -115,7 +115,7 @@ extends collection.AbstractSeq[Int]
     else start + (step * idx)
   }
 
-  @inline final override def foreach[@specialized(Unit) U](f: Int => U) {
+  @inline final override def foreach[U](f: Int => U) {
     if (validateRangeBoundaries(f)) {
       var i = start
       val terminal = terminalElement

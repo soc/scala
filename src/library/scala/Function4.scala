@@ -22,7 +22,7 @@ trait Function4[-T1, -T2, -T3, -T4, +R] extends AnyRef { self =>
    *
    *  @return   a function `f` such that `f(x1)(x2)(x3)(x4) == apply(x1, x2, x3, x4)`
    */
-  @annotation.unspecialized def curried: T1 => T2 => T3 => T4 => R = {
+  def curried: T1 => T2 => T3 => T4 => R = {
     (x1: T1) => (x2: T2) => (x3: T3) => (x4: T4) => apply(x1, x2, x3, x4)
   }
   /** Creates a tupled version of this function: instead of 4 arguments,
@@ -31,7 +31,7 @@ trait Function4[-T1, -T2, -T3, -T4, +R] extends AnyRef { self =>
    *  @return   a function `f` such that `f((x1, x2, x3, x4)) == f(Tuple4(x1, x2, x3, x4)) == apply(x1, x2, x3, x4)`
    */
 
-  @annotation.unspecialized def tupled: Tuple4[T1, T2, T3, T4] => R = {
+  def tupled: Tuple4[T1, T2, T3, T4] => R = {
     case Tuple4(x1, x2, x3, x4) => apply(x1, x2, x3, x4)
   }
   override def toString() = "<function4>"

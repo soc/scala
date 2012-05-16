@@ -125,7 +125,7 @@ class MurmurHash3 {
 
   /** Compute the hash of an array.
    */
-  final def arrayHash[@specialized T](a: Array[T], seed: Int): Int = {
+  final def arrayHash[T](a: Array[T], seed: Int): Int = {
     var h = seed
     var i = 0
     while (i < a.length) {
@@ -184,7 +184,7 @@ object MurmurHash3 extends MurmurHash3 {
   final val mapSeed         = "Map".hashCode
   final val setSeed         = "Set".hashCode
 
-  def arrayHash[@specialized T](a: Array[T]): Int  = arrayHash(a, arraySeed)
+  def arrayHash[T](a: Array[T]): Int  = arrayHash(a, arraySeed)
   def bytesHash(data: Array[Byte]): Int            = bytesHash(data, arraySeed)
   def orderedHash(xs: TraversableOnce[Any]): Int   = orderedHash(xs, symmetricSeed)
   def productHash(x: Product): Int                 = productHash(x, productSeed)

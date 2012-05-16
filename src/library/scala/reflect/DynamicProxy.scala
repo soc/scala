@@ -24,7 +24,7 @@ trait DynamicProxy extends Dynamic{
    */
   case class DynamicReflectBoxed( class_ : Class[_], value: Any )
   object DynamicReflectBoxed{
-    implicit def box[@specialized T]( v:T ) = DynamicReflectBoxed( v.getClass, v )
+    implicit def box[T]( v:T ) = DynamicReflectBoxed( v.getClass, v )
   }
 
   def selectDynamic( method:String ) = {
