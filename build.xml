@@ -82,6 +82,7 @@ PROPERTIES
   <property name="comp.starr.jar" value="${lib.dir}/scala-compiler.jar"/>
   <property name="jline.jar" value="${lib.dir}/jline.jar"/>
   <property name="ant.jar" value="${ant.home}/lib/ant.jar"/>
+  <property name="fjbg.jar" value="${lib.dir}/fjbg.jar"/>
 
   <!-- Sets location of build folders -->
   <property name="build.dir" value="${basedir}/build"/>
@@ -522,31 +523,7 @@ QUICK BUILD (QUICK)
     <stopwatch name="quick.lib.timer" action="total"/>
   </target>
 
-  <target name="quick.newlibs" depends="quick.lib" if="libs.outdated">
-    <antcall target="libs.done" inheritRefs="true"/>
-    <property name="fjbg.jar" value="${build-libs.dir}/fjbg.jar"/>
-  </target>
-
-  <target name="quick.libs" depends="quick.newlibs" unless="libs.outdated">
-    <property name="fjbg.jar" value="${lib.dir}/fjbg.jar"/>
-  </target>
-
-  <target name="quick.newforkjoin" depends="quick.libs" if="forkjoin.outdated">
-    <antcall target="forkjoin.done" inheritRefs="true"/>
-    <property name="forkjoin.jar" value="${build-libs.dir}/forkjoin.jar"/>
-  </target>
-
-  <target name="quick.forkjoin" depends="quick.newforkjoin" unless="forkjoin.outdated">
-    <property name="forkjoin.jar" value="${lib.dir}/forkjoin.jar"/>
-  </target>
-
-  <target name="quick.pre-comp" depends="quick.forkjoin">
-    <uptodate property="quick.comp.available" targetfile="${build-quick.dir}/compiler.complete">
-      <srcfiles dir="${src.dir}/compiler"/>
-    </uptodate>
-  </target>
-
-  <target name="quick.comp" depends="quick.pre-comp" unless="quick.comp.available">
+  <target name="quick.comp" depends="quick.lib" unless="quick.comp.available">
     <stopwatch name="quick.comp.timer"/>
     <mkdir dir="${build-quick.dir}/classes/compiler"/>
     <!-- TODO If we have cross dependencies, move this below scalacfork... -->
@@ -627,18 +604,12 @@ QUICK BUILD (QUICK)
       javaFlags="${java.flags}"
       classpathref="quick.bin.classpath"/>
     <quick-bin
-      file="${build-quick.dir}/bin/scaladoc"
-      class="scala.tools.nsc.ScalaDoc"
-      javaFlags="${java.flags}"
-      classpathref="quick.bin.classpath"/>
-    <quick-bin
       file="${build-quick.dir}/bin/fsc"
       class="scala.tools.nsc.CompileClient"
       javaFlags="${java.flags}"
       classpathref="quick.bin.classpath"/>
     <chmod perm="ugo+rx" file="${build-quick.dir}/bin/scala"/>
     <chmod perm="ugo+rx" file="${build-quick.dir}/bin/scalac"/>
-    <chmod perm="ugo+rx" file="${build-quick.dir}/bin/scaladoc"/>
     <chmod perm="ugo+rx" file="${build-quick.dir}/bin/fsc"/>
     <touch file="${build-quick.dir}/bin.complete" verbose="no"/>
   </target>
@@ -733,16 +704,11 @@ PACKED QUICK BUILD (PACK)
       class="scala.tools.nsc.Main"
       javaFlags="${java.flags}"/>
     <pack-bin
-      file="${build-pack.dir}/bin/scaladoc"
-      class="scala.tools.nsc.ScalaDoc"
-      javaFlags="${java.flags}"/>
-    <pack-bin
       file="${build-pack.dir}/bin/fsc"
       class="scala.tools.nsc.CompileClient"
       javaFlags="${java.flags}"/>
     <chmod perm="ugo+rx" file="${build-pack.dir}/bin/scala"/>
     <chmod perm="ugo+rx" file="${build-pack.dir}/bin/scalac"/>
-    <chmod perm="ugo+rx" file="${build-pack.dir}/bin/scaladoc"/>
     <chmod perm="ugo+rx" file="${build-pack.dir}/bin/fsc"/>
     <touch file="${build-pack.dir}/bin.complete" verbose="no"/>
   </target>
@@ -815,5 +781,5 @@ STABLE REFERENCE (STARR)
     </delete>
   </target>
 
-  <target name="starr.done" depends="starr.libs, starr.removesha1"/>
+  <target name="starr.done" depends="starr.comp, starr.removesha1"/>
 </project>

@@ -59,7 +59,6 @@ trait MemberHandlers {
     case member: ClassDef      => new ClassHandler(member)
     case member: TypeDef       => new TypeAliasHandler(member)
     case member: Import        => new ImportHandler(member)
-    case DocDef(_, documented) => chooseHandler(documented)
     case member                => new GenericHandler(member)
   }
 

@@ -12,6 +12,4 @@ trait Required { self: SymbolTable =>
   def settings: MutableSettings
 
   def forInteractive: Boolean
-
-  def forScaladoc: Boolean
 }

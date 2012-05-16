@@ -20,7 +20,6 @@ abstract class Universe extends SymbolTable with ToolBoxes {
 
   lazy val settings = new Settings
   def forInteractive = false
-  def forScaladoc = false
 
   val phaseWithId: Array[Phase] = Array(NoPhase, SomePhase)
   val currentRunId = 1 // fake a run id so that it is different from NoRunId

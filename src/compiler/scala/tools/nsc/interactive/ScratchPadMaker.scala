@@ -70,8 +70,6 @@ trait ScratchPadMaker { self: Global =>
             toPrint += literal(nameType(stat.symbol))
           case Annotated(_, arg) =>
             traverse(arg)
-          case DocDef(_, defn) =>
-            traverse(defn)
           case _ =>
             if (stat.isTerm) {
               addSkip(stat)

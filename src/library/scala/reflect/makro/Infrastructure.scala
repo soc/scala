@@ -7,10 +7,6 @@ trait Infrastructure {
    */
   val forInteractive: Boolean
 
-  /** Determines whether the compiler expanding a macro is a Scaladoc compiler.
-   */
-  val forScaladoc: Boolean
-
   /** Exposes current compilation run.
    */
   val currentRun: Run

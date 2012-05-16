@@ -40,7 +40,6 @@ class Global(var currentSettings: Settings, var reporter: Reporter) extends Symb
                                                                        with Trees
                                                                        with FreeVars
                                                                        with TreePrinters
-                                                                       with DocComments
                                                                        with Positions {
 
   override def settings = currentSettings
@@ -1604,7 +1603,6 @@ class Global(var currentSettings: Settings, var reporter: Reporter) extends Symb
     })
   }
   def forInteractive   = onlyPresentation
-  def forScaladoc      = onlyPresentation
   def createJavadoc    = false
 
   @deprecated("Use forInteractive or forScaladoc, depending on what you're after", "2.9.0")

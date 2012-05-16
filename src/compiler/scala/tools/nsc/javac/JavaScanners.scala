@@ -72,7 +72,6 @@ trait JavaScanners extends ast.parser.ScannersCommon {
     def floatVal: Double = floatVal(false)
     //def token2string(token : Int) : String = configuration.token2string(token)
     /** return recent scala doc, if any */
-    def flushDoc: DocComment
     def currentPos: Position
   }
 
@@ -254,12 +253,6 @@ trait JavaScanners extends ast.parser.ScannersCommon {
     /** buffer for the documentation comment
      */
     var docBuffer: StringBuilder = null
-
-    def flushDoc: DocComment = {
-      val ret = if (docBuffer != null) DocComment(docBuffer.toString, NoPosition) else null
-      docBuffer = null
-      ret
-    }
 
     /** add the given character to the documentation buffer
      */
@@ -627,8 +620,6 @@ trait JavaScanners extends ast.parser.ScannersCommon {
         docBuffer = null
         in.next
         val scalaDoc = ("/**", "*/")
-        if (in.ch == '*' && forScaladoc)
-          docBuffer = new StringBuilder(scalaDoc._1)
         do {
           do {
             if (in.ch != '*' && in.ch != SU) {

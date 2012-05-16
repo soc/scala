@@ -178,7 +178,6 @@ trait ScalaSettings extends AbsScalaSettings
    */
   val Ybuildmanagerdebug      = BooleanSetting("-Ybuild-manager-debug", "Generate debug information for the Refined Build Manager compiler.")
   val Ycompletion             = BooleanSetting("-Ycompletion-debug", "Trace all tab completion activity.")
-  val Ydocdebug               = BooleanSetting("-Ydoc-debug", "Trace all scaladoc activity.")
   val Yidedebug               = BooleanSetting("-Yide-debug", "Generate, validate and output trees using the interactive compiler.")
   val Yinferdebug             = BooleanSetting("-Yinfer-debug", "Trace type inference and implicit search.")
   val Yissuedebug             = BooleanSetting("-Yissue-debug", "Print stack traces when a context issues an error.")
@@ -218,7 +217,4 @@ trait ScalaSettings extends AbsScalaSettings
    */
   val pluginOptions = MultiStringSetting("-P", "plugin:opt", "Pass an option to a plugin") .
                         withHelpSyntax("-P:<plugin>:<opt>")
-
-  /** Test whether this is scaladoc we're looking at */
-  def isScaladoc = false
 }

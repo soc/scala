@@ -651,35 +651,6 @@ self =>
 
     def isStatSep: Boolean = isStatSep(in.token)
 
-
-/* --------- COMMENT AND ATTRIBUTE COLLECTION ----------------------------- */
-
-    /** Join the comment associated with a definition. */
-    def joinComment(trees: => List[Tree]): List[Tree] = {
-      val doc = in.flushDoc
-      if ((doc ne null) && doc.raw.length > 0) {
-        val joined = trees map {
-          t =>
-            DocDef(doc, t) setPos {
-              if (t.pos.isDefined) {
-                val pos = doc.pos.withEnd(t.pos.endOrPoint)
-                // always make the position transparent
-                pos.makeTransparent
-              } else {
-                t.pos
-              }
-            }
-        }
-        joined.find(_.pos.isOpaqueRange) foreach {
-          main =>
-            val mains = List(main)
-            joined foreach { t => if (t ne main) ensureNonOverlapping(t, mains) }
-        }
-        joined
-      }
-      else trees
-    }
-
 /* ---------- TREE CONSTRUCTION ------------------------------------------- */
 
     def atPos[T <: Tree](offset: Int)(t: T): T =
@@ -2898,16 +2869,14 @@ self =>
           case PACKAGE  =>
             val start = in.skipToken()
             if (in.token == OBJECT)
-              joinComment(List(makePackageObject(start, objectDef(in.offset, NoMods))))
-            else {
-              in.flushDoc
+              List(makePackageObject(start, objectDef(in.offset, NoMods)))
+            else
               List(packaging(start))
-            }
+
           case IMPORT =>
-            in.flushDoc
             importClause()
           case x if x == AT || isTemplateIntro || isModifier =>
-            joinComment(List(topLevelTmplDef))
+            List(topLevelTmplDef)
           case _ =>
             if (!isStatSep)
               syntaxErrorOrIncomplete("expected class or object definition", true)
@@ -2940,7 +2909,6 @@ self =>
       var self: ValDef = emptyValDef
       val stats = new ListBuffer[Tree]
       if (isExprIntro) {
-        in.flushDoc
         val first = expr(InTemplate) // @S: first statement is potentially converted so cannot be stubbed.
         if (in.token == ARROW) {
           first match {
@@ -2961,13 +2929,11 @@ self =>
       }
       while (!isStatSeqEnd) {
         if (in.token == IMPORT) {
-          in.flushDoc
           stats ++= importClause()
         } else if (isExprIntro) {
-          in.flushDoc
           stats += statement(InTemplate)
         } else if (isDefIntro || isModifier || in.token == AT) {
-          stats ++= joinComment(nonLocalDefOrDcl)
+          stats ++= nonLocalDefOrDcl
         } else if (!isStatSep) {
           syntaxErrorOrIncomplete("illegal start of definition", true)
         }
@@ -2987,7 +2953,7 @@ self =>
       val stats = new ListBuffer[Tree]
       while (!isStatSeqEnd) {
         if (isDclIntro) { // don't IDE hook
-          stats ++= joinComment(defOrDcl(in.offset, NoMods))
+          stats ++= defOrDcl(in.offset, NoMods)
         } else if (!isStatSep) {
           syntaxErrorOrIncomplete(
             "illegal start of declaration"+
@@ -3080,14 +3046,13 @@ self =>
         if (in.token == PACKAGE) {
           in.nextToken()
           if (in.token == OBJECT) {
-            ts ++= joinComment(List(makePackageObject(start, objectDef(in.offset, NoMods))))
+            ts ++= List(makePackageObject(start, objectDef(in.offset, NoMods)))
             if (in.token != EOF) {
               acceptStatSep()
               ts ++= topStatSeq()
             }
           } else {
             val nameOffset = in.offset
-            in.flushDoc
             val pkg = pkgQualId()
 
             if (in.token == EOF) {

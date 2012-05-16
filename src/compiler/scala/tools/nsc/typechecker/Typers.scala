@@ -94,7 +94,7 @@ trait Typers extends Modes with Adaptations with Taggings {
   //  - we may virtualize matches (if -Xexperimental and there's a suitable __match in scope)
   //  - we synthesize PartialFunction implementations for `x => x match {...}` and `match {...}` when the expected type is PartialFunction
   // this is disabled by: -Xoldpatmat, scaladoc or interactive compilation
-  @inline private def newPatternMatching = opt.virtPatmat && !forScaladoc && !forInteractive // && (phase.id < currentRun.uncurryPhase.id)
+  @inline private def newPatternMatching = opt.virtPatmat && !forInteractive // && (phase.id < currentRun.uncurryPhase.id)
 
   abstract class Typer(context0: Context) extends TyperDiagnostics with Adaptation with Tagging with TyperContextErrors {
     import context0.unit
@@ -1044,7 +1044,7 @@ trait Typers extends Modes with Adaptations with Taggings {
       tree.tpe match {
         case atp @ AnnotatedType(_, _, _) if canAdaptAnnotations(tree, mode, pt) => // (-1)
           adaptAnnotations(tree, mode, pt)
-        case ct @ ConstantType(value) if inNoModes(mode, TYPEmode | FUNmode) && (ct <:< pt) && !forScaladoc && !forInteractive => // (0)
+        case ct @ ConstantType(value) if inNoModes(mode, TYPEmode | FUNmode) && (ct <:< pt) => // (0)
           val sym = tree.symbol
           if (sym != null && sym.isDeprecated) {
             val msg = sym.toString + sym.locationString + " is deprecated: " + sym.deprecationMessage.getOrElse("")
@@ -1654,7 +1654,6 @@ trait Typers extends Modes with Adaptations with Taggings {
      *  to be transparent.
      */
     def rewrappingWrapperTrees(f: Tree => List[Tree]): Tree => List[Tree] = {
-      case dd @ DocDef(comment, defn) => f(defn) map (stat => DocDef(comment, stat) setPos dd.pos)
       case Annotated(annot, defn)     => f(defn) map (stat => Annotated(annot, stat))
       case tree                       => f(tree)
     }
@@ -1889,45 +1888,6 @@ trait Typers extends Modes with Adaptations with Taggings {
         if (paramType.isInstanceOf[ThisType] && sym == meth.owner)
           fail("Parameter type in structural refinement may not refer to the type of that refinement (self type)")
       }
-    }
-    def typedUseCase(useCase: UseCase) {
-      def stringParser(str: String): syntaxAnalyzer.Parser = {
-        val file = new BatchSourceFile(context.unit.source.file, str) {
-          override def positionInUltimateSource(pos: Position) = {
-            pos.withSource(context.unit.source, useCase.pos.start)
-          }
-        }
-        val unit = new CompilationUnit(file)
-        new syntaxAnalyzer.UnitParser(unit)
-      }
-      val trees = stringParser(useCase.body+";").nonLocalDefOrDcl
-      val enclClass = context.enclClass.owner
-      def defineAlias(name: Name) =
-        if (context.scope.lookup(name) == NoSymbol) {
-          lookupVariable(name.toString.substring(1), enclClass) match {
-            case Some(repl) =>
-              silent(_.typedTypeConstructor(stringParser(repl).typ())) match {
-                case SilentResultValue(tpt) =>
-                  val alias = enclClass.newAliasType(name.toTypeName, useCase.pos)
-                  val tparams = cloneSymbolsAtOwner(tpt.tpe.typeSymbol.typeParams, alias)
-                  alias setInfo typeFun(tparams, appliedType(tpt.tpe, tparams map (_.tpe)))
-                  context.scope.enter(alias)
-                case _ =>
-              }
-            case _ =>
-          }
-        }
-      for (tree <- trees; t <- tree)
-        t match {
-          case Ident(name) if name startsWith '$' => defineAlias(name)
-          case _ =>
-        }
-      useCase.aliases = context.scope.toList
-      namer.enterSyms(trees)
-      typedStats(trees, NoSymbol)
-      useCase.defined = context.scope.toList filterNot (useCase.aliases contains _)
-      if (settings.debug.value)
-        useCase.defined foreach (sym => println("defined use cases: %s:%s".format(sym, sym.tpe)))
     }
 
     /**
@@ -4629,25 +4589,6 @@ trait Typers extends Modes with Adaptations with Taggings {
 
         case ldef @ LabelDef(_, _, _) =>
           labelTyper(ldef).typedLabelDef(ldef)
-
-        case ddef @ DocDef(comment, defn) =>
-          if (forScaladoc && (sym ne null) && (sym ne NoSymbol)) {
-            docComments(sym) = comment
-            comment.defineVariables(sym)
-            val typer1 = newTyper(context.makeNewScope(tree, context.owner))
-            for (useCase <- comment.useCases) {
-              typer1.silent(_.typedUseCase(useCase)) match {
-                case SilentTypeError(err) =>
-                  unit.warning(useCase.pos, err.errMsg)
-                case _ =>
-              }
-              for (useCaseSym <- useCase.defined) {
-                if (sym.name != useCaseSym.name)
-                  unit.warning(useCase.pos, "@usecase " + useCaseSym.name.decode + " does not match commented symbol: " + sym.name.decode)
-              }
-            }
-          }
-          typed(defn, mode, pt)
 
         case Annotated(constr, arg) =>
           typedAnnotated(constr, typed(arg, mode, pt))

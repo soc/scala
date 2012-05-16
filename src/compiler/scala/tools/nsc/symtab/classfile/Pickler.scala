@@ -283,11 +283,6 @@ abstract class Pickler extends SubComponent {
             putEntry(from)
             putEntry(to)
           }
-/*
-        case DocDef(comment, definition) =>  should not be needed
-          putConstant(Constant(comment))
-          putTree(definition)
-*/
         case Template(parents, self, body) =>
           writeNat(parents.length)
           putTrees(parents)
@@ -724,13 +719,6 @@ abstract class Pickler extends SubComponent {
             writeRef(from)
             writeRef(to)
           }
-          TREE
-
-        case tree@DocDef(comment, definition) =>
-          writeNat(DOCDEFtree)
-          writeRef(tree.tpe)
-          writeRef(Constant(comment))
-          writeRef(definition)
           TREE
 
         case tree@Template(parents, self, body) =>

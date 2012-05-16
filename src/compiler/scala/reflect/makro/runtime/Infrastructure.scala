@@ -6,8 +6,6 @@ trait Infrastructure {
 
   val forInteractive: Boolean = mirror.forInteractive
 
-  val forScaladoc: Boolean = mirror.forScaladoc
-
   val currentRun: Run = mirror.currentRun
 
   type Run = mirror.Run

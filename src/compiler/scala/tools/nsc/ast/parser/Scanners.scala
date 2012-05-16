@@ -133,29 +133,11 @@ trait Scanners extends ScannersCommon {
       cbuf.clear()
     }
 
-    /** Should doc comments be built? */
-    def buildDocs: Boolean = forScaladoc
-
     /** buffer for the documentation comment
      */
-    var docBuffer: StringBuilder = null
     var docPos: Position = null
 
-    /** Return current docBuffer and set docBuffer to null */
-    def flushDoc: DocComment = {
-      val ret = if (docBuffer != null) DocComment(docBuffer.toString, docPos) else null
-      docBuffer = null
-      ret
-    }
-
-    /** add the given character to the documentation buffer
-     */
-    protected def putDocChar(c: Char) {
-      if (docBuffer ne null) docBuffer.append(c)
-    }
-
     protected def foundComment(value: String, start: Int, end: Int) = ()
-    protected def foundDocComment(value: String, start: Int, end: Int) = ()
 
     private class TokenData0 extends TokenData
 
@@ -230,11 +212,9 @@ trait Scanners extends ScannersCommon {
           while (!sepRegions.isEmpty && sepRegions.head != RBRACE)
             sepRegions = sepRegions.tail
           if (!sepRegions.isEmpty) sepRegions = sepRegions.tail
-          docBuffer = null
         case RBRACKET | RPAREN =>
           if (!sepRegions.isEmpty && sepRegions.head == lastToken)
             sepRegions = sepRegions.tail
-          docBuffer = null
         case ARROW =>
           if (!sepRegions.isEmpty && sepRegions.head == lastToken)
             sepRegions = sepRegions.tail
@@ -519,41 +499,32 @@ trait Scanners extends ScannersCommon {
             nextChar()
           } while ((ch != CR) && (ch != LF) && (ch != SU))
         } else {
-          docBuffer = null
           var openComments = 1
           appendToComment()
           nextChar()
           appendToComment()
-          var buildingDocComment = false
-          if (ch == '*' && buildDocs) {
-            buildingDocComment = true
-            docBuffer = new StringBuilder("/**")
-          }
           while (openComments > 0) {
             do {
               do {
                 if (ch == '/') {
-                  nextChar(); putDocChar(ch); appendToComment()
+                  nextChar(); appendToComment()
                   if (ch == '*') {
-                    nextChar(); putDocChar(ch); appendToComment()
+                    nextChar(); appendToComment()
                     openComments += 1
                   }
                 }
                 if (ch != '*' && ch != SU) {
-                  nextChar(); putDocChar(ch); appendToComment()
+                  nextChar(); appendToComment()
                 }
               } while (ch != '*' && ch != SU)
               while (ch == '*') {
-                nextChar(); putDocChar(ch); appendToComment()
+                nextChar(); appendToComment()
               }
             } while (ch != '/' && ch != SU)
             if (ch == '/') nextChar()
             else incompleteInputError("unclosed comment")
             openComments -= 1
           }
-
-          if (buildingDocComment)
-            foundDocComment(comment.toString, offset, charOffset - 2)
         }
 
         foundComment(comment.toString, offset, charOffset - 2)
@@ -1269,11 +1240,6 @@ trait Scanners extends ScannersCommon {
     override def foundComment(value: String, start: Int, end: Int) {
       val pos = new RangePosition(unit.source, start, start, end)
       unit.comment(pos, value)
-    }
-
-    override def foundDocComment(value: String, start: Int, end: Int) {
-      docPos = new RangePosition(unit.source, start, start, end)
-      unit.comment(docPos, value)
     }
   }
 

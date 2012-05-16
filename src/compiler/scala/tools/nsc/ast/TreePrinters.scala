@@ -46,11 +46,6 @@ trait TreePrinters extends reflect.internal.TreePrinters { this: Global =>
 
   // overflow cases missing from TreePrinter in reflect.api
   override def xprintTree(treePrinter: super.TreePrinter, tree: Tree) = tree match {
-    case DocDef(comment, definition) =>
-      treePrinter.print(comment.raw)
-      treePrinter.println()
-      treePrinter.print(definition)
-
     case TypeTreeWithDeferredRefCheck() =>
       treePrinter.print("<tree with deferred refcheck>")
 
@@ -212,7 +207,6 @@ trait TreePrinters extends reflect.internal.TreePrinters { this: Global =>
       // eliminated by typer
       case Annotated(annot, arg)  =>
       case AssignOrNamedArg(lhs, rhs) =>
-      case DocDef(comment, definition) =>
       case Import(expr, selectors) =>
 
       // eliminated by refchecks
