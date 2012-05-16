@@ -6,8 +6,6 @@
 **                          |/                                          **
 \*                                                                      */
 
-
-
 package scala.collection
 package immutable
 
@@ -47,6 +45,4 @@ final class StringOps(override val repr: String) extends AnyVal with StringLike[
   }
   override def toString = repr
   override def length = repr.length
-
-  def seq = new WrappedString(repr)
 }

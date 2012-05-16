@@ -490,22 +490,22 @@ trait SeqLike[+A, +Repr] extends Any with IterableLike[A, Repr] {
   //  *  @return  A new $coll which contains the first occurrence of every element of this $coll.
   //  */
   // def distinct: Repr
-  //
-  // /** Hashcodes for $Coll produce a value from the hashcodes of all the
-  //  *  elements of the $coll.
-  //  */
-  // override def hashCode() = util.MurmurHash3.seqHash(this)
-  //
-  // /** The equals method for arbitrary sequences. Compares this sequence to
-  //  *  some other object.
-  //  *  @param    that  The object to compare the sequence to
-  //  *  @return   `true` if `that` is a sequence that has the same elements as
-  //  *            this sequence in the same order, `false` otherwise
-  //  */
-  // override def equals(that: Any): Boolean = that match {
-  //   case that: Seq[_] => (that canEqual this) && (this sameElements that)
-  //   case _               => false
-  // }
+
+  /** Hashcodes for $Coll produce a value from the hashcodes of all the
+   *  elements of the $coll.
+   */
+  override def hashCode() = util.MurmurHash3.seqHash(this.toSeq)
+
+  /** The equals method for arbitrary sequences. Compares this sequence to
+   *  some other object.
+   *  @param    that  The object to compare the sequence to
+   *  @return   `true` if `that` is a sequence that has the same elements as
+   *            this sequence in the same order, `false` otherwise
+   */
+  override def equals(that: Any): Boolean = that match {
+    case that: Seq[_] => (that canEqual this) && (this sameElements that)
+    case _            => false
+  }
 
   override protected[this] def thisCollection: Seq[A] = this.asInstanceOf[Seq[A]]
   override protected[this] def toCollection(repr: Repr): Seq[A] = repr.asInstanceOf[Seq[A]]

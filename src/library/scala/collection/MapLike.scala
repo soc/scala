@@ -65,11 +65,11 @@ trait MapLike[A, +B, +This <: MapLike[A, B, This] with Map[A, B]]
   // def apply(key: A): B
   // def +[B1 >: B](kv: (A, B1)): GenMap[A, B1]
   // def - (key: A): Repr
-  //
-  // // This hash code must be symmetric in the contents but ought not
-  // // collide trivially.
-  // override def hashCode() = util.MurmurHash3.mapHash(this)
-  //
+
+  // This hash code must be symmetric in the contents but ought not
+  // collide trivially.
+  override def hashCode() = util.MurmurHash3.mapHash(this.toMap)
+
   // /**  Returns the value associated with a key, or a default value if the key is not contained in the map.
   //  *   @param   key      the key.
   //  *   @param   default  a computation that yields a default value in case no binding for `key` is
@@ -137,36 +137,35 @@ trait MapLike[A, +B, +This <: MapLike[A, B, This] with Map[A, B]]
   //  *          to `f(this(key))`. The resulting map wraps the original map without copying any elements.
   //  */
   // def mapValues[C](f: B => C): GenMap[A, C]
-  //
-  // /** Compares two maps structurally; i.e. checks if all mappings
-  //  *  contained in this map are also contained in the other map,
-  //  *  and vice versa.
-  //  *
-  //  *  @param that the other map
-  //  *  @return     `true` if both maps contain exactly the
-  //  *              same mappings, `false` otherwise.
-  //  */
-  // override def equals(that: Any): Boolean = that match {
-  //   case that: GenMap[b, _] =>
-  //     (this eq that) ||
-  //     (that canEqual this) &&
-  //     (this.size == that.size) && {
-  //     try {
-  //       this forall {
-  //         case (k, v) => that.get(k.asInstanceOf[b]) match {
-  //           case Some(`v`) =>
-  //             true
-  //           case _ => false
-  //         }
-  //       }
-  //     } catch {
-  //       case ex: ClassCastException =>
-  //         println("class cast "); false
-  //     }}
-  //   case _ =>
-  //     false
-  // }
-  //
+
+  /** Compares two maps structurally; i.e. checks if all mappings
+   *  contained in this map are also contained in the other map,
+   *  and vice versa.
+   *
+   *  @param that the other map
+   *  @return     `true` if both maps contain exactly the
+   *              same mappings, `false` otherwise.
+   */
+  override def equals(that: Any): Boolean = that match {
+    case that: collection.Map[b, _] =>
+      (this eq that) ||
+      (that canEqual this) &&
+      (this.size == that.size) && {
+      try {
+        this forall {
+          case (k, v) => that.get(k.asInstanceOf[b]) match {
+            case Some(`v`) =>
+              true
+            case _ => false
+          }
+        }
+      } catch {
+        case ex: ClassCastException =>
+          println("class cast "); false
+      }}
+    case _ =>
+      false
+  }
 
   /** The empty map of the same type as this map
    *   @return   an empty map of type `This`.
@@ -293,14 +292,12 @@ trait MapLike[A, +B, +This <: MapLike[A, B, This] with Map[A, B]]
    *
    *  @return the keys of this map as an iterable.
    */
-  @migration("`keys` returns `Iterable[A]` rather than `Iterator[A]`.", "2.8.0")
   def keys: Iterable[A] = keySet
 
   /** Collects all values of this map in an iterable collection.
    *
    *  @return the values of this map as an iterable.
    */
-  @migration("`values` returns `Iterable[B]` rather than `Iterator[B]`.", "2.8.0")
   def values: Iterable[B] = new DefaultValuesIterable
 
   /** The implementation class of the iterable returned by `values`.

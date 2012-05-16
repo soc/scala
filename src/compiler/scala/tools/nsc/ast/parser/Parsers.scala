@@ -159,8 +159,8 @@ self =>
     def syntaxError(offset: Int, msg: String): Unit = throw new MalformedInput(offset, msg)
     def incompleteInputError(msg: String): Unit = throw new MalformedInput(source.content.length - 1, msg)
 
-    def xmlLiteral : Tree = EmptyTree
-    def xmlLiteralPattern : Tree = EmptyTree
+    def xmlLiteral : Tree = sys.error("xmlLiteral")
+    def xmlLiteralPattern : Tree = sys.error("xmlLiteralPattern")
   }
 
   class OutlineParser(source: SourceFile) extends SourceFileParser(source) {

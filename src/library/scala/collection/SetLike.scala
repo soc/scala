@@ -132,27 +132,27 @@ extends IterableLike[A, This]
    *              every element of this set is also an element of `that`.
    */
   def subsetOf(that: Set[A]): Boolean = this forall that
-  //
-  // /** Compares this set with another object for equality.
-  //  *
-  //  *  '''Note:''' This operation contains an unchecked cast: if `that`
-  //  *        is a set, it will assume with an unchecked cast
-  //  *        that it has the same element type as this set.
-  //  *        Any subsequent ClassCastException is treated as a `false` result.
-  //  *  @param that the other object
-  //  *  @return     `true` if `that` is a set which contains the same elements
-  //  *              as this set.
-  //  */
-  // override def equals(that: Any): Boolean = that match {
-  //   case that: Set[_] =>
-  //     (this eq that) ||
-  //     (that canEqual this) &&
-  //     (this.size == that.size) &&
-  //     (try this subsetOf that.asInstanceOf[Set[A]]
-  //      catch { case ex: ClassCastException => false })
-  //   case _ =>
-  //     false
-  // }
+
+  /** Compares this set with another object for equality.
+   *
+   *  '''Note:''' This operation contains an unchecked cast: if `that`
+   *        is a set, it will assume with an unchecked cast
+   *        that it has the same element type as this set.
+   *        Any subsequent ClassCastException is treated as a `false` result.
+   *  @param that the other object
+   *  @return     `true` if `that` is a set which contains the same elements
+   *              as this set.
+   */
+  override def equals(that: Any): Boolean = that match {
+    case that: Set[_] =>
+      (this eq that) ||
+      (that canEqual this) &&
+      (this.size == that.size) &&
+      (try this subsetOf that.asInstanceOf[Set[A]]
+       catch { case ex: ClassCastException => false })
+    case _ =>
+      false
+  }
 
   // Careful! Don't write a Set's hashCode like:
   //    override def hashCode() = this map (_.hashCode) sum
