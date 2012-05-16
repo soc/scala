@@ -124,7 +124,7 @@ trait ParsersCommon extends ScannersCommon {
  *    </li>
  *  </ol>
  */
-trait Parsers extends Scanners with MarkupParsers with ParsersCommon {
+trait Parsers extends Scanners with ParsersCommon {
 self =>
   val global: Global
   import global._
@@ -159,16 +159,8 @@ self =>
     def syntaxError(offset: Int, msg: String): Unit = throw new MalformedInput(offset, msg)
     def incompleteInputError(msg: String): Unit = throw new MalformedInput(source.content.length - 1, msg)
 
-    /** the markup parser */
-    lazy val xmlp = new MarkupParser(this, true)
-
-    object symbXMLBuilder extends SymbolicXMLBuilder(this, true) { // DEBUG choices
-      val global: self.global.type = self.global
-      def freshName(prefix: String): Name = SourceFileParser.this.freshName(prefix)
-    }
-
-    def xmlLiteral : Tree = xmlp.xLiteral
-    def xmlLiteralPattern : Tree = xmlp.xLiteralPattern
+    def xmlLiteral : Tree = EmptyTree
+    def xmlLiteralPattern : Tree = EmptyTree
   }
 
   class OutlineParser(source: SourceFile) extends SourceFileParser(source) {
