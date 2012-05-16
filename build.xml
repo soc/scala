@@ -83,6 +83,7 @@ PROPERTIES
   <property name="jline.jar" value="${lib.dir}/jline.jar"/>
   <property name="ant.jar" value="${ant.home}/lib/ant.jar"/>
   <property name="fjbg.jar" value="${lib.dir}/fjbg.jar"/>
+  <property name="forkjoin.jar" value="${lib.dir}/forkjoin.jar"/>
 
   <!-- Sets location of build folders -->
   <property name="build.dir" value="${basedir}/build"/>
@@ -603,14 +604,8 @@ QUICK BUILD (QUICK)
       class="scala.tools.nsc.Main"
       javaFlags="${java.flags}"
       classpathref="quick.bin.classpath"/>
-    <quick-bin
-      file="${build-quick.dir}/bin/fsc"
-      class="scala.tools.nsc.CompileClient"
-      javaFlags="${java.flags}"
-      classpathref="quick.bin.classpath"/>
     <chmod perm="ugo+rx" file="${build-quick.dir}/bin/scala"/>
     <chmod perm="ugo+rx" file="${build-quick.dir}/bin/scalac"/>
-    <chmod perm="ugo+rx" file="${build-quick.dir}/bin/fsc"/>
     <touch file="${build-quick.dir}/bin.complete" verbose="no"/>
   </target>
 
@@ -703,13 +698,8 @@ PACKED QUICK BUILD (PACK)
       file="${build-pack.dir}/bin/scalac"
       class="scala.tools.nsc.Main"
       javaFlags="${java.flags}"/>
-    <pack-bin
-      file="${build-pack.dir}/bin/fsc"
-      class="scala.tools.nsc.CompileClient"
-      javaFlags="${java.flags}"/>
     <chmod perm="ugo+rx" file="${build-pack.dir}/bin/scala"/>
     <chmod perm="ugo+rx" file="${build-pack.dir}/bin/scalac"/>
-    <chmod perm="ugo+rx" file="${build-pack.dir}/bin/fsc"/>
     <touch file="${build-pack.dir}/bin.complete" verbose="no"/>
   </target>
 
@@ -732,7 +722,29 @@ PACKED QUICK BUILD (PACK)
 TEST AND DISTRIBUTION BUNDLE (ALL)
 ============================================================================ -->
 
-  <target name="all.clean" depends="locker.clean, quick.clean, pack.clean"/>
+  <property name="dists.dir" value="${basedir}/dists"/>
+
+  <target name="dist" depends="pack.done">
+    <property name="dist.name" value="scala-${version.number}"/>
+    <property name="dist.dir" value="${dists.dir}/${dist.name}"/>
+    <mkdir dir="${dist.dir}/lib"/>
+    <copy toDir="${dist.dir}/lib">
+      <fileset dir="${build-pack.dir}/lib"/>
+    </copy>
+    <mkdir dir="${dist.dir}/bin"/>
+    <copy toDir="${dist.dir}/bin">
+      <fileset dir="${build-pack.dir}/bin"/>
+    </copy>
+    <chmod perm="ugo+rx" file="${dist.dir}/bin/scala"/>
+    <chmod perm="ugo+rx" file="${dist.dir}/bin/scalac"/>
+    <symlink link="${dists.dir}/latest" resource="${dist.name}" overwrite="yes"/>
+  </target>
+
+  <target name="dist.clean">
+    <delete dir="${dists.dir}" includeemptydirs="yes" quiet="yes" failonerror="no"/>
+  </target>
+
+  <target name="all.clean" depends="locker.clean, quick.clean, pack.clean, dist.clean"/>
 
 <!-- ===========================================================================
 STABLE REFERENCE (STARR)
