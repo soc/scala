@@ -1,0 +1,4 @@
+<antlib>
+    <taskdef name="scalacfork"
+             classname="scala.tools.ant.sabbus.ScalacFork"/>
+</antlib>
