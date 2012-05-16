@@ -25,7 +25,6 @@ abstract class Driver {
   protected def doCompile(compiler: Global) {
     if (command.files.isEmpty) {
       reporter.echo(command.usageMsg)
-      reporter.echo(compiler.pluginOptionsHelp)
     } else {
       val run = new compiler.Run()
       run compile command.files

@@ -117,8 +117,6 @@ object PathResolver {
 
     def scalaExtDirs = Environment.scalaExtDirs
 
-    def scalaPluginPath = (scalaHomeDir / "misc" / "scala-devel" / "plugins").path
-
     override def toString = """
       |object Defaults {
       |  scalaHome            = %s
@@ -126,12 +124,11 @@ object PathResolver {
       |  scalaLibDirFound     = %s
       |  scalaLibFound        = %s
       |  scalaBootClassPath   = %s
-      |  scalaPluginPath      = %s
       |}""".trim.stripMargin.format(
         scalaHome,
         ppcp(javaBootClassPath),
         scalaLibDirFound, scalaLibFound,
-        ppcp(scalaBootClassPath), ppcp(scalaPluginPath)
+        ppcp(scalaBootClassPath)
       )
   }
 

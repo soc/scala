@@ -18,7 +18,6 @@ import settings.{ AestheticSettings }
 import symtab.{ Flags, SymbolTable, SymbolLoaders, SymbolTrackers }
 import symtab.classfile.Pickler
 import dependencies.DependencyAnalysis
-import plugins.Plugins
 import ast._
 import ast.parser._
 import typechecker._
@@ -35,7 +34,6 @@ class Global(var currentSettings: Settings, var reporter: Reporter) extends Symb
                                                                        with ClassLoaders
                                                                        with ToolBoxes
                                                                        with CompilationUnits
-                                                                       with Plugins
                                                                        with PhaseAssembly
                                                                        with Trees
                                                                        with FreeVars
@@ -734,7 +732,6 @@ class Global(var currentSettings: Settings, var reporter: Reporter) extends Symb
   protected def computePhaseDescriptors: List[SubComponent] = {
     computeInternalPhases()       // Global.scala
     computePlatformPhases()       // backend/Platform.scala
-    computePluginPhases()         // plugins/Plugins.scala
     buildCompilerFromPhasesSet()  // PhaseAssembly.scala
   }
 

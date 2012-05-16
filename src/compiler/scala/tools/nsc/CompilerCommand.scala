@@ -90,15 +90,14 @@ class CompilerCommand(arguments: List[String], val settings: Settings) {
   // an informative message of some sort should be printed instead.
   def shouldStopWithInfo = {
     import settings.{ Setting => _, _ }
-    Set[BooleanSetting](help, Xhelp, Yhelp, showPlugins, showPhases) exists (_.value)
+    Set[BooleanSetting](help, Xhelp, Yhelp, showPhases) exists (_.value)
   }
 
   def getInfoMessage(global: Global): String = {
     import settings._
-    if (help.value)               usageMsg + global.pluginOptionsHelp
+    if (help.value)               usageMsg
     else if (Xhelp.value)         xusageMsg
     else if (Yhelp.value)         yusageMsg
-    else if (showPlugins.value)   global.pluginDescriptions
     else if (showPhases.value)    global.phaseDescriptions + (
       if (debug.value) "\n" + global.phaseFlagDescriptions else ""
     )
