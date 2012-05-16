@@ -245,7 +245,7 @@ extends collection.AbstractSeq[Int]
 
   final def contains(x: Int) = isWithinBoundaries(x) && ((x - start) % step == 0)
 
-  final override def sum[B >: Int](implicit num: Numeric[B]): Int = {
+  def sum[B >: Int](implicit num: Numeric[B]): Int = {
     if (isEmpty) 0
     else if (numRangeElements == 1) head
     else (numRangeElements.toLong * (head + last) / 2).toInt

@@ -273,67 +273,6 @@ trait TraversableOnce[+A] extends Any {
   //  */
   // def count(p: A => Boolean): Int
   //
-  // /** Sums up the elements of this collection.
-  //  *
-  //  *   @param   num  an implicit parameter defining a set of numeric operations
-  //  *                 which includes the `+` operator to be used in forming the sum.
-  //  *   @tparam  A1   the result type of the `+` operator.
-  //  *   @return       the sum of all elements of this $coll with respect to the `+` operator in `num`.
-  //  *
-  //  *   @usecase def sum: A
-  //  *     @inheritdoc
-  //  *
-  //  *     @return       the sum of all elements in this $coll of numbers of type `Int`.
-  //  *     Instead of `Int`, any other type `T` with an implicit `Numeric[T]` implementation
-  //  *     can be used as element type of the $coll and as result type of `sum`.
-  //  *     Examples of such types are: `Long`, `Float`, `Double`, `BigInt`.
-  //  *
-  //  */
-  // def sum[A1 >: A](implicit num: Numeric[A1]): A1
-  //
-  // /** Multiplies up the elements of this collection.
-  //  *
-  //  *   @param   num  an implicit parameter defining a set of numeric operations
-  //  *                 which includes the `*` operator to be used in forming the product.
-  //  *   @tparam  A1   the result type of the `*` operator.
-  //  *   @return       the product of all elements of this $coll with respect to the `*` operator in `num`.
-  //  *
-  //  *   @usecase def product: A
-  //  *     @inheritdoc
-  //  *
-  //  *     @return       the product of all elements in this $coll of numbers of type `Int`.
-  //  *     Instead of `Int`, any other type `T` with an implicit `Numeric[T]` implementation
-  //  *     can be used as element type of the $coll and as result type of `product`.
-  //  *     Examples of such types are: `Long`, `Float`, `Double`, `BigInt`.
-  //  */
-  // def product[A1 >: A](implicit num: Numeric[A1]): A1
-  //
-  // /** Finds the smallest element.
-  //  *
-  //  *  @param    ord   An ordering to be used for comparing elements.
-  //  *  @tparam   A1    The type over which the ordering is defined.
-  //  *  @return   the smallest element of this $coll with respect to the ordering `cmp`.
-  //  *
-  //  *  @usecase def min: A
-  //  *    @inheritdoc
-  //  *
-  //  *    @return   the smallest element of this $coll
-  //  */
-  // def min[A1 >: A](implicit ord: Ordering[A1]): A
-  //
-  // /** Finds the largest element.
-  //  *
-  //  *  @param    ord   An ordering to be used for comparing elements.
-  //  *  @tparam   A1    The type over which the ordering is defined.
-  //  *  @return   the largest element of this $coll with respect to the ordering `cmp`.
-  //  *
-  //  *  @usecase def max: A
-  //  *    @inheritdoc
-  //  *
-  //  *    @return   the largest element of this $coll.
-  //  */
-  // def max[A1 >: A](implicit ord: Ordering[A1]): A
-  //
   // def maxBy[B](f: A => B)(implicit cmp: Ordering[B]): A
   //
   // def minBy[B](f: A => B)(implicit cmp: Ordering[B]): A
@@ -614,37 +553,37 @@ trait TraversableOnce[+A] extends Any {
   def fold[A1 >: A](z: A1)(op: (A1, A1) => A1): A1 = foldLeft(z)(op)
 
   def aggregate[B](z: B)(seqop: (B, A) => B, combop: (B, B) => B): B = foldLeft(z)(seqop)
-
-  def sum[B >: A](implicit num: Numeric[B]): B = foldLeft(num.zero)(num.plus)
-
-  def product[B >: A](implicit num: Numeric[B]): B = foldLeft(num.one)(num.times)
-
-  def min[B >: A](implicit cmp: Ordering[B]): A = {
-    if (isEmpty)
-      throw new UnsupportedOperationException("empty.min")
-
-    reduceLeft((x, y) => if (cmp.lteq(x, y)) x else y)
-  }
-
-  def max[B >: A](implicit cmp: Ordering[B]): A = {
-    if (isEmpty)
-      throw new UnsupportedOperationException("empty.max")
-
-    reduceLeft((x, y) => if (cmp.gteq(x, y)) x else y)
-  }
-
-  def maxBy[B](f: A => B)(implicit cmp: Ordering[B]): A = {
-    if (isEmpty)
-      throw new UnsupportedOperationException("empty.maxBy")
-
-    reduceLeft((x, y) => if (cmp.gteq(f(x), f(y))) x else y)
-  }
-  def minBy[B](f: A => B)(implicit cmp: Ordering[B]): A = {
-    if (isEmpty)
-      throw new UnsupportedOperationException("empty.minBy")
-
-    reduceLeft((x, y) => if (cmp.lteq(f(x), f(y))) x else y)
-  }
+  //
+  // def sum[B >: A](implicit num: Numeric[B]): B = foldLeft(num.zero)(num.plus)
+  //
+  // def product[B >: A](implicit num: Numeric[B]): B = foldLeft(num.one)(num.times)
+  //
+  // def min[B >: A](implicit cmp: Ordering[B]): A = {
+  //   if (isEmpty)
+  //     throw new UnsupportedOperationException("empty.min")
+  //
+  //   reduceLeft((x, y) => if (cmp.lteq(x, y)) x else y)
+  // }
+  //
+  // def max[B >: A](implicit cmp: Ordering[B]): A = {
+  //   if (isEmpty)
+  //     throw new UnsupportedOperationException("empty.max")
+  //
+  //   reduceLeft((x, y) => if (cmp.gteq(x, y)) x else y)
+  // }
+  //
+  // def maxBy[B](f: A => B)(implicit cmp: Ordering[B]): A = {
+  //   if (isEmpty)
+  //     throw new UnsupportedOperationException("empty.maxBy")
+  //
+  //   reduceLeft((x, y) => if (cmp.gteq(f(x), f(y))) x else y)
+  // }
+  // def minBy[B](f: A => B)(implicit cmp: Ordering[B]): A = {
+  //   if (isEmpty)
+  //     throw new UnsupportedOperationException("empty.minBy")
+  //
+  //   reduceLeft((x, y) => if (cmp.lteq(f(x), f(y))) x else y)
+  // }
 
   /** Copies all elements of this $coll to a buffer.
    *  $willNotTerminateInf
@@ -787,11 +726,8 @@ trait TraversableOnce[+A] extends Any {
 
 
 object TraversableOnce {
-  @deprecated("use OnceCanBuildFrom instead")
-  def traversableOnceCanBuildFrom[T] = new OnceCanBuildFrom[T]
-  @deprecated("use MonadOps instead")
-  def wrapTraversableOnce[A](trav: TraversableOnce[A]) = new MonadOps(trav)
-
+  implicit def orderedTraversableOnce[A](xs: TraversableOnce[A]) = new OrderOps(xs)
+  implicit def numericTraversableOnce[A](xs: TraversableOnce[A]) = new NumOps(xs)
   implicit def alternateImplicit[A](trav: TraversableOnce[A]) = new ForceImplicitAmbiguity
   implicit def flattenTraversableOnce[A, CC[_]](travs: TraversableOnce[CC[A]])(implicit ev: CC[A] => TraversableOnce[A]) =
     new FlattenOps[A](travs map ev)
@@ -832,6 +768,83 @@ object TraversableOnce {
   /** Evidence for building collections from `TraversableOnce` collections */
   implicit def OnceCanBuildFrom[A] = new OnceCanBuildFrom[A]
   
+  final class NumOps[A](val xs: TraversableOnce[A]) extends AnyVal {
+    /** Sums up the elements of this collection.
+     *
+     *   @param   num  an implicit parameter defining a set of numeric operations
+     *                 which includes the `+` operator to be used in forming the sum.
+     *   @tparam  A1   the result type of the `+` operator.
+     *   @return       the sum of all elements of this $coll with respect to the `+` operator in `num`.
+     *
+     *   @usecase def sum: A
+     *     @inheritdoc
+     *
+     *     @return       the sum of all elements in this $coll of numbers of type `Int`.
+     *     Instead of `Int`, any other type `T` with an implicit `Numeric[T]` implementation
+     *     can be used as element type of the $coll and as result type of `sum`.
+     *     Examples of such types are: `Long`, `Float`, `Double`, `BigInt`.
+     *
+     */
+    def sum(implicit num: Numeric[A]) = xs.foldLeft(num.zero)(num.plus)
+
+    /** Multiplies up the elements of this collection.
+     *
+     *   @param   num  an implicit parameter defining a set of numeric operations
+     *                 which includes the `*` operator to be used in forming the product.
+     *   @tparam  A1   the result type of the `*` operator.
+     *   @return       the product of all elements of this $coll with respect to the `*` operator in `num`.
+     *
+     *   @usecase def product: A
+     *     @inheritdoc
+     *
+     *     @return       the product of all elements in this $coll of numbers of type `Int`.
+     *     Instead of `Int`, any other type `T` with an implicit `Numeric[T]` implementation
+     *     can be used as element type of the $coll and as result type of `product`.
+     *     Examples of such types are: `Long`, `Float`, `Double`, `BigInt`.
+     */
+    def product(implicit num: Numeric[A]) = xs.foldLeft(num.one)(num.times)
+  }
+  final class OrderOps[A](val xs: TraversableOnce[A]) extends AnyVal {
+    /** Finds the smallest element.
+     *
+     *  @param    ord   An ordering to be used for comparing elements.
+     *  @tparam   A1    The type over which the ordering is defined.
+     *  @return   the smallest element of this $coll with respect to the ordering `cmp`.
+     *
+     *  @usecase def min: A
+     *    @inheritdoc
+     *
+     *    @return   the smallest element of this $coll
+     */
+    def min(implicit ord: Ordering[A]) = (
+      if (xs.isEmpty) throw new UnsupportedOperationException("empty.min")
+      else xs.reduceLeft((x, y) => if (ord.lteq(x, y)) x else y)
+    )
+    /** Finds the largest element.
+     *
+     *  @param    ord   An ordering to be used for comparing elements.
+     *  @tparam   A1    The type over which the ordering is defined.
+     *  @return   the largest element of this $coll with respect to the ordering `cmp`.
+     *
+     *  @usecase def max: A
+     *    @inheritdoc
+     *
+     *    @return   the largest element of this $coll.
+     */
+    def max(implicit ord: Ordering[A]) = (
+      if (xs.isEmpty) throw new UnsupportedOperationException("empty.min")
+      else xs.reduceLeft((x, y) => if (ord.gteq(x, y)) x else y)
+    )
+    def minBy[B](f: A => B)(implicit ord: Ordering[B]): A = (
+      if (xs.isEmpty) throw new UnsupportedOperationException("empty.minBy")
+      else xs.reduceLeft((x, y) => if (ord.lteq(f(x), f(y))) x else y)
+    )
+    def maxBy[B](f: A => B)(implicit ord: Ordering[B]): A = (
+      if (xs.isEmpty) throw new UnsupportedOperationException("empty.maxBy")
+      else xs.reduceLeft((x, y) => if (ord.gteq(f(x), f(y))) x else y)
+    )
+  }
+
   class FlattenOps[A](travs: TraversableOnce[TraversableOnce[A]]) {
     def flatten: Iterator[A] = new AbstractIterator[A] {
       val its = travs.toIterator

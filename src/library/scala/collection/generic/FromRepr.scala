@@ -48,7 +48,7 @@ object FromRepr {
     val hasElem = implicitly[HasElem[String, Char]]
   }
 
-  implicit def traversableLikeFromRepr[C[_], A0]
+  implicit def TraversableLikeFromRepr[C[_], A0]
     (implicit hasElem0: HasElem[C[A0], A0]) : FromRepr[C[A0]] { type A = A0 } = new FromRepr[C[A0]] {
       type A = A0
       val hasElem = hasElem0

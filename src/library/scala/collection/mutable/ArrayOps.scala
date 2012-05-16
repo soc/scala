@@ -59,9 +59,8 @@ abstract class ArrayOps[T] extends ArrayLike[T, Array[T]] {
    */
   def flatten[U, To](implicit asTrav: T => collection.Traversable[U], m: ArrayTag[U]): Array[U] = {
     val b = Array.newBuilder[U]
-    b.sizeHint(map{case is: collection.IndexedSeq[_] => is.size case _ => 0}.sum)
-    for (xs <- this)
-      b ++= asTrav(xs)
+    b sizeHint (thisCollection map (_.size) sum)
+    this foreach (b ++= _)
     b.result
   }
 
@@ -152,6 +151,20 @@ object ArrayOps {
     def length: Int = repr.length
     def apply(index: Int): Int = repr(index)
     def update(index: Int, elem: Int) { repr(index) = elem }
+    def sum = thisCollection.sum
+    def max = {
+      if (repr.length == 0) thisCollection.max
+      else {
+        var max = repr(0)
+        var i = 1
+        while (i < repr.length) {
+          if (repr(i) > max)
+            max = repr(i)
+          i += 1
+        }
+        max
+      }
+    }
   }
 
   /** A class of `ArrayOps` for arrays containing `long`s. */
@@ -164,6 +177,7 @@ object ArrayOps {
     def length: Int = repr.length
     def apply(index: Int): Long = repr(index)
     def update(index: Int, elem: Long) { repr(index) = elem }
+    def sum = thisCollection.sum
   }
 
   /** A class of `ArrayOps` for arrays containing `float`s. */

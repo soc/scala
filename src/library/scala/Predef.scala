@@ -308,16 +308,16 @@ object Predef extends LowPriorityImplicits {
     case null              => null
   }).asInstanceOf[ArrayOps[T]]
 
-  implicit def booleanArrayOps(xs: Array[Boolean]): ArrayOps[Boolean] = new ArrayOps.ofBoolean(xs)
-  implicit def byteArrayOps(xs: Array[Byte]): ArrayOps[Byte]          = new ArrayOps.ofByte(xs)
-  implicit def charArrayOps(xs: Array[Char]): ArrayOps[Char]          = new ArrayOps.ofChar(xs)
-  implicit def doubleArrayOps(xs: Array[Double]): ArrayOps[Double]    = new ArrayOps.ofDouble(xs)
-  implicit def floatArrayOps(xs: Array[Float]): ArrayOps[Float]       = new ArrayOps.ofFloat(xs)
-  implicit def intArrayOps(xs: Array[Int]): ArrayOps[Int]             = new ArrayOps.ofInt(xs)
-  implicit def longArrayOps(xs: Array[Long]): ArrayOps[Long]          = new ArrayOps.ofLong(xs)
-  implicit def refArrayOps[T <: AnyRef](xs: Array[T]): ArrayOps[T]    = new ArrayOps.ofRef[T](xs)
-  implicit def shortArrayOps(xs: Array[Short]): ArrayOps[Short]       = new ArrayOps.ofShort(xs)
-  implicit def unitArrayOps(xs: Array[Unit]): ArrayOps[Unit]          = new ArrayOps.ofUnit(xs)
+  implicit def booleanArrayOps(xs: Array[Boolean])    = new ArrayOps.ofBoolean(xs)
+  implicit def byteArrayOps(xs: Array[Byte])          = new ArrayOps.ofByte(xs)
+  implicit def charArrayOps(xs: Array[Char])          = new ArrayOps.ofChar(xs)
+  implicit def doubleArrayOps(xs: Array[Double])      = new ArrayOps.ofDouble(xs)
+  implicit def floatArrayOps(xs: Array[Float])        = new ArrayOps.ofFloat(xs)
+  implicit def intArrayOps(xs: Array[Int])            = new ArrayOps.ofInt(xs)
+  implicit def longArrayOps(xs: Array[Long])          = new ArrayOps.ofLong(xs)
+  implicit def refArrayOps[T <: AnyRef](xs: Array[T]) = new ArrayOps.ofRef[T](xs)
+  implicit def shortArrayOps(xs: Array[Short])        = new ArrayOps.ofShort(xs)
+  implicit def unitArrayOps(xs: Array[Unit])          = new ArrayOps.ofUnit(xs)
 
   // "Autoboxing" and "Autounboxing" ---------------------------------------------------
 

@@ -172,7 +172,7 @@ extends AbstractSeq[T] with IndexedSeq[T] with Serializable {
     try containsTyped(x.asInstanceOf[T])
     catch { case _: ClassCastException => false }
 
-  final override def sum[B >: T](implicit num: Numeric[B]): B = {
+  def sum[B >: T](implicit num: Numeric[B]): B = {
     import num.Ops
     if (isEmpty) this.num fromInt 0
     else if (numRangeElements == 1) head
