@@ -10,7 +10,6 @@ package scala.collection
 package mutable
 
 import generic._
-import script._
 import annotation.{ migration, bridge }
 
 /** A template trait for mutable sets of type `mutable.Set[A]`.
@@ -53,7 +52,6 @@ import annotation.{ migration, bridge }
  */
 trait SetLike[A, +This <: SetLike[A, This] with Set[A]]
   extends scala.collection.SetLike[A, This]
-     with Scriptable[A]
      with Builder[A, This]
      with Growable[A]
      with Shrinkable[A]
@@ -196,18 +194,4 @@ trait SetLike[A, +This <: SetLike[A, This] with Set[A]]
    */
   @migration("`--` creates a new set. Use `--=` to remove elements from this set and return that set itself.", "2.8.0")
   override def --(xs: TraversableOnce[A]): This = clone() --= xs
-
-  /** Send a message to this scriptable object.
-   *
-   *  @param cmd  the message to send.
-   *  @throws `Predef.UnsupportedOperationException`
-   *  if the message was not understood.
-   */
-   def <<(cmd: Message[A]): Unit = cmd match {
-     case Include(_, x)     => this += x
-     case Remove(_, x)      => this -= x
-     case Reset()           => clear
-     case s: Script[_]      => s.iterator foreach <<
-     case _                 => throw new UnsupportedOperationException("message " + cmd + " not understood")
-   }
 }

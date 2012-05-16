@@ -6,12 +6,8 @@
 **                          |/                                          **
 \*                                                                      */
 
-
-
 package scala.collection
 package mutable
-
-import script._
 
 /** This class should be used as a mixin. It synchronizes the `Buffer`
  *  methods of the class into which it is mixed in.
@@ -158,10 +154,6 @@ trait SynchronizedBuffer[A] extends Buffer[A] {
    */
   abstract override def clear(): Unit = synchronized {
     super.clear
-  }
-
-  override def <<(cmd: Message[A]): Unit = synchronized {
-    super.<<(cmd)
   }
 
   /** Return a clone of this buffer.
