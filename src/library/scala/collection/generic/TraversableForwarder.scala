@@ -42,9 +42,7 @@ trait TraversableForwarder[+A] extends Traversable[A] {
   override def foldRight[B](z: B)(op: (A, B) => B): B = underlying.foldRight(z)(op)
   override def :\ [B](z: B)(op: (A, B) => B): B = underlying.:\(z)(op)
   override def reduceLeft[B >: A](op: (B, A) => B): B = underlying.reduceLeft(op)
-  override def reduceLeftOption[B >: A](op: (B, A) => B): Option[B] = underlying.reduceLeftOption(op)
   override def reduceRight[B >: A](op: (A, B) => B): B = underlying.reduceRight(op)
-  override def reduceRightOption[B >: A](op: (A, B) => B): Option[B] = underlying.reduceRightOption(op)
   override def sum[B >: A](implicit num: Numeric[B]): B = underlying sum num
   override def product[B >: A](implicit num: Numeric[B]): B = underlying product num
   override def min[B >: A](implicit cmp: Ordering[B]): A = underlying min cmp

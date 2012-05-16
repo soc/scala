@@ -101,18 +101,6 @@ trait TraversableOnce[+A] extends Any {
   //  */
   // def reduce[A1 >: A](op: (A1, A1) => A1): A1
   //
-  // /** Reduces the elements of this $coll, if any, using the specified
-  //  *  associative binary operator.
-  //  *
-  //  *  $undefinedorder
-  //  *
-  //  *  @tparam A1     A type parameter for the binary operator, a supertype of `A`.
-  //  *  @param op      A binary operator that must be associative.
-  //  *  @return        An option value containing result of applying reduce operator `op` between all
-  //  *                 the elements if the collection is nonempty, and `None` otherwise.
-  //  */
-  // def reduceOption[A1 >: A](op: (A1, A1) => A1): Option[A1]
-  //
   // /** Folds the elements of this $coll using the specified associative
   //  *  binary operator.
   //  *
@@ -126,19 +114,6 @@ trait TraversableOnce[+A] extends Any {
   //  *  @return        the result of applying fold operator `op` between all the elements and `z`
   //  */
   // def fold[A1 >: A](z: A1)(op: (A1, A1) => A1): A1
-  //
-  // /** A syntactic sugar for out of order folding. See `fold`.
-  //  *
-  //  * Example:
-  //  * {{{
-  //  *      scala> val a = LinkedList(1,2,3,4)
-  //  *      a: scala.collection.mutable.LinkedList[Int] = LinkedList(1, 2, 3, 4)
-  //  *
-  //  *      scala> val b = (a /:\ 5)(_+_)
-  //  *      b: Int = 15
-  //  * }}}*/
-  // @deprecated("use fold instead", "2.10.0")
-  // def /:\[A1 >: A](z: A1)(op: (A1, A1) => A1): A1 = fold(z)(op)
   //
   // /** Applies a binary operator to a start value and all elements of this $coll,
   //  *  going left to right.
@@ -290,29 +265,6 @@ trait TraversableOnce[+A] extends Any {
   //  *  @throws `UnsupportedOperationException` if this $coll is empty.
   //  */
   // def reduceRight[B >: A](op: (A, B) => B): B
-  //
-  // /** Optionally applies a binary operator to all elements of this $coll, going left to right.
-  //  *  $willNotTerminateInf
-  //  *  $orderDependentFold
-  //  *
-  //  *  @param  op    the binary operator.
-  //  *  @tparam  B    the result type of the binary operator.
-  //  *  @return  an option value containing the result of `reduceLeft(op)` is this $coll is nonempty,
-  //  *           `None` otherwise.
-  //  */
-  // def reduceLeftOption[B >: A](op: (B, A) => B): Option[B]
-  //
-  // /** Optionally applies a binary operator to all elements of this $coll, going
-  //  *  right to left.
-  //  *  $willNotTerminateInf
-  //  *  $orderDependentFold
-  //  *
-  //  *  @param  op    the binary operator.
-  //  *  @tparam  B    the result type of the binary operator.
-  //  *  @return  an option value containing the result of `reduceRight(op)` is this $coll is nonempty,
-  //  *           `None` otherwise.
-  //  */
-  // def reduceRightOption[B >: A](op: (A, B) => B): Option[B]
   //
   // /** Counts the number of elements in the $coll which satisfy a predicate.
   //  *
@@ -657,15 +609,7 @@ trait TraversableOnce[+A] extends Any {
     reversed.reduceLeft[B]((x, y) => op(y, x))
   }
 
-  def reduceLeftOption[B >: A](op: (B, A) => B): Option[B] =
-    if (isEmpty) None else Some(reduceLeft(op))
-
-  def reduceRightOption[B >: A](op: (A, B) => B): Option[B] =
-    if (isEmpty) None else Some(reduceRight(op))
-
   def reduce[A1 >: A](op: (A1, A1) => A1): A1 = reduceLeft(op)
-
-  def reduceOption[A1 >: A](op: (A1, A1) => A1): Option[A1] = reduceLeftOption(op)
 
   def fold[A1 >: A](z: A1)(op: (A1, A1) => A1): A1 = foldLeft(z)(op)
 
