@@ -202,12 +202,6 @@ abstract class GenJVM extends SubComponent with GenJVMUtil with GenAndroid with 
     val JavaLangClassType = new JObjectType("java.lang.Class")
     val MethodHandleType  = new JObjectType("java.dyn.MethodHandle")
 
-    // Scala attributes
-    val BeanInfoAttr        = definitions.getRequiredClass("scala.beans.BeanInfo")
-    val BeanInfoSkipAttr    = definitions.getRequiredClass("scala.beans.BeanInfoSkip")
-    val BeanDisplayNameAttr = definitions.getRequiredClass("scala.beans.BeanDisplayName")
-    val BeanDescriptionAttr = definitions.getRequiredClass("scala.beans.BeanDescription")
-
     final val ExcludedForwarderFlags = {
       import Flags._
       // Should include DEFERRED but this breaks findMember.
@@ -478,9 +472,6 @@ abstract class GenJVM extends SubComponent with GenJVMUtil with GenAndroid with 
       addAnnotations(jclass, c.symbol.annotations ++ ssa)
       addEnclosingMethodAttribute(jclass, c.symbol)
       emitClass(jclass, c.symbol)
-
-      if (c.symbol hasAnnotation BeanInfoAttr)
-        genBeanInfoClass(c)
     }
 
     private def addEnclosingMethodAttribute(jclass: JClass, clazz: Symbol) {
@@ -519,78 +510,6 @@ abstract class GenJVM extends SubComponent with GenJVMUtil with GenAndroid with 
       jc.writeTo(dos)
       dos.close()
       bos.toByteArray
-    }
-
-    /**
-     * Generate a bean info class that describes the given class.
-     *
-     * @author Ross Judson (ross.judson@soletta.com)
-     */
-    def genBeanInfoClass(c: IClass) {
-      val description = c.symbol getAnnotation BeanDescriptionAttr
-      // informProgress(description.toString)
-
-      val beanInfoClass = fjbgContext.JClass(javaFlags(c.symbol),
-            javaName(c.symbol) + "BeanInfo",
-            "scala/beans/ScalaBeanInfo",
-            JClass.NO_INTERFACES,
-            c.cunit.source.toString)
-
-      var fieldList = List[String]()
-      for (f <- clasz.fields if f.symbol.hasGetter;
-	         g = f.symbol.getter(c.symbol);
-	         s = f.symbol.setter(c.symbol);
-	         if g.isPublic && !(f.symbol.name startsWith "$"))  // inserting $outer breaks the bean
-        fieldList = javaName(f.symbol) :: javaName(g) :: (if (s != NoSymbol) javaName(s) else null) :: fieldList
-      val methodList =
-	     for (m <- clasz.methods
-	         if !m.symbol.isConstructor &&
-	         m.symbol.isPublic &&
-	         !(m.symbol.name startsWith "$") &&
-	         !m.symbol.isGetter &&
-	         !m.symbol.isSetter) yield javaName(m.symbol)
-
-      val constructor = beanInfoClass.addNewMethod(ACC_PUBLIC, "<init>", JType.VOID, new Array[JType](0), new Array[String](0))
-      val jcode = constructor.getCode().asInstanceOf[JExtendedCode]
-      val strKind = new JObjectType(javaName(StringClass))
-      val stringArrayKind = new JArrayType(strKind)
-      val conType = new JMethodType(JType.VOID, Array(javaType(ClassClass), stringArrayKind, stringArrayKind))
-
-      def push(lst:Seq[String]) {
-        var fi = 0
-        for (f <- lst) {
-          jcode.emitDUP()
-          jcode emitPUSH fi
-          if (f != null)
-            jcode emitPUSH f
-          else
-            jcode.emitACONST_NULL()
-          jcode emitASTORE strKind
-          fi += 1
-        }
-      }
-
-      jcode.emitALOAD_0()
-      // push the class
-      jcode emitPUSH javaType(c.symbol).asInstanceOf[JReferenceType]
-
-      // push the string array of field information
-      jcode emitPUSH fieldList.length
-      jcode emitANEWARRAY strKind
-      push(fieldList)
-
-      // push the string array of method information
-      jcode emitPUSH methodList.length
-      jcode emitANEWARRAY strKind
-      push(methodList)
-
-      // invoke the superclass constructor, which will do the
-      // necessary java reflection and create Method objects.
-      jcode.emitINVOKESPECIAL("scala/beans/ScalaBeanInfo", "<init>", conType)
-      jcode.emitRETURN()
-
-      // write the bean information class file.
-      writeClass("BeanInfo ", beanInfoClass.getName(), toByteArray(beanInfoClass), c.symbol)
     }
 
     /** Add the given 'throws' attributes to jmethod */
