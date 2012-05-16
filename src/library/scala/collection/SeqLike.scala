@@ -497,7 +497,7 @@ trait SeqLike[+A, +Repr] extends Any with IterableLike[A, Repr] with GenSeqLike[
     val (prefix, rest) = this.splitAt(from)
     b ++= toCollection(prefix)
     b ++= patch.seq
-    b ++= toCollection(rest).view drop replaced
+    b ++= toCollection(rest).iterator.drop(replaced)
     b.result
   }
 
@@ -506,7 +506,7 @@ trait SeqLike[+A, +Repr] extends Any with IterableLike[A, Repr] with GenSeqLike[
     val (prefix, rest) = this.splitAt(index)
     b ++= toCollection(prefix)
     b += elem
-    b ++= toCollection(rest).view.tail
+    b ++= toCollection(rest).iterator.drop(1)
     b.result
   }
 
@@ -625,15 +625,6 @@ trait SeqLike[+A, +Repr] extends Any with IterableLike[A, Repr] with GenSeqLike[
    */
   def indices: Range = 0 until length
 
-  override def view = new SeqView[A, Repr] {
-    protected lazy val underlying = self.repr
-    override def iterator = self.iterator
-    override def length = self.length
-    override def apply(idx: Int) = self.apply(idx)
-  }
-
-  override def view(from: Int, until: Int) = view.slice(from, until)
-
   /* Need to override string, so that it's not the Function1's string that gets mixed in.
    */
   override def toString = super[IterableLike].toString
@@ -744,7 +735,7 @@ object SeqLike {
     // Check for redundant case when both sequences are same size
     else if (m1-m0 == n1-n0) {
       // Accepting a little slowness for the uncommon case.
-      if (S.view.slice(m0, m1) == W.view.slice(n0, n1)) m0
+      if (S.iterator.slice(m0, m1) == W.iterator.slice(n0, n1)) m0
       else -1
     }
     // Now we know we actually need KMP search, so do it

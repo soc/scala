@@ -31,8 +31,6 @@ trait Iterable[+A] extends Traversable[A]
   override def takeRight(n: Int): Iterable[A]
   override def dropRight(n: Int): Iterable[A]
   override def sameElements[B >: A](that: GenIterable[B]): Boolean
-  override def view
-  override def view(from: Int, until: Int)
   */
 
 }

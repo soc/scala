@@ -914,13 +914,6 @@ self =>
     else flatten1(asTraversable(head).seq.toTraversable)
   }
 
-  override def view = new StreamView[A, Stream[A]] {
-    protected lazy val underlying = self.repr
-    override def iterator = self.iterator
-    override def length = self.length
-    override def apply(idx: Int) = self.apply(idx)
-  }
-
   /** Defines the prefix of this object's `toString` representation as `Stream`.
    */
   override def stringPrefix = "Stream"

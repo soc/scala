@@ -290,11 +290,4 @@ self =>
    *           takes into consideration only the run-time types of objects but ignores their elements.
    */
   override /*TraversableLike*/ def canEqual(that: Any) = true
-
-  override /*TraversableLike*/ def view = new IterableView[A, Repr] {
-    protected lazy val underlying = self.repr
-    override def iterator = self.iterator
-  }
-
-  override /*TraversableLike*/ def view(from: Int, until: Int) = view.slice(from, until)
 }

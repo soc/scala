@@ -65,8 +65,6 @@ trait SeqProxyLike[+A, +Repr <: SeqLike[A, Repr] with Seq[A]] extends SeqLike[A,
   override def sortBy[B](f: A => B)(implicit ord: Ordering[B]): Repr = self.sortBy(f)(ord)
   override def sorted[B >: A](implicit ord: Ordering[B]): Repr = self.sorted(ord)
   override def indices: Range = self.indices
-  override def view = self.view
-  override def view(from: Int, until: Int) = self.view(from, until)
 }
 
 

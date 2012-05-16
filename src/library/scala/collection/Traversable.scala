@@ -82,8 +82,6 @@ trait Traversable[+A] extends TraversableLike[A, Traversable[A]]
   override def addString(b: StringBuilder): StringBuilder
   override def toString
   override def stringPrefix : String
-  override def view
-  override def view(from: Int, until: Int): TraversableView[A, Traversable[A]]
   */
 }
 

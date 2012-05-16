@@ -640,30 +640,6 @@ trait TraversableLike[+A, +Repr] extends Any
     string
   }
 
-  /** Creates a non-strict view of this $coll.
-   *
-   *  @return a non-strict view of this $coll.
-   */
-  def view = new TraversableView[A, Repr] {
-    protected lazy val underlying = self.repr
-    override def foreach[U](f: A => U) = self foreach f
-  }
-
-  /** Creates a non-strict view of a slice of this $coll.
-   *
-   *  Note: the difference between `view` and `slice` is that `view` produces
-   *        a view of the current $coll, whereas `slice` produces a new $coll.
-   *
-   *  Note: `view(from, to)` is equivalent to `view.slice(from, to)`
-   *  $orderDependent
-   *
-   *  @param from   the index of the first element of the view
-   *  @param until  the index of the element following the view
-   *  @return a non-strict view of a slice of this $coll, starting at index `from`
-   *  and extending up to (but not including) index `until`.
-   */
-  def view(from: Int, until: Int): TraversableView[A, Repr] = view.slice(from, until)
-
   /** Creates a non-strict filter of this $coll.
    *
    *  Note: the difference between `c filter p` and `c withFilter p` is that

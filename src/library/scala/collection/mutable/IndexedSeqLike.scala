@@ -48,26 +48,4 @@ trait IndexedSeqLike[A, +Repr] extends scala.collection.IndexedSeqLike[A, Repr] 
    *  @throws   IndexOutOfBoundsException if the index is not valid.
    */
   def update(idx: Int, elem: A)
-
-  /** Creates a view of this iterable @see Iterable.View
-   */
-  override def view = new IndexedSeqView[A, Repr] {
-    protected lazy val underlying = self.repr
-    override def iterator = self.iterator
-    override def length = self.length
-    override def apply(idx: Int) = self.apply(idx)
-    override def update(idx: Int, elem: A) = self.update(idx, elem)
-  }
-
-  /** A sub-sequence view  starting at index `from`
-   *  and extending up to (but not including) index `until`.
-   *
-   *  @param from   The index of the first element of the slice
-   *  @param until  The index of the element following the slice
-   *  @note  The difference between `view` and `slice` is that `view` produces
-   *         a view of the current sequence, whereas `slice` produces a new sequence.
-   *
-   *  @note view(from, to)  is equivalent to view.slice(from, to)
-   */
-  override def view(from: Int, until: Int) = view.slice(from, until)
 }

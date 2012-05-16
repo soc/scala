@@ -813,15 +813,6 @@ self: ParIterableLike[T, Repr, Sequential] =>
     tasksupport.executeAndWaitResult(new ToParMap(combinerFactory(cbf), splitter)(ev) mapResult { _.resultWithTaskSupport })
   }
 
-  def view = new ParIterableView[T, Repr, Sequential] {
-    protected lazy val underlying = self.repr
-    protected[this] def viewIdentifier = ""
-    protected[this] def viewIdString = ""
-    override def seq = self.seq.view
-    def splitter = self.splitter
-    def size = splitter.remaining
-  }
-
   override def toArray[U >: T: ArrayTag]: Array[U] = {
     val arr = new Array[U](size)
     copyToArray(arr)

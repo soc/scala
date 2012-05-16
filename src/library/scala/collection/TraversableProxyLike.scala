@@ -91,8 +91,6 @@ trait TraversableProxyLike[+A, +Repr <: TraversableLike[A, Repr] with Traversabl
   override def addString(b: StringBuilder, sep: String): StringBuilder = self.addString(b, sep)
   override def addString(b: StringBuilder): StringBuilder = self.addString(b)
   override def stringPrefix : String = self.stringPrefix
-  override def view = self.view
-  override def view(from: Int, until: Int): TraversableView[A, Repr] = self.view(from, until)
   // This appears difficult to override due to the type of WithFilter.
   // override def withFilter(p: A => Boolean): WithFilter = self.withFilter(p)
 }

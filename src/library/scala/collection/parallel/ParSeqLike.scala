@@ -322,16 +322,6 @@ self =>
 
   override def toSeq = this.asInstanceOf[ParSeq[T]]
 
-  override def view = new ParSeqView[T, Repr, Sequential] {
-    protected lazy val underlying = self.repr
-    protected[this] def viewIdentifier = ""
-    protected[this] def viewIdString = ""
-    def length = self.length
-    def apply(idx: Int) = self(idx)
-    override def seq = self.seq.view
-    def splitter = self.splitter
-  }
-
   /* tasks */
 
   protected[this] def down(p: IterableSplitter[_]) = p.asInstanceOf[SeqSplitter[T]]
