@@ -32,14 +32,7 @@ extends CompilerCommand(args, settings) {
     if (!ok) Error
     else if (io.Jar.isJarOrZip(target)) AsJar
     else if (util.ScalaClassLoader.classExists(settings.classpathURLs, target)) AsObject
-    else {
-      val f = io.File(target)
-      if (!f.hasExtension("class", "jar", "zip") && f.canRead) AsScript
-      else {
-        Console.err.println("No such file or class on classpath: " + target)
-        Error
-      }
-    }
+    else Error
   }
   /** String with either the jar file, class name, or script file name. */
   def thingToRun = targetAndArguments.headOption getOrElse ""
@@ -94,8 +87,7 @@ object GenericRunnerCommand {
   sealed abstract class HowToRun(val name: String) { }
   case object AsJar extends HowToRun("jar")
   case object AsObject extends HowToRun("object")
-  case object AsScript extends HowToRun("script")
   case object AsRepl extends HowToRun("repl")
   case object Error extends HowToRun("<error>")
-  val waysToRun = List(AsJar, AsObject, AsScript, AsRepl)
+  val waysToRun = List(AsJar, AsObject, AsRepl)
 }

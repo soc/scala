@@ -136,9 +136,7 @@ self =>
     /** The parse starting point depends on whether the source file is self-contained:
      *  if not, the AST will be supplemented.
      */
-    def parseStartRule =
-      if (source.isSelfContained) () => compilationUnit()
-      else () => scriptBody()
+    def parseStartRule = () => compilationUnit()
 
     def newScanner = new SourceFileScanner(source)
 
@@ -309,99 +307,6 @@ self =>
       val t = parseStartRule()
       accept(EOF)
       t
-    }
-
-    /** This is the parse entry point for code which is not self-contained, e.g.
-     *  a script which is a series of template statements.  They will be
-     *  swaddled in Trees until the AST is equivalent to the one returned
-     *  by compilationUnit().
-     */
-    def scriptBody(): Tree = {
-      val stmts = templateStats()
-      accept(EOF)
-
-      def mainModuleName = newTermName(settings.script.value)
-      /** If there is only a single object template in the file and it has a
-       *  suitable main method, we will use it rather than building another object
-       *  around it.  Since objects are loaded lazily the whole script would have
-       *  been a no-op, so we're not taking much liberty.
-       */
-      def searchForMain(): Option[Tree] = {
-        /** Have to be fairly liberal about what constitutes a main method since
-         *  nothing has been typed yet - for instance we can't assume the parameter
-         *  type will look exactly like "Array[String]" as it could have been renamed
-         *  via import, etc.
-         */
-        def isMainMethod(t: Tree) = t match {
-          case DefDef(_, nme.main, Nil, List(_), _, _)  => true
-          case _                                        => false
-        }
-        /** For now we require there only be one top level object. */
-        var seenModule = false
-        val newStmts = stmts collect {
-          case t @ Import(_, _) => t
-          case md @ ModuleDef(mods, name, template) if !seenModule && (md exists isMainMethod) =>
-            seenModule = true
-            /** This slightly hacky situation arises because we have no way to communicate
-             *  back to the scriptrunner what the name of the program is.  Even if we were
-             *  willing to take the sketchy route of settings.script.value = progName, that
-             *  does not work when using fsc.  And to find out in advance would impose a
-             *  whole additional parse.  So instead, if the actual object's name differs from
-             *  what the script is expecting, we transform it to match.
-             */
-            if (name == mainModuleName) md
-            else treeCopy.ModuleDef(md, mods, mainModuleName, template)
-          case _ =>
-            /** If we see anything but the above, fail. */
-            return None
-        }
-        Some(makePackaging(0, emptyPkg, newStmts))
-      }
-
-      if (mainModuleName == newTermName(ScriptRunner.defaultScriptMain))
-        searchForMain() foreach { return _ }
-
-      /** Here we are building an AST representing the following source fiction,
-       *  where `moduleName` is from -Xscript (defaults to "Main") and <stmts> are
-       *  the result of parsing the script file.
-       *
-       *  {{{
-       *  object moduleName {
-       *    def main(argv: Array[String]): Unit = {
-       *      val args = argv
-       *      new AnyRef {
-       *        stmts
-       *      }
-       *    }
-       *  }
-       *  }}}
-       */
-      import definitions._
-
-      def emptyPkg    = atPos(0, 0, 0) { Ident(nme.EMPTY_PACKAGE_NAME) }
-      def emptyInit   = DefDef(
-        NoMods,
-        nme.CONSTRUCTOR,
-        Nil,
-        List(Nil),
-        TypeTree(),
-        Block(List(Apply(Select(Super(This(tpnme.EMPTY), tpnme.EMPTY), nme.CONSTRUCTOR), Nil)), Literal(Constant(())))
-      )
-
-      // def main
-      def mainParamType = AppliedTypeTree(Ident(tpnme.Array), List(Ident(tpnme.String)))
-      def mainParameter = List(ValDef(Modifiers(Flags.PARAM), nme.argv, mainParamType, EmptyTree))
-      def mainSetArgv   = List(ValDef(NoMods, nme.args, TypeTree(), Ident(nme.argv)))
-      def mainNew       = makeNew(Nil, emptyValDef, stmts, List(Nil), NoPosition, NoPosition)
-      def mainDef       = DefDef(NoMods, nme.main, Nil, List(mainParameter), scalaDot(tpnme.Unit), Block(mainSetArgv, mainNew))
-
-      // object Main
-      def moduleName  = newTermName(ScriptRunner scriptMain settings)
-      def moduleBody  = Template(List(atPos(o2p(in.offset))(scalaAnyRefConstr)), emptyValDef, List(emptyInit, mainDef))
-      def moduleDef   = ModuleDef(NoMods, moduleName, moduleBody)
-
-      // package <empty> { ... }
-      makePackaging(0, emptyPkg, List(moduleDef))
     }
 
 /* --------------- PLACEHOLDERS ------------------------------------------- */
