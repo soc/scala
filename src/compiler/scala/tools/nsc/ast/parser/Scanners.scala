@@ -10,7 +10,6 @@ import scala.reflect.internal.Chars._
 import Tokens._
 import scala.annotation.switch
 import scala.collection.mutable.{ ListBuffer, ArrayBuffer }
-import scala.xml.Utility.{ isNameStart }
 
 /** See Parsers.scala / ParsersCommon for some explanation of ScannersCommon.
  */
@@ -342,7 +341,7 @@ trait Scanners extends ScannersCommon {
           val last = if (charOffset >= 2) buf(charOffset - 2) else ' '
           nextChar()
           last match {
-            case ' '|'\t'|'\n'|'{'|'('|'>' if isNameStart(ch) || ch == '!' || ch == '?' =>
+            case ' '|'\t'|'\n'|'{'|'('|'>' if isXmlNameStart(ch) || ch == '!' || ch == '?' =>
               token = XMLSTART
             case _ =>
               // Console.println("found '<', but last is '"+in.last+"'"); // DEBUG

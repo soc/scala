@@ -91,6 +91,26 @@ trait Chars {
          '|' | '/' | '\\' => true
     case c => isSpecial(c)
   }
+
+  /** {{{
+   *  NameStart ::= ( Letter | '_' )
+   *  }}}
+   *  where Letter means in one of the Unicode general
+   *  categories `{ Ll, Lu, Lo, Lt, Nl }`.
+   *
+   *  We do not allow a name to start with `:`.
+   *  See [3] and Appendix B of XML 1.0 specification
+   */
+  def isXmlNameStart(ch: Char) = {
+    import java.lang.Character._
+
+    getType(ch).toByte match {
+      case LOWERCASE_LETTER |
+              UPPERCASE_LETTER | OTHER_LETTER |
+              TITLECASE_LETTER | LETTER_NUMBER => true
+      case _                                   => ch == '_'
+    }
+  }
 }
 
 object Chars extends Chars { }
