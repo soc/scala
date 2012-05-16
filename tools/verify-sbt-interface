@@ -1,0 +1,8 @@
+#!/bin/sh
+#
+
+scala_home="${SCALA_HOME:-$(dirname $0)/../build/pack}"
+
+$scala_home/bin/scalac -Ystop-after:typer \
+  -cp /Users/paulp/.ivy2/local/org.scala-sbt/interface/0.13.0-SNAPSHOT/jars/interface.jar \
+  /scala/sbt/xsbt/compile/interface/*.scala
