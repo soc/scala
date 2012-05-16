@@ -17,7 +17,6 @@ import scala.reflect.internal.pickling.{ PickleBuffer, PickleFormat }
 import settings.{ AestheticSettings }
 import symtab.{ Flags, SymbolTable, SymbolLoaders, SymbolTrackers }
 import symtab.classfile.Pickler
-import dependencies.DependencyAnalysis
 import ast._
 import ast.parser._
 import typechecker._
@@ -159,13 +158,7 @@ class Global(var currentSettings: Settings, var reporter: Reporter) extends Symb
     }
   }
 
-  /** Representing ASTs as graphs */
-  object treeBrowsers extends {
-    val global: Global.this.type = Global.this
-  } with TreeBrowsers
-
   val nodeToString = nodePrinters.nodeToString
-  val treeBrowser = treeBrowsers.create()
 
   // ------------ Hooks for interactive mode-------------------------
 
@@ -300,9 +293,6 @@ class Global(var currentSettings: Settings, var reporter: Reporter) extends Symb
     }
   }
 
-  if (!dependencyAnalysis.off)
-    dependencyAnalysis.loadDependencyAnalysis()
-
   if (opt.verbose || opt.logClasspath) {
     // Uses the "do not truncate" inform
     informComplete("[search path for source files: " + classPath.sourcepaths.mkString(",") + "]")
@@ -406,8 +396,7 @@ class Global(var currentSettings: Settings, var reporter: Reporter) extends Symb
 
     /** Is current phase cancelled on this unit? */
     def cancelled(unit: CompilationUnit) = {
-      // run the typer only if in `createJavadoc` mode
-      val maxJavaPhase = if (createJavadoc) currentRun.typerPhase.id else currentRun.namerPhase.id
+      val maxJavaPhase = currentRun.namerPhase.id
       reporter.cancelled || unit.isJava && this.id > maxJavaPhase
     }
 
@@ -625,14 +614,6 @@ class Global(var currentSettings: Settings, var reporter: Reporter) extends Symb
     val runsAfter = List("dce")
     val runsRightAfter = None
   } with GenASM
-
-  // This phase is optional: only added if settings.make option is given.
-  // phaseName = "dependencyAnalysis"
-  object dependencyAnalysis extends {
-    val global: Global.this.type = Global.this
-    val runsAfter = List("jvm")
-    val runsRightAfter = None
-  } with DependencyAnalysis
 
   // phaseName = "terminal"
   object terminal extends {
@@ -1320,8 +1301,7 @@ class Global(var currentSettings: Settings, var reporter: Reporter) extends Symb
 
     /** Compile list of source files */
     def compileSources(_sources: List[SourceFile]) {
-      val depSources = dependencyAnalysis calculateFiles _sources.distinct
-      val sources    = coreClassesFirst(depSources)
+      val sources = coreClassesFirst(_sources.distinct.sortBy("" + _))
       // there is a problem already, e.g. a plugin was passed a bad option
       if (reporter.hasErrors)
         return
@@ -1380,10 +1360,6 @@ class Global(var currentSettings: Settings, var reporter: Reporter) extends Symb
         if (opt.showPhase)
           showMembers()
 
-        // browse trees with swing tree viewer
-        if (opt.browsePhase)
-          treeBrowser browse (phase.name, units)
-
         // move the pointer
         globalPhase = globalPhase.next
 
@@ -1408,10 +1384,6 @@ class Global(var currentSettings: Settings, var reporter: Reporter) extends Symb
       reportCompileErrors()
       symSource.keys foreach (x => resetPackageClass(x.owner))
       informTime("total", startTime)
-
-      // record dependency data
-      if (!dependencyAnalysis.off)
-        dependencyAnalysis.saveDependencyAnalysis()
 
       // Clear any sets or maps created via perRunCaches.
       perRunCaches.clearAll()
@@ -1599,11 +1571,6 @@ class Global(var currentSettings: Settings, var reporter: Reporter) extends Symb
       }
     })
   }
-  def forInteractive   = onlyPresentation
-  def createJavadoc    = false
-
-  @deprecated("Use forInteractive or forScaladoc, depending on what you're after", "2.9.0")
-  def onlyPresentation = false
 }
 
 object Global {

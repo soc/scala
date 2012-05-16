@@ -242,7 +242,7 @@ trait Namers extends MethodSynthesis {
       }
       tree.symbol match {
         case NoSymbol => try dispatch() catch typeErrorHandler(tree, this.context)
-        case sym      => enterExistingSym(sym)
+        case sym      => this.context
       }
     }
 
@@ -650,22 +650,6 @@ trait Namers extends MethodSynthesis {
         }
         else context.unit.error(tree.pos, "implicit classes must accept exactly one primary constructor parameter")
       }
-    }
-
-    // this logic is needed in case typer was interrupted half
-    // way through and then comes back to do the tree again. In
-    // that case the definitions that were already attributed as
-    // well as any default parameters of such methods need to be
-    // re-entered in the current scope.
-    protected def enterExistingSym(sym: Symbol): Context = {
-      if (forInteractive && sym != null && sym.owner.isTerm) {
-        enterIfNotThere(sym)
-        if (sym.isLazy)
-          sym.lazyAccessor andAlso enterIfNotThere
-
-        defaultParametersOfMethod(sym) foreach { symRef => enterIfNotThere(symRef()) }
-      }
-      this.context
     }
 
     def enterSyntheticSym(tree: Tree): Symbol = {
@@ -1146,14 +1130,8 @@ trait Namers extends MethodSynthesis {
             if (!isConstr)
               clazz.resetFlag(INTERFACE) // there's a concrete member now
             val default = parentNamer.enterSyntheticSym(defaultTree)
-            if (forInteractive && default.owner.isTerm) {
-              // enter into map from method symbols to default arguments.
-              // if compiling the same local block several times (which can happen in interactive mode)
-              // we might otherwise not find the default symbol, because the second time it the
-              // method symbol will be re-entered in the scope but the default parameter will not.
-              defaultParametersOfMethod(meth) += new WeakReference(default)
-            }
-          } else if (baseHasDefault) {
+          }
+          else if (baseHasDefault) {
             // the parameter does not have a default itself, but the
             // corresponding parameter in the base class does.
             sym.setFlag(DEFAULTPARAM)

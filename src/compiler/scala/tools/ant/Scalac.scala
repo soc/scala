@@ -37,7 +37,6 @@ import scala.tools.nsc.reporters.{Reporter, ConsoleReporter}
  *  - `extdirs`,
  *  - `extdirsref`,
  *  - `argfile`,
- *  - `dependencyfile`,
  *  - `encoding`,
  *  - `target`,
  *  - `force`,
@@ -128,8 +127,6 @@ class Scalac extends ScalaMatchingTask with ScalacShared {
   protected var extdirs: Option[Path] = None
 
   protected var argfile: Option[File] = None
-  /** The dependency tracking file. */
-  protected var dependencyfile: Option[File] = None
   /** The character encoding of the files to compile. */
   protected var encoding: Option[String] = None
 
@@ -300,12 +297,6 @@ class Scalac extends ScalaMatchingTask with ScalacShared {
    *  @param input The value of `argfile`. */
   def setArgfile(input: File) {
     argfile = Some(input)
-  }
-
-  /** Sets the `dependencyfile` attribute. Used by [[http://ant.apache.org Ant]].
-   *  @param input The value of `dependencyfile`. */
-  def setDependencyfile(input: File) {
-    dependencyfile = Some(input)
   }
 
   /** Sets the `encoding` attribute. Used by [[http://ant.apache.org Ant]].
@@ -584,8 +575,6 @@ class Scalac extends ScalaMatchingTask with ScalacShared {
     if (!bootclasspath.isEmpty)
       settings.bootclasspath.value = asString(getBootclasspath)
     if (!extdirs.isEmpty) settings.extdirs.value = asString(getExtdirs)
-    if (!dependencyfile.isEmpty)
-      settings.dependencyfile.value = asString(dependencyfile.get)
     if (!encoding.isEmpty) settings.encoding.value = encoding.get
     if (!backend.isEmpty) settings.target.value = backend.get
     if (!logging.isEmpty && logging.get == "verbose")
@@ -613,16 +602,6 @@ class Scalac extends ScalaMatchingTask with ScalacShared {
 
     // let CompilerCommand processes all params
     val command = new CompilerCommand(settings.splitParams(addParams), settings)
-
-    // resolve dependenciesFile path from project's basedir, so <ant antfile ...> call from other project works.
-    // the dependenciesFile may be relative path to basedir or absolute path, in either case, the following code
-    // will return correct answer.
-    command.settings.dependenciesFile.value match {
-      case "none" =>
-      case x =>
-        val depFilePath = SPath(x)
-        command.settings.dependenciesFile.value = SPath(getProject.getBaseDir).normalize resolve depFilePath path
-    }
 
     (command.settings, sourceFiles, javaOnly)
   }

@@ -19,7 +19,6 @@ abstract class Universe extends SymbolTable with ToolBoxes {
   val gen = new TreeGen { val global: Universe.this.type = Universe.this }
 
   lazy val settings = new Settings
-  def forInteractive = false
 
   val phaseWithId: Array[Phase] = Array(NoPhase, SomePhase)
   val currentRunId = 1 // fake a run id so that it is different from NoRunId

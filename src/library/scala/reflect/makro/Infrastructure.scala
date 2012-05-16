@@ -3,10 +3,6 @@ package scala.reflect.makro
 trait Infrastructure {
   self: Context =>
 
-  /** Determines whether the compiler expanding a macro is a presentation compiler.
-   */
-  val forInteractive: Boolean
-
   /** Exposes current compilation run.
    */
   val currentRun: Run

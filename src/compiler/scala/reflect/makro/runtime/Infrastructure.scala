@@ -4,8 +4,6 @@ package runtime
 trait Infrastructure {
   self: Context =>
 
-  val forInteractive: Boolean = mirror.forInteractive
-
   val currentRun: Run = mirror.currentRun
 
   type Run = mirror.Run

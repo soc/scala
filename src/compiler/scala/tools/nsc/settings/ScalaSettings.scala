@@ -106,7 +106,6 @@ trait ScalaSettings extends AbsScalaSettings
    */
   def XO = optimise
   def debuginfo = g
-  def dependenciesFile = dependencyfile
   def nowarnings = nowarn
   def outdir = d
   def printLate = print

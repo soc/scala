@@ -10,6 +10,4 @@ trait Required { self: SymbolTable =>
   def picklerPhase: Phase
 
   def settings: MutableSettings
-
-  def forInteractive: Boolean
 }

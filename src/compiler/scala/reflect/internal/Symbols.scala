@@ -969,13 +969,7 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
     // e.g. after flatten all classes are owned by package classes, there are lots and
     // lots of these to be declared (or more realistically, discovered.)
     def owner_=(owner: Symbol) {
-      // don't keep the original owner in presentation compiler runs
-      // (the map will grow indefinitely, and the only use case is the
-      // backend).
-      if (!forInteractive) {
-        if (originalOwner contains this) ()
-        else originalOwner(this) = rawowner
-      }
+      originalOwner(this) = rawowner
       assert(!inReflexiveMirror, "owner_= is not thread-safe; cannot be run in reflexive code")
       if (traceSymbolActivity)
         traceSymbols.recordNewSymbolOwner(this, owner)
@@ -1788,7 +1782,6 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
      *        may hang on to lazy types and in turn to whole (outdated) compilation units.
      */
     def originalEnclosingMethod: Symbol = {
-      assert(!forInteractive, "originalOwner is not kept in presentation compiler runs.")
       if (isMethod) this
       else {
         val owner = originalOwner.getOrElse(this, rawowner)

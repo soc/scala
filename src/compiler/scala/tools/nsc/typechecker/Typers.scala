@@ -94,7 +94,7 @@ trait Typers extends Modes with Adaptations with Taggings {
   //  - we may virtualize matches (if -Xexperimental and there's a suitable __match in scope)
   //  - we synthesize PartialFunction implementations for `x => x match {...}` and `match {...}` when the expected type is PartialFunction
   // this is disabled by: -Xoldpatmat, scaladoc or interactive compilation
-  @inline private def newPatternMatching = opt.virtPatmat && !forInteractive // && (phase.id < currentRun.uncurryPhase.id)
+  @inline private def newPatternMatching = opt.virtPatmat // && (phase.id < currentRun.uncurryPhase.id)
 
   abstract class Typer(context0: Context) extends TyperDiagnostics with Adaptation with Tagging with TyperContextErrors {
     import context0.unit
@@ -2137,12 +2137,6 @@ trait Typers extends Modes with Adaptations with Taggings {
       if (pat1.tpe.paramSectionCount > 0)
         pat1 setType pat1.tpe.finalResultType
 
-      if (forInteractive) {
-        for (bind @ Bind(name, _) <- cdef.pat)
-          if (name.toTermName != nme.WILDCARD && bind.symbol != null && bind.symbol != NoSymbol)
-            namer.enterIfNotThere(bind.symbol)
-      }
-
       val guard1: Tree = if (cdef.guard == EmptyTree) EmptyTree
                          else typed(cdef.guard, BooleanClass.tpe)
       var body1: Tree = typed(cdef.body, pt)
@@ -2913,7 +2907,7 @@ trait Typers extends Modes with Adaptations with Taggings {
                *  forced during kind-arity checking, so it is guarded by additional
                *  tests to ensure we're sufficiently far along.
                */
-              if (args.isEmpty && !forInteractive && fun.symbol.isInitialized && ListModule.hasCompleteInfo && (fun.symbol == List_apply))
+              if (args.isEmpty && fun.symbol.isInitialized && ListModule.hasCompleteInfo && (fun.symbol == List_apply))
                 atPos(tree.pos)(gen.mkNil setType restpe)
               else
                 constfold(treeCopy.Apply(tree, fun, args1) setType ifPatternSkipFormals(restpe))
@@ -4207,18 +4201,6 @@ trait Typers extends Modes with Adaptations with Taggings {
             "\nscope-id = "+qual.tpe.termSymbol.info.decls.hashCode()+"\nmembers = "+qual.tpe.members+
             "\nname = "+name+"\nfound = "+sym+"\nowner = "+context.enclClass.owner
           )
-
-          def makeInteractiveErrorTree = {
-            val tree1 = tree match {
-              case Select(_, _) => treeCopy.Select(tree, qual, name)
-              case SelectFromTypeTree(_, _) => treeCopy.SelectFromTypeTree(tree, qual, name)
-            }
-            setError(tree1)
-          }
-
-          if (name == nme.ERROR && forInteractive)
-            return makeInteractiveErrorTree
-
           if (!qual.tpe.widen.isErroneous) {
             if ((mode & QUALmode) != 0) {
               val lastTry = missingHook(qual.tpe.typeSymbol, name)
@@ -4227,7 +4209,7 @@ trait Typers extends Modes with Adaptations with Taggings {
             NotAMemberError(tree, qual, name)
           }
 
-          if (forInteractive) makeInteractiveErrorTree else setError(tree)
+          setError(tree)
         } else {
           val tree1 = tree match {
             case Select(_, _) => treeCopy.Select(tree, qual, name)
@@ -4867,9 +4849,6 @@ trait Typers extends Modes with Adaptations with Taggings {
             // and we try again (@see tryTypedApply). In that case we can assign
             // whatever type to tree; we just have to survive until a real error message is issued.
             tree setType AnyClass.tpe
-        case Import(expr, selectors) =>
-          assert(forInteractive, "!forInteractive") // should not happen in normal circumstances.
-          tree setType tree.symbol.tpe
         case _ =>
           abort("unexpected tree: " + tree.getClass + "\n" + tree)//debug
       }

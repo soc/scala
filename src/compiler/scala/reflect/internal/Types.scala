@@ -4324,21 +4324,9 @@ trait Types extends api.Types { self: SymbolTable =>
                   case TypeRef(_, basesym, baseargs) =>
 
                    def instParam(ps: List[Symbol], as: List[Type]): Type =
-                      if (ps.isEmpty) {
-                        if (forInteractive) {
-                          val saved = settings.uniqid.value
-                          try {
-                            settings.uniqid.value = true
-                            println("*** stale type parameter: " + tp + sym.locationString + " cannot be instantiated from " + pre.widen)
-                            println("*** confused with params: " + sym + " in " + sym.owner + " not in " + ps + " of " + basesym)
-                            println("*** stacktrace = ")
-                            new Error().printStackTrace()
-                          } finally settings.uniqid.value = saved
-                          instParamRelaxed(basesym.typeParams, baseargs)
-                        } else throwError
-                      } else if (sym eq ps.head)
-                        // @M! don't just replace the whole thing, might be followed by type application
-                        appliedType(as.head, args mapConserve (this)) // @M: was as.head
+                      if (ps.isEmpty) throwError
+                      // @M! don't just replace the whole thing, might be followed by type application
+                      else if (sym eq ps.head) appliedType(as.head, args mapConserve (this)) // @M: was as.head
                       else instParam(ps.tail, as.tail)
 
                     /** Relaxed version of instParams which matches on names not symbols.
