@@ -4454,10 +4454,13 @@ trait Types extends api.Types { self: SymbolTable =>
       tp match {
         case TypeRef(pre, sym, args) if pre ne NoPrefix =>
           val newSym = subst(sym, from, to)
+          if (sym eq newSym) mapOver(tp)
+          else mapOver(copyTypeRef(tp, pre, newSym, args)) // mapOver takes care of subst'ing in args
           // assert(newSym.typeParams.length == sym.typeParams.length, "typars mismatch in SubstSymMap: "+(sym, sym.typeParams, newSym, newSym.typeParams))
-          mapOver(copyTypeRef(tp, pre, newSym, args)) // mapOver takes care of subst'ing in args
         case SingleType(pre, sym) if pre ne NoPrefix =>
-          mapOver(singleType(pre, subst(sym, from, to)))
+          val newSym = subst(sym, from, to)
+          if (sym eq newSym) mapOver(tp)
+          else mapOver(singleType(pre, newSym))
         case _ =>
           super.apply(tp)
       }
