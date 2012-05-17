@@ -634,13 +634,6 @@ class Global(var currentSettings: Settings, var reporter: Reporter) extends Symb
     }
   }
 
-  // phaseName = "SAMPLE PHASE"
-  object sampleTransform extends {
-    val global: Global.this.type = Global.this
-    val runsAfter = List[String]()
-    val runsRightAfter = None
-  } with SampleTransform
-
   /** The checkers are for validating the compiler data structures
    *  at phase boundaries.
    */
