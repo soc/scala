@@ -6053,11 +6053,12 @@ trait Types extends api.Types { self: SymbolTable =>
       case _                                                            => tp
     }
     var lubListDepth = 0
-    def loop(tsBts: List[List[Type]]): List[Type] = {
+    // pretypes is a tail-recursion-preserving accumulator.
+    @annotation.tailrec def loop(pretypes: List[Type], tsBts: List[List[Type]]): List[Type] = {
       lubListDepth += 1
 
-      if (tsBts.isEmpty || tsBts.exists(_.isEmpty)) Nil
-      else if (tsBts.tail.isEmpty) tsBts.head
+      if (tsBts.isEmpty || tsBts.exists(_.isEmpty)) pretypes.reverse
+      else if (tsBts.tail.isEmpty) pretypes.reverse ++ tsBts.head
       else {
         // ts0 is the 1-dimensional frontier of symbols cutting through 2-dimensional tsBts.
         // Invariant: all symbols "under" (closer to the first row) the frontier
@@ -6090,8 +6091,8 @@ trait Types extends api.Types { self: SymbolTable =>
           }
           val tails = tsBts map (_.tail)
           mergePrefixAndArgs(elimSub(ts0 map elimHigherOrderTypeParam, depth), 1, depth) match {
-            case Some(tp) => tp :: loop(tails)
-            case _        => loop(tails)
+            case Some(tp) => loop(tp :: pretypes, tails)
+            case _        => loop(pretypes, tails)
           }
         }
         else {
@@ -6108,7 +6109,7 @@ trait Types extends api.Types { self: SymbolTable =>
             printLubMatrix(ts zip tsBts toMap, lubListDepth)
           }
 
-          loop(newtps)
+          loop(pretypes, newtps)
         }
       }
     }
@@ -6117,7 +6118,7 @@ trait Types extends api.Types { self: SymbolTable =>
     if (printLubs)
       printLubMatrix(ts zip initialBTSes toMap, depth)
 
-    loop(initialBTSes)
+    loop(Nil, initialBTSes)
   }
 
   /** The minimal symbol (wrt Symbol.isLess) of a list of types */
