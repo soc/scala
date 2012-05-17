@@ -508,9 +508,9 @@ abstract class TypeFlowAnalysis {
           val cm = i.asInstanceOf[opcodes.CALL_METHOD]
           val msym = cm.method
           val paramsLength = msym.info.paramTypes.size
-          val receiver = result.stack.types.drop(paramsLength).head match {
-            case REFERENCE(s) => s
-            case _            => NoSymbol // e.g. the scrutinee is BOX(s) or ARRAY
+          val receiver = result.stack.types.drop(paramsLength) match {
+            case REFERENCE(s) :: _ => s
+            case _                 => NoSymbol // e.g. the scrutinee is BOX(s) or ARRAY
           }
           val concreteMethod = inliner.lookupImplFor(msym, receiver)
           val isCandidate = {
