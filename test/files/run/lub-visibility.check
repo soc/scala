@@ -8,7 +8,23 @@ scala> // should infer List[scala.collection.immutable.Seq[Nothing]]
 scala> // but reverted that for SI-5534.
 
 scala> val x = List(List(), Vector())
-x: List[scala.collection.immutable.Seq[Nothing] with scala.collection.AbstractSeq[Nothing]{def companion: scala.collection.generic.GenericCompanion[scala.collection.immutable.Seq with scala.collection.AbstractSeq{def dropRight(n: Int): scala.collection.immutable.Seq[Any] with scala.collection.AbstractSeq[Any]; def takeRight(n: Int): scala.collection.immutable.Seq[Any] with scala.collection.AbstractSeq[Any]; def drop(n: Int): scala.collection.immutable.Seq[Any] with scala.collection.AbstractSeq[Any]; def take(n: Int): scala.collection.immutable.Seq[Any] with scala.collection.AbstractSeq[Any]; def slice(from: Int,until: Int): scala.collection.immutable.Seq[Any] with scala.collection.AbstractSeq[Any]}]; def dropRight(n: Int): scala.collection.immutable.Seq[Nothing] with scala.collection.Ab...
+x: List[scala.collection.immutable.Seq[Nothing] with scala.collection.AbstractSeq[Nothing]] = List(List(), Vector())
+
+scala>
+
+scala> :type Map(1 -> (1 to 10), 2 -> (1 to 10).toList)
+scala.collection.immutable.Map[Int,scala.collection.immutable.Seq[Int] with scala.collection.AbstractSeq[Int]]
+
+scala>
+
+scala> abstract class Foo { def x: Any } ; class Bar extends Foo { def x = Iterator(Nil) } ; class Baz extends Foo { def x = Iterable(Vector()) }
+defined class Foo
+defined class Bar
+defined class Baz
+
+scala> def f = if (true) new Bar else new Baz
+f: Foo
+
 scala> 
 
 scala> 
