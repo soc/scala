@@ -37,6 +37,13 @@ trait ReplGlobal extends Global {
     }
   }
 
+  override lazy val gen = new {
+    val global: ReplGlobal.this.type = ReplGlobal.this
+  } with TreeGen with improving.TreeGen {
+    def mkAttributedCast(tree: Tree, pt: Type): Tree =
+      typer.typed(mkCast(tree, pt))
+  }
+
   object replPhase extends SubComponent {
     val global: ReplGlobal.this.type = ReplGlobal.this
     val phaseName = "repl"

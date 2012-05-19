@@ -80,7 +80,7 @@ class Global(var currentSettings: Settings, var reporter: Reporter) extends Symb
   /** Generate ASTs */
   type TreeGen = scala.tools.nsc.ast.TreeGen
 
-  object gen extends {
+  lazy val gen = new {
     val global: Global.this.type = Global.this
   } with TreeGen {
     def mkAttributedCast(tree: Tree, pt: Type): Tree =

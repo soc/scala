@@ -93,7 +93,7 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
    */
   private var _classLoader: AbstractFileClassLoader = null                              // active classloader
   private var _lineManager: Line.Manager            = null                              // logic for individual lines
-  private val _compiler: Global                     = newCompiler(settings, reporter)   // our private compiler
+  private val _compiler: ReplGlobal                 = newCompiler(settings, reporter)   // our private compiler
 
   private val nextReqId = {
     var counter = 0
@@ -178,7 +178,7 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
   def isInitializeComplete = _initializeComplete
 
   /** the public, go through the future compiler */
-  lazy val global: Global = {
+  lazy val global: ReplGlobal = {
     if (isInitializeComplete) _compiler
     else {
       // If init hasn't been called yet you're on your own.
