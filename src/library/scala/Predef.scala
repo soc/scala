@@ -271,21 +271,6 @@ object Predef extends LowPriorityImplicits {
   def println(x: Any) = Console.println(x)
   def printf(text: String, xs: Any*) = Console.print(text.format(xs: _*))
 
-  def readLine(): String = Console.readLine()
-  def readLine(text: String, args: Any*) = Console.readLine(text, args: _*)
-  def readBoolean() = Console.readBoolean()
-  def readByte() = Console.readByte()
-  def readShort() = Console.readShort()
-  def readChar() = Console.readChar()
-  def readInt() = Console.readInt()
-  def readLong() = Console.readLong()
-  def readFloat() = Console.readFloat()
-  def readDouble() = Console.readDouble()
-  def readf(format: String) = Console.readf(format)
-  def readf1(format: String) = Console.readf1(format)
-  def readf2(format: String) = Console.readf2(format)
-  def readf3(format: String) = Console.readf3(format)
-
   // views --------------------------------------------------------------
 
   implicit def exceptionWrapper(exc: Throwable)                                 = new runtime.RichException(exc)

@@ -10,23 +10,6 @@ import collection.{ mutable, immutable }
 import mutable.ListBuffer
 import language.implicitConversions
 
-class ProcessResult(val line: String) {
-  import sys.process._
-  private val buffer = new ListBuffer[String]
-
-  val builder  = Process(line)
-  val logger   = ProcessLogger(buffer += _)
-  val exitCode = builder ! logger
-  def lines    = buffer.toList
-
-  def show() = lines foreach println
-  override def toString = "`%s` (%d lines, exit %d)".format(line, buffer.size, exitCode)
-}
-object ProcessResult {
-  implicit def processResultToOutputLines(pr: ProcessResult): List[String] = pr.lines
-  def apply(line: String): ProcessResult = new ProcessResult(line)
-}
-
 trait LoopCommands {
   protected def out: JPrintWriter
 

@@ -9,7 +9,6 @@ package interpreter
 import Predef.{ println => _, _ }
 import java.io.{ BufferedReader, FileReader }
 import java.util.concurrent.locks.ReentrantLock
-import scala.sys.process.Process
 import session._
 import scala.util.Properties.{ jdkHome, javaVersion }
 import scala.tools.util.{ Javap }
@@ -263,7 +262,6 @@ class ILoop(in0: Option[BufferedReader], protected val out: JPrintWriter)
     nullary("quit", "exit the interpreter", () => Result(false, None)),
     nullary("replay", "reset execution and replay all previous commands", replay),
     nullary("reset", "reset the repl to its initial state, forgetting all session entries", resetCommand),
-    shCommand,
     nullary("silent", "disable/enable automatic printing of results", verbosity),
     cmd("type", "[-v] <expr>", "display the type of an expression without evaluating it", typeCommand),
     nullary("warnings", "show the suppressed warnings from the most recent line which had any", warningsCommand)
@@ -613,18 +611,6 @@ class ILoop(in0: Option[BufferedReader], protected val out: JPrintWriter)
   def reset() {
     intp.reset()
     unleashAndSetPhase()
-  }
-
-  /** fork a shell and run a command */
-  lazy val shCommand = new LoopCommand("sh", "run a shell command (result is implicitly => List[String])") {
-    override def usage = "<command line>"
-    def apply(line: String): Result = line match {
-      case ""   => showUsage()
-      case _    =>
-        val toRun = classOf[ProcessResult].getName + "(" + string2codeQuoted(line) + ")"
-        intp interpret toRun
-        ()
-    }
   }
 
   def withFile(filename: String)(action: File => Unit) {
