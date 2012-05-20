@@ -1,4 +1,5 @@
 package scala.collection
+
 import generic.CanBuildFrom
 
 package object generic {
