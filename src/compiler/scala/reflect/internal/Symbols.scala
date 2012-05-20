@@ -457,23 +457,6 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
       case x              => throw new FatalError(this + " is not a TermSymbol")
     }
 
-    @deprecated("Use the other signature", "2.10.0")
-    def newClass(pos: Position, name: TypeName): Symbol        = newClass(name, pos)
-    @deprecated("Use the other signature", "2.10.0")
-    def newModuleClass(pos: Position, name: TypeName): Symbol  = newModuleClass(name, pos)
-    @deprecated("Use the other signature", "2.10.0")
-    def newLabel(pos: Position, name: TermName): MethodSymbol  = newLabel(name, pos)
-    @deprecated("Use the other signature", "2.10.0")
-    def newValue(pos: Position, name: TermName): TermSymbol    = newTermSymbol(name, pos)
-    @deprecated("Use the other signature", "2.10.0")
-    def newAliasType(pos: Position, name: TypeName): Symbol    = newAliasType(name, pos)
-    @deprecated("Use the other signature", "2.10.0")
-    def newAbstractType(pos: Position, name: TypeName): Symbol = newAbstractType(name, pos)
-    @deprecated("Use the other signature", "2.10.0")
-    def newExistential(pos: Position, name: TypeName): Symbol  = newExistential(name, pos)
-    @deprecated("Use the other signature", "2.10.0")
-    def newMethod(pos: Position, name: TermName): MethodSymbol = newMethod(name, pos)
-
 // ----- locking and unlocking ------------------------------------------------------
 
     // True if the symbol is unlocked.

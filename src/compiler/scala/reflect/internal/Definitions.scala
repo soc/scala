@@ -111,7 +111,7 @@ trait Definitions extends reflect.api.StandardDefinitions {
     lazy val abbrvTag         = symbolsMap(ScalaValueClasses, nameToTag) withDefaultValue OBJECT_TAG
     lazy val numericWeight    = symbolsMapFilt(ScalaValueClasses, nameToWeight.keySet, nameToWeight)
     lazy val boxedModule      = classesMap(x => getModule(boxedName(x)))
-    lazy val boxedClass       = classesMap(x => getClass(boxedName(x)))
+    lazy val boxedClass       = classesMap(x => getClassByName(boxedName(x)))
     lazy val refClass         = classesMap(x => getRequiredClass("scala.runtime." + x + "Ref"))
     lazy val volatileRefClass = classesMap(x => getRequiredClass("scala.runtime.Volatile" + x + "Ref"))
     lazy val boxMethod        = classesMap(x => valueCompanionMember(x, nme.box))
@@ -296,8 +296,8 @@ trait Definitions extends reflect.api.StandardDefinitions {
       lazy val AnyVal_getClass = enterNewMethod(AnyValClass, nme.getClass_, Nil, getClassReturnType(AnyValClass.tpe))
 
     // bottom types
-    lazy val RuntimeNothingClass  = getClass(fulltpnme.RuntimeNothing)
-    lazy val RuntimeNullClass     = getClass(fulltpnme.RuntimeNull)
+    lazy val RuntimeNothingClass  = getClassByName(fulltpnme.RuntimeNothing)
+    lazy val RuntimeNullClass     = getClassByName(fulltpnme.RuntimeNull)
 
     sealed abstract class BottomClassSymbol(name: TypeName, parent: Symbol) extends ClassSymbol(ScalaPackageClass, NoPosition, name) {
       locally {
@@ -318,12 +318,12 @@ trait Definitions extends reflect.api.StandardDefinitions {
 
     // exceptions and other throwables
     lazy val ClassCastExceptionClass        = requiredClass[ClassCastException]
-    lazy val IndexOutOfBoundsExceptionClass = getClass(sn.IOOBException)
-    lazy val InvocationTargetExceptionClass = getClass(sn.InvTargetException)
+    lazy val IndexOutOfBoundsExceptionClass = getClassByName(sn.IOOBException)
+    lazy val InvocationTargetExceptionClass = getClassByName(sn.InvTargetException)
     lazy val MatchErrorClass                = requiredClass[MatchError]
     lazy val NonLocalReturnControlClass     = requiredClass[scala.runtime.NonLocalReturnControl[_]]
-    lazy val NullPointerExceptionClass      = getClass(sn.NPException)
-    lazy val ThrowableClass                 = getClass(sn.Throwable)
+    lazy val NullPointerExceptionClass      = getClassByName(sn.NPException)
+    lazy val ThrowableClass                 = getClassByName(sn.Throwable)
     lazy val UninitializedErrorClass        = requiredClass[UninitializedFieldError]
 
     // fundamental reference classes
@@ -471,7 +471,7 @@ trait Definitions extends reflect.api.StandardDefinitions {
     // reflection / structural types
     lazy val SoftReferenceClass     = requiredClass[java.lang.ref.SoftReference[_]]
     lazy val WeakReferenceClass     = requiredClass[java.lang.ref.WeakReference[_]]
-    lazy val MethodClass            = getClass(sn.MethodAsObject)
+    lazy val MethodClass            = getClassByName(sn.MethodAsObject)
       def methodClass_setAccessible = getMember(MethodClass, nme.setAccessible)
     lazy val EmptyMethodCacheClass  = requiredClass[scala.runtime.EmptyMethodCache]
     lazy val MethodCacheClass       = requiredClass[scala.runtime.MethodCache]
@@ -603,9 +603,6 @@ trait Definitions extends reflect.api.StandardDefinitions {
         if ((elemtp <:< AnyRefClass.tpe) && !isPhantomClass(elemtp.typeSymbol)) nme.wrapRefArray
         else nme.genericWrapArray
     }
-
-    @deprecated("Use isTupleType", "2.10.0")
-    def isTupleTypeOrSubtype(tp: Type) = isTupleType(tp)
 
     def tupleField(n: Int, j: Int) = getMember(TupleClass(n), nme.productAccessorName(j))
     def isTupleSymbol(sym: Symbol) = TupleClass contains unspecializedSymbol(sym)
@@ -742,9 +739,9 @@ trait Definitions extends reflect.api.StandardDefinitions {
 
     lazy val ComparatorClass = getRequiredClass("scala.runtime.Comparator")
     // System.ValueType
-    lazy val ValueTypeClass: Symbol = getClass(sn.ValueType)
+    lazy val ValueTypeClass: Symbol = getClassByName(sn.ValueType)
     // System.MulticastDelegate
-    lazy val DelegateClass: Symbol = getClass(sn.Delegate)
+    lazy val DelegateClass: Symbol = getClassByName(sn.Delegate)
     var Delegate_scalaCallers: List[Symbol] = List() // Syncnote: No protection necessary yet as only for .NET where reflection is not supported.
     // Symbol -> (Symbol, Type): scalaCaller -> (scalaMethodSym, DelegateType)
     // var Delegate_scalaCallerInfos: HashMap[Symbol, (Symbol, Type)] = _
@@ -898,9 +895,9 @@ trait Definitions extends reflect.api.StandardDefinitions {
     lazy val RuntimeStaticsModule   = getRequiredModule("scala.runtime.Statics")
     lazy val BoxesRunTimeModule     = getRequiredModule("scala.runtime.BoxesRunTime")
     lazy val BoxesRunTimeClass      = BoxesRunTimeModule.moduleClass
-    lazy val BoxedNumberClass       = getClass(sn.BoxedNumber)
-    lazy val BoxedCharacterClass    = getClass(sn.BoxedCharacter)
-    lazy val BoxedBooleanClass      = getClass(sn.BoxedBoolean)
+    lazy val BoxedNumberClass       = getClassByName(sn.BoxedNumber)
+    lazy val BoxedCharacterClass    = getClassByName(sn.BoxedCharacter)
+    lazy val BoxedBooleanClass      = getClassByName(sn.BoxedBoolean)
     lazy val BoxedByteClass         = requiredClass[java.lang.Byte]
     lazy val BoxedShortClass        = requiredClass[java.lang.Short]
     lazy val BoxedIntClass          = requiredClass[java.lang.Integer]
@@ -1015,9 +1012,6 @@ trait Definitions extends reflect.api.StandardDefinitions {
       throw new FatalError(owner + " does not have a " + what + " " + name)
     }
 
-    @deprecated("Use getClassByName", "2.10.0")
-    def getClass(fullname: Name): Symbol = getClassByName(fullname)
-
     def getRequiredPackage(fullname: String): PackageSymbol =
       getPackage(newTermNameCached(fullname))
 
@@ -1057,7 +1051,7 @@ trait Definitions extends reflect.api.StandardDefinitions {
       getClassIfDefined(newTypeName(fullname))
 
     def getClassIfDefined(fullname: Name): Symbol =
-      wrapMissing(getClass(fullname.toTypeName))
+      wrapMissing(getClassByName(fullname.toTypeName))
 
     def getModuleIfDefined(fullname: String): Symbol =
       getModuleIfDefined(newTermName(fullname))
@@ -1258,7 +1252,7 @@ trait Definitions extends reflect.api.StandardDefinitions {
     // def getClass2(name1: Name, name2: Name) = {
     //   try {
     //     val result = getModuleOrClass(name1.toTypeName)
-    //     if (result.isAliasType) getClass(name2) else result
+    //     if (result.isAliasType) getClassByName(name2) else result
     //   }
     //   catch { case ex1: FatalError =>
     //     try getModuleOrClass(name2.toTypeName)

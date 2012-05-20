@@ -165,10 +165,10 @@ abstract class ICodeReader extends ClassfileParser {
     else if (name == fulltpnme.RuntimeNull)
       definitions.NullClass
     else if (nme.isImplClassName(name)) {
-      val iface = definitions.getClass(tpnme.interfaceName(name))
+      val iface = definitions.getClassByName(tpnme.interfaceName(name))
       log("forcing " + iface.owner + " at phase: " + phase + " impl: " + iface.implClass)
       iface.owner.info // force the mixin type-transformer
-      definitions.getClass(name)
+      definitions.getClassByName(name)
     }
     else if (nme.isModuleName(name)) {
       val strippedName = nme.stripModuleSuffix(name)
@@ -179,7 +179,7 @@ abstract class ICodeReader extends ClassfileParser {
     }
     else {
       forceMangledName(name, false)
-      afterFlatten(definitions.getClass(name.toTypeName))
+      afterFlatten(definitions.getClassByName(name.toTypeName))
     }
     if (sym.isModule)
       sym.moduleClass

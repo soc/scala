@@ -471,7 +471,7 @@ abstract class ClassfileParser {
       if (name.pos('.') == name.length)
         definitions.getMember(definitions.EmptyPackageClass, name.toTypeName)
       else
-        definitions.getClass(name) // see tickets #2464, #3756
+        definitions.getClassByName(name) // see tickets #2464, #3756
     } catch {
       case _: FatalError => loadClassSymbol(name)
     }
