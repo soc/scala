@@ -5,7 +5,7 @@
 
 package scala.tools.nsc
 
-import scala.ref.WeakReference
+import java.lang.ref.WeakReference
 
 /** An nsc sub-component.
  *
@@ -52,7 +52,7 @@ abstract class SubComponent {
 
   /** The phase corresponding to this subcomponent in the current compiler run */
   def ownPhase: Phase = {
-    ownPhaseCache.get match {
+    Option(ownPhaseCache.get) match {
       case Some(phase) if ownPhaseRunId == global.currentRunId =>
         phase
       case _ =>

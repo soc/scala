@@ -8,7 +8,7 @@ package internal
 
 import scala.collection.{ mutable, immutable, generic }
 import generic.Clearable
-import scala.ref.WeakReference
+import java.lang.ref.WeakReference
 import mutable.ListBuffer
 import Flags._
 import scala.util.control.ControlThrowable
@@ -1469,8 +1469,8 @@ trait Types extends api.Types { self: SymbolTable =>
       intersectionWitness get parents match {
         case Some(ref) =>
           ref.get match {
-            case Some(w) => if (w eq this) op1 else op2(w)
-            case None => updateCache()
+            case null => updateCache()
+            case w    => if (w eq this) op1 else op2(w)
           }
         case None => updateCache()
       }

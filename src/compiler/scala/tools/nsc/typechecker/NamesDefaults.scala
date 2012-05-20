@@ -8,7 +8,7 @@ package typechecker
 
 import symtab.Flags._
 import scala.collection.mutable
-import scala.ref.WeakReference
+import java.lang.ref.WeakReference
 
 /**
  *  @author Lukas Rytz
@@ -19,9 +19,6 @@ trait NamesDefaults { self: Analyzer =>
   import global._
   import definitions._
   import NamesDefaultsErrorsGen._
-
-  val defaultParametersOfMethod =
-    perRunCaches.newWeakMap[Symbol, Set[WeakReference[Symbol]]]() withDefaultValue Set()
 
   case class NamedApplyInfo(
     qual:       Option[Tree],

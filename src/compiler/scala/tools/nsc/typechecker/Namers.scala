@@ -8,7 +8,7 @@ package typechecker
 
 import scala.collection.mutable
 import scala.annotation.tailrec
-import scala.ref.WeakReference
+import java.lang.ref.WeakReference
 import symtab.Flags._
 import scala.tools.nsc.io.AbstractFile
 
@@ -837,9 +837,11 @@ trait Namers extends MethodSynthesis {
       // unless they exist already; here, "clazz" is the module class
       if (clazz.isModuleClass) {
         Namers.this.classOfModuleClass get clazz foreach { cdefRef =>
-          val cdef = cdefRef()
-          if (cdef.mods.isCase) addApplyUnapply(cdef, templateNamer)
-          classOfModuleClass -= clazz
+          val cdef = cdefRef.get
+          if (cdef != null) {
+            if (cdef.mods.isCase) addApplyUnapply(cdef, templateNamer)
+            classOfModuleClass -= clazz
+          }
         }
       }
 
@@ -851,13 +853,14 @@ trait Namers extends MethodSynthesis {
       if (clazz.isClass && !clazz.hasModuleFlag) {
         val modClass = companionSymbolOf(clazz, context).moduleClass
         Namers.this.classOfModuleClass get modClass map { cdefRef =>
-          val cdef = cdefRef()
-
-          def hasCopy(decls: Scope) = (decls lookup nme.copy) != NoSymbol
-          if (cdef.mods.isCase && !hasCopy(decls) &&
-                  !parents.exists(p => hasCopy(p.typeSymbol.info.decls)) &&
-                  !parents.flatMap(_.baseClasses).distinct.exists(bc => hasCopy(bc.info.decls)))
-            addCopyMethod(cdef, templateNamer)
+          val cdef = cdefRef.get
+          if (cdef != null) {
+            def hasCopy(decls: Scope) = (decls lookup nme.copy) != NoSymbol
+            if (cdef.mods.isCase && !hasCopy(decls) &&
+                    !parents.exists(p => hasCopy(p.typeSymbol.info.decls)) &&
+                    !parents.flatMap(_.baseClasses).distinct.exists(bc => hasCopy(bc.info.decls)))
+              addCopyMethod(cdef, templateNamer)
+          }
         }
       }
 
