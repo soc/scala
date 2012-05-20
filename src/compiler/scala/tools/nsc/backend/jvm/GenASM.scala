@@ -223,8 +223,6 @@ abstract class GenASM extends SubComponent with BytecodeWriters {
 
   @inline final private def hasPublicBitSet(flags: Int) = ((flags & asm.Opcodes.ACC_PUBLIC) != 0)
 
-  @inline final private def isRemote(s: Symbol) = (s hasAnnotation RemoteAttr)
-
   /**
    * Return the Java modifiers for the given symbol.
    * Java modifiers for classes:
@@ -1036,23 +1034,6 @@ abstract class GenASM extends SubComponent with BytecodeWriters {
       }
     }
 
-    /** Adds a @remote annotation, actual use unknown.
-     *
-     * Invoked from genMethod() and addForwarder().
-     */
-    def addRemoteExceptionAnnot(isRemoteClass: Boolean, isJMethodPublic: Boolean, meth: Symbol) {
-      val needsAnnotation = (
-        (  isRemoteClass ||
-           isRemote(meth) && isJMethodPublic
-        ) && !(meth.throwsAnnotations contains RemoteExceptionClass)
-      )
-      if (needsAnnotation) {
-        val c   = Constant(RemoteExceptionClass.tpe)
-        val arg = Literal(c) setType c.tpe
-        meth.addAnnotation(ThrowsClass, arg)
-      }
-    }
-
     // -----------------------------------------------------------------------------------------
     // Static forwarders (related to mirror classes but also present in
     // a plain class lacking companion module, for details see `isCandidateForForwarders`).
@@ -1065,7 +1046,7 @@ abstract class GenASM extends SubComponent with BytecodeWriters {
     }
 
     /** Add a forwarder for method m. Used only from addForwarders(). */
-    private def addForwarder(isRemoteClass: Boolean, jclass: asm.ClassVisitor, module: Symbol, m: Symbol) {
+    private def addForwarder(jclass: asm.ClassVisitor, module: Symbol, m: Symbol) {
       val moduleName     = javaName(module)
       val methodInfo     = module.thisType.memberInfo(m)
       val paramJavaTypes: List[asm.Type] = methodInfo.paramTypes map javaType
@@ -1083,7 +1064,6 @@ abstract class GenASM extends SubComponent with BytecodeWriters {
 
       // TODO needed? for(ann <- m.annotations) { ann.symbol.initialize }
       val jgensig = if (m.isDeferred) null else getGenericSignature(m, module); // only add generic signature if method concrete; bug #1745
-      addRemoteExceptionAnnot(isRemoteClass, hasPublicBitSet(flags), m)
       val (throws, others) = m.annotations partition (_.symbol == ThrowsClass)
       val thrownExceptions: List[String] = getExceptions(throws)
 
@@ -1131,7 +1111,7 @@ abstract class GenASM extends SubComponent with BytecodeWriters {
      *  a method with the same name is defined both in a class and its companion object:
      *  method signature is not taken into account.
      */
-    def addForwarders(isRemoteClass: Boolean, jclass: asm.ClassVisitor, jclassName: String, moduleClass: Symbol) {
+    def addForwarders(jclass: asm.ClassVisitor, jclassName: String, moduleClass: Symbol) {
       assert(moduleClass.isModuleClass, moduleClass)
       debuglog("Dumping mirror class for object: " + moduleClass)
 
@@ -1149,7 +1129,7 @@ abstract class GenASM extends SubComponent with BytecodeWriters {
           log("No forwarder for " + m + " due to conflict with " + linkedClass.info.member(m.name))
         else {
           log("Adding static forwarder for '%s' from %s to '%s'".format(m, jclassName, moduleClass))
-          addForwarder(isRemoteClass, jclass, moduleClass, m)
+          addForwarder(jclass, moduleClass, m)
         }
       }
     }
@@ -1304,7 +1284,6 @@ abstract class GenASM extends SubComponent with BytecodeWriters {
         def newParentForAttr(attr: Symbol): Option[Symbol] = attr match {
           case SerializableAttr => Some(SerializableClass)
           case CloneableAttr    => Some(JavaCloneableClass)
-          case RemoteAttr       => Some(RemoteInterfaceClass)
           case _                => None
         }
 
@@ -1408,7 +1387,7 @@ abstract class GenASM extends SubComponent with BytecodeWriters {
             }
             if (isCandidateForForwarders) {
               log("Adding static forwarders from '%s' to implementations in '%s'".format(c.symbol, lmoc))
-              addForwarders(isRemote(clasz.symbol), jclass, thisName, lmoc.moduleClass)
+              addForwarders(jclass, thisName, lmoc.moduleClass)
             }
           }
         }
@@ -1528,7 +1507,6 @@ abstract class GenASM extends SubComponent with BytecodeWriters {
 
       // TODO needed? for(ann <- m.symbol.annotations) { ann.symbol.initialize }
       val jgensig = getGenericSignature(m.symbol, clasz.symbol)
-      addRemoteExceptionAnnot(isRemote(clasz.symbol), hasPublicBitSet(flags), m.symbol)
       val (excs, others) = m.symbol.annotations partition (_.symbol == ThrowsClass)
       val thrownExceptions: List[String] = getExceptions(excs)
 
@@ -2897,13 +2875,11 @@ abstract class GenASM extends SubComponent with BytecodeWriters {
       // typestate: entering mode with valid call sequences:
       //   ( visitInnerClass | visitField | visitMethod )* visitEnd
 
-      addForwarders(isRemote(modsym), mirrorClass, mirrorName, modsym)
-
+      addForwarders(mirrorClass, mirrorName, modsym)
       addInnerClasses(modsym, mirrorClass)
       mirrorClass.visitEnd()
       writeIfNotTooBig("" + modsym.name, mirrorName, mirrorClass, modsym)
     }
-
 
   } // end of class JMirrorBuilder
 

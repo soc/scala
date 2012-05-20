@@ -114,7 +114,6 @@ package object scala {
   type inline = annotation.inline
   type native = annotation.native
   type noinline = noannotation.inline
-  type remote = annotation.remote
   type serializable = annotation.serializable
   type specialized = annotation.specialized
   type transient = annotation.transient

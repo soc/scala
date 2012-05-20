@@ -212,7 +212,6 @@ abstract class GenJVM extends SubComponent with GenJVMUtil with GenAndroid with 
     def newParentForAttr(attr: Symbol): Option[Symbol] = attr match {
       case SerializableAttr => Some(SerializableClass)
       case CloneableAttr    => Some(JavaCloneableClass)
-      case RemoteAttr       => Some(RemoteInterfaceClass)
       case _                => None
     }
 
@@ -268,7 +267,6 @@ abstract class GenJVM extends SubComponent with GenJVMUtil with GenAndroid with 
     // var jcode: JExtendedCode = _
 
     def isParcelableClass = isAndroidParcelableClass(clasz.symbol)
-    def isRemoteClass = clasz.symbol hasAnnotation RemoteAttr
     def serialVUID = clasz.symbol getAnnotation SerialVersionUIDAttr collect {
       case AnnotationInfo(_, Literal(const) :: _, _) => const.longValue
     }
@@ -824,8 +822,6 @@ abstract class GenJVM extends SubComponent with GenJVMUtil with GenAndroid with 
                                     mkArray(m.params map (p => javaType(p.kind))),
                                     mkArray(m.params map (p => javaName(p.sym))))
 
-      addRemoteException(jmethod, m.symbol)
-
       if (!jmethod.isAbstract() && !method.native) {
         val jcode = jmethod.getCode().asInstanceOf[JExtendedCode]
 
@@ -869,20 +865,6 @@ abstract class GenJVM extends SubComponent with GenJVMUtil with GenAndroid with 
         case e: JCode.CodeSizeTooBigException =>
           clasz.cunit.error(m.symbol.pos, "Code size exceeds JVM limits: %d".format(e.codeSize))
           throw e
-      }
-    }
-
-    /** Adds a @remote annotation, actual use unknown.
-     */
-    private def addRemoteException(jmethod: JMethod, meth: Symbol) {
-      val needsAnnotation = (
-        (isRemoteClass || (meth hasAnnotation RemoteAttr) && jmethod.isPublic)
-          && !(meth.throwsAnnotations contains RemoteExceptionClass)
-      )
-      if (needsAnnotation) {
-        val c   = Constant(RemoteExceptionClass.tpe)
-        val arg = Literal(c) setType c.tpe
-        meth.addAnnotation(ThrowsClass, arg)
       }
     }
 
@@ -1005,7 +987,6 @@ abstract class GenJVM extends SubComponent with GenJVMUtil with GenAndroid with 
       mirrorCode.emitINVOKEVIRTUAL(moduleName, mirrorMethod.getName, javaType(m).asInstanceOf[JMethodType])
       mirrorCode emitRETURN mirrorMethod.getReturnType()
 
-      addRemoteException(mirrorMethod, m)
       // only add generic signature if the method is concrete; bug #1745
       if (!m.isDeferred)
         addGenericSignature(mirrorMethod, m, module)
