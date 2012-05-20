@@ -2214,7 +2214,7 @@ abstract class GenASM extends SubComponent with BytecodeWriters {
         }
         // adding non-param locals
         var anonCounter = 0
-        var fltnd: List[Triple[String, Local, Interval]] = Nil
+        var fltnd: List[Tuple3[String, Local, Interval]] = Nil
         for(Pair(local, ranges) <- scoping.getMerged()) {
           var name = javaName(local.sym)
           if (name == null) {
@@ -2222,17 +2222,17 @@ abstract class GenASM extends SubComponent with BytecodeWriters {
             name = "<anon" + anonCounter + ">"
           }
           for(intrvl <- ranges) {
-            fltnd ::= Triple(name, local, intrvl)
+            fltnd ::= Tuple3(name, local, intrvl)
           }
         }
         // quest for deterministic output that Map.toList doesn't provide (so that ant test.stability doesn't complain).
         val srtd = fltnd.sortBy { kr =>
-          val Triple(name: String, local: Local, intrvl: Interval) = kr
+          val Tuple3(name: String, local: Local, intrvl: Interval) = kr
 
-          Triple(intrvl.start, intrvl.end - intrvl.start, name)  // ie sort by (start, length, name)
+          Tuple3(intrvl.start, intrvl.end - intrvl.start, name)  // ie sort by (start, length, name)
         }
 
-        for(Triple(name, local, Interval(start, end)) <- srtd) {
+        for(Tuple3(name, local, Interval(start, end)) <- srtd) {
           jmethod.visitLocalVariable(name, descriptor(local.kind), null, start, end, indexOf(local))
         }
         // "There may be no more than one LocalVariableTable attribute per local variable in the Code attribute"

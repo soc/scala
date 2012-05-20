@@ -243,12 +243,6 @@ object Predef extends LowPriorityImplicits {
     def unapply[A, B](x: Tuple2[A, B]): Option[Tuple2[A, B]] = Some(x)
   }
 
-  type Triple[+A, +B, +C] = Tuple3[A, B, C]
-  object Triple {
-    def apply[A, B, C](x: A, y: B, z: C) = Tuple3(x, y, z)
-    def unapply[A, B, C](x: Tuple3[A, B, C]): Option[Tuple3[A, B, C]] = Some(x)
-  }
-
   final class ArrowAssoc[A](val __leftOfArrow: A) extends AnyVal {
     // `__leftOfArrow` must be a public val to allow inlining. The val
     // used to be called `x`, but now goes by `__leftOfArrow`, as that
