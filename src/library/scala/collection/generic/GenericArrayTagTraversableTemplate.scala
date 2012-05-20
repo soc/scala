@@ -23,8 +23,4 @@ trait GenericArrayTagTraversableTemplate[+A, +CC[X] <: Traversable[X]] extends H
   implicit protected[this] val tag: ArrayTag[A]
   def arrayTagCompanion: GenericArrayTagCompanion[CC]
   def genericArrayTagBuilder[B](implicit tag: ArrayTag[B]): Builder[B, CC[B]] = arrayTagCompanion.newBuilder[B]
-  @deprecated("use arrayTagCompanion instead", "2.10.0")
-  def classManifestCompanion: GenericClassManifestCompanion[CC] = arrayTagCompanion
-  @deprecated("use genericArrayTagBuilder instead", "2.10.0")
-  def genericClassManifestBuilder[B](implicit manifest: ClassManifest[B]): Builder[B, CC[B]] = genericArrayTagBuilder[B](manifest)
 }

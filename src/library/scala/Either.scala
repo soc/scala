@@ -203,7 +203,6 @@ final case class Right[+A, +B](b: B) extends Either[A, B] {
 }
 
 object Either {
-
   /**
    * Allows use of a ``merge`` method to extract values from Either instances
    * regardless of whether they are Left or Right.
@@ -221,8 +220,6 @@ object Either {
       case Right(a) => a
     }
   }
-  @deprecated("use MergeableEither instead", "2.10")
-  def either2mergeable[A](x: Either[A, A]): MergeableEither[A] = new MergeableEither(x)
 
   /**
    * Projects an `Either` into a `Left`.
