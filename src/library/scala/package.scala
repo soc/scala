@@ -32,10 +32,6 @@ package object scala {
   val AnyRef = new Specializable {
     override def toString = "object AnyRef"
   }
-
-  @deprecated("instead of `@serializable class C`, use `class C extends Serializable`", "2.9.0")
-  type serializable = annotation.serializable
-
   type TraversableOnce[+A] = scala.collection.TraversableOnce[A]
 
   type Traversable[+A] = scala.collection.Traversable[A]
@@ -101,9 +97,6 @@ package object scala {
 
   type Ordering[T] = scala.math.Ordering[T]
   val Ordering = scala.math.Ordering
-
-  type PartialOrdering[T] = scala.math.PartialOrdering[T]
-  type PartiallyOrdered[T] = scala.math.PartiallyOrdered[T]
 
   // Annotations which we might move to annotation.*
 /*

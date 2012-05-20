@@ -65,7 +65,7 @@ import language.{implicitConversions, higherKinds}
   * @see [[scala.math.Ordered]], [[scala.util.Sorting]]
   */
 @annotation.implicitNotFound(msg = "No implicit Ordering defined for ${T}.")
-trait Ordering[T] extends Comparator[T] with PartialOrdering[T] with Serializable {
+trait Ordering[T] extends Comparator[T] with Serializable {
   outer =>
 
   /** Returns whether a comparison between `x` and `y` is defined, and if so
@@ -84,19 +84,19 @@ trait Ordering[T] extends Comparator[T] with PartialOrdering[T] with Serializabl
   def compare(x: T, y: T): Int
 
   /** Return true if `x` <= `y` in the ordering. */
-  override def lteq(x: T, y: T): Boolean = compare(x, y) <= 0
+  def lteq(x: T, y: T): Boolean = compare(x, y) <= 0
 
   /** Return true if `x` >= `y` in the ordering. */
-  override def gteq(x: T, y: T): Boolean = compare(x, y) >= 0
+  def gteq(x: T, y: T): Boolean = compare(x, y) >= 0
 
   /** Return true if `x` < `y` in the ordering. */
-  override def lt(x: T, y: T): Boolean = compare(x, y) < 0
+  def lt(x: T, y: T): Boolean = compare(x, y) < 0
 
   /** Return true if `x` > `y` in the ordering. */
-  override def gt(x: T, y: T): Boolean = compare(x, y) > 0
+  def gt(x: T, y: T): Boolean = compare(x, y) > 0
 
   /** Return true if `x` == `y` in the ordering. */
-  override def equiv(x: T, y: T): Boolean = compare(x, y) == 0
+  def equiv(x: T, y: T): Boolean = compare(x, y) == 0
 
   /** Return `x` if `x` >= `y`, otherwise `y`. */
   def max(x: T, y: T): T = if (gteq(x, y)) x else y
@@ -105,7 +105,7 @@ trait Ordering[T] extends Comparator[T] with PartialOrdering[T] with Serializabl
   def min(x: T, y: T): T = if (lteq(x, y)) x else y
 
   /** Return the opposite ordering of this one. */
-  override def reverse: Ordering[T] = new Ordering[T] {
+  def reverse: Ordering[T] = new Ordering[T] {
     override def reverse = outer
     def compare(x: T, y: T) = outer.compare(y, x)
   }
