@@ -14,7 +14,6 @@ import scala.util.Properties.{ jdkHome, javaVersion }
 import scala.tools.util.{ Javap }
 import scala.annotation.tailrec
 import scala.collection.mutable.ListBuffer
-import scala.concurrent.ops
 import util.{ ClassPath, Exceptional, stringFromWriter, stringFromStream }
 import interpreter._
 import io.{ File, Directory }

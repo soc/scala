@@ -8,7 +8,7 @@
 
 package scala.collection
 
-import java.{ lang => jl, util => ju }, java.util.{ concurrent => juc }
+import java.{ lang => jl, util => ju }
 import convert._
 
 // TODO: I cleaned all this documentation up in JavaConversions, but the
