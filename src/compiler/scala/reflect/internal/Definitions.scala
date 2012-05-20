@@ -565,7 +565,8 @@ trait Definitions extends reflect.api.StandardDefinitions {
     def isNoneType(tp: Type)    = tp.typeSymbol eq NoneModule
 
     // Product, Tuple, Function, AbstractFunction
-    private def mkArityArray(name: String, arity: Int, countFrom: Int = 1): Array[Symbol] = {
+    private def mkArityArray(name: String, arity0: Int, countFrom: Int = 1): Array[Symbol] = {
+      val arity = arity0 // math.min(arity0, 10)
       val list = countFrom to arity map (i => getRequiredClass("scala." + name + i))
       if (countFrom == 0) list.toArray
       else (NoSymbol +: list).toArray
@@ -576,7 +577,7 @@ trait Definitions extends reflect.api.StandardDefinitions {
       else appliedType(symbolArray(arity), args ++ others: _*)
     }
 
-    val MaxTupleArity, MaxProductArity, MaxFunctionArity = 22
+    val MaxTupleArity, MaxProductArity, MaxFunctionArity = 10
     lazy val ProductClass          = { val arr = mkArityArray("Product", MaxProductArity) ; arr(0) = UnitClass ; arr }
     lazy val TupleClass            = mkArityArray("Tuple", MaxTupleArity)
     lazy val FunctionClass         = mkArityArray("Function", MaxFunctionArity, 0)
