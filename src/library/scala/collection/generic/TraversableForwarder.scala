@@ -10,7 +10,7 @@ package scala.collection.generic
 
 import scala.collection._
 import mutable.{ Buffer, StringBuilder }
-import immutable.{ List, Stream }
+import immutable.List
 
 /** This trait implements a forwarder for traversable objects. It forwards
  *  all calls to a different traversable, except for:
@@ -57,7 +57,6 @@ trait TraversableForwarder[+A] extends Traversable[A] {
   override def toSeq: Seq[A] = underlying.toSeq
   override def toIndexedSeq = underlying.toIndexedSeq
   override def toBuffer[B >: A] = underlying.toBuffer
-  override def toStream: Stream[A] = underlying.toStream
   override def toSet[B >: A]: immutable.Set[B] = underlying.toSet
   override def toMap[T, U](implicit ev: A <:< (T, U)): immutable.Map[T, U] = underlying.toMap(ev)
   override def mkString(start: String, sep: String, end: String): String = underlying.mkString(start, sep, end)

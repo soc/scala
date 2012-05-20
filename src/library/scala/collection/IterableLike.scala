@@ -10,7 +10,7 @@ package scala.collection
 
 
 import generic._
-import immutable.{ List, Stream }
+import immutable.List
 import annotation.unchecked.uncheckedVariance
 
 /** A template trait for iterable collections of type `Iterable[A]`.
@@ -385,8 +385,6 @@ trait IterableLike[+A, +Repr] extends Any with Equals with TraversableLike[A, Re
 
     !these.hasNext && !those.hasNext
   }
-
-  override /*TraversableLike*/ def toStream: Stream[A] = iterator.toStream
 
   /** Method called from equality methods, so that user-defined subclasses can
    *  refuse to be equal to other collections of the same kind.

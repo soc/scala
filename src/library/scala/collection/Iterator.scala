@@ -10,7 +10,6 @@ package scala.collection
 
 import mutable.ArrayBuffer
 import annotation.migration
-import immutable.Stream
 
 /** The `Iterator` object provides various functions for creating specialized iterators.
  *
@@ -1131,11 +1130,8 @@ trait Iterator[+A] extends TraversableOnce[A] {
     !hasNext && !that.hasNext
   }
 
-  def toTraversable: Traversable[A] = toStream
+  def toTraversable: Traversable[A] = toList
   def toIterator: Iterator[A] = self
-  def toStream: Stream[A] =
-    if (self.hasNext) Stream.cons(self.next, self.toStream)
-    else Stream.empty[A]
 
   /** Converts this iterator to a string.
    *

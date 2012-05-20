@@ -44,16 +44,16 @@ abstract class ExtensionMethods extends Transform with TypingTransformers {
    *  in `extensionMethod` if the first name has the wrong type. We thereby gain a level of insensitivity
    *  of how overloaded types are ordered between phases and picklings.
    */
-  private def extensionNames(imeth: Symbol): Stream[Name] =
+  private def extensionNames(imeth: Symbol): Iterator[Name] =
     imeth.owner.info.decl(imeth.name).tpe match {
       case OverloadedType(_, alts) =>
         val index = alts indexOf imeth
         assert(index >= 0, alts+" does not contain "+imeth)
         def altName(index: Int) = newTermName("extension"+index+"$"+imeth.name)
-        altName(index) #:: ((0 until alts.length).toStream filter (index != _) map altName)
+        Iterator(altName(index)) ++ ((0 until alts.length).iterator filter (index != _) map altName)
       case tpe =>
         assert(tpe != NoType, imeth.name+" not found in "+imeth.owner+"'s decls: "+imeth.owner.info.decls)
-        Stream(newTermName("extension$"+imeth.name))
+        Iterator(newTermName("extension$"+imeth.name))
     }
 
   /** Return the extension method that corresponds to given instance method `meth`.
@@ -63,7 +63,7 @@ abstract class ExtensionMethods extends Transform with TypingTransformers {
     val candidates = extensionNames(imeth) map (companionInfo.decl(_))
     val matching = candidates filter (alt => normalize(alt.tpe, imeth.owner) matches imeth.tpe)
     assert(matching.nonEmpty, "no extension method found for "+imeth+" among "+candidates+"/"+extensionNames(imeth))
-    matching.head
+    matching.next
   }
 
   private def normalize(stpe: Type, clazz: Symbol): Type = stpe match {
@@ -112,7 +112,7 @@ abstract class ExtensionMethods extends Transform with TypingTransformers {
         case DefDef(_, _, tparams, vparamss, _, rhs) if tree.symbol.isMethodWithExtension =>
           val companion = currentOwner.companionModule
           val origMeth = tree.symbol
-          val extensionName = extensionNames(origMeth).head
+          val extensionName = extensionNames(origMeth).next
           val extensionMeth = companion.moduleClass.newMethod(extensionName, origMeth.pos, origMeth.flags & ~OVERRIDE & ~PROTECTED | FINAL)
             .setAnnotations(origMeth.annotations)
           companion.info.decls.enter(extensionMeth)

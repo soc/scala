@@ -389,12 +389,6 @@ trait TraversableOnce[+A] extends Any {
   //  */
   // def toIndexedSeq: immutable.IndexedSeq[A]
 
-  /** Converts this $coll to a stream.
-   *  $willNotTerminateInf
-   *  @return a stream containing all elements of this $coll.
-   */
-  def toStream: Stream[A]
-
   /** Returns an Iterator over the elements in this $coll.  Will return
    *  the same Iterator if this instance is already an Iterator.
    *  $willNotTerminateInf
@@ -610,9 +604,9 @@ trait TraversableOnce[+A] extends Any {
 
   def toList: List[A] = (new ListBuffer[A] ++= this).toList
 
-  def toIterable: Iterable[A] = toStream
+  def toIterable: Iterable[A] = Iterable[A]() ++ this
 
-  def toSeq: Seq[A] = toStream
+  def toSeq: Seq[A] = Seq[A]() ++ this
 
   def toIndexedSeq: immutable.IndexedSeq[A] = immutable.IndexedSeq() ++ this
 

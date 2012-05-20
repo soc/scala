@@ -10,7 +10,7 @@ package scala.util
 
 import collection.mutable.ArrayBuffer
 import collection.generic.CanBuildFrom
-import scala.collection.immutable.{ List, Stream }
+import scala.collection.immutable.List
 import language.{implicitConversions, higherKinds}
 
 /**
@@ -120,17 +120,16 @@ class Random(val self: java.util.Random) {
     (bf(xs) ++= buf).result
   }
 
-  /** Returns a Stream of pseudorandomly chosen alphanumeric characters,
+  /** Returns an Iterator of pseudorandomly chosen alphanumeric characters,
    *  equally chosen from A-Z, a-z, and 0-9.
    *
    *  @since 2.8
    */
-  def alphanumeric: Stream[Char] = {
+  def alphanumeric: Iterator[Char] = {
     def isAlphaNum(c: Char) = (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9')
 
-    Stream continually nextPrintableChar filter isAlphaNum
+    Iterator continually nextPrintableChar filter isAlphaNum
   }
-
 }
 
 /** The object `Random` offers a default implementation

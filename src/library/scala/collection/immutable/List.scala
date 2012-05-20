@@ -296,10 +296,6 @@ sealed abstract class List[+A] extends AbstractSeq[A]
   }
 
   override def stringPrefix = "List"
-
-  override def toStream : Stream[A] =
-    if (isEmpty) Stream.Empty
-    else new Stream.Cons(head, tail.toStream)
 }
 
 /** The empty list.

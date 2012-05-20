@@ -178,10 +178,10 @@ class ScalaTool extends ScalaMatchingTask {
 \*============================================================================*/
 
     // XXX encoding and generalize
-    private def getResourceAsCharStream(clazz: Class[_], resource: String): Stream[Char] = {
+    private def getResourceAsCharStream(clazz: Class[_], resource: String): Iterator[Char] = {
       val stream = clazz.getClassLoader() getResourceAsStream resource
-      if (stream == null) Stream.empty
-      else Stream continually stream.read() takeWhile (_ != -1) map (_.asInstanceOf[Char])
+      if (stream == null) Iterator.empty
+      else Iterator continually stream.read() takeWhile (_ != -1) map (_.asInstanceOf[Char])
     }
 
     // Converts a variable like @SCALA_HOME@ to ${SCALA_HOME} when pre = "${" and post = "}"
@@ -208,7 +208,7 @@ class ScalaTool extends ScalaMatchingTask {
     }
 
     private def readAndPatchResource(resource: String, tokens: Map[String, String]): String = {
-      val chars = getResourceAsCharStream(this.getClass, resource).iterator
+      val chars = getResourceAsCharStream(this.getClass, resource)
       val builder = new StringBuilder()
 
       while (chars.hasNext) {

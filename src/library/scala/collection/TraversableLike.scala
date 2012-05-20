@@ -964,8 +964,7 @@ trait TraversableLike[+A, +Repr] extends Any
   }
 
   def toTraversable: Traversable[A] = thisCollection
-  def toIterator: Iterator[A] = toStream.iterator
-  def toStream: Stream[A] = toBuffer.toStream
+  def toIterator: Iterator[A] = toSeq.iterator
 
   /** Converts this $coll to a string.
    *

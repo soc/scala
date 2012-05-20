@@ -10,7 +10,7 @@ package scala.runtime
 
 import scala.collection.{ Seq, IndexedSeq, AbstractIterator }
 import scala.collection.mutable.WrappedArray
-import scala.collection.immutable.{ StringLike, NumericRange, List, Stream, Nil, :: }
+import scala.collection.immutable.{ StringLike, NumericRange, List, Nil, :: }
 import scala.collection.generic.{ Sorted }
 import scala.util.control.ControlThrowable
 import java.lang.Double.doubleToLongBits

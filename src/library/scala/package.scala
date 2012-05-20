@@ -62,10 +62,6 @@ package object scala {
   val +: = scala.collection.+:
   val :+ = scala.collection.:+
 
-  type Stream[+A] = scala.collection.immutable.Stream[A]
-  val Stream = scala.collection.immutable.Stream
-  val #:: = scala.collection.immutable.Stream.#::
-
   type Vector[+A] = scala.collection.immutable.Vector[A]
   val Vector = scala.collection.immutable.Vector
 
