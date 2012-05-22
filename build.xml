@@ -326,7 +326,7 @@ LOCAL REFERENCE BUILD (LOCKER)
       destdir="${build-locker.dir}/classes/library"
       classpath="${build-locker.dir}/classes/library"
       includes="**/*.java"
-      target="1.5" source="1.5">
+      target="1.6" source="1.6">
         <compilerarg line="${javac.args} -XDignore.symbol.file"/>
     </javac>
     <!-- NOTE: Potential problem with maximal command line length on Windows
@@ -377,7 +377,7 @@ LOCAL REFERENCE BUILD (LOCKER)
       srcdir="${src.dir}/compiler"
       destdir="${build-locker.dir}/classes/compiler"
       includes="**/*.java"
-      target="1.5" source="1.5">
+      target="1.6" source="1.6">
         <compilerarg line="${javac.args}"/>
         <classpath>
           <pathelement location="${build-locker.dir}/classes/library"/>
@@ -492,7 +492,7 @@ QUICK BUILD (QUICK)
       destdir="${build-quick.dir}/classes/library"
       classpath="${build-quick.dir}/classes/library"
       includes="**/*.java"
-      target="1.5" source="1.5">
+      target="1.6" source="1.6">
       <compilerarg line="${javac.args} -XDignore.symbol.file"/>
     </javac>
     <scalacfork
@@ -531,7 +531,7 @@ QUICK BUILD (QUICK)
       srcdir="${src.dir}/compiler"
       destdir="${build-quick.dir}/classes/compiler"
       includes="**/*.java"
-      target="1.5" source="1.5">
+      target="1.6" source="1.6">
         <compilerarg line="${javac.args}"/>
         <classpath>
           <pathelement location="${build-quick.dir}/classes/library"/>
