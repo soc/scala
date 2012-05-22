@@ -10,11 +10,7 @@ package scala.runtime
 
 import scala.collection.immutable.Range
 
-// Note that this does not implement IntegralProxy[Int] so that it can return
-// the Int-specific Range class from until/to.
-final class RichInt(val self: Int) extends ScalaNumberProxy[Int] with RangedProxy[Int] {
-  type ResultWithoutStep = Range
-
+final class RichInt(val self: Int) extends AnyVal {
   /**
     * @return `'''true'''` if this number has no decimal component.
     *         Always returns `'''true'''` for `RichInt`.
@@ -55,17 +51,17 @@ final class RichInt(val self: Int) extends ScalaNumberProxy[Int] with RangedProx
   /**
     * @return `'''this'''` if `'''this''' < that` or `that` otherwise
     */
-  override def min(that: Int): Int = if (self < that) self else that
+  def min(that: Int): Int = if (self < that) self else that
 
   /**
     * @return `'''this'''` if `'''this''' > that` or `that` otherwise
     */
-  override def max(that: Int): Int = if (self > that) self else that
+  def max(that: Int): Int = if (self > that) self else that
 
   /**
     * Computes the absolute value of `'''this'''`.
     */
-  override def abs: Int = if (self < 0) -self else self
+  def abs: Int = if (self < 0) -self else self
 
   def toBinaryString: String = java.lang.Integer.toBinaryString(self)
   def toHexString: String = java.lang.Integer.toHexString(self)

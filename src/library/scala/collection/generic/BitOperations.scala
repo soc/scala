@@ -46,7 +46,7 @@ private[collection] object BitOperations {
     def unsignedCompare(i: Long, j: Long)          = (i < j) ^ (i < 0L) ^ (j < 0L)
     def shorter(m1: Long, m2: Long)                = unsignedCompare(m2, m1)
     def complement(i: Long)                        = (-1L) ^ i
-    def bits(num: Long)                            = 63L to 0L by -1L map (i => (num >>> i & 1L) != 0L)
+    def bits(num: Long)                            = 63 to 0 by -1 map (i => (num >>> i.toLong & 1L) != 0L)
     def bitString(num: Long, sep: String = "")     = bits(num) map (b => if (b) "1" else "0") mkString sep
 
     def highestOneBit(j: Long) = {

@@ -11,9 +11,7 @@ package scala.math
 
 import java.{ lang => jl }
 import java.math.{ MathContext, BigDecimal => BigDec }
-import scala.collection.immutable.NumericRange
 import language.implicitConversions
-
 
 /**
  *  @author  Stephane Micheloud
@@ -169,42 +167,15 @@ extends ScalaNumber with ScalaNumericConversions with Serializable {
    *  which deems 2 == 2.00, whereas in java these are unequal
    *  with unequal hashCodes.
    */
-  override def hashCode(): Int =
-    if (isWhole) unifiedPrimitiveHashcode
-    else doubleValue.##
+  override def hashCode(): Int = bigDecimal.doubleValue.##
 
   /** Compares this BigDecimal with the specified value for equality.
    */
   override def equals (that: Any): Boolean = that match {
-    case that: BigDecimal     => this equals that
-    case that: BigInt         => this.toBigIntExact exists (that equals _)
-    case that: Double         => isValidDouble && toDouble == that
-    case that: Float          => isValidFloat && toFloat == that
-    case _                    => isValidLong && unifiedPrimitiveEquals(that)
+    case that: BigDecimal => this equals that
+    case that: BigInt     => this.toBigIntExact exists (that equals _)
+    case _                => super.equals(that)
   }
-  override def isValidByte  = noArithmeticException(toByteExact)
-  override def isValidShort = noArithmeticException(toShortExact)
-  override def isValidChar  = isValidInt && toIntExact >= Char.MinValue && toIntExact <= Char.MaxValue
-  override def isValidInt   = noArithmeticException(toIntExact)
-  def isValidLong  = noArithmeticException(toLongExact)
-  /** Returns `true` iff this can be represented exactly by [[scala.Float]]; otherwise returns `false`.
-    */
-  def isValidFloat = {
-    val f = toFloat
-    !f.isInfinity && bigDecimal.compareTo(new java.math.BigDecimal(f)) == 0
-  }
-  /** Returns `true` iff this can be represented exactly by [[scala.Double]]; otherwise returns `false`.
-    */
-  def isValidDouble = {
-    val d = toDouble
-    !d.isInfinity && bigDecimal.compareTo(new java.math.BigDecimal(d)) == 0
-  }
-
-  private def noArithmeticException(body: => Unit): Boolean = {
-    try   { body ; true }
-    catch { case _: ArithmeticException => false }
-  }
-
   protected[math] def isWhole = (this remainder 1) == BigDecimal(0)
   def underlying = bigDecimal
 
@@ -402,32 +373,6 @@ extends ScalaNumber with ScalaNumericConversions with Serializable {
     * thrown.
     */
   def toLongExact = bigDecimal.longValueExact
-
-  /** Creates a partially constructed NumericRange[BigDecimal] in range
-   *  `[start;end)`, where start is the target BigDecimal.  The step
-   *  must be supplied via the "by" method of the returned object in order
-   *  to receive the fully constructed range.  For example:
-   * {{{
-   * val partial = BigDecimal(1.0) to 2.0       // not usable yet
-   * val range = partial by 0.01                // now a NumericRange
-   * val range2 = BigDecimal(0) to 1.0 by 0.01  // all at once of course is fine too
-   * }}}
-   *
-   *  @param end    the end value of the range (exclusive)
-   *  @return       the partially constructed NumericRange
-   */
-  def until(end: BigDecimal): Range.Partial[BigDecimal, NumericRange.Exclusive[BigDecimal]] =
-    new Range.Partial(until(end, _))
-
-  /** Same as the one-argument `until`, but creates the range immediately. */
-  def until(end: BigDecimal, step: BigDecimal) = Range.BigDecimal(this, end, step)
-
-  /** Like `until`, but inclusive of the end value. */
-  def to(end: BigDecimal): Range.Partial[BigDecimal, NumericRange.Inclusive[BigDecimal]] =
-    new Range.Partial(to(end, _))
-
-  /** Like `until`, but inclusive of the end value. */
-  def to(end: BigDecimal, step: BigDecimal) = Range.BigDecimal.inclusive(this, end, step)
 
   /** Converts this `BigDecimal` to a scala.BigInt.
    */

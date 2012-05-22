@@ -8,4 +8,4 @@
 
 package scala.runtime
 
-final class RichByte(val self: Byte) extends ScalaWholeNumberProxy[Byte] { }
+final class RichByte(val self: Byte) extends AnyVal { }

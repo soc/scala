@@ -8,13 +8,11 @@
 
 package scala.runtime
 
-import scala.collection.{ Seq, IndexedSeq, AbstractIterator }
-import scala.collection.mutable.WrappedArray
-import scala.collection.immutable.{ StringLike, NumericRange, List, Nil, :: }
-import scala.collection.generic.{ Sorted }
+import scala.collection.{ mutable, immutable, generic }
+import scala.collection.immutable.{ StringLike, List, Nil, :: }
+import scala.collection.generic.Sorted
 import scala.util.control.ControlThrowable
-import java.lang.Double.doubleToLongBits
-import java.lang.reflect.{ Modifier, Method => JMethod }
+import java.lang.reflect.{ Method => JMethod }
 
 /** The object ScalaRunTime provides support methods required by
  *  the scala runtime.  All these methods should be considered
@@ -201,7 +199,7 @@ object ScalaRunTime {
 
   /** A helper for case classes. */
   def typedProductIterator[T](x: Product): Iterator[T] = {
-    new AbstractIterator[T] {
+    new collection.AbstractIterator[T] {
       private var c: Int = 0
       private val cmax = x.productArity
       def hasNext = c < cmax
@@ -302,8 +300,8 @@ object ScalaRunTime {
 
     // When doing our own iteration is dangerous
     def useOwnToString(x: Any) = x match {
-      // Range/NumericRange have a custom toString to avoid walking a gazillion elements
-      case _: Range | _: NumericRange[_] => true
+      // Range has a custom toString to avoid walking a gazillion elements
+      case _: Range => true
       // Sorted collections to the wrong thing (for us) on iteration - ticket #3493
       case _: Sorted[_, _]  => true
       // StringBuilder(a, b, c) and similar not so attractive
@@ -327,7 +325,7 @@ object ScalaRunTime {
       if (x.getClass.getComponentType == classOf[BoxedUnit])
         0 until (array_length(x) min maxElements) map (_ => "()") mkString ("Array(", ", ", ")")
       else
-        WrappedArray make x take maxElements map inner mkString ("Array(", ", ", ")")
+        mutable.WrappedArray make x take maxElements map inner mkString ("Array(", ", ", ")")
     }
 
     // The recursively applied attempt to prettify Array printing.

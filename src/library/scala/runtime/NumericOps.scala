@@ -8,4 +8,8 @@
 
 package scala.runtime
 
-final class RichShort(val self: Short) extends AnyVal { }
+final class NumericOps[T: Numeric](val self: T) {
+  // def toBinaryString: String = java.lang.Long.toBinaryString(self)
+  // def toHexString: String = java.lang.Long.toHexString(self)
+  // def toOctalString: String = java.lang.Long.toOctalString(self)
+}

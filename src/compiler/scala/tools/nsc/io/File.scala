@@ -163,7 +163,7 @@ class File(jfile: JFile)(implicit constructorCodec: Codec) extends Path(jfile) w
       val size = in.size()
       var pos, count = 0L
       while (pos < size) {
-        count = (size - pos) min CHUNK
+        count = math.min((size - pos), CHUNK)
         pos += out.transferFrom(in, pos, count)
       }
     }

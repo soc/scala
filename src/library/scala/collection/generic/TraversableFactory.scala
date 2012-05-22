@@ -197,14 +197,14 @@ trait TraversableFactory[CC[X] <: Traversable[X] with GenericTraversableTemplate
    */
   def tabulate[A](n1: Int, n2: Int, n3: Int, n4: Int, n5: Int)(f: (Int, Int, Int, Int, Int) => A): CC[CC[CC[CC[CC[A]]]]] =
     tabulate(n1)(i1 => tabulate(n2, n3, n4, n5)(f(i1, _, _, _, _)))
-
+  
   /** Produces a $coll containing a sequence of increasing of integers.
    *
    *  @param start the first element of the $coll
    *  @param end   the end value of the $coll (the first value NOT contained)
    *  @return  a $coll with values `start, start + 1, ..., end - 1`
    */
-  def range[T: Integral](start: T, end: T): CC[T] = range(start, end, implicitly[Integral[T]].one)
+  def range(start: Int, end: Int): CC[Int] = range(start, end, 1)
 
   /** Produces a $coll containing equally spaced values in some integer interval.
    *  @param start the start value of the $coll
@@ -212,15 +212,12 @@ trait TraversableFactory[CC[X] <: Traversable[X] with GenericTraversableTemplate
    *  @param step  the difference between successive elements of the $coll (must be positive or negative)
    *  @return      a $coll with values `start, start + step, ...` up to, but excluding `end`
    */
-  def range[T: Integral](start: T, end: T, step: T): CC[T] = {
-    val num = implicitly[Integral[T]]
-    import num._
-
-    if (step == zero) throw new IllegalArgumentException("zero step")
-    val b = newBuilder[T]
-    b sizeHint immutable.NumericRange.count(start, end, step, false)
+  def range(start: Int, end: Int, step: Int): CC[Int] = {
+    if (step == 0) throw new IllegalArgumentException("zero step")
+    val b = newBuilder[Int]
+    b sizeHint immutable.Range.count(start, end, step, false)
     var i = start
-    while (if (step < zero) end < i else i < end) {
+    while (if (step < 0) end < i else i < end) {
       b += i
       i += step
     }

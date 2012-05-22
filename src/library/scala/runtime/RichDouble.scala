@@ -8,9 +8,7 @@
 
 package scala.runtime
 
-final class RichDouble(val self: Double) extends FractionalProxy[Double] {
-  protected val integralNum = Numeric.DoubleAsIfIntegral
-
+final class RichDouble(val self: Double) extends AnyVal {
   def round: Long   = math.round(self)
   def ceil: Double  = math.ceil(self)
   def floor: Double = math.floor(self)
@@ -33,16 +31,4 @@ final class RichDouble(val self: Double) extends FractionalProxy[Double] {
   def isInfinity: Boolean = java.lang.Double.isInfinite(self)
   def isPosInfinity: Boolean = isInfinity && self > 0.0
   def isNegInfinity: Boolean = isInfinity && self < 0.0
-
-  override def isValidByte = self.toByte.toDouble == self
-  override def isValidShort = self.toShort.toDouble == self
-  override def isValidChar = self.toChar.toDouble == self
-  override def isValidInt = self.toInt.toDouble == self
-  // override def isValidLong = { val l = self.toLong; l.toDouble == self && l != Long.MaxValue }
-  // override def isValidFloat = self.toFloat.toDouble == self
-  // override def isValidDouble = !java.lang.Double.isNaN(self)
-  override def isWhole = {
-    val l = self.toLong
-    l.toDouble == self || l == Long.MaxValue && self < Double.PositiveInfinity || l == Long.MinValue && self > Double.NegativeInfinity
-  }
 }

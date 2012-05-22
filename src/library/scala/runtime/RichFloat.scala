@@ -8,9 +8,7 @@
 
 package scala.runtime
 
-final class RichFloat(val self: Float) extends FractionalProxy[Float] {
-  protected val integralNum = Numeric.FloatAsIfIntegral
-
+final class RichFloat(val self: Float) extends AnyVal {
   def round: Int   = math.round(self)
   def ceil: Float  = math.ceil(self).toFloat
   def floor: Float = math.floor(self).toFloat
@@ -34,16 +32,4 @@ final class RichFloat(val self: Float) extends FractionalProxy[Float] {
   def isInfinity: Boolean = java.lang.Float.isInfinite(self)
   def isPosInfinity: Boolean = isInfinity && self > 0.0f
   def isNegInfinity: Boolean = isInfinity && self < 0.0f
-
-  override def isValidByte = self.toByte.toFloat == self
-  override def isValidShort = self.toShort.toFloat == self
-  override def isValidChar = self.toChar.toFloat == self
-  override def isValidInt = { val i = self.toInt; i.toFloat == self && i != Int.MaxValue }
-  // override def isValidLong = { val l = self.toLong; l.toFloat == self && l != Long.MaxValue }
-  // override def isValidFloat = !java.lang.Float.isNaN(self)
-  // override def isValidDouble = !java.lang.Float.isNaN(self)
-  override def isWhole = {
-    val l = self.toLong
-    l.toFloat == self || l == Long.MaxValue && self < Float.PositiveInfinity || l == Long.MinValue && self > Float.NegativeInfinity
-  }
 }
