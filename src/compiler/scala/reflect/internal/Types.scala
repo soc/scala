@@ -3622,14 +3622,6 @@ trait Types extends api.Types { self: SymbolTable =>
       tp
   }
 
-  // Set to true for A* => Seq[A]
-  //   (And it will only rewrite A* in method result types.)
-  //   This is the pre-existing behavior.
-  // Or false for Seq[A] => Seq[A]
-  //   (It will rewrite A* everywhere but method parameters.)
-  //   This is the specified behavior.
-  protected def etaExpandKeepsStar = false
-
   object dropRepeatedParamType extends TypeMap {
     def apply(tp: Type): Type = tp match {
       case MethodType(params, restpe) =>
@@ -3639,7 +3631,10 @@ trait Types extends api.Types { self: SymbolTable =>
       case TypeRef(_, RepeatedParamClass, arg :: Nil) =>
         seqType(arg)
       case _ =>
-        if (etaExpandKeepsStar) tp else mapOver(tp)
+        // Note: until 2.10 this allowed A* to escape during eta expansion,
+        // as it was 'tp' rather than 'mapOver(tp)'.  Now A* expands to Seq[A]
+        // as specified.
+        mapOver(tp)
     }
   }
 
