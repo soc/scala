@@ -7,7 +7,7 @@ package interactive
 
 import ast.Trees
 import ast.Positions
-import scala.tools.nsc.util.{SourceFile, Position, RangePosition, NoPosition, WorkScheduler}
+import scala.tools.nsc.util.{SourceFile, Position, RangePosition, NoPosition}
 import scala.collection.mutable.ListBuffer
 
 /** Handling range positions
