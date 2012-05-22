@@ -623,35 +623,6 @@ trait TraversableLike[+A, +Repr] extends Any
     b.result
   }
 
-  /** Builds a new collection by applying an option-valued function to all
-   *  elements of this $coll on which the function is defined.
-   *
-   *  @param f      the option-valued function which filters and maps the $coll.
-   *  @tparam B     the element type of the returned collection.
-   *  @tparam That  $thatinfo
-   *  @param bf     $bfinfo
-   *  @return       a new collection of type `That` resulting from applying the option-valued function
-   *                `f` to each element and collecting all defined results.
-   *                The order of the elements is preserved.
-   *
-   *  @usecase def filterMap[B](f: A => Option[B]): $Coll[B]
-   *    @inheritdoc
-   *
-   *    @param pf     the partial function which filters and maps the $coll.
-   *    @return       a new $coll resulting from applying the given option-valued function
-   *                  `f` to each element and collecting all defined results.
-   *                  The order of the elements is preserved.
-  def filterMap[B, That](f: A => Option[B])(implicit bf: CanBuildFrom[Repr, B, That]): That = {
-    val b = bf(repr)
-    for (x <- this)
-      f(x) match {
-        case Some(y) => b += y
-        case _ =>
-      }
-    b.result
-  }
-   */
-
   /** Partitions this $coll in two ${coll}s according to a predicate.
    *
    *  @param p the predicate on which to partition.
