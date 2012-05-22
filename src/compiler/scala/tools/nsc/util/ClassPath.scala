@@ -9,7 +9,7 @@ package util
 
 import java.net.URL
 import scala.collection.{ mutable, immutable }
-import io.{ File, Directory, Path, Jar, AbstractFile }
+import io.{ File, Directory, Path, Jar, AbstractFile, ClassAndJarInfo }
 import scala.tools.util.StringOps.splitWhere
 import Jar.isJarOrZip
 import File.pathSeparator
@@ -23,6 +23,16 @@ import java.net.MalformedURLException
  *  @author Stepan Koltsov
  */
 object ClassPath {
+  def scalaLibrary  = locate[Option[_]]
+  def scalaCompiler = locate[Global]
+
+  def infoFor[T](value: T)     = info(value.getClass)
+  def info[T](clazz: Class[T]) = new ClassAndJarInfo()(ClassTag[T](clazz))
+  def info[T: ClassTag]        = new ClassAndJarInfo[T]
+  def locate[T: ClassTag]      = info[T].rootClasspath
+  def locateJar[T: ClassTag]   = info[T].rootPossibles find (x => isJarOrZip(x)) map (x => File(x))
+  def locateDir[T: ClassTag]   = info[T].rootPossibles find (_.isDirectory) map (_.toDirectory)
+
   /** Expand single path entry */
   private def expandS(pattern: String): List[String] = {
     val wildSuffix = File.separator + "*"
