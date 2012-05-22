@@ -8,7 +8,17 @@
 
 package scala.runtime
 
-final class RichLong(val self: Long) {
+final class RichLong(val self: Long) extends AnyVal {
+  /**
+    * @return `'''this'''` if `'''this''' < that` or `that` otherwise
+    */
+  def min(that: Long): Long = if (self < that) self else that
+
+  /**
+    * @return `'''this'''` if `'''this''' > that` or `that` otherwise
+    */
+  def max(that: Long): Long = if (self > that) self else that
+
   def toBinaryString: String = java.lang.Long.toBinaryString(self)
   def toHexString: String = java.lang.Long.toHexString(self)
   def toOctalString: String = java.lang.Long.toOctalString(self)

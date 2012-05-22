@@ -77,6 +77,14 @@ package scala
  */
 package object collection {
   import scala.collection.generic.CanBuildFrom
+  
+  type GenIterable[+A]               = Iterable[A]
+  type GenMap[A, +B]                 = Map[A, B]
+  type GenSeq[+A]                    = Seq[A]
+  type GenSet[A]                     = Set[A]
+  type GenTraversableLike[+A, +Repr] = TraversableLike[A, Repr]
+  type GenTraversableOnce[+A]        = TraversableOnce[A]
+  type GenTraversable[+A]            = Traversable[A]
 
   /** Provides a CanBuildFrom instance that builds a specific target collection (`To')
    *  irrespective of the original collection (`From').

@@ -13,6 +13,9 @@ package scala
   * trigonometric functions.
   */
 package object math {
+  type BigDecimal = Decimal
+  val BigDecimal = Decimal
+
   /** The `double` value that is closer than any other to `e`, the base of
    *  the natural logarithms.
    */
