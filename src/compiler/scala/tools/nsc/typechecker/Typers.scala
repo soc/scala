@@ -799,7 +799,6 @@ trait Typers extends Modes with Adaptations with Taggings {
 
     /** Perform the following adaptations of expression, pattern or type `tree` wrt to
      *  given mode `mode` and given prototype `pt`:
-     *  (-1) For expressions with annotated types, let AnnotationCheckers decide what to do
      *  (0) Convert expressions with constant types to literals (unless in interactive/scaladoc mode)
      *  (1) Resolve overloading, unless mode contains FUNmode
      *  (2) Apply parameterless functions
@@ -829,7 +828,6 @@ trait Typers extends Modes with Adaptations with Taggings {
      *      is an integer fitting in the range of that type, convert it to that type.
      *  (11) Widen numeric literals to their expected type, if necessary
      *  (12) When in mode EXPRmode, convert E to { E; () } if expected type is scala.Unit.
-     *  (13) When in mode EXPRmode, apply AnnotationChecker conversion if expected type is annotated.
      *  (14) When in mode EXPRmode, apply a view
      *  If all this fails, error
      */
@@ -862,7 +860,6 @@ trait Typers extends Modes with Adaptations with Taggings {
               case _ =>
                 debuglog("fallback on implicits: " + tree + "/" + resetAllAttrs(original))
                 val tree1 = typed(resetAllAttrs(original), mode, WildcardType)
-                tree1.tpe = addAnnotations(tree1, tree1.tpe)
                 if (tree1.isEmpty) tree1 else adapt(tree1, mode, pt, EmptyTree)
             }
           else
@@ -1042,8 +1039,6 @@ trait Typers extends Modes with Adaptations with Taggings {
 
       // begin adapt
       tree.tpe match {
-        case atp @ AnnotatedType(_, _, _) if canAdaptAnnotations(tree, mode, pt) => // (-1)
-          adaptAnnotations(tree, mode, pt)
         case ct @ ConstantType(value) if inNoModes(mode, TYPEmode | FUNmode) && (ct <:< pt) => // (0)
           val sym = tree.symbol
           if (sym != null && sym.isDeprecated) {
@@ -1138,8 +1133,6 @@ trait Typers extends Modes with Adaptations with Taggings {
                         context.unit.warning(tree.pos, "implicit numeric widening")
                       return typed(atPos(tree.pos)(Select(tree, "to" + sym.name)), mode, pt)
                     }
-                  case AnnotatedType(_, _, _) if canAdaptAnnotations(tree, mode, pt) => // (13)
-                    return typed(adaptAnnotations(tree, mode, pt), mode, pt)
                   case _ =>
                 }
                 if (!context.undetparams.isEmpty) {
@@ -4900,7 +4893,6 @@ trait Typers extends Modes with Adaptations with Taggings {
           tree1
         }
 
-        tree1.tpe = addAnnotations(tree1, tree1.tpe)
         val result = if (tree1.isEmpty) tree1 else adapt(tree1, mode, pt, tree)
 
         if (!alreadyTyped) {

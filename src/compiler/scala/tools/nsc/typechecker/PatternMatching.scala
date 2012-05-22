@@ -47,15 +47,6 @@ trait PatternMatching extends Transform with TypingTransformers with ast.TreeDSL
     if (opt.virtPatmat) new MatchTransformer(unit)
     else noopTransformer
 
-  // duplicated from CPSUtils (avoid dependency from compiler -> cps plugin...)
-  private lazy val MarkerCPSAdaptPlus  = definitions.getClassIfDefined("scala.util.continuations.cpsPlus")
-  private lazy val MarkerCPSAdaptMinus = definitions.getClassIfDefined("scala.util.continuations.cpsMinus")
-  private lazy val MarkerCPSSynth      = definitions.getClassIfDefined("scala.util.continuations.cpsSynth")
-  private lazy val stripTriggerCPSAnns = List(MarkerCPSSynth, MarkerCPSAdaptMinus, MarkerCPSAdaptPlus)
-  private lazy val MarkerCPSTypes      = definitions.getClassIfDefined("scala.util.continuations.cpsParam")
-  private lazy val strippedCPSAnns     = MarkerCPSTypes :: stripTriggerCPSAnns
-  private def removeCPSAdaptAnnotations(tp: Type) = tp filterAnnotations (ann => !(strippedCPSAnns exists (ann matches _)))
-
   class MatchTransformer(unit: CompilationUnit) extends TypingTransformer(unit) {
     override def transform(tree: Tree): Tree = tree match {
       case Match(sel, cases) =>
@@ -181,19 +172,13 @@ trait PatternMatching extends Transform with TypingTransformers with ast.TreeDSL
       val selectorTp = repeatedToSeq(elimAnonymousClass(selector.tpe.widen.withoutAnnotations))
 
       val origPt  = match_.tpe
-      // when one of the internal cps-type-state annotations is present, strip all CPS annotations
-      // a cps-type-state-annotated type makes no sense as an expected type (matchX.tpe is used as pt in translateMatch)
-      // (only test availability of MarkerCPSAdaptPlus assuming they are either all available or none of them are)
-      val ptUnCPS =
-        if (MarkerCPSAdaptPlus != NoSymbol && (stripTriggerCPSAnns exists origPt.hasAnnotation))
-          removeCPSAdaptAnnotations(origPt)
-        else origPt
+      val ptUnCPS = origPt
 
       // we've packed the type for each case in typedMatch so that if all cases have the same existential case, we get a clean lub
       // here, we should open up the existential again
       // relevant test cases: pos/existentials-harmful.scala, pos/gadt-gilles.scala, pos/t2683.scala, pos/virtpatmat_exist4.scala
       // TODO: fix skolemizeExistential (it should preserve annotations, right?)
-      val pt = repeatedToSeq(ptUnCPS.skolemizeExistential(context.owner, context.tree) withAnnotations ptUnCPS.annotations)
+      val pt = repeatedToSeq(ptUnCPS.skolemizeExistential(context.owner, context.tree))
 
       // the alternative to attaching the default case override would be to simply
       // append the default to the list of cases and suppress the unreachable case error that may arise (once we detect that...)

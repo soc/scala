@@ -5173,9 +5173,9 @@ trait Types extends api.Types { self: SymbolTable =>
       case (tp, tv @ TypeVar(_,_)) =>
         tv.registerTypeEquality(tp, false)
       case (AnnotatedType(_,_,_), _) =>
-        annotationsConform(tp1, tp2) && annotationsConform(tp2, tp1) && tp1.withoutAnnotations =:= tp2.withoutAnnotations
+        tp1.withoutAnnotations =:= tp2.withoutAnnotations
       case (_, AnnotatedType(_,_,_)) =>
-        annotationsConform(tp1, tp2) && annotationsConform(tp2, tp1) && tp1.withoutAnnotations =:= tp2.withoutAnnotations
+        tp1.withoutAnnotations =:= tp2.withoutAnnotations
       case (_: SingletonType, _: SingletonType) =>
         var origin1 = tp1
         while (origin1.underlying.isInstanceOf[SingletonType]) {
@@ -5345,12 +5345,12 @@ trait Types extends api.Types { self: SymbolTable =>
     }
     tp1 match {
       case _: AnnotatedType =>
-        return annotationsConform(tp1, tp2) && annotationsConform(tp2, tp1) && tp1.withoutAnnotations =:= tp2.withoutAnnotations
+        return tp1.withoutAnnotations =:= tp2.withoutAnnotations
       case _ =>
     }
     tp2 match {
       case _: AnnotatedType =>
-        return annotationsConform(tp1, tp2) && annotationsConform(tp2, tp1) && tp1.withoutAnnotations =:= tp2.withoutAnnotations
+        return tp1.withoutAnnotations =:= tp2.withoutAnnotations
       case _ =>
     }
     tp1 match {
@@ -5493,7 +5493,7 @@ trait Types extends api.Types { self: SymbolTable =>
             // val tpsFresh = tparams1 map (_.cloneSymbol)
             // for (tpFresh <- tpsFresh) tpFresh.setInfo(tpFresh.info.substSym(tparams1, tpsFresh))
         }
-      } && annotationsConform(tp1.normalize, tp2.normalize)
+      }
       case (_, _) => false // @assume !tp1.isHigherKinded || !tp2.isHigherKinded
       // --> thus, cannot be subtypes (Any/Nothing has already been checked)
     }))
@@ -5544,7 +5544,7 @@ trait Types extends api.Types { self: SymbolTable =>
             secondTry
         }
       case AnnotatedType(_, _, _) =>
-        tp1.withoutAnnotations <:< tp2.withoutAnnotations && annotationsConform(tp1, tp2)
+        tp1.withoutAnnotations <:< tp2.withoutAnnotations
       case BoundedWildcardType(bounds) =>
         tp1 <:< bounds.hi
       case tv2 @ TypeVar(_, constr2) =>
@@ -5565,7 +5565,7 @@ trait Types extends api.Types { self: SymbolTable =>
      */
     def secondTry = tp1 match {
       case AnnotatedType(_, _, _) =>
-        tp1.withoutAnnotations <:< tp2.withoutAnnotations && annotationsConform(tp1, tp2)
+        tp1.withoutAnnotations <:< tp2.withoutAnnotations
       case BoundedWildcardType(bounds) =>
         tp1.bounds.lo <:< tp2
       case tv @ TypeVar(_,_) =>
@@ -5960,12 +5960,9 @@ trait Types extends api.Types { self: SymbolTable =>
 
   /** Do type arguments `targs` conform to formal parameters `tparams`?
    */
-  def isWithinBounds(pre: Type, owner: Symbol, tparams: List[Symbol], targs: List[Type]): Boolean = {
-    var bounds = instantiatedBounds(pre, owner, tparams, targs)
-    if (targs.exists(_.annotations.nonEmpty))
-      bounds = adaptBoundsToAnnotations(bounds, tparams, targs)
-    (bounds corresponds targs)(_ containsType _)
-  }
+  def isWithinBounds(pre: Type, owner: Symbol, tparams: List[Symbol], targs: List[Type]) = (
+    (instantiatedBounds(pre, owner, tparams, targs) corresponds targs)(_ containsType _)
+  )
 
   def instantiatedBounds(pre: Type, owner: Symbol, tparams: List[Symbol], targs: List[Type]): List[TypeBounds] =
     tparams map (_.info.asSeenFrom(pre, owner).instantiateTypeParams(tparams, targs).bounds)
@@ -6177,8 +6174,6 @@ trait Types extends api.Types { self: SymbolTable =>
 
   def weakLub(ts: List[Type]) =
     if (ts.nonEmpty && (ts forall isNumericValueType)) (numericLub(ts), true)
-    else if (ts.nonEmpty && (ts exists (_.annotations.nonEmpty)))
-      (annotationsLub(lub(ts map (_.withoutAnnotations)), ts), true)
     else (lub(ts), false)
 
   def weakGlb(ts: List[Type]) = {
@@ -6186,9 +6181,8 @@ trait Types extends api.Types { self: SymbolTable =>
       val nglb = numericGlb(ts)
       if (nglb != NoType) (nglb, true)
       else (glb(ts), false)
-    } else if (ts.nonEmpty && (ts exists (_.annotations.nonEmpty))) {
-      (annotationsGlb(glb(ts map (_.withoutAnnotations)), ts), true)
-    } else (glb(ts), false)
+    }
+    else (glb(ts), false)
   }
 
   def numericLub(ts: List[Type]) =
