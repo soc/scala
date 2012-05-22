@@ -43,9 +43,7 @@ trait PatternMatching extends Transform with TypingTransformers with ast.TreeDSL
 
   val phaseName: String = "patmat"
 
-  def newTransformer(unit: CompilationUnit): Transformer =
-    if (opt.virtPatmat) new MatchTransformer(unit)
-    else noopTransformer
+  def newTransformer(unit: CompilationUnit): Transformer = new MatchTransformer(unit)
 
   class MatchTransformer(unit: CompilationUnit) extends TypingTransformer(unit) {
     override def transform(tree: Tree): Tree = tree match {

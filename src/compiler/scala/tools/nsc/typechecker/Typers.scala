@@ -90,11 +90,9 @@ trait Typers extends Modes with Adaptations with Taggings {
   // Funnel everything through one doorway.
   var lastTreeToTyper: Tree = EmptyTree
 
-  // when true:
-  //  - we may virtualize matches (if -Xexperimental and there's a suitable __match in scope)
+  // Virtpatmat:
+  //  - we may virtualize matches (if there's a suitable __match in scope)
   //  - we synthesize PartialFunction implementations for `x => x match {...}` and `match {...}` when the expected type is PartialFunction
-  // this is disabled by: -Xoldpatmat, scaladoc or interactive compilation
-  @inline private def newPatternMatching = opt.virtPatmat // && (phase.id < currentRun.uncurryPhase.id)
 
   abstract class Typer(context0: Context) extends TyperDiagnostics with Adaptation with Tagging with TyperContextErrors {
     import context0.unit
@@ -2180,10 +2178,7 @@ trait Typers extends Modes with Adaptations with Taggings {
       val selectorTp = packCaptured(selector1.tpe.widen)
       val casesTyped = typedCases(cases, selectorTp, pt)
 
-      val (resTp, needAdapt) =
-        if (opt.virtPatmat) ptOrLubPacked(casesTyped, pt)
-        else ptOrLub(casesTyped map (_.tpe), pt)
-
+      val (resTp, needAdapt) = ptOrLubPacked(casesTyped, pt)
       val casesAdapted = if (!needAdapt) casesTyped else casesTyped map (adaptCase(_, mode, resTp))
 
       treeCopy.Match(tree, selector1, casesAdapted) setType resTp
@@ -2196,12 +2191,13 @@ trait Typers extends Modes with Adaptations with Taggings {
       import patmat.{vpmName, PureMatchTranslator, OptimizingMatchTranslator}
 
       // TODO: add fallback __match sentinel to predef
-      val matchStrategy: Tree =
-        if (!(newPatternMatching && opt.experimental && context.isNameInScope(vpmName._match))) null    // fast path, avoiding the next line if there's no __match to be seen
+      val matchStrategy: Tree = (
+        if (!context.isNameInScope(vpmName._match)) null    // fast path, avoiding the next line if there's no __match to be seen
         else newTyper(context.makeImplicit(reportAmbiguousErrors = false)).silent(_.typed(Ident(vpmName._match), EXPRmode, WildcardType), reportAmbiguousErrors = false) match {
           case SilentResultValue(ms) => ms
           case _                     => null
         }
+      )
 
       if (matchStrategy ne null) // virtualize
         typed((new PureMatchTranslator(this.asInstanceOf[patmat.global.analyzer.Typer] /*TODO*/, matchStrategy)).translateMatch(match_), mode, pt)
@@ -2420,7 +2416,7 @@ trait Typers extends Modes with Adaptations with Taggings {
         fun.body match {
           // later phase indicates scaladoc is calling (where shit is messed up, I tell you)
           //  -- so fall back to old patmat, which is more forgiving
-          case Match(sel, cases) if (sel ne EmptyTree) && newPatternMatching && (pt.typeSymbol == PartialFunctionClass) =>
+          case Match(sel, cases) if (sel ne EmptyTree) && (pt.typeSymbol == PartialFunctionClass) =>
             // go to outer context -- must discard the context that was created for the Function since we're discarding the function
             // thus, its symbol, which serves as the current context.owner, is not the right owner
             // you won't know you're using the wrong owner until lambda lift crashes (unless you know better than to use the wrong owner)
@@ -3746,7 +3742,7 @@ trait Typers extends Modes with Adaptations with Taggings {
             // in the special (though common) case where the types are equal, it pays to pack before comparing
             // especially virtpatmat needs more aggressive unification of skolemized types
             // this breaks src/library/scala/collection/immutable/TrieIterator.scala
-            if ( opt.virtPatmat && !isPastTyper
+            if (!isPastTyper
               && thenp1.tpe.annotations.isEmpty && elsep1.tpe.annotations.isEmpty // annotated types need to be lubbed regardless (at least, continations break if you by pass them like this)
               && thenTp =:= elseTp
                ) (thenp1.tpe, false) // use unpacked type
@@ -3766,7 +3762,7 @@ trait Typers extends Modes with Adaptations with Taggings {
       // empty-selector matches are transformed into synthetic PartialFunction implementations when the expected type demands it
       def typedVirtualizedMatch(tree: Tree, selector: Tree, cases: List[CaseDef]): Tree =
         if (selector == EmptyTree) {
-          if (newPatternMatching && (pt.typeSymbol == PartialFunctionClass)) (new MatchFunTyper(tree, cases, mode, pt)).translated
+          if (pt.typeSymbol == PartialFunctionClass) (new MatchFunTyper(tree, cases, mode, pt)).translated
           else {
             val arity = if (isFunctionType(pt)) pt.normalize.typeArgs.length - 1 else 1
             val params = for (i <- List.range(0, arity)) yield
