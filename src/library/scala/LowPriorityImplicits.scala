@@ -28,14 +28,11 @@ class LowPriorityImplicits {
    *  need to implement ScalaNumber in order to have a symmetric equals
    *  method, but that implies implementing java.lang.Number as well.
    */
-  implicit def byteWrapper(x: Byte)       = new runtime.RichByte(x)
-  implicit def shortWrapper(x: Short)     = new runtime.RichShort(x)
   implicit def intWrapper(x: Int)         = new runtime.RichInt(x)
   implicit def charWrapper(c: Char)       = new runtime.RichChar(c)
   implicit def longWrapper(x: Long)       = new runtime.RichLong(x)
   implicit def floatWrapper(x: Float)     = new runtime.RichFloat(x)
   implicit def doubleWrapper(x: Double)   = new runtime.RichDouble(x)
-  implicit def booleanWrapper(x: Boolean) = new runtime.RichBoolean(x)
 
   // These eight implicits exist solely to exclude Null from the domain of
   // the boxed types, so that e.g. "var x: Int = null" is a compile time
