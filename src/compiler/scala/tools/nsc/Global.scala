@@ -330,7 +330,6 @@ class Global(var currentSettings: Settings, var reporter: Reporter) extends Symb
     def writeICode = settings.writeICode.isSetByUser && isActive(settings.writeICode)
 
     // showing/printing things
-    def browsePhase   = isActive(settings.browse)
     def echoFilenames = opt.debug && (opt.verbose || currentRun.size < 5)
     def noShow        = settings.Yshow.isDefault
     def printLate     = settings.printLate.value

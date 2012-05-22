@@ -3624,38 +3624,8 @@ trait Typers extends Modes with Adaptations with Taggings {
           // make sure the annotation is only typechecked once
           if (ann.tpe == null) {
             // an annotated type
-            val selfsym =
-              if (!settings.selfInAnnots.value)
-                NoSymbol
-              else
-                arg1.tpe.selfsym orElse {
-                  /* Implementation limitation: Currently this
-                   * can cause cyclical reference errors even
-                   * when the self symbol is not referenced at all.
-                   * Surely at least some of these cases can be
-                   * fixed by proper use of LazyType's.  Lex tinkered
-                   * on this but did not succeed, so is leaving
-                   * it alone for now. Example code with the problem:
-                   *  class peer extends Annotation
-                   *  class NPE[T <: NPE[T] @peer]
-                   *
-                   * (Note: -Yself-in-annots must be on to see the problem)
-                   * */
-                  ( context.owner
-                      newLocalDummy (ann.pos)
-                      newValue (nme.self, ann.pos)
-                      setInfo (arg1.tpe.withoutAnnotations)
-                  )
-                }
-
-            val ainfo = typedAnnotation(ann, annotMode, selfsym)
-            val atype0 = arg1.tpe.withAnnotation(ainfo)
-            val atype =
-              if ((selfsym != NoSymbol) && (ainfo.refsSymbol(selfsym)))
-                atype0.withSelfsym(selfsym)
-              else
-                atype0 // do not record selfsym if
-                       // this annotation did not need it
+            val ainfo   = typedAnnotation(ann, annotMode, NoSymbol)
+            val atype   = arg1.tpe.withAnnotation(ainfo)
 
             if (ainfo.isErroneous)
               // Erroneous annotations were already reported in typedAnnotation

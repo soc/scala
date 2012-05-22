@@ -45,13 +45,7 @@ abstract class ICodes extends AnyRef
   def checkerDebug(msg: String) = if (shouldCheckIcode && global.opt.debug) println(msg)
 
   /** The ICode linearizer. */
-  val linearizer: Linearizer = settings.Xlinearizer.value match {
-    case "rpo"    => new ReversePostOrderLinearizer()
-    case "dfs"    => new DepthFirstLinerizer()
-    case "normal" => new NormalLinearizer()
-    case "dump"   => new DumpLinearizer()
-    case x        => global.abort("Unknown linearizer: " + x)
-  }
+  val linearizer: Linearizer = new ReversePostOrderLinearizer()
 
   def newTextPrinter() =
     new TextPrinter(new PrintWriter(Console.out, true), new DumpLinearizer)

@@ -27,8 +27,6 @@ trait MatrixAdditions extends ast.TreeDSL {
   private[matching] trait Squeezer {
     self: MatrixContext =>
 
-    private val settings_squeeze = !settings.Ynosqueeze.value
-
     class RefTraverser(vd: ValDef) extends Traverser {
       private val targetSymbol = vd.symbol
       private var safeRefs     = 0
@@ -60,8 +58,7 @@ trait MatrixAdditions extends ast.TreeDSL {
       case _                                     => Block(stats, expr)
     }
     def squeezedBlock(vds: List[Tree], exp: Tree): Tree =
-      if (settings_squeeze) combineBlocks(Nil, squeezedBlock1(vds, exp))
-      else                  combineBlocks(vds, exp)
+      combineBlocks(Nil, squeezedBlock1(vds, exp))
 
     private def squeezedBlock1(vds: List[Tree], exp: Tree): Tree = {
       lazy val squeezedTail = squeezedBlock(vds.tail, exp)
