@@ -223,7 +223,7 @@ public final class BoxesRunTime
      *  The hashCode is only 32 bits so this is a more tractable
      *  issue than Float's, but it might be better simply to exclude it.)
      *
-     *  Note: BigInt and BigDecimal, being arbitrary precision, could
+     *  Note: BigInt and Decimal, being arbitrary precision, could
      *  be made consistent with all other types for the Int range, but
      *  as yet have not.
      *

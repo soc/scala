@@ -131,8 +131,8 @@ object Numeric {
     def div(x: Float, y: Float): Float = x / y
   }
   trait FloatAsIfIntegral extends FloatIsConflicted with Integral[Float] {
-    def quot(x: Float, y: Float): Float = (BigDecimal(x) / BigDecimal(y)).floatValue
-    def rem(x: Float, y: Float): Float = (BigDecimal(x) remainder BigDecimal(y)).floatValue
+    def quot(x: Float, y: Float): Float = (Decimal(x) / Decimal(y)).floatValue
+    def rem(x: Float, y: Float): Float = (Decimal(x) remainder Decimal(y)).floatValue
   }
   implicit object FloatIsFractional extends FloatIsFractional with Ordering.FloatOrdering
   object FloatAsIfIntegral extends FloatAsIfIntegral with Ordering.FloatOrdering {
@@ -153,34 +153,34 @@ object Numeric {
     def div(x: Double, y: Double): Double = x / y
   }
   trait DoubleAsIfIntegral extends DoubleIsConflicted with Integral[Double] {
-    def quot(x: Double, y: Double): Double = (BigDecimal(x) / BigDecimal(y)).doubleValue
-    def rem(x: Double, y: Double): Double = (BigDecimal(x) remainder BigDecimal(y)).doubleValue
+    def quot(x: Double, y: Double): Double = (Decimal(x) / Decimal(y)).doubleValue
+    def rem(x: Double, y: Double): Double = (Decimal(x) remainder Decimal(y)).doubleValue
   }
 
-  trait BigDecimalIsConflicted extends Numeric[BigDecimal] {
-    def plus(x: BigDecimal, y: BigDecimal): BigDecimal = x + y
-    def minus(x: BigDecimal, y: BigDecimal): BigDecimal = x - y
-    def times(x: BigDecimal, y: BigDecimal): BigDecimal = x * y
-    def negate(x: BigDecimal): BigDecimal = -x
-    def fromInt(x: Int): BigDecimal = BigDecimal(x)
-    def toInt(x: BigDecimal): Int = x.intValue
-    def toLong(x: BigDecimal): Long = x.longValue
-    def toFloat(x: BigDecimal): Float = x.floatValue
-    def toDouble(x: BigDecimal): Double = x.doubleValue
+  trait DecimalIsConflicted extends Numeric[Decimal] {
+    def plus(x: Decimal, y: Decimal): Decimal = x + y
+    def minus(x: Decimal, y: Decimal): Decimal = x - y
+    def times(x: Decimal, y: Decimal): Decimal = x * y
+    def negate(x: Decimal): Decimal = -x
+    def fromInt(x: Int): Decimal = Decimal(x)
+    def toInt(x: Decimal): Int = x.intValue
+    def toLong(x: Decimal): Long = x.longValue
+    def toFloat(x: Decimal): Float = x.floatValue
+    def toDouble(x: Decimal): Double = x.doubleValue
   }
 
-  trait BigDecimalIsFractional extends BigDecimalIsConflicted with Fractional[BigDecimal] {
-    def div(x: BigDecimal, y: BigDecimal): BigDecimal = x / y
+  trait DecimalIsFractional extends DecimalIsConflicted with Fractional[Decimal] {
+    def div(x: Decimal, y: Decimal): Decimal = x / y
   }
-  trait BigDecimalAsIfIntegral extends BigDecimalIsConflicted with Integral[BigDecimal] {
-    def quot(x: BigDecimal, y: BigDecimal): BigDecimal = x / y
-    def rem(x: BigDecimal, y: BigDecimal): BigDecimal = x remainder y
+  trait DecimalAsIfIntegral extends DecimalIsConflicted with Integral[Decimal] {
+    def quot(x: Decimal, y: Decimal): Decimal = x / y
+    def rem(x: Decimal, y: Decimal): Decimal = x remainder y
   }
 
-  // For Double and BigDecimal we offer implicit Fractional objects, but also one
+  // For Double and Decimal we offer implicit Fractional objects, but also one
   // which acts like an Integral type, which is useful in NumericRange.
-  implicit object BigDecimalIsFractional extends BigDecimalIsFractional with Ordering.BigDecimalOrdering
-  object BigDecimalAsIfIntegral extends BigDecimalAsIfIntegral with Ordering.BigDecimalOrdering
+  implicit object DecimalIsFractional extends DecimalIsFractional with Ordering.DecimalOrdering
+  object DecimalAsIfIntegral extends DecimalAsIfIntegral with Ordering.DecimalOrdering
 
   implicit object DoubleIsFractional extends DoubleIsFractional with Ordering.DoubleOrdering
   object DoubleAsIfIntegral extends DoubleAsIfIntegral with Ordering.DoubleOrdering

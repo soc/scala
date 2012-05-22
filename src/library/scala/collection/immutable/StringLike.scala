@@ -255,7 +255,7 @@ self =>
    *    <a href="" target="contentFrame" class="java/util/Formatter">
    *    `java.util.Formatter`</a>, with the addition that
    *    classes deriving from `ScalaNumber` (such as [[scala.BigInt]] and
-   *    [[scala.BigDecimal]]) are unwrapped to pass a type which `Formatter`
+   *    [[scala.Decimal]]) are unwrapped to pass a type which `Formatter`
    *    understands.
    *
    *  @param args the arguments used to instantiating the pattern.
@@ -271,7 +271,7 @@ self =>
    *    <a href="" target="contentFrame" class="java/util/Formatter">
    *    `java.util.Formatter`</a>, with the addition that
    *    classes deriving from `ScalaNumber` (such as `scala.BigInt` and
-   *    `scala.BigDecimal`) are unwrapped to pass a type which `Formatter`
+   *    `scala.Decimal`) are unwrapped to pass a type which `Formatter`
    *    understands.
    *
    *  @param l    an instance of `java.util.Locale`

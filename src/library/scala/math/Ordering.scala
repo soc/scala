@@ -317,10 +317,10 @@ object Ordering extends LowPriorityOrderingImplicits {
   }
   implicit object BigInt extends BigIntOrdering
 
-  trait BigDecimalOrdering extends Ordering[BigDecimal] {
-    def compare(x: BigDecimal, y: BigDecimal) = x.compare(y)
+  trait DecimalOrdering extends Ordering[Decimal] {
+    def compare(x: Decimal, y: Decimal) = x.compare(y)
   }
-  implicit object BigDecimal extends BigDecimalOrdering
+  implicit object Decimal extends DecimalOrdering
 
   trait StringOrdering extends Ordering[String] {
     def compare(x: String, y: String) = x.compareTo(y)

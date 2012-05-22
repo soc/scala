@@ -73,8 +73,8 @@ package object scala {
 
   // Numeric types which were moved into scala.math.*
 
-  type BigDecimal = scala.math.BigDecimal
-  val BigDecimal = scala.math.BigDecimal
+  type Decimal = scala.math.Decimal
+  val Decimal = scala.math.Decimal
 
   type BigInt = scala.math.BigInt
   val BigInt = scala.math.BigInt
