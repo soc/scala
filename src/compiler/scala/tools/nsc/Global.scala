@@ -23,7 +23,7 @@ import typechecker._
 import transform._
 import backend.icode.{ ICodes, GenICode, ICodeCheckers }
 import backend.{ ScalaPrimitives, Platform, JavaPlatform }
-import backend.jvm.{GenJVM, GenASM}
+import backend.jvm.GenASM
 import backend.opt.{ Inliners, ClosureElimination, DeadCodeElimination }
 import backend.icode.analysis._
 import language.postfixOps
@@ -608,13 +608,6 @@ class Global(var currentSettings: Settings, var reporter: Reporter) extends Symb
     val runsAfter = List("closelim")
     val runsRightAfter = None
   } with DeadCodeElimination
-
-  // phaseName = "jvm", FJBG-based version
-  object genJVM extends {
-    val global: Global.this.type = Global.this
-    val runsAfter = List("dce")
-    val runsRightAfter = None
-  } with GenJVM
 
   // phaseName = "jvm", ASM-based version
   object genASM extends {
