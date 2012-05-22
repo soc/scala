@@ -9,7 +9,6 @@ package transform
 import symtab._
 import Flags.{ CASE => _, _ }
 import scala.collection.mutable.ListBuffer
-import matching.{ Patterns, ParallelMatching }
 
 /** This class ...
  *
@@ -17,15 +16,12 @@ import matching.{ Patterns, ParallelMatching }
  *  @version 1.0
  */
 abstract class ExplicitOuter extends InfoTransform
-      with Patterns
-      with ParallelMatching
       with TypingTransformers
       with ast.TreeDSL
 {
   import global._
   import definitions._
   import CODE._
-  import Debug.TRACE
 
   /** The following flags may be set by this phase: */
   override def phaseNewFlags: Long = notPROTECTED
@@ -70,15 +66,6 @@ abstract class ExplicitOuter extends InfoTransform
   }
 
   private val innerClassConstructorParamName: TermName = newTermName("arg" + nme.OUTER)
-
-  class RemoveBindingsTransformer(toRemove: Set[Symbol]) extends Transformer {
-    override def transform(tree: Tree) = tree match {
-      case Bind(_, body) if toRemove(tree.symbol) =>
-        TRACE("Dropping unused binding: " + tree.symbol)
-        super.transform(body)
-      case _                                      => super.transform(tree)
-    }
-  }
 
   /** Issue a migration warning for instance checks which might be on an Array and
    *  for which the type parameter conforms to Seq, because these answers changed in 2.8.
@@ -374,76 +361,6 @@ abstract class ExplicitOuter extends InfoTransform
       }
     }
 
-    def matchTranslation(tree: Match) = {
-      val Match(selector, cases) = tree
-      var nselector = transform(selector)
-
-      def makeGuardDef(vs: List[Symbol], guard: Tree) = {
-        val gdname = unit.freshTermName("gd")
-        val method = currentOwner.newMethod(gdname, tree.pos, SYNTHETIC)
-        val params = method newSyntheticValueParams vs.map(_.tpe)
-        method setInfo new MethodType(params, BooleanClass.tpe)
-
-        localTyper typed {
-          DEF(method) === guard.changeOwner(currentOwner -> method).substTreeSyms(vs zip params: _*)
-        }
-      }
-
-      val nguard = new ListBuffer[Tree]
-      val ncases =
-        for (CaseDef(pat, guard, body) <- cases) yield {
-          // Strip out any unused pattern bindings up front
-          val patternIdents = for (b @ Bind(_, _) <- pat) yield b.symbol
-          val references: Set[Symbol] = Set(guard, body) flatMap { t => for (id @ Ident(name) <- t) yield id.symbol }
-          val (used, unused) = patternIdents partition references
-          val strippedPat = if (unused.isEmpty) pat else new RemoveBindingsTransformer(unused.toSet) transform pat
-
-          val gdcall =
-            if (guard == EmptyTree) EmptyTree
-            else {
-              val guardDef = makeGuardDef(used, guard)
-              nguard += transform(guardDef) // building up list of guards
-
-              localTyper typed (Ident(guardDef.symbol) APPLY (used map Ident))
-            }
-
-          (CASE(transform(strippedPat)) IF gdcall) ==> transform(body)
-        }
-
-      def isUncheckedAnnotation(tpe: Type) = tpe hasAnnotation UncheckedClass
-      def isSwitchAnnotation(tpe: Type) = tpe hasAnnotation SwitchClass
-
-      val (checkExhaustive, requireSwitch) = nselector match {
-        case Typed(nselector1, tpt) =>
-          val unchecked = isUncheckedAnnotation(tpt.tpe)
-          if (unchecked)
-            nselector = nselector1
-
-          // Don't require a tableswitch if there are 1-2 casedefs
-          // since the matcher intentionally emits an if-then-else.
-          (!unchecked, isSwitchAnnotation(tpt.tpe) && ncases.size > 2)
-        case _  =>
-          (true, false)
-      }
-
-      val t = atPos(tree.pos) {
-        val context     = MatrixContext(currentUnit, transform, localTyper, currentOwner, tree.tpe)
-        val t_untyped   = handlePattern(nselector, ncases, checkExhaustive, context)
-
-        /* if @switch annotation is present, verify the resulting tree is a Match */
-        if (requireSwitch) t_untyped match {
-          case Block(_, Match(_, _))  => // ok
-          case _                      =>
-            unit.error(tree.pos, "could not emit switch for @switch annotated match")
-        }
-
-        localTyper.typed(t_untyped, context.matchResultType)
-      }
-
-      if (nguard.isEmpty) t
-      else Block(nguard.toList, t) setType t.tpe
-    }
-
     /** The main transformation method */
     override def transform(tree: Tree): Tree = {
       val sym = tree.symbol
@@ -517,42 +434,20 @@ abstract class ExplicitOuter extends InfoTransform
               })
           })
           super.transform(treeCopy.Apply(tree, sel, outerVal :: args))
-
-        // entry point for pattern matcher translation
-        case mch: Match if (!opt.virtPatmat) => // don't use old pattern matcher as fallback when the user wants the virtualizing one
-          matchTranslation(mch)
-
+        // for patmatvirtualiser
+        // base.<outer>.eq(o) --> base.$outer().eq(o) if there's an accessor, else the whole tree becomes TRUE
+        // TODO remove the synthetic `<outer>` method from outerFor??
+        case Apply(eqsel@Select(Apply(sel@Select(base, nme.OUTER_SYNTH), Nil), eq), args) =>
+          val outerFor = sel.symbol.owner.toInterface // TODO: toInterface necessary?
+          outerAccessor(outerFor) match {
+            case NoSymbol => transform(TRUE) // urgh... drop condition if there's no accessor
+            case acc      =>
+              // println("(base, acc)= "+(base, acc))
+              val outerSelect = localTyper typed Apply(Select(base, acc), Nil)
+              // achieves the same as: localTyper typed atPos(tree.pos)(outerPath(base, base.tpe.typeSymbol, outerFor.outerClass))
+              transform(treeCopy.Apply(tree, treeCopy.Select(eqsel, outerSelect, eq), args))
+          }
         case _ =>
-          if (opt.virtPatmat) { // this turned out to be expensive, hence the hacky `if` and `return`
-            tree match {
-              // for patmatvirtualiser
-              // base.<outer>.eq(o) --> base.$outer().eq(o) if there's an accessor, else the whole tree becomes TRUE
-              // TODO remove the synthetic `<outer>` method from outerFor??
-              case Apply(eqsel@Select(eqapp@Apply(sel@Select(base, outerAcc), Nil), eq), args)  if outerAcc == nme.OUTER_SYNTH =>
-                val outerFor = sel.symbol.owner.toInterface // TODO: toInterface necessary?
-                val acc = outerAccessor(outerFor)
-                if(acc == NoSymbol) {
-                  // println("WARNING: no outer for "+ outerFor)
-                  return transform(TRUE) // urgh... drop condition if there's no accessor
-                } else {
-                  // println("(base, acc)= "+(base, acc))
-                  val outerSelect = localTyper typed Apply(Select(base, acc), Nil)
-                  // achieves the same as: localTyper typed atPos(tree.pos)(outerPath(base, base.tpe.typeSymbol, outerFor.outerClass))
-                  // println("(b, tpsym, outerForI, outerFor, outerClass)= "+ (base, base.tpe.typeSymbol, outerFor, sel.symbol.owner, outerFor.outerClass))
-                  // println("outerSelect = "+ outerSelect)
-                  return transform(treeCopy.Apply(tree, treeCopy.Select(eqsel, outerSelect, eq), args))
-                }
-              case _ =>
-            }
-          }
-
-          if (settings.Xmigration28.value) tree match {
-            case TypeApply(fn @ Select(qual, _), args) if fn.symbol == Object_isInstanceOf || fn.symbol == Any_isInstanceOf =>
-              if (isArraySeqTest(qual.tpe, args.head.tpe))
-                unit.warning(tree.pos, "An Array will no longer match as Seq[_].")
-            case _ => ()
-          }
-
           val x = super.transform(tree)
           if (x.tpe eq null) x
           else x setType transformInfo(currentOwner, x.tpe)
