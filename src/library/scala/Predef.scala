@@ -136,22 +136,8 @@ object Predef extends LowPriorityImplicits {
   @inline def implicitly[T](implicit e: T) = e    // for summoning implicit values from the nether world -- TODO: when dependent method types are on by default, give this result type `e.type`, so that inliner has better chance of knowing which method to inline in calls like `implicitly[MatchingStrategy[Option]].zero`
   @inline def locally[T](x: T): T  = x    // to communicate intent and avoid unmoored statements
 
-  // Apparently needed for the xml library
-  val $scope = scala.xml.TopScope
-
-  // Deprecated
-
   @deprecated("Use sys.error(message) instead", "2.9.0")
   def error(message: String): Nothing = sys.error(message)
-
-  @deprecated("Use sys.exit() instead", "2.9.0")
-  def exit(): Nothing = sys.exit()
-
-  @deprecated("Use sys.exit(status) instead", "2.9.0")
-  def exit(status: Int): Nothing = sys.exit(status)
-
-  @deprecated("Use formatString.format(args: _*) or arg.formatted(formatString) instead", "2.9.0")
-  def format(text: String, xs: Any*) = augmentString(text).format(xs: _*)
 
   // errors and asserts -------------------------------------------------
 
@@ -237,11 +223,6 @@ object Predef extends LowPriorityImplicits {
   }
 
   final class Ensuring[A](val __resultOfEnsuring: A) extends AnyVal {
-    // `__resultOfEnsuring` must be a public val to allow inlining.
-    // See comments in ArrowAssoc for more.
-    @deprecated("Use __resultOfEnsuring instead", "2.10.0")
-    def x = __resultOfEnsuring
-
     def ensuring(cond: Boolean): A = { assert(cond); __resultOfEnsuring }
     def ensuring(cond: Boolean, msg: => Any): A = { assert(cond, msg); __resultOfEnsuring }
     def ensuring(cond: A => Boolean): A = { assert(cond(__resultOfEnsuring)); __resultOfEnsuring }
@@ -338,33 +319,6 @@ object Predef extends LowPriorityImplicits {
   implicit def shortArrayOps(xs: Array[Short]): ArrayOps[Short]       = new ArrayOps.ofShort(xs)
   implicit def unitArrayOps(xs: Array[Unit]): ArrayOps[Unit]          = new ArrayOps.ofUnit(xs)
 
-  // Primitive Widenings --------------------------------------------------------------
-
-  @deprecated("Use a method in an AnyVal's companion object", "2.10.0") def byte2short(x: Byte): Short = x.toShort
-  @deprecated("Use a method in an AnyVal's companion object", "2.10.0") def byte2int(x: Byte): Int = x.toInt
-  @deprecated("Use a method in an AnyVal's companion object", "2.10.0") def byte2long(x: Byte): Long = x.toLong
-  @deprecated("Use a method in an AnyVal's companion object", "2.10.0") def byte2float(x: Byte): Float = x.toFloat
-  @deprecated("Use a method in an AnyVal's companion object", "2.10.0") def byte2double(x: Byte): Double = x.toDouble
-
-  @deprecated("Use a method in an AnyVal's companion object", "2.10.0") def short2int(x: Short): Int = x.toInt
-  @deprecated("Use a method in an AnyVal's companion object", "2.10.0") def short2long(x: Short): Long = x.toLong
-  @deprecated("Use a method in an AnyVal's companion object", "2.10.0") def short2float(x: Short): Float = x.toFloat
-  @deprecated("Use a method in an AnyVal's companion object", "2.10.0") def short2double(x: Short): Double = x.toDouble
-
-  @deprecated("Use a method in an AnyVal's companion object", "2.10.0") def char2int(x: Char): Int = x.toInt
-  @deprecated("Use a method in an AnyVal's companion object", "2.10.0") def char2long(x: Char): Long = x.toLong
-  @deprecated("Use a method in an AnyVal's companion object", "2.10.0") def char2float(x: Char): Float = x.toFloat
-  @deprecated("Use a method in an AnyVal's companion object", "2.10.0") def char2double(x: Char): Double = x.toDouble
-
-  @deprecated("Use a method in an AnyVal's companion object", "2.10.0") def int2long(x: Int): Long = x.toLong
-  @deprecated("Use a method in an AnyVal's companion object", "2.10.0") def int2float(x: Int): Float = x.toFloat
-  @deprecated("Use a method in an AnyVal's companion object", "2.10.0") def int2double(x: Int): Double = x.toDouble
-
-  @deprecated("Use a method in an AnyVal's companion object", "2.10.0") def long2float(x: Long): Float = x.toFloat
-  @deprecated("Use a method in an AnyVal's companion object", "2.10.0") def long2double(x: Long): Double = x.toDouble
-
-  @deprecated("Use a method in an AnyVal's companion object", "2.10.0") def float2double(x: Float): Double = x.toDouble
-
   // "Autoboxing" and "Autounboxing" ---------------------------------------------------
 
   implicit def byte2Byte(x: Byte)           = java.lang.Byte.valueOf(x)
@@ -404,9 +358,6 @@ object Predef extends LowPriorityImplicits {
   @inline implicit def augmentString(x: String): StringOps = new StringOps(x)
   implicit def any2stringadd(x: Any) = new runtime.StringAdd(x)
   implicit def unaugmentString(x: StringOps): String = x.repr
-
-  @deprecated("Use StringCanBuildFrom", "2.10.0")
-  def stringCanBuildFrom: CanBuildFrom[String, Char, String] = StringCanBuildFrom
 
   implicit val StringCanBuildFrom: CanBuildFrom[String, Char, String] = new CanBuildFrom[String, Char, String] {
     def apply(from: String) = apply()
