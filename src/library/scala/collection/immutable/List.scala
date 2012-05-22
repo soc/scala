@@ -151,7 +151,68 @@ sealed abstract class List[+A] extends AbstractSeq[A]
    *  @usecase def mapConserve(f: A => A): List[A]
    *    @inheritdoc
    */
-  def mapConserve[B >: A <: AnyRef](f: A => B): List[B] = {
+  private def mapConserveNew[B >: A <: AnyRef](f: A => B): List[B] = {
+    var count = 0
+    this foreach { x =>
+      val y = f(x)
+      if (x.asInstanceOf[AnyRef] eq y)
+        count += 1
+      else {
+        val lb = ListBuffer[B]()
+        return ( lb ++= (this take count) += y ++= (this drop count + 1 map f) result )
+      }
+    }
+    this
+  }
+  private def mapConserveNew2[B >: A <: AnyRef](f: A => B): List[B] = {
+    var seen: List[B] = Nil
+    var left: List[A] = this
+
+    while (left.nonEmpty) {
+      val x = left.head
+      val y = f(x)
+      left = left.tail
+      if (x.asInstanceOf[AnyRef] eq y)
+        seen ::= y
+      else
+        return seen.reverse ::: (y :: (left map f))
+    }
+    this
+  }
+  private def mapConserveNew3[B >: A <: AnyRef](f: A => B): List[B] = {
+    var original = true
+    val result = this map { x =>
+      val y = f(x)
+      if (original)
+        original = x.asInstanceOf[AnyRef] eq y
+
+      y
+    }
+    if (original) this else result
+  }
+  private def mapConserveNew4[B >: A <: AnyRef](f: A => B): List[B] = this match {
+    case Nil =>
+      this
+    case x1 :: Nil =>
+      val y1 = f(x1)
+      if (x1.asInstanceOf[AnyRef] eq y1) this
+      else y1 :: Nil
+    case x1 :: x2 :: Nil =>
+      val y1 = f(x1)
+      val y2 = f(x2)
+      if ((x1.asInstanceOf[AnyRef] eq y1) && (x2.asInstanceOf[AnyRef] eq y2)) this
+      else y1 :: y2 :: Nil
+    case x1 :: x2 :: x3 :: Nil =>
+      val y1 = f(x1)
+      val y2 = f(x2)
+      val y3 = f(x3)
+      if ((x1.asInstanceOf[AnyRef] eq y1) && (x2.asInstanceOf[AnyRef] eq y2) && (x3.asInstanceOf[AnyRef] eq y3)) this
+      else y1 :: y2 :: y3 :: Nil
+    case _ =>
+      mapConserveOld(f)
+  }
+
+  private def mapConserveOld[B >: A <: AnyRef](f: A => B): List[B] = {
     @tailrec
     def loop(mapped: ListBuffer[B], unchanged: List[A], pending: List[A]): List[B] =
       if (pending.isEmpty) {
@@ -179,6 +240,20 @@ sealed abstract class List[+A] extends AbstractSeq[A]
     loop(null, this, this)
   }
 
+  def mapConserve[B >: A <: AnyRef](f: A => B): List[B] = {
+    val start   = System.nanoTime
+    val result  = List.useImplNum match {
+      case 1  => mapConserveNew(f)
+      case 2  => mapConserveNew2(f)
+      case 3  => mapConserveNew3(f)
+      case 4  => mapConserveNew4(f)
+      case _  => mapConserveOld(f)
+    }
+    val elapsed = System.nanoTime - start
+    List.mapConserveMillis += (elapsed / 1000000L).toInt
+    List.mapConserveLength(this.length) += 1
+    result
+  }
   // Overridden methods from IterableLike and SeqLike or overloaded variants of such methods
 
   override def ++[B >: A, That](that: GenTraversableOnce[B])(implicit bf: CanBuildFrom[List[A], B, That]): That = {
@@ -313,6 +388,7 @@ sealed abstract class List[+A] extends AbstractSeq[A]
  */
 @SerialVersionUID(0 - 8256821097970055419L)
 case object Nil extends List[Nothing] {
+  // override def mapConserve[B <: AnyRef](f: Nothing => B) = this
   override def isEmpty = true
   override def head: Nothing =
     throw new NoSuchElementException("head of empty list")
@@ -385,6 +461,20 @@ final case class ::[B](private var hd: B, private[scala] var tl: List[B]) extend
  *  @define Coll `List`
  */
 object List extends SeqFactory[List] {
+  final val useImplNum = sys.props("mapConserve") match {
+    case null   => 0
+    case str    => str.toInt
+  }
+
+  val mapConserveLength = mutable.Map[Int, Int]() withDefaultValue 0
+  // var randomFalsehood = false
+  var mapConserveMillis = 0L
+  // var mapConserveNewNanos = 0L
+
+  sys addShutdownHook {
+    println("mapConserve(%s impl): %d ms".format(sys.props("mapConserve"), mapConserveMillis))
+    mapConserveLength.keys.toList.sorted foreach (len => println("Length " + len + ": " + mapConserveLength(len) + " calls."))
+  }
 
   import scala.collection.{Iterable, Seq, IndexedSeq}
 
