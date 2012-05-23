@@ -3,10 +3,9 @@
  * @author Paul Phillips
  */
 
-package scala.reflect
-package internal.util
+package scala.util
 
-import NameTransformer._
+import scala.reflect.NameTransformer._
 import scala.collection.{ mutable, immutable }
 import Origins._
 
@@ -114,5 +113,6 @@ object Origins {
     def isCutoff(el: StackTraceElement) = id matches el
     def newRep(xs: StackSlice): Rep     = (xs take numLines).toList
     def repString(rep: Rep)             = rep.map("\n  " + _).mkString
+    override def readStack() = super.readStack() drop 1
   }
 }
