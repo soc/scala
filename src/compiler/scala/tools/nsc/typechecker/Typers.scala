@@ -1901,7 +1901,7 @@ trait Typers extends Modes with Adaptations with Taggings {
       }
 
       val tparams1 = ddef.tparams mapConserve typedTypeDef
-      val vparamss1 = ddef.vparamss mapConserve (_ mapConserve typedValDef)
+      val vparamss1 = mmapConserve(ddef.vparamss)(typedValDef)
 
       // complete lazy annotations
       val annots = meth.annotations

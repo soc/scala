@@ -553,10 +553,7 @@ abstract class UnCurry extends InfoTransform
         else translateSynchronized(tree) match {
           case dd @ DefDef(mods, name, tparams, _, tpt, rhs) =>
             // Remove default argument trees from parameter ValDefs, SI-4812
-            val vparamssNoRhs = dd.vparamss mapConserve (_ mapConserve {p =>
-              treeCopy.ValDef(p, p.mods, p.name, p.tpt, EmptyTree)
-            })
-
+            val vparamssNoRhs = mmapConserve(dd.vparamss)(p => deriveValDef(p)(_ => EmptyTree))
             if (dd.symbol hasAnnotation VarargsClass) saveRepeatedParams(dd)
 
             withNeedLift(false) {

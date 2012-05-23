@@ -1485,8 +1485,7 @@ trait PatternMatching extends Transform with TypingTransformers with ast.TreeDSL
         collapsedTreeMakers getOrElse tests.map(_.treeMaker) // sharedPrefix need not be empty (but it only contains Top-tests, which are dropped above)
       }
       okToCall = true // TODO: remove (debugging)
-
-      res mapConserve (_ mapConserve reusedOrOrig)
+      mmapConserve(res)(reusedOrOrig)
     }
 
     object ReusedCondTreeMaker {

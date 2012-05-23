@@ -176,7 +176,17 @@ sealed abstract class List[+A] extends AbstractSeq[A]
           loop(b, tail0, tail0)
         }
       }
-    loop(null, this, this)
+    // Unrolled a little since lists of length 0-2 are passed in 90+%
+    // of the invocations of this method.
+    this match {
+      case Nil      => this
+      case x :: Nil =>
+        val y = f(x)
+        if (x.asInstanceOf[AnyRef] eq y) this
+        else y :: Nil
+      case _ =>
+        loop(null, this, this)
+    }
   }
 
   // Overridden methods from IterableLike and SeqLike or overloaded variants of such methods
