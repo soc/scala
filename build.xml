@@ -88,6 +88,7 @@ PROPERTIES
 
   <!-- Sets location of build folders -->
   <property name="build.dir" value="${basedir}/build"/>
+  <property name="build-asm.dir" value="${build.dir}/asm"/>
   <property name="build-locker.dir" value="${build.dir}/locker"/>
   <property name="build-quick.dir" value="${build.dir}/quick"/>
   <property name="build-pack.dir" value="${build.dir}/pack"/>
@@ -303,10 +304,43 @@ INITIALISATION
   </target>
 
 <!-- ===========================================================================
+LOCAL Adapted ASM
+============================================================================ -->
+
+  <target name="asm.start" depends="init">
+    <condition property="asm.available">
+      <available file="${build-asm.dir}/asm.complete"/>
+    </condition>
+  </target>
+
+  <target name="asm.lib" depends="asm.start" unless="asm.available">
+    <stopwatch name="asm.lib.timer"/>
+    <mkdir dir="${build-asm.dir}/classes/"/>
+    <javac
+      srcdir="${src.dir}/asm"
+      destdir="${build-asm.dir}/classes"
+      classpath="${build-asm.dir}/classes"
+      includes="**/*.java"
+      target="1.5" source="1.5">
+        <compilerarg line="${javac.args} -XDignore.symbol.file"/>
+    </javac>
+    <touch file="${build-asm.dir}/asm.complete" verbose="no"/>
+    <stopwatch name="asm.lib.timer" action="total"/>
+  </target>
+
+
+  <target name="asm.done" depends="asm.lib">
+    <path id="asm.classpath">
+      <pathelement location="${build-asm.dir}/classes/"/>
+    </path>
+  </target>
+
+
+<!-- ===========================================================================
 LOCAL REFERENCE BUILD (LOCKER)
 ============================================================================ -->
 
-  <target name="locker.start" depends="init">
+  <target name="locker.start" depends="asm.done">
     <condition property="locker.available">
       <available file="${build-locker.dir}/all.complete"/>
     </condition>
@@ -397,6 +431,7 @@ LOCAL REFERENCE BUILD (LOCKER)
         <pathelement location="${build-locker.dir}/classes/library"/>
         <pathelement location="${build-locker.dir}/classes/compiler"/>
         <path refid="aux.libs"/>
+        <path refid="asm.classpath"/>
         <pathelement location="${jline.jar}"/>
       </compilationpath>
     </scalacfork>
@@ -428,11 +463,13 @@ LOCAL REFERENCE BUILD (LOCKER)
     <path id="locker.classpath">
       <pathelement location="${build-locker.dir}/classes/library"/>
       <pathelement location="${build-locker.dir}/classes/compiler"/>
+      <path refid="asm.classpath"/>
       <path refid="aux.libs"/>
     </path>
     <path id="quick.classpath">
       <pathelement location="${build-quick.dir}/classes/library"/>
       <pathelement location="${build-quick.dir}/classes/compiler"/>
+      <path refid="asm.classpath"/>
       <path refid="aux.libs"/>
       <path refid="lib.extra"/>
     </path>
@@ -551,6 +588,7 @@ QUICK BUILD (QUICK)
         <pathelement location="${build-quick.dir}/classes/library"/>
         <pathelement location="${build-quick.dir}/classes/compiler"/>
         <path refid="aux.libs"/>
+        <path refid="asm.classpath"/>
         <pathelement location="${jline.jar}"/>
       </compilationpath>
     </scalacfork>
@@ -612,6 +650,7 @@ QUICK BUILD (QUICK)
     <path id="quick.classpath">
       <pathelement location="${build-quick.dir}/classes/library"/>
       <pathelement location="${build-quick.dir}/classes/compiler"/>
+      <path refid="asm.classpath"/>
       <path refid="aux.libs"/>
     </path>
   </target>
@@ -662,6 +701,7 @@ PACKED QUICK BUILD (PACK)
     <mkdir dir="${build-pack.dir}/lib"/>
     <jar destfile="${build-pack.dir}/lib/scala-compiler.jar" manifest="${build-pack.dir}/META-INF/MANIFEST.MF">
       <fileset dir="${build-quick.dir}/classes/compiler"/>
+      <fileset dir="${build-asm.dir}/classes"/>
       <!-- filemode / dirmode: see trac ticket #1294 -->
       <zipfileset dirmode="755" filemode="644" src="${fjbg.jar}"/>
     </jar>
