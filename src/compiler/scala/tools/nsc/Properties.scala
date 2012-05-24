@@ -17,6 +17,5 @@ object Properties extends scala.util.PropertiesTrait {
   def shellPromptString    = scalaPropOrElse("shell.prompt", "\nscala> ")
 
   // derived values
-  def isEmacsShell         = propOrEmpty("env.emacs") != ""
   def fileEndings          = fileEndingString.split("""\|""").toList
 }

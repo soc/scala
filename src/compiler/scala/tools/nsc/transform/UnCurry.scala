@@ -275,7 +275,7 @@ abstract class UnCurry extends InfoTransform
       }
 
     def synthPartialFunction(fun: Function) = {
-      if (!settings.XoldPatmat.value) debugwarn("Under the new pattern matching scheme, PartialFunction should have been synthesized during typers.")
+      debugwarn("Under the new pattern matching scheme, PartialFunction should have been synthesized during typers.")
 
       val targs             = fun.tpe.typeArgs
       val (formals, restpe) = (targs.init, targs.last)
