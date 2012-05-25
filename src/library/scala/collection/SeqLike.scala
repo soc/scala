@@ -913,15 +913,6 @@ trait SeqLike[+A, +Repr] extends Any with IterableLike[A, Repr] {
     b.result
   }
 
-  def patch[B >: A, That](from: Int, patch: Seq[B], replaced: Int)(implicit bf: CanBuildFrom[Repr, B, That]): That = {
-    val b = bf(repr)
-    val (prefix, rest) = this.splitAt(from)
-    b ++= toCollection(prefix)
-    b ++= patch
-    b ++= toCollection(rest).iterator.drop(replaced)
-    b.result
-  }
-
   def updated[B >: A, That](index: Int, elem: B)(implicit bf: CanBuildFrom[Repr, B, That]): That = {
     val b = bf(repr)
     val (prefix, rest) = this.splitAt(index)

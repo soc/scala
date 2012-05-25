@@ -262,7 +262,8 @@ trait BasicBlocks {
       indexOf(oldInstr) match {
         case -1   => false
         case idx  =>
-          instrs = instrs.patch(idx, is, 1)
+          val (prefix, rest) = instrs splitAt idx
+          instrs = prefix ++ is ++ (rest drop 1)
           code.touched = true
           true
       }
@@ -272,7 +273,8 @@ trait BasicBlocks {
     def insertAfter(idx: Int, is: List[Instruction]) {
       assert(closed, "Instructions can be replaced only after the basic block is closed")
 
-      instrs = instrs.patch(idx + 1, is, 0)
+      val (prefix, rest) = instrs splitAt idx
+      instrs = prefix ++ is ++ rest
       code.touched = true
     }
 

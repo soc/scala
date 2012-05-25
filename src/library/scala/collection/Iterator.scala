@@ -1062,30 +1062,6 @@ trait Iterator[+A] extends IterableOnce[A] {
     (new Partner, new Partner)
   }
 
-  /** Returns this iterator with patched values.
-   *
-   *  @param from       The start index from which to patch
-   *  @param patchElems The iterator of patch values
-   *  @param replaced   The number of values in the original iterator that are replaced by the patch.
-   *  @note           Reuse: $consumesTwoAndProducesOneIterator
-   */
-  def patch[B >: A](from: Int, patchElems: Iterator[B], replaced: Int): Iterator[B] = new AbstractIterator[B] {
-    private var origElems = self
-    private var i = 0
-    def hasNext: Boolean =
-      if (i < from) origElems.hasNext
-      else patchElems.hasNext || origElems.hasNext
-    def next(): B = {
-      // We have to do this *first* just in case from = 0.
-      if (i == from) origElems = origElems drop replaced
-      val result: B =
-        if (i < from || !patchElems.hasNext) origElems.next()
-        else patchElems.next()
-      i += 1
-      result
-    }
-  }
-
   /** Copies selected values produced by this iterator to an array.
    *  Fills the given array `xs` starting at index `start` with at most
    *  `len` values produced by this iterator.
