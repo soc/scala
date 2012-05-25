@@ -502,8 +502,6 @@ trait Definitions extends reflect.api.StandardDefinitions {
     lazy val TypeTagsClass         = requiredClass[scala.reflect.api.TypeTags]
     lazy val TypeTagClass          = getMemberClass(TypeTagsClass, tpnme.TypeTag)
     lazy val TypeTagModule         = getMemberModule(TypeTagsClass, nme.TypeTag)
-    // lazy val ConcreteTypeTagClass  = getMemberClass(TypeTagsClass, tpnme.ConcreteTypeTag)
-    // lazy val ConcreteTypeTagModule = getMemberModule(TypeTagsClass, nme.ConcreteTypeTag)
 
          def ArrayTagWrap          = getMemberMethod(ArrayTagClass, nme.wrap)
          def ArrayTagNewArray      = getMemberMethod(ArrayTagClass, nme.newArray)
@@ -520,7 +518,6 @@ trait Definitions extends reflect.api.StandardDefinitions {
          def MacroInternal_materializeArrayTag        = getMemberMethod(MacroInternalPackage, nme.materializeArrayTag)
          def MacroInternal_materializeClassTag        = getMemberMethod(MacroInternalPackage, nme.materializeClassTag)
          def MacroInternal_materializeTypeTag         = getMemberMethod(MacroInternalPackage, nme.materializeTypeTag)
-         // def MacroInternal_materializeConcreteTypeTag = getMemberMethod(MacroInternalPackage, nme.materializeConcreteTypeTag)
 
     lazy val ScalaSignatureAnnotation = requiredClass[scala.reflect.ScalaSignature]
     lazy val ScalaLongSignatureAnnotation = requiredClass[scala.reflect.ScalaLongSignature]

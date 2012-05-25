@@ -129,7 +129,6 @@ trait StdNames {
     final val Symbol: NameType = "Symbol"
     final val ClassTag: NameType = "ClassTag"
     final val TypeTag : NameType = "TypeTag"
-    // final val ConcreteTypeTag: NameType = "ConcreteTypeTag"
 
     // fictions we use as both types and terms
     final val ERROR: NameType    = "<error>"
@@ -593,7 +592,6 @@ trait StdNames {
     val checkInitialized: NameType     = "checkInitialized"
     val classOf: NameType              = "classOf"
     val clone_ : NameType              = "clone" // sn.OClone causes checkinit failure
-    val concreteTypeTagToManifest: NameType = "concreteTypeTagToManifest"
     val conforms: NameType             = "conforms"
     val copy: NameType                 = "copy"
     val definitions: NameType          = "definitions"
@@ -645,11 +643,9 @@ trait StdNames {
     val macroContext : NameType        = "c"
     val main: NameType                 = "main"
     val manifest: NameType             = "manifest"
-    // val manifestToConcreteTypeTag: NameType = "manifestToConcreteTypeTag"
     val map: NameType                  = "map"
     val materializeArrayTag: NameType  = "materializeArrayTag"
     val materializeClassTag: NameType  = "materializeClassTag"
-    // val materializeConcreteTypeTag: NameType = "materializeConcreteTypeTag"
     val materializeTypeTag: NameType   = "materializeTypeTag"
     val mirror : NameType              = "mirror"
     val moduleClass : NameType         = "moduleClass"

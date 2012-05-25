@@ -65,10 +65,6 @@ trait Types { self: Universe =>
      */
     def typeConstructor: Type
 
-    /** Does this type refer to spliceable types or is a spliceable type?
-     */
-    def isConcrete: Boolean
-
     /** Is this type an abstract type that needs to be resolved?
      */
     def isSpliceable: Boolean

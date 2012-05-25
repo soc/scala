@@ -75,7 +75,7 @@ abstract class Reifier extends Phases
             CannotReifyReifeeThatHasTypeLocalToReifee(tree)
 
           val taggedType = typer.packedType(tree, NoSymbol)
-          val tagModule = TypeTagModule // if (reificationIsConcrete) ConcreteTypeTagModule else TypeTagModule
+          val tagModule = TypeTagModule
           val tagCtor = TypeApply(Select(Ident(nme.MIRROR_SHORT), tagModule.name), List(TypeTree(taggedType)))
           val exprCtor = TypeApply(Select(Ident(nme.MIRROR_SHORT), ExprModule.name), List(TypeTree(taggedType)))
           val tagArgs = List(reify(taggedType), reifyClass(mirror)(typer, taggedType))
@@ -87,7 +87,7 @@ abstract class Reifier extends Phases
           val rtree = reify(tpe)
 
           val taggedType = tpe
-          val tagModule = TypeTagModule // if (reificationIsConcrete) ConcreteTypeTagModule else TypeTagModule
+          val tagModule = TypeTagModule
           val ctor = TypeApply(Select(Ident(nme.MIRROR_SHORT), tagModule.name), List(TypeTree(taggedType)))
           val args = List(rtree, reifyClass(mirror)(typer, taggedType))
           Apply(ctor, args)

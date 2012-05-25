@@ -43,13 +43,9 @@ package object reflect {
   // ConcreteErasureTag trait is defined separately from the mirror
   // ClassTag class is defined separately from the mirror
   type TypeTag[T]          = scala.reflect.mirror.TypeTag[T]
-  type ConcreteTypeTag[T]  = scala.reflect.mirror.ConcreteTypeTag[T]
 
   // ClassTag object is defined separately from the mirror
   lazy val TypeTag         = scala.reflect.mirror.TypeTag
-  lazy val ConcreteTypeTag = scala.reflect.mirror.ConcreteTypeTag
 
   def arrayTagToClassManifest[T](tag: ArrayTag[T]): ClassManifest[T] = TagInterop.arrayTagToClassManifest[T](tag)
-  def concreteTypeTagToManifest[T](tag: ConcreteTypeTag[T]): Manifest[T] = TagInterop.concreteTypeTagToManifest[T](tag)
-  def manifestToConcreteTypeTag[T](tag: Manifest[T]): ConcreteTypeTag[T] = TagInterop.manifestToConcreteTypeTag[T](tag)
 }

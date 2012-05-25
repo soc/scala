@@ -155,7 +155,7 @@ trait Macros extends Traces {
       case TypeRef(SingleType(NoPrefix, contextParam), sym, List(tparam)) =>
         var wannabe = sym
         while (wannabe.isAliasType) wannabe = wannabe.info.typeSymbol
-        if (wannabe != definitions.TypeTagClass)  // && wannabe != definitions.ConcreteTypeTagClass)
+        if (wannabe != definitions.TypeTagClass)
           List(param)
         else
           transform(param, tparam.typeSymbol) map (_ :: Nil) getOrElse Nil
@@ -654,11 +654,6 @@ trait Macros extends Traces {
         val c = args(0).asInstanceOf[MacroContext]
         materializeTypeTag_impl(c)(args(1).asInstanceOf[c.Expr[Universe]])(args(2).asInstanceOf[c.TypeTag[_]])
       })
-      // MacroInternal_materializeConcreteTypeTag -> (args => {
-      //   assert(args.length == 3, args)
-      //   val c = args(0).asInstanceOf[MacroContext]
-      //   materializeConcreteTypeTag_impl(c)(args(1).asInstanceOf[c.Expr[Universe]])(args(2).asInstanceOf[c.TypeTag[_]])
-      // })
     )
   }
   private def macroRuntime(macroDef: Symbol): Option[MacroRuntime] = {
@@ -913,13 +908,8 @@ trait Macros extends Traces {
       macroLogVerbose("resolved tparam %s as %s".format(tparam, tpe))
       resolved(tparam) = tpe
       param.tpe.typeSymbol match {
-        case definitions.TypeTagClass =>
-          // do nothing
-        // case definitions.ConcreteTypeTagClass =>
-        //   if (!tpe.isConcrete) context.abort(context.enclosingPosition, "cannot create ConcreteTypeTag from a type %s having unresolved type parameters".format(tpe))
-        //   // otherwise do nothing
-        case _ =>
-          throw new Error("unsupported tpe: " + tpe)
+        case definitions.TypeTagClass => 
+        case _                        => throw new Error("unsupported tpe: " + tpe)
       }
       Some(tparam)
     })
@@ -927,8 +917,7 @@ trait Macros extends Traces {
       // generally speaking, it's impossible to calculate erasure from a tpe here
       // the tpe might be compiled by this run, so its jClass might not exist yet
       // hence I just pass `null` instead and leave this puzzle to macro programmers
-      val ttag = TypeTag(tpe, null)
-      if (ttag.isConcrete) ttag.toConcrete else ttag
+      TypeTag(tpe, null)
     })
     if (paramss.lastOption map (params => !params.isEmpty && params.forall(_.isType)) getOrElse false) argss = argss :+ Nil
     argss = argss.dropRight(1) :+ (tags ++ argss.last) // todo. add support for context bounds in argss

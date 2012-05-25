@@ -64,18 +64,6 @@ trait Types {
   /** An obscure flag necessary for implicit TypeTag generation */
   private var spliceTypesEnabled = !dontSpliceAtTopLevel
 
-  /** Keeps track of whether this reification contains abstract type parameters */
-  private var _reificationIsConcrete = true
-  def reificationIsConcrete = _reificationIsConcrete
-  def reificationIsConcrete_=(value: Boolean) {
-    _reificationIsConcrete = value
-    // if (!value && concrete) {
-    //   assert(current.isInstanceOf[Type], current)
-    //   val offender = current.asInstanceOf[Type]
-    //   CannotReifyConcreteTypeTagHavingUnresolvedTypeParameters(offender)
-    // }
-  }
-
   private type SpliceCacheKey = (Symbol, Symbol)
   private lazy val spliceCache: collection.mutable.Map[SpliceCacheKey, Tree] = {
     val cache = analyzer.perRunMacroCache.getOrElseUpdate(MacroContextReify, collection.mutable.Map[Any, Any]())
@@ -89,7 +77,7 @@ trait Types {
       if (reifyDebug) println("splicing " + tpe)
 
       if (spliceTypesEnabled) {
-        var tagClass = TypeTagClass // if (concrete) ConcreteTypeTagClass else TypeTagClass
+        var tagClass = TypeTagClass
         val tagTpe = singleType(prefix.tpe, prefix.tpe member tagClass.name)
 
         // [Eugene] this should be enough for an abstract type, right?
@@ -105,7 +93,6 @@ trait Types {
               EmptyTree
             case success =>
               if (reifyDebug) println("implicit search has produced a result: " + success)
-              reificationIsConcrete &= concrete
               var splice = Select(success, nme.tpe)
               splice match {
                 case InlinedTypeSplice(_, inlinedSymbolTable, tpe) =>
@@ -122,8 +109,6 @@ trait Types {
       } else {
         if (reifyDebug) println("splicing has been cancelled: spliceTypesEnabled = false")
       }
-
-      reificationIsConcrete = false
     }
 
     spliceTypesEnabled = true

@@ -212,8 +212,6 @@ class DummyMirror(cl: ClassLoader) extends api.Mirror {
     def ClassClass = DummyClassSymbol
     def ClassTagClass = DummyClassSymbol
     def ClassTagModule = DummySymbol
-    // def ConcreteTypeTagClass = DummyClassSymbol
-    // def ConcreteTypeTagModule = DummySymbol
     def ConsClass = DummySymbol
     def DoubleClass = DummyClassSymbol
     def EmptyPackage = DummyPackageSymbol
@@ -699,7 +697,6 @@ class DummyMirror(cl: ClassLoader) extends api.Mirror {
     def exists(p: Type => Boolean): Boolean = notSupported()
     def find(p: Type => Boolean): Option[Type] = notSupported()
     def foreach(f: Type => Unit): Unit = notSupported()
-    def isConcrete: Boolean = notSupported()
     def isHigherKinded: Boolean = notSupported()
     def isSpliceable: Boolean = notSupported()
     def kind: String = notSupported()

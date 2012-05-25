@@ -12,13 +12,6 @@ package object internal {
   /** This method is required by the compiler and <b>should not be used in client code</b>. */
   def materializeArrayTag_impl[T: c.TypeTag](c: Context)(u: c.Expr[Universe]): c.Expr[ArrayTag[T]] =
     c.Expr[Nothing](c.materializeArrayTag(u.tree, implicitly[c.TypeTag[T]].tpe))(c.TypeTag.Nothing)
-  
-  /** This method is required by the compiler and <b>should not be used in client code</b>. */
-  def materializeErasureTag[T](u: Universe): ErasureTag[T] = macro materializeErasureTag_impl[T]
-  
-  /** This method is required by the compiler and <b>should not be used in client code</b>. */
-  def materializeErasureTag_impl[T: c.TypeTag](c: Context)(u: c.Expr[Universe]): c.Expr[ErasureTag[T]] = ???
-    // c.Expr[Nothing](c.materializeErasureTag(u.tree, implicitly[c.TypeTag[T]].tpe, concrete = false))(c.TypeTag.Nothing)
 
   /** This method is required by the compiler and <b>should not be used in client code</b>. */
   def materializeClassTag[T](u: Universe): ClassTag[T] = macro materializeClassTag_impl[T]
@@ -33,13 +26,6 @@ package object internal {
   /** This method is required by the compiler and <b>should not be used in client code</b>. */
   def materializeTypeTag_impl[T: c.TypeTag](c: Context)(u: c.Expr[Universe]): c.Expr[u.value.TypeTag[T]] =
     c.Expr[Nothing](c.materializeTypeTag(u.tree, implicitly[c.TypeTag[T]].tpe, concrete = false))(c.TypeTag.Nothing)
-
-  /** This method is required by the compiler and <b>should not be used in client code</b>. */
-  def materializeConcreteTypeTag[T](u: Universe): u.ConcreteTypeTag[T] = macro materializeConcreteTypeTag_impl[T]
-
-  /** This method is required by the compiler and <b>should not be used in client code</b>. */
-  def materializeConcreteTypeTag_impl[T: c.TypeTag](c: Context)(u: c.Expr[Universe]): c.Expr[u.value.ConcreteTypeTag[T]] =
-    c.Expr[Nothing](c.materializeTypeTag(u.tree, implicitly[c.TypeTag[T]].tpe, concrete = true))(c.TypeTag.Nothing)
 
   /** This method is required by the compiler and <b>should not be used in client code</b>. */
   private[scala] implicit def context2utils(c0: Context) : Utils { val c: c0.type } = new { val c: c0.type = c0 } with Utils
@@ -83,7 +69,7 @@ package internal {
       })
 
     def materializeTypeTag(prefix: Tree, tpe: Type, concrete: Boolean): Tree = {
-      val tagModule = TypeTagModule // if (concrete) ConcreteTypeTagModule else TypeTagModule
+      val tagModule = TypeTagModule
       materializeTag(prefix, tpe, tagModule, c.reifyType(prefix, tpe, dontSpliceAtTopLevel = true, concrete = concrete))
     }
 
@@ -94,9 +80,7 @@ package internal {
             val ref = if (tagModule.owner.isPackageClass) Ident(tagModule) else Select(prefix, tagModule.name)
             Select(ref, coreTags(coreTpe))
           case _ =>
-            val manifestInScope = nonSyntheticManifestInScope(tpe)
-            if (manifestInScope.isEmpty) translatingReificationErrors(materializer)
-            else gen.mkMethodCall(staticModule("scala.reflect.package"), newTermName("manifestToConcreteTypeTag"), List(tpe), List(manifestInScope))
+            translatingReificationErrors(materializer)
         }
       try c.typeCheck(result)
       catch { case terr @ c.TypeError(pos, msg) => failTag(terr) }

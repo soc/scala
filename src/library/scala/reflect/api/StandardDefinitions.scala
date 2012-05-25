@@ -44,7 +44,6 @@ trait StandardDefinitions extends StandardTypes {
     def Array_update: Symbol
     def ByNameParamClass: Symbol
     def ClassTagModule: Symbol
-    // def ConcreteTypeTagModule: Symbol
     def ConsClass: Symbol
     def EmptyPackageClass: Symbol
     def FunctionClass : Array[Symbol]
@@ -118,7 +117,6 @@ trait StandardDefinitions extends StandardTypes {
     // type tags
     def ClassTagClass: ClassSymbol
     def TypeTagClass: ClassSymbol
-    // def ConcreteTypeTagClass: ClassSymbol
 
     /** Given a type T, returns the type corresponding to the VM's
      *  representation: ClassClass's type constructor applied to `arg`.

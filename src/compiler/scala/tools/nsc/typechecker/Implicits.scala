@@ -1131,7 +1131,6 @@ trait Implicits {
       ArrayTagClass        -> MacroInternal_materializeArrayTag,
       ClassTagClass        -> MacroInternal_materializeClassTag,
       TypeTagClass         -> MacroInternal_materializeTypeTag
-      // ConcreteTypeTagClass -> MacroInternal_materializeConcreteTypeTag
     )
 
     /** Creates a tree will produce a tag of the requested flavor.
