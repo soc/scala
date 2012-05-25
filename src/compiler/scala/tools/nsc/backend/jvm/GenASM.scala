@@ -495,10 +495,10 @@ abstract class GenASM extends SubComponent with BytecodeWriters {
     }
 
     /** Specialized array conversion to prevent calling
-     *  java.lang.reflect.Array.newInstance via TraversableOnce.toArray
+     *  java.lang.reflect.Array.newInstance via IterableOnce.toArray
      */
-    def mkArray(xs: Traversable[asm.Type]):  Array[asm.Type]  = { val a = new Array[asm.Type](xs.size); xs.copyToArray(a); a }
-    def mkArray(xs: Traversable[String]):    Array[String]    = { val a = new Array[String](xs.size);   xs.copyToArray(a); a }
+    def mkArray(xs: Iterable[asm.Type]):  Array[asm.Type]  = { val a = new Array[asm.Type](xs.size); xs.copyToArray(a); a }
+    def mkArray(xs: Iterable[String]):    Array[String]    = { val a = new Array[String](xs.size);   xs.copyToArray(a); a }
 
     // -----------------------------------------------------------------------------------------
     // Getters for (JVMS 4.2) internal and unqualified names (represented as JType instances).
@@ -2949,7 +2949,7 @@ abstract class GenASM extends SubComponent with BytecodeWriters {
 
     /** Transitive closure of successors potentially reachable due to normal (non-exceptional) control flow.
        Those BBs in the argument are also included in the result */
-    private def directSuccStar(starters: Traversable[BasicBlock]): List[BasicBlock] = {
+    private def directSuccStar(starters: Iterable[BasicBlock]): List[BasicBlock] = {
       val result = new mutable.ListBuffer[BasicBlock]
       var toVisit: List[BasicBlock] = starters.toList.distinct
       while(toVisit.nonEmpty) {

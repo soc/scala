@@ -12,7 +12,7 @@ import language.higherKinds
 /**
  * @since 2.8
  */
-trait GenericSetTemplate[A, +CC[X] <: Set[X]] extends GenericTraversableTemplate[A, CC] {
+trait GenericSetTemplate[A, +CC[X] <: Set[X]] extends GenericIterableTemplate[A, CC] {
   def empty: CC[A] = companion.empty[A]
 }
 

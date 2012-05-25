@@ -64,7 +64,7 @@ class ArrayStack[T] private(private var table : Array[AnyRef],
 extends AbstractSeq[T]
    with Seq[T]
    with SeqLike[T, ArrayStack[T]]
-   with GenericTraversableTemplate[T, ArrayStack]
+   with GenericIterableTemplate[T, ArrayStack]
    with Cloneable[ArrayStack[T]]
    with Builder[T, ArrayStack[T]]
    with Serializable
@@ -155,7 +155,7 @@ extends AbstractSeq[T]
    *  @param xs The source of elements to push.
    *  @return   A reference to this stack.
    */
-  override def ++=(xs: TraversableOnce[T]): this.type = { xs foreach += ; this }
+  override def ++=(xs: IterableOnce[T]): this.type = { xs foreach += ; this }
 
   /** Does the same as `push`, but returns the updated stack.
    *

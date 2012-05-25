@@ -33,7 +33,7 @@ import generic._
 @cloneable
 class Queue[A]
 extends MutableList[A]
-   with GenericTraversableTemplate[A, Queue]
+   with GenericIterableTemplate[A, Queue]
    with Cloneable[Queue[A]]
    with Serializable
 {

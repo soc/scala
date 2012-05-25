@@ -43,7 +43,7 @@ import annotation.{migration, bridge}
  *       def clear()
  *       def +=(elem: A): this.type
  *       def +=:(elem: A): this.type
- *       def insertAll(n: Int, iter: Traversable[A])
+ *       def insertAll(n: Int, iter: Iterable[A])
  *       def remove(n: Int): A
  *    }}}
  *  @define coll buffer
@@ -91,7 +91,7 @@ trait BufferLike[A, +This <: BufferLike[A, This] with Buffer[A]]
    *  @throws   IndexOutOfBoundsException if the index `n` is not in the valid range
    *            `0 <= n <= length`.
    */
-  def insertAll(n: Int, elems: collection.Traversable[A])
+  def insertAll(n: Int, elems: collection.Iterable[A])
 
    /** Removes the element at a given index from this buffer.
     *
@@ -128,10 +128,10 @@ trait BufferLike[A, +This <: BufferLike[A, This] with Buffer[A]]
 
   /** Prepends elements to this buffer.
    *
-   *  @param xs  the TraversableOnce containing the elements to prepend.
+   *  @param xs  the IterableOnce containing the elements to prepend.
    *  @return the buffer itself.
    */
-  def ++=:(xs: TraversableOnce[A]): this.type = { insertAll(0, xs.toTraversable); this }
+  def ++=:(xs: IterableOnce[A]): this.type = { insertAll(0, xs.toIterable); this }
 
   /** Appends the given elements to this buffer.
    *
@@ -142,7 +142,7 @@ trait BufferLike[A, +This <: BufferLike[A, This] with Buffer[A]]
   /** Appends the elements contained in a traversable object to this buffer.
    *  @param xs  the traversable object containing the elements to append.
    */
-  def appendAll(xs: TraversableOnce[A]) { this ++= xs }
+  def appendAll(xs: IterableOnce[A]) { this ++= xs }
 
   /** Prepends given elements to this buffer.
    *  @param elems  the elements to prepend.
@@ -152,7 +152,7 @@ trait BufferLike[A, +This <: BufferLike[A, This] with Buffer[A]]
   /** Prepends the elements contained in a traversable object to this buffer.
    *  @param xs  the collection containing the elements to prepend.
    */
-  def prependAll(xs: TraversableOnce[A]) { xs ++=: this }
+  def prependAll(xs: IterableOnce[A]) { xs ++=: this }
 
   /** Inserts new elements at a given index into this buffer.
    *
@@ -195,7 +195,7 @@ trait BufferLike[A, +This <: BufferLike[A, This] with Buffer[A]]
    *  @return       a new collection consisting of all the elements of this collection and `xs`.
    */
   @migration("`++` creates a new buffer. Use `++=` to add an element from this buffer and return that buffer itself.", "2.8.0")
-  def ++(xs: TraversableOnce[A]): This = clone() ++= xs
+  def ++(xs: IterableOnce[A]): This = clone() ++= xs
 
   /** Creates a new collection with all the elements of this collection except `elem`.
    *
@@ -225,5 +225,5 @@ trait BufferLike[A, +This <: BufferLike[A, This] with Buffer[A]]
    *                  those in `xs`
    */
   @migration("`--` creates a new buffer. Use `--=` to remove an element from this buffer and return that buffer itself.", "2.8.0")
-  override def --(xs: TraversableOnce[A]): This = clone() --= xs
+  override def --(xs: IterableOnce[A]): This = clone() --= xs
 }

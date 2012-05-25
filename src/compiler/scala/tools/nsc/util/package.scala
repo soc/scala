@@ -24,9 +24,9 @@ package object util {
   def returning[T](x: T)(f: T => Unit): T = { f(x) ; x }
 
   /** Frequency counter */
-  def freq[T](xs: Traversable[T]): Map[T, Int] = xs groupBy identity mapValues (_.size)
+  def freq[T](xs: Iterable[T]): Map[T, Int] = xs groupBy identity mapValues (_.size)
 
-  def freqrank[T](xs: Traversable[(T, Int)]): List[(Int, T)] = xs.toList map (_.swap) sortBy (-_._1)
+  def freqrank[T](xs: Iterable[(T, Int)]): List[(Int, T)] = xs.toList map (_.swap) sortBy (-_._1)
 
   /** Execute code and then wait for all non-daemon Threads
    *  created and begun during its execution to complete.

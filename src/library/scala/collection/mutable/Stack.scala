@@ -58,7 +58,7 @@ class Stack[A] private (var elems: List[A])
 extends AbstractSeq[A]
    with Seq[A]
    with SeqLike[A, Stack[A]]
-   with GenericTraversableTemplate[A, Stack]
+   with GenericIterableTemplate[A, Stack]
    with Cloneable[Stack[A]]
    with Serializable
 {
@@ -119,7 +119,7 @@ extends AbstractSeq[A]
    *  @param xs the traversable object.
    *  @return the stack with the new elements on top.
    */
-  def pushAll(xs: TraversableOnce[A]): this.type = { xs foreach push ; this }
+  def pushAll(xs: IterableOnce[A]): this.type = { xs foreach push ; this }
 
   /** Returns the top element of the stack. This method will not remove
    *  the element from the stack. An error is signaled if there is no
@@ -156,7 +156,6 @@ extends AbstractSeq[A]
    *
    *  @return an iterator over all stack elements.
    */
-  @migration("`iterator` traverses in FIFO order.", "2.8.0")
   override def iterator: Iterator[A] = elems.iterator
 
   /** Creates a list of all stack elements in LIFO order.
@@ -165,9 +164,6 @@ extends AbstractSeq[A]
    */
   @migration("`toList` traverses in FIFO order.", "2.8.0")
   override def toList: List[A] = elems
-
-  @migration("`foreach` traverses in FIFO order.", "2.8.0")
-  override def foreach[U](f: A => U): Unit = super.foreach(f)
 
   /** This method clones the stack.
    *

@@ -10,9 +10,9 @@ package scala.collection
 package generic
 
 /** Type class witnessing that a collection representation type `Repr` has
- *  elements of type `A` and has a conversion to `TraversableLike[A, Repr]`.
+ *  elements of type `A` and has a conversion to `IterableLike[A, Repr]`.
  *
- *  This type enables simple enrichment of `Traversable`s with extension
+ *  This type enables simple enrichment of `Iterable`s with extension
  *  methods which can make full use of the mechanics of the Scala collections
  *  framework in their implementation.
  *
@@ -48,7 +48,7 @@ object FromRepr {
     val hasElem = implicitly[HasElem[String, Char]]
   }
 
-  implicit def TraversableLikeFromRepr[C[_], A0]
+  implicit def IterableLikeFromRepr[C[_], A0]
     (implicit hasElem0: HasElem[C[A0], A0]) : FromRepr[C[A0]] { type A = A0 } = new FromRepr[C[A0]] {
       type A = A0
       val hasElem = hasElem0

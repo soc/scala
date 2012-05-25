@@ -219,7 +219,6 @@ class DummyMirror(cl: ClassLoader) extends api.Mirror {
     def FloatClass = DummyClassSymbol
     def FunctionClass: Array[Symbol] = Array()
     def IntClass = DummyClassSymbol
-    def IterableClass = DummySymbol
     def IteratorClass = DummySymbol
     def IteratorModule = DummySymbol
     def Iterator_apply = DummySymbol
@@ -250,7 +249,7 @@ class DummyMirror(cl: ClassLoader) extends api.Mirror {
     def StringBuilderClass = DummySymbol
     def StringClass = DummyClassSymbol
     def SymbolClass = DummySymbol
-    def TraversableClass = DummySymbol
+    def IterableClass = DummySymbol
     def TupleClass: Array[Symbol] = Array()
     def TypeTagClass = DummyClassSymbol
     def TypeTagModule = DummySymbol

@@ -45,7 +45,7 @@ import java.io._
 final class ListBuffer[A]
       extends AbstractBuffer[A]
          with Buffer[A]
-         with GenericTraversableTemplate[A, ListBuffer]
+         with GenericIterableTemplate[A, ListBuffer]
          with BufferLike[A, ListBuffer[A]]
          with Builder[A, List[A]]
          with SeqForwarder[A]
@@ -53,7 +53,7 @@ final class ListBuffer[A]
 {
   override def companion: GenericCompanion[ListBuffer] = ListBuffer
 
-  import scala.collection.Traversable
+  import scala.collection.Iterable
   import scala.collection.immutable.ListSerializeEnd
 
   private var start: List[A] = Nil
@@ -174,10 +174,10 @@ final class ListBuffer[A]
     this
   }
 
-  override def ++=(xs: TraversableOnce[A]): this.type =
+  override def ++=(xs: IterableOnce[A]): this.type =
     if (xs.asInstanceOf[AnyRef] eq this) ++= (this take size) else super.++=(xs)
 
-  override def ++=:(xs: TraversableOnce[A]): this.type =
+  override def ++=:(xs: IterableOnce[A]): this.type =
     if (xs.asInstanceOf[AnyRef] eq this) ++=: (this take size) else super.++=:(xs)
 
   /** Clears the buffer contents.
@@ -211,7 +211,7 @@ final class ListBuffer[A]
    *  @param  seq   the iterable object providing all elements to insert.
    *  @throws Predef.IndexOutOfBoundsException if `n` is out of bounds.
    */
-  def insertAll(n: Int, seq: Traversable[A]) {
+  def insertAll(n: Int, seq: Iterable[A]) {
     try {
       if (exported) copy()
       var elems = seq.toList.reverse

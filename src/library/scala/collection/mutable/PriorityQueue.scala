@@ -35,7 +35,7 @@ import generic._
 class PriorityQueue[A](implicit val ord: Ordering[A])
    extends AbstractIterable[A]
       with Iterable[A]
-      with GenericOrderedTraversableTemplate[A, PriorityQueue]
+      with GenericOrderedIterableTemplate[A, PriorityQueue]
       with IterableLike[A, PriorityQueue[A]]
       with Growable[A]
       with Builder[A, PriorityQueue[A]]
@@ -104,13 +104,13 @@ class PriorityQueue[A](implicit val ord: Ordering[A])
     this
   }
 
-  /** Adds all elements provided by a `TraversableOnce` object
+  /** Adds all elements provided by a `IterableOnce` object
    *  into the priority queue.
    *
    *  @param  xs    a traversable object.
    *  @return       a new priority queue containing elements of both `xs` and `this`.
    */
-  def ++(xs: TraversableOnce[A]): PriorityQueue[A] = { this.clone() ++= xs }
+  def ++(xs: IterableOnce[A]): PriorityQueue[A] = { this.clone() ++= xs }
 
   /** Adds all elements to the queue.
    *
@@ -252,7 +252,7 @@ class PriorityQueue[A](implicit val ord: Ordering[A])
 }
 
 
-object PriorityQueue extends OrderedTraversableFactory[PriorityQueue] {
+object PriorityQueue extends OrderedIterableFactory[PriorityQueue] {
   def newBuilder[A](implicit ord: Ordering[A]) = new PriorityQueue[A]
   implicit def canBuildFrom[A](implicit ord: Ordering[A]): CanBuildFrom[Coll, A, PriorityQueue[A]] = new GenericCanBuildFrom[A]
 }

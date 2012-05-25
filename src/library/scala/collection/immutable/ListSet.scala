@@ -98,7 +98,7 @@ class ListSet[A] extends AbstractSet[A]
    *  so we take the easy way out and add ourselves and the argument to
    *  a new builder.
    */
-  override def ++(xs: TraversableOnce[A]): ListSet[A] =
+  override def ++(xs: IterableOnce[A]): ListSet[A] =
     if (xs.isEmpty) this
     else (new ListSet.ListSetBuilder(this) ++= xs).result
 

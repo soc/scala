@@ -17,7 +17,7 @@ import language.higherKinds
  *
  *  @author Aleksandar Prokopec
  */
-abstract class GenericArrayTagCompanion[+CC[X] <: Traversable[X]] {
+abstract class GenericArrayTagCompanion[+CC[X] <: Iterable[X]] {
   type Coll = CC[_]
 
   def newBuilder[A](implicit ord: ArrayTag[A]): Builder[A, CC[A]]

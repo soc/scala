@@ -6740,7 +6740,7 @@ trait Types extends api.Types { self: SymbolTable =>
     "scala.collection.immutable.List",
     "scala.collection.immutable.Nil",
     "scala.collection.Seq",
-    "scala.collection.Traversable",
+    "scala.collection.Iterable",
     "scala.collection.Iterable",
     "scala.collection.mutable.StringBuilder",
     "scala.collection.IndexedSeq",

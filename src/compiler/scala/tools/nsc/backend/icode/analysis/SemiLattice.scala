@@ -26,7 +26,7 @@ trait SemiLattice {
         false
     }
     private def tstring(x: Any): String = x match {
-      case xs: TraversableOnce[_] => xs map tstring mkString " "
+      case xs: IterableOnce[_] => xs map tstring mkString " "
       case _                      => "" + x
     }
     override def toString = "IState(" + tstring(vars) + ", " + tstring(stack) + ")"

@@ -41,11 +41,8 @@ trait ProxyReport {
     def SimpleTypeProxy       = getType("SimpleTypeProxy")
     def RewrappingTypeProxy   = getType("RewrappingTypeProxy")
 
-    def TraversableForwarder = getGeneric("TraversableForwarder")
     def IterableForwarder    = getGeneric("IterableForwarder")
     def SeqForwarder         = getGeneric("SeqForwarder")
-    def TraversableLike      = getColl("TraversableLike")
-    def TraversableProxy     = getColl("TraversableProxyLike")
     def IterableLike         = getColl("IterableLike")
     def IterableProxy        = getColl("IterableProxyLike")
     def MapLike              = getColl("MapLike")
@@ -100,10 +97,8 @@ trait Unwrapped {
   lazy val wrappers = List(
     TypeClass        -> SimpleTypeProxy,
     TypeClass        -> RewrappingTypeProxy,
-    TraversableClass -> TraversableForwarder,
     IterableClass    -> IterableForwarder,
     SeqClass         -> SeqForwarder,
-    TraversableLike  -> TraversableProxy,
     IterableLike     -> IterableProxy,
     MapLike          -> MapProxy,
     SetLike          -> SetProxy,

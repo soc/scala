@@ -23,7 +23,7 @@ import mutable.Builder
  */
 trait Seq[+A] extends immutable.Iterable[A]
                       with scala.collection.Seq[A]
-                      with GenericTraversableTemplate[A, Seq]
+                      with GenericIterableTemplate[A, Seq]
                       with SeqLike[A, Seq[A]]
 {
   override def companion: GenericCompanion[Seq] = Seq

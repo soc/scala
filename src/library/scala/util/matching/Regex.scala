@@ -97,7 +97,7 @@ import java.util.regex.{ Pattern, Matcher }
  *
  *  {{{
  *  def hasDate(text: String): Boolean = (dateP1 findFirstIn text).nonEmpty
- *  def printLinesWithDates(lines: Traversable[String]) {
+ *  def printLinesWithDates(lines: Iterable[String]) {
  *    lines foreach { line =>
  *      dateP1 findFirstIn line foreach { _ => println(line) }
  *    }
@@ -563,8 +563,8 @@ object Regex {
 
   /** A class to step through a sequence of regex matches
    */
-  class MatchIterator(val source: java.lang.CharSequence, val regex: Regex, val groupNames: Seq[String])
-  extends AbstractIterator[String] with Iterator[String] with MatchData { self =>
+  class MatchIterator(val source: java.lang.CharSequence, val regex: Regex, val groupNames: Seq[String]) extends AbstractIterator[String] with MatchData {
+    self =>
 
     protected[Regex] val matcher = regex.pattern.matcher(source)
     private var nextSeen = false

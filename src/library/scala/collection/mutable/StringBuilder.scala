@@ -223,7 +223,7 @@ final class StringBuilder(private val underlying: JavaStringBuilder)
    *  @param  xs  the characters to be appended.
    *  @return     this StringBuilder.
    */
-  def appendAll(xs: TraversableOnce[Char]): StringBuilder = appendAll(xs.toArray)
+  def appendAll(xs: IterableOnce[Char]): StringBuilder = appendAll(xs.toArray)
 
   /** Appends all the Chars in the given Array[Char] to this sequence.
    *
@@ -337,7 +337,7 @@ final class StringBuilder(private val underlying: JavaStringBuilder)
    *  @return       this StringBuilder.
    *  @throws StringIndexOutOfBoundsException  if the index is out of bounds.
    */
-  def insertAll(index: Int, xs: TraversableOnce[Char]): StringBuilder = insertAll(index, xs.toArray)
+  def insertAll(index: Int, xs: IterableOnce[Char]): StringBuilder = insertAll(index, xs.toArray)
 
   /** Inserts the given Array[Char] into this sequence at the given index.
    *

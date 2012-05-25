@@ -13,12 +13,12 @@ import generic._
 /** A base trait for iterable collections that can be mutated.
  *  $iterableInfo
  */
-trait Iterable[A] extends mutable.Traversable[A]
-                     with scala.collection.Iterable[A]
-                     with GenericTraversableTemplate[A, Iterable]
-                     with IterableLike[A, Iterable[A]]
+trait Iterable[A] extends scala.collection.Iterable[A]
+                     with GenericIterableTemplate[A, mutable.Iterable]
+                     with IterableLike[A, mutable.Iterable[A]]
+                     with Mutable
 {
-  override def companion: GenericCompanion[Iterable] = Iterable
+  override def companion: GenericCompanion[mutable.Iterable] = mutable.Iterable
 }
 
 /** $factoryInfo
@@ -26,10 +26,10 @@ trait Iterable[A] extends mutable.Traversable[A]
  *  @define coll mutable iterable collection
  *  @define Coll `mutable.Iterable`
  */
-object Iterable extends TraversableFactory[Iterable] {
-  implicit def canBuildFrom[A]: CanBuildFrom[Coll, A, Iterable[A]] = ReusableCBF.asInstanceOf[GenericCanBuildFrom[A]]
-  def newBuilder[A]: Builder[A, Iterable[A]] = new ArrayBuffer
+object Iterable extends IterableFactory[mutable.Iterable] {
+  implicit def canBuildFrom[A]: CanBuildFrom[Coll, A, mutable.Iterable[A]] = ReusableCBF.asInstanceOf[GenericCanBuildFrom[A]]
+  def newBuilder[A]: Builder[A, mutable.Iterable[A]] = new ArrayBuffer
 }
 
 /** Explicit instantiation of the `Iterable` trait to reduce class file size in subclasses. */
-private[scala] abstract class AbstractIterable[A] extends scala.collection.AbstractIterable[A] with Iterable[A]
+private[scala] abstract class AbstractIterable[A] extends scala.collection.AbstractIterable[A] with mutable.Iterable[A]

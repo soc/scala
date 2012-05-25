@@ -18,7 +18,7 @@ import language.higherKinds
  *  @author Aleksandar Prokopec
  *  @since 2.8
  */
-abstract class GenericOrderedCompanion[+CC[X] <: Traversable[X]] {
+abstract class GenericOrderedCompanion[+CC[X] <: Iterable[X]] {
   type Coll = CC[_]
 
   def newBuilder[A](implicit ord: Ordering[A]): Builder[A, CC[A]]

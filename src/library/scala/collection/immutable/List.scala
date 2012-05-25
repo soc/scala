@@ -77,11 +77,11 @@ import java.io._
 sealed abstract class List[+A] extends AbstractSeq[A]
                                   with LinearSeq[A]
                                   with Product
-                                  with GenericTraversableTemplate[A, List]
+                                  with GenericIterableTemplate[A, List]
                                   with LinearSeqOptimized[A, List[A]] {
   override def companion: GenericCompanion[List] = List
 
-  import scala.collection.{Iterable, Traversable, Seq, IndexedSeq}
+  import scala.collection.{Iterable, Seq, IndexedSeq}
 
   def isEmpty: Boolean
   def head: A
@@ -191,7 +191,7 @@ sealed abstract class List[+A] extends AbstractSeq[A]
 
   // Overridden methods from IterableLike and SeqLike or overloaded variants of such methods
 
-  override def ++[B >: A, That](that: TraversableOnce[B])(implicit bf: CanBuildFrom[List[A], B, That]): That = {
+  override def ++[B >: A, That](that: IterableOnce[B])(implicit bf: CanBuildFrom[List[A], B, That]): That = {
     val b = bf(this)
     if (b.isInstanceOf[ListBuffer[_]]) (this ::: that.toList).asInstanceOf[That]
     else super.++(that)

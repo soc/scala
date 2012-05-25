@@ -95,7 +95,7 @@ class MurmurHash3 {
    *  where the order of appearance of elements does not matter.
    *  This is useful for hashing sets, for example.
    */
-  final def unorderedHash(xs: TraversableOnce[Any], seed: Int): Int = {
+  final def unorderedHash(xs: IterableOnce[Any], seed: Int): Int = {
     var a, b, n = 0
     var c = 1
     xs foreach { x =>
@@ -113,7 +113,7 @@ class MurmurHash3 {
   }
   /** Compute a hash that depends on the order of its arguments.
    */
-  final def orderedHash(xs: TraversableOnce[Any], seed: Int): Int = {
+  final def orderedHash(xs: IterableOnce[Any], seed: Int): Int = {
     var n = 0
     var h = seed
     xs foreach { x =>
@@ -186,10 +186,10 @@ object MurmurHash3 extends MurmurHash3 {
 
   def arrayHash[T](a: Array[T]): Int  = arrayHash(a, arraySeed)
   def bytesHash(data: Array[Byte]): Int            = bytesHash(data, arraySeed)
-  def orderedHash(xs: TraversableOnce[Any]): Int   = orderedHash(xs, symmetricSeed)
+  def orderedHash(xs: IterableOnce[Any]): Int   = orderedHash(xs, symmetricSeed)
   def productHash(x: Product): Int                 = productHash(x, productSeed)
   def stringHash(x: String): Int                   = stringHash(x, stringSeed)
-  def unorderedHash(xs: TraversableOnce[Any]): Int = unorderedHash(xs, traversableSeed)
+  def unorderedHash(xs: IterableOnce[Any]): Int = unorderedHash(xs, traversableSeed)
 
   /** To offer some potential for optimization.
    */

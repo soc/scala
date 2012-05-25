@@ -8,26 +8,23 @@
 
 package scala.runtime
 
-import scala.collection.{ TraversableLike, IterableLike }
+import scala.collection.{ IterableLike }
 import scala.collection.generic.{ CanBuildFrom => CBF }
 
-/** See comment on ZippedTraversable2. */
-trait ZippedTraversable3[+El1, +El2, +El3] {
+/** See comment on ZippedIterable2. */
+trait ZippedIterable3[+El1, +El2, +El3] {
   def foreach[U](f: (El1, El2, El3) => U): Unit
 }
-object ZippedTraversable3 {
-  implicit def zippedTraversable3ToTraversable[El1, El2, El3](zz: ZippedTraversable3[El1, El2, El3]): Traversable[(El1, El2, El3)] = {
-    new collection.AbstractTraversable[(El1, El2, El3)] {
-      def foreach[U](f: ((El1, El2, El3)) => U): Unit = zz foreach Function.untupled(f)
-    }
-  }
+object ZippedIterable3 {
+  implicit def zippedIterable3ToIterable[El1, El2, El3](zz: ZippedIterable3[El1, El2, El3]): Iterable[(El1, El2, El3)] =
+    Iterable fromForeach (f => zz foreach Function.untupled(f))
 }
 
 class Tuple3Zipped[El1, Repr1, El2, Repr2, El3, Repr3](
-  coll1: TraversableLike[El1, Repr1],
+  coll1: IterableLike[El1, Repr1],
   coll2: IterableLike[El2, Repr2],
   coll3: IterableLike[El3, Repr3]
-) extends ZippedTraversable3[El1, El2, El3] {
+) extends ZippedIterable3[El1, El2, El3] {
   def map[B, To](f: (El1, El2, El3) => B)(implicit cbf: CBF[Repr1, B, To]): To = {
     val b = cbf(coll1.repr)
     val elems2 = coll2.iterator
@@ -42,7 +39,7 @@ class Tuple3Zipped[El1, Repr1, El2, Repr2, El3, Repr3](
     b.result
   }
 
-  def flatMap[B, To](f: (El1, El2, El3) => TraversableOnce[B])(implicit cbf: CBF[Repr1, B, To]): To = {
+  def flatMap[B, To](f: (El1, El2, El3) => IterableOnce[B])(implicit cbf: CBF[Repr1, B, To]): To = {
     val b = cbf(coll1.repr)
     val elems2 = coll2.iterator
     val elems3 = coll3.iterator
@@ -116,7 +113,7 @@ class Tuple3Zipped[El1, Repr1, El2, Repr2, El3, Repr3](
 
 object Tuple3Zipped {
   class Ops[T1, T2, T3](x: (T1, T2, T3)) {
-    def invert[El1, CC1[X] <: TraversableOnce[X], El2, CC2[X] <: TraversableOnce[X], El3, CC3[X] <: TraversableOnce[X], That]
+    def invert[El1, CC1[X] <: IterableOnce[X], El2, CC2[X] <: IterableOnce[X], El3, CC3[X] <: IterableOnce[X], That]
       (implicit w1: T1 <:< CC1[El1],
                 w2: T2 <:< CC2[El2],
                 w3: T3 <:< CC3[El3],
@@ -133,7 +130,7 @@ object Tuple3Zipped {
       }
     
     def zipped[El1, Repr1, El2, Repr2, El3, Repr3]
-      (implicit w1: T1 => TraversableLike[El1, Repr1],
+      (implicit w1: T1 => IterableLike[El1, Repr1],
                 w2: T2 => IterableLike[El2, Repr2],
                 w3: T3 => IterableLike[El3, Repr3]
       ): Tuple3Zipped[El1, Repr1, El2, Repr2, El3, Repr3] = new Tuple3Zipped(x._1, x._2, x._3)

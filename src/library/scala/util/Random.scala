@@ -103,7 +103,7 @@ class Random(val self: java.util.Random) {
    *
    *  @return         the shuffled collection
    */
-  def shuffle[T, CC[X] <: TraversableOnce[X]](xs: CC[T])(implicit bf: CanBuildFrom[CC[T], T, CC[T]]): CC[T] = {
+  def shuffle[T, CC[X] <: IterableOnce[X]](xs: CC[T])(implicit bf: CanBuildFrom[CC[T], T, CC[T]]): CC[T] = {
     val buf = new ArrayBuffer[T] ++= xs
 
     def swap(i1: Int, i2: Int) {

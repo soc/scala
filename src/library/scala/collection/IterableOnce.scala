@@ -27,17 +27,17 @@ import language.{implicitConversions, higherKinds}
  *
  *  @define traversableonceinfo
  *  This trait exists primarily to eliminate code duplication between
- *  `Iterator` and `Traversable`, and thus implements some of the common
+ *  `Iterator` and `Iterable`, and thus implements some of the common
  *  methods that can be implemented solely in terms of foreach without
  *  access to a `Builder`. It also includes a number of abstract methods
- *  whose implementations are provided by `Iterator`, `Traversable`, etc.
+ *  whose implementations are provided by `Iterator`, `Iterable`, etc.
  *  It contains implementations common to `Iterators` and
- *  `Traversables`, such as folds, conversions, and other operations which
+ *  `Iterables`, such as folds, conversions, and other operations which
  *  traverse some or all of the elements and return a derived value.
- *  Directly subclassing `TraversableOnce` is not recommended - instead,
+ *  Directly subclassing `IterableOnce` is not recommended - instead,
  *  consider declaring an `Iterator` with a `next` and `hasNext` method,
  *  creating an `Iterator` with one of the methods on the `Iterator` object,
- *  or declaring a subclass of `Traversable`.
+ *  or declaring a subclass of `Iterable`.
  *
  *  @define coll traversable or iterator
  *  @define orderDependent
@@ -55,7 +55,7 @@ import language.{implicitConversions, higherKinds}
  *
  *    Note: will not terminate for infinite-sized collections.
  */
-trait TraversableOnce[+A] extends Any {
+trait IterableOnce[+A] extends Any {
   self =>
   //
   // def foreach[U](f: A => U): Unit
@@ -83,11 +83,11 @@ trait TraversableOnce[+A] extends Any {
   // def nonEmpty: Boolean
 
   /** Tests whether this $coll can be repeatedly traversed.  Always
-   *  true for Traversables and false for Iterators unless overridden.
+   *  true for Iterables and false for Iterators unless overridden.
    *
    *  @return   `true` if it is repeatedly traversable, `false` otherwise.
    */
-  def isTraversableAgain: Boolean
+  def isIterableAgain: Boolean
 
   // /** Reduces the elements of this $coll using the specified associative binary operator.
   //  *
@@ -402,16 +402,16 @@ trait TraversableOnce[+A] extends Any {
   //  */
   // def toBuffer[A1 >: A]: collection.mutable.Buffer[A1]
   //
-  // /** Converts this $coll to an unspecified Traversable.  Will return
-  //  *  the same collection if this instance is already Traversable.
+  // /** Converts this $coll to an unspecified Iterable.  Will return
+  //  *  the same collection if this instance is already Iterable.
   //  *  $willNotTerminateInf
-  //  *  @return a Traversable containing all elements of this $coll.
+  //  *  @return a Iterable containing all elements of this $coll.
   //  */
-  // def toTraversable: Traversable[A]
+  // def toIterable: Iterable[A]
   //
   // /** Converts this $coll to an iterable collection.  Note that
   //  *  the choice of target `Iterable` is lazy in this default implementation
-  //  *  as this `TraversableOnce` may be lazy and unevaluated (i.e. it may
+  //  *  as this `IterableOnce` may be lazy and unevaluated (i.e. it may
   //  *  be an iterator which is only traversable once).
   //  *
   //  *  $willNotTerminateInf
@@ -420,7 +420,7 @@ trait TraversableOnce[+A] extends Any {
   // def toIterable: Iterable[A]
   //
   // /** Converts this $coll to a sequence. As with `toIterable`, it's lazy
-  //  *  in this default implementation, as this `TraversableOnce` may be
+  //  *  in this default implementation, as this `IterableOnce` may be
   //  *  lazy and unevaluated.
   //  *
   //  *  $willNotTerminateInf
@@ -454,7 +454,7 @@ trait TraversableOnce[+A] extends Any {
   def isEmpty: Boolean
   def hasDefiniteSize: Boolean
 
-  /** Presently these are abstract because the Traversable versions use
+  /** Presently these are abstract because the Iterable versions use
    *  breakable/break, and I wasn't sure enough of how that's supposed to
    *  function to consolidate them with the Iterator versions.
    */
@@ -592,7 +592,7 @@ trait TraversableOnce[+A] extends Any {
     copyToArray(xs, 0, xs.length)
 
   def toArray[B >: A : ArrayTag]: Array[B] = {
-    if (isTraversableAgain) {
+    if (isIterableAgain) {
       val result = new Array[B](size)
       copyToArray(result, 0)
       result
@@ -600,11 +600,11 @@ trait TraversableOnce[+A] extends Any {
     else toBuffer.toArray
   }
 
-  def toTraversable: Traversable[A]
+  def toIterable: Iterable[A]
 
   def toList: List[A] = (new ListBuffer[A] ++= this).toList
-
-  def toIterable: Iterable[A] = Iterable[A]() ++ this
+  // 
+  // def toIterable: Iterable[A] = Iterable[A]() ++ this
 
   def toSeq: Seq[A] = Seq[A]() ++ this
 
@@ -719,17 +719,17 @@ trait TraversableOnce[+A] extends Any {
 }
 
 
-object TraversableOnce {
-  implicit def orderedTraversableOnce[A](xs: TraversableOnce[A]) = new OrderOps(xs)
-  implicit def numericTraversableOnce[A](xs: TraversableOnce[A]) = new NumOps(xs)
-  implicit def alternateImplicit[A](trav: TraversableOnce[A]) = new ForceImplicitAmbiguity
-  implicit def flattenTraversableOnce[A, CC[_]](travs: TraversableOnce[CC[A]])(implicit ev: CC[A] => TraversableOnce[A]) =
+object IterableOnce {
+  implicit def orderedIterableOnce[A](xs: IterableOnce[A]) = new OrderOps(xs)
+  implicit def numericIterableOnce[A](xs: IterableOnce[A]) = new NumOps(xs)
+  implicit def alternateImplicit[A](trav: IterableOnce[A]) = new ForceImplicitAmbiguity
+  implicit def flattenIterableOnce[A, CC[_]](travs: IterableOnce[CC[A]])(implicit ev: CC[A] => IterableOnce[A]) =
     new FlattenOps[A](travs map ev)
   
   /* Functionality reused in Iterator.CanBuildFrom */
-  private[collection] abstract class BufferedCanBuildFrom[A, Coll[X] <: TraversableOnce[X]] extends generic.CanBuildFrom[Coll[_], A, Coll[A]] {
+  private[collection] abstract class BufferedCanBuildFrom[A, Coll[X] <: IterableOnce[X]] extends generic.CanBuildFrom[Coll[_], A, Coll[A]] {
     def bufferToColl[B](buff: ArrayBuffer[B]): Coll[B]
-    def traversableToColl[B](t: Traversable[B]): Coll[B]
+    def traversableToColl[B](t: Iterable[B]): Coll[B]
     
     def newIterator: Builder[A, Coll[A]] = new ArrayBuffer[A] mapResult bufferToColl
 
@@ -738,8 +738,8 @@ object TraversableOnce {
      *  @return the result of invoking the `genericBuilder` method on `from`.
      */
     def apply(from: Coll[_]): Builder[A, Coll[A]] = from match {
-      case xs: generic.GenericTraversableTemplate[_, _] => xs.genericBuilder.asInstanceOf[Builder[A, Traversable[A]]] mapResult {
-        case res => traversableToColl(res.asInstanceOf[Traversable[A]])
+      case xs: generic.GenericIterableTemplate[_, _] => xs.genericBuilder.asInstanceOf[Builder[A, Iterable[A]]] mapResult {
+        case res => traversableToColl(res.asInstanceOf[Iterable[A]])
       }
       case _ => newIterator
     }
@@ -750,19 +750,19 @@ object TraversableOnce {
     def apply() = newIterator
   }
   
-  /** With the advent of `TraversableOnce`, it can be useful to have a builder which
+  /** With the advent of `IterableOnce`, it can be useful to have a builder which
    *  operates on `Iterator`s so they can be treated uniformly along with the collections.
    *  See `scala.util.Random.shuffle` or `scala.concurrent.Future.sequence` for an example.
    */
-  class OnceCanBuildFrom[A] extends BufferedCanBuildFrom[A, TraversableOnce] {
+  class OnceCanBuildFrom[A] extends BufferedCanBuildFrom[A, IterableOnce] {
     def bufferToColl[B](buff: ArrayBuffer[B]) = buff.iterator
-    def traversableToColl[B](t: Traversable[B]) = t
+    def traversableToColl[B](t: Iterable[B]) = t
   }
   
-  /** Evidence for building collections from `TraversableOnce` collections */
+  /** Evidence for building collections from `IterableOnce` collections */
   implicit def OnceCanBuildFrom[A] = new OnceCanBuildFrom[A]
   
-  final class NumOps[A](val xs: TraversableOnce[A]) extends AnyVal {
+  final class NumOps[A](val xs: IterableOnce[A]) extends AnyVal {
     /** Sums up the elements of this collection.
      *
      *   @param   num  an implicit parameter defining a set of numeric operations
@@ -798,7 +798,7 @@ object TraversableOnce {
      */
     def product(implicit num: Numeric[A]) = xs.foldLeft(num.one)(num.times)
   }
-  final class OrderOps[A](val xs: TraversableOnce[A]) extends AnyVal {
+  final class OrderOps[A](val xs: IterableOnce[A]) extends AnyVal {
     /** Finds the smallest element.
      *
      *  @param    ord   An ordering to be used for comparing elements.
@@ -839,7 +839,7 @@ object TraversableOnce {
     )
   }
 
-  class FlattenOps[A](travs: TraversableOnce[TraversableOnce[A]]) {
+  class FlattenOps[A](travs: IterableOnce[IterableOnce[A]]) {
     def flatten: Iterator[A] = new AbstractIterator[A] {
       val its = travs.toIterator
       private var it: Iterator[A] = Iterator.empty
@@ -850,10 +850,10 @@ object TraversableOnce {
 
   class ForceImplicitAmbiguity
 
-  implicit class MonadOps[+A](trav: TraversableOnce[A]) {
-    def map[B](f: A => B): TraversableOnce[B] = trav.toIterator map f
-    def flatMap[B](f: A => TraversableOnce[B]): TraversableOnce[B] = trav.toIterator flatMap f
+  implicit class MonadOps[+A](trav: IterableOnce[A]) {
+    def map[B](f: A => B): IterableOnce[B] = trav.toIterator map f
+    def flatMap[B](f: A => IterableOnce[B]): IterableOnce[B] = trav.toIterator flatMap f
     def withFilter(p: A => Boolean) = trav.toIterator filter p
-    def filter(p: A => Boolean): TraversableOnce[A] = withFilter(p)
+    def filter(p: A => Boolean): IterableOnce[A] = withFilter(p)
   }
 }

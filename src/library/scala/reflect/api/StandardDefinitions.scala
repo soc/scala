@@ -61,16 +61,15 @@ trait StandardDefinitions extends StandardTypes {
     def ProductClass  : Array[Symbol]
     def RepeatedParamClass: Symbol
     def ScalaPackageClass: Symbol
+    def ScalaPrimitiveValueClasses: List[ClassSymbol]
     def SeqClass: Symbol
     def SeqModule: Symbol
     def SomeClass: Symbol
     def SomeModule: Symbol
     def StringBuilderClass: Symbol
     def SymbolClass : Symbol
-    def TraversableClass: Symbol
     def TupleClass    : Array[Symbol]
     def TypeTagModule: Symbol
-    def ScalaPrimitiveValueClasses: List[ClassSymbol]
   }
 
   trait AbsDefinitions extends AbsDefinitionsInternal {

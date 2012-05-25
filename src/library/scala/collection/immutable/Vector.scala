@@ -56,7 +56,7 @@ object Vector extends SeqFactory[Vector] {
 final class Vector[+A](private[collection] val startIndex: Int, private[collection] val endIndex: Int, focus: Int)
 extends AbstractSeq[A]
    with IndexedSeq[A]
-   with GenericTraversableTemplate[A, Vector]
+   with GenericIterableTemplate[A, Vector]
    with IndexedSeqLike[A, Vector[A]]
    with VectorPointer[A @uncheckedVariance]
    with Serializable
@@ -180,17 +180,17 @@ override def companion: GenericCompanion[Vector] = Vector
     apply(0)
   }
 
-  override /*TraversableLike*/ def tail: Vector[A] = {
+  override /*IterableLike*/ def tail: Vector[A] = {
     if (isEmpty) throw new UnsupportedOperationException("empty.tail")
     drop(1)
   }
 
-  override /*TraversableLike*/ def last: A = {
+  override /*IterableLike*/ def last: A = {
     if (isEmpty) throw new UnsupportedOperationException("empty.last")
     apply(length-1)
   }
 
-  override /*TraversableLike*/ def init: Vector[A] = {
+  override /*IterableLike*/ def init: Vector[A] = {
     if (isEmpty) throw new UnsupportedOperationException("empty.init")
     dropRight(1)
   }
@@ -203,7 +203,7 @@ override def companion: GenericCompanion[Vector] = Vector
 
   // concat (stub)
 
-  override def ++[B >: A, That](that: TraversableOnce[B])(implicit bf: CanBuildFrom[Vector[A], B, That]): That = {
+  override def ++[B >: A, That](that: IterableOnce[B])(implicit bf: CanBuildFrom[Vector[A], B, That]): That = {
     super.++(that)
   }
 
@@ -699,7 +699,7 @@ final class VectorBuilder[A]() extends Builder[A,Vector[A]] with VectorPointer[A
     this
   }
 
-  override def ++=(xs: TraversableOnce[A]): this.type =
+  override def ++=(xs: IterableOnce[A]): this.type =
     super.++=(xs)
 
   def result: Vector[A] = {

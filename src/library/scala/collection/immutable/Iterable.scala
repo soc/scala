@@ -6,13 +6,10 @@
 **                          |/                                          **
 \*                                                                      */
 
-
-
 package scala.collection
 package immutable
 
 import generic._
-import mutable.Builder
 
 /** A base trait for iterable collections that are guaranteed immutable.
  *  $iterableInfo
@@ -20,19 +17,19 @@ import mutable.Builder
  *  @define Coll `immutable.Iterable`
  *  @define coll immutable iterable collection
  */
-trait Iterable[+A] extends immutable.Traversable[A]
-                      with scala.collection.Iterable[A]
-                      with GenericTraversableTemplate[A, Iterable]
-                      with IterableLike[A, Iterable[A]]
+trait Iterable[+A] extends scala.collection.Iterable[A]
+                      with GenericIterableTemplate[A, immutable.Iterable]
+                      with IterableLike[A, immutable.Iterable[A]]
+                      with Immutable
 {
-  override def companion: GenericCompanion[Iterable] = Iterable
+  override def companion: GenericCompanion[immutable.Iterable] = immutable.Iterable
 }
 
 /** $factoryInfo
  *  @define Coll `immutable.Iterable`
  *  @define coll immutable iterable collection
  */
-object Iterable extends TraversableFactory[Iterable] {
+object Iterable extends IterableFactory[immutable.Iterable] {
   implicit def canBuildFrom[A]: CanBuildFrom[Coll, A, Iterable[A]] = ReusableCBF.asInstanceOf[GenericCanBuildFrom[A]]
-  def newBuilder[A]: Builder[A, Iterable[A]] = new mutable.ListBuffer
+  def newBuilder[A]: mutable.Builder[A, immutable.Iterable[A]] = new mutable.ListBuffer
 }

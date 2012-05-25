@@ -19,7 +19,7 @@ import mutable.{ArrayBuffer, Builder}
  */
 trait IndexedSeq[+A] extends Seq[A]
                     with scala.collection.IndexedSeq[A]
-                    with GenericTraversableTemplate[A, IndexedSeq]
+                    with GenericIterableTemplate[A, IndexedSeq]
                     with IndexedSeqLike[A, IndexedSeq[A]] {
   override def companion: GenericCompanion[IndexedSeq] = IndexedSeq
   override def toIndexedSeq: IndexedSeq[A] = this

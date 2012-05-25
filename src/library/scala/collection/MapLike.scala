@@ -302,7 +302,7 @@ trait MapLike[A, +B, +This <: MapLike[A, B, This] with Map[A, B]]
 
   /** The implementation class of the iterable returned by `values`.
    */
-  protected class DefaultValuesIterable extends AbstractIterable[B] with Iterable[B] with Serializable {
+  protected class DefaultValuesIterable extends AbstractIterable[B] with Serializable {
     def iterator = valuesIterator
     override def size = self.size
     override def foreach[C](f: B => C) = self.valuesIterator foreach f
@@ -393,10 +393,10 @@ trait MapLike[A, +B, +This <: MapLike[A, B, This] with Map[A, B]]
    *  @tparam   B1  the type of the added values
    *  @return   a new map with the given bindings added to this map
    *
-   *  @usecase  def ++ (xs: Traversable[(A, B)]): Map[A, B]
+   *  @usecase  def ++ (xs: Iterable[(A, B)]): Map[A, B]
    *    @inheritdoc
    */
-  def ++[B1 >: B](xs: TraversableOnce[(A, B1)]): Map[A, B1] =
+  def ++[B1 >: B](xs: IterableOnce[(A, B1)]): Map[A, B1] =
     ((repr: Map[A, B1]) /: xs) (_ + _)
 
   /** Returns a new map with all key/value pairs for which the predicate

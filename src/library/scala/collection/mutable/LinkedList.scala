@@ -77,7 +77,7 @@ import generic._
 @SerialVersionUID(-7308240733518833071L)
 class LinkedList[A]() extends AbstractSeq[A]
                          with LinearSeq[A]
-                         with GenericTraversableTemplate[A, LinkedList]
+                         with GenericIterableTemplate[A, LinkedList]
                          with LinkedListLike[A, LinkedList[A]]
                          with Serializable {
   next = this

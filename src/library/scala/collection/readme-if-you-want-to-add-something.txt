@@ -26,7 +26,7 @@ class you need to add the same method to the corresponding ProxyLike class.
 
 2. Forwarders
 
-Classes Traversable, Iterable, and Seq also have forwarders, which
+Classes Iterable, Iterable, and Seq also have forwarders, which
 forward all collection-specific accessor operations to an underlying
 collection. These are defined as classes with names ending
 in `Forwarder' in package collection.generic.  If you add a new
@@ -35,7 +35,7 @@ need to add the same method to the corresponding forwarder class.
 
 3. Views
 
-Classes Traversable, Iterable, Seq, IndexedSeq, and mutable.IndexedSeq
+Classes Iterable, Iterable, Seq, IndexedSeq, and mutable.IndexedSeq
 support views. Their operations are all defined in classes with names
 ending in `ViewLike'. If you add a new transformer method to one of
 the above collection classes, you need to add the same method to the

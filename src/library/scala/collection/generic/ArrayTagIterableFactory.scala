@@ -21,7 +21,7 @@ import language.higherKinds
  *    @author Aleksandar Prokopec
  *    @since 2.8
  */
-abstract class ArrayTagTraversableFactory[CC[X] <: Traversable[X] with GenericArrayTagTraversableTemplate[X, CC]]
+abstract class ArrayTagIterableFactory[CC[X] <: Iterable[X] with GenericArrayTagIterableTemplate[X, CC]]
               extends GenericArrayTagCompanion[CC] {
 
   class GenericCanBuildFrom[A](implicit tag: ArrayTag[A]) extends CanBuildFrom[CC[_], A, CC[A]] {

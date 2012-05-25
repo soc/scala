@@ -261,7 +261,7 @@ abstract class Inliners extends SubComponent {
        *  (the statically known receiver and method are both final, thus, at runtime they can't be any others than those).
        *
        */
-      def inlineWithoutTFA(inputBlocks: Traversable[BasicBlock], callsites: Function1[BasicBlock, List[opcodes.CALL_METHOD]]): Int = {
+      def inlineWithoutTFA(inputBlocks: Iterable[BasicBlock], callsites: Function1[BasicBlock, List[opcodes.CALL_METHOD]]): Int = {
         var inlineCount = 0
         import scala.util.control.Breaks._
         for(x <- inputBlocks; easyCake = callsites(x); if easyCake.nonEmpty) {

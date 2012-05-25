@@ -12,14 +12,14 @@ package generic
 
 import language.higherKinds
 
-/** A template for companion objects of `Traversable` and subclasses thereof.
+/** A template for companion objects of `Iterable` and subclasses thereof.
  *  This class provides a set of operations to create `$Coll` objects.
- *  It is typically inherited by companion objects of subclasses of `Traversable`.
+ *  It is typically inherited by companion objects of subclasses of `Iterable`.
  *
  *  @since 2.8
  *
  *  @define coll collection
- *  @define Coll Traversable
+ *  @define Coll Iterable
  *  @define factoryInfo
  *    This object provides a set of operations to create `$Coll` values.
  *    @author Martin Odersky
@@ -35,7 +35,7 @@ import language.higherKinds
  *    @see CanBuildFrom
  *    @see GenericCanBuildFrom
  */
-trait TraversableFactory[CC[X] <: Traversable[X] with GenericTraversableTemplate[X, CC]] extends GenericCompanion[CC] {
+trait IterableFactory[CC[X] <: Iterable[X] with GenericIterableTemplate[X, CC]] extends GenericCompanion[CC] {
 
   // A default implementation of GenericCanBuildFrom which can be cast
   // to whatever is desired.
@@ -68,7 +68,7 @@ trait TraversableFactory[CC[X] <: Traversable[X] with GenericTraversableTemplate
    *  @param xss the collections that are to be concatenated.
    *  @return the concatenation of all the collections.
    */
-  def concat[A](xss: Traversable[A]*): CC[A] = {
+  def concat[A](xss: Iterable[A]*): CC[A] = {
     val b = newBuilder[A]
     // At present we're using IndexedSeq as a proxy for "has a cheap size method".
     if (xss forall (_.isInstanceOf[IndexedSeq[_]]))

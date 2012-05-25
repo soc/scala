@@ -57,7 +57,7 @@ abstract class ArrayOps[T] extends ArrayLike[T, Array[T]] {
    *  @param asTrav    A function that converts elements of this array to rows - arrays of type `U`.
    *  @return          An array obtained by concatenating rows of this array.
    */
-  def flatten[U, To](implicit asTrav: T => collection.Traversable[U], m: ArrayTag[U]): Array[U] = {
+  def flatten[U, To](implicit asTrav: T => collection.Iterable[U], m: ArrayTag[U]): Array[U] = {
     val b = Array.newBuilder[U]
     b sizeHint (thisCollection map (_.size) sum)
     this foreach (b ++= _)

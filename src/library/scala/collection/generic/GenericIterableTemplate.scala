@@ -26,7 +26,7 @@ import language.higherKinds
  *  @define coll  collection
  *  @define Coll  CC
  */
-trait GenericTraversableTemplate[+A, +CC[X] <: Traversable[X]] extends HasNewBuilder[A, CC[A] @uncheckedVariance] {
+trait GenericIterableTemplate[+A, +CC[X] <: Iterable[X]] extends HasNewBuilder[A, CC[A] @uncheckedVariance] {
 
   /** Applies a function `f` to all elements of this $coll.
    *
@@ -68,7 +68,7 @@ trait GenericTraversableTemplate[+A, +CC[X] <: Traversable[X]] extends HasNewBui
    */
   def genericBuilder[B]: Builder[B, CC[B]] = companion.newBuilder[B]
 
-  private def sequential: TraversableOnce[A] = this.asInstanceOf[TraversableOnce[A]]
+  private def sequential: IterableOnce[A] = this.asInstanceOf[IterableOnce[A]]
 
   /** Converts this $coll of pairs into two collections of the first and second
    *  half of each pair.
@@ -121,8 +121,8 @@ trait GenericTraversableTemplate[+A, +CC[X] <: Traversable[X]] extends HasNewBui
    *  collections.
    *
    *  @tparam B the type of the elements of each traversable collection.
-   *  @param asTraversable an implicit conversion which asserts that the element
-   *          type of this $coll is a `Traversable`.
+   *  @param asIterable an implicit conversion which asserts that the element
+   *          type of this $coll is a `Iterable`.
    *  @return a new $coll resulting from concatenating all element ${coll}s.
    *
    *  @usecase def flatten[B]: $Coll[B]
@@ -140,10 +140,10 @@ trait GenericTraversableTemplate[+A, +CC[X] <: Traversable[X]] extends HasNewBui
    *    // ys == Set(1, 2, 3)
    *    }}} 
    */
-  def flatten[B](implicit asTraversable: A => /*<:<!!!*/ TraversableOnce[B]): CC[B] = {
+  def flatten[B](implicit asIterable: A => /*<:<!!!*/ IterableOnce[B]): CC[B] = {
     val b = genericBuilder[B]
     for (xs <- sequential)
-      b ++= asTraversable(xs)
+      b ++= asIterable(xs)
     b.result
   }
 
@@ -151,25 +151,25 @@ trait GenericTraversableTemplate[+A, +CC[X] <: Traversable[X]] extends HasNewBui
    *  a $coll of ${coll}s.
    *
    *  @tparam B the type of the elements of each traversable collection.
-   *  @param  asTraversable an implicit conversion which asserts that the
-   *          element type of this $coll is a `Traversable`.
+   *  @param  asIterable an implicit conversion which asserts that the
+   *          element type of this $coll is a `Iterable`.
    *  @return a two-dimensional $coll of ${coll}s which has as ''n''th row
    *          the ''n''th column of this $coll.
    *  @throws `IllegalArgumentException` if all collections in this $coll
    *          are not of the same size.
    */
   @migration("`transpose` throws an `IllegalArgumentException` if collections are not uniformly sized.", "2.9.0")
-  def transpose[B](implicit asTraversable: A => /*<:<!!!*/ TraversableOnce[B]): CC[CC[B] @uncheckedVariance] = {
+  def transpose[B](implicit asIterable: A => /*<:<!!!*/ IterableOnce[B]): CC[CC[B] @uncheckedVariance] = {
     if (isEmpty)
       return genericBuilder[CC[B]].result
 
     def fail = throw new IllegalArgumentException("transpose requires all collections have the same size")
 
-    val headSize = asTraversable(head).size
+    val headSize = asIterable(head).size
     val bs: IndexedSeq[Builder[B, CC[B]]] = IndexedSeq.fill(headSize)(genericBuilder[B])
     for (xs <- sequential) {
       var i = 0
-      for (x <- asTraversable(xs)) {
+      for (x <- asIterable(xs)) {
         if (i >= headSize) fail
         bs(i) += x
         i += 1

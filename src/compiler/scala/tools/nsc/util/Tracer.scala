@@ -17,7 +17,7 @@ class Tracer(enabled: () => Boolean) {
   // get a lot of extra parens or noisy prefixes.
   def stringifyArgs(x: Any) = {
     x match {
-      case x: TraversableOnce[_] => x map stringify mkString ", "
+      case x: IterableOnce[_] => x map stringify mkString ", "
       case x: Product            => x.productIterator map stringify mkString ", "
       case _                     => stringify(x)
     }

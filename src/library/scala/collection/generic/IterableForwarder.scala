@@ -27,14 +27,48 @@ import collection.mutable.Buffer
  *  @version 2.8
  *  @since   2.8
  */
-trait IterableForwarder[+A] extends Iterable[A] with TraversableForwarder[A] {
-
+trait IterableForwarder[+A] extends Iterable[A] {
   /** The iterable object to which calls are forwarded */
   protected def underlying: Iterable[A]
 
-  // Iterable delegates
-  // Iterable methods could be printed by  cat IterableLike.scala | sed -n '/trait Iterable/,$ p' | egrep '^  (override )?def'
-
   override def iterator: Iterator[A] = underlying.iterator
   override def sameElements[B >: A](that: Iterable[B]): Boolean = underlying.sameElements(that)
+
+  override def foreach[B](f: A => B): Unit = underlying foreach f
+  override def isEmpty: Boolean = underlying.isEmpty
+  override def nonEmpty: Boolean = underlying.nonEmpty
+  override def size: Int = underlying.size
+  override def hasDefiniteSize = underlying.hasDefiniteSize
+  override def forall(p: A => Boolean): Boolean = underlying forall p
+  override def exists(p: A => Boolean): Boolean = underlying exists p
+  override def count(p: A => Boolean): Int = underlying count p
+  override def find(p: A => Boolean): Option[A] = underlying find p
+  override def foldLeft[B](z: B)(op: (B, A) => B): B = underlying.foldLeft(z)(op)
+  override def /: [B](z: B)(op: (B, A) => B): B = underlying./:(z)(op)
+  override def foldRight[B](z: B)(op: (A, B) => B): B = underlying.foldRight(z)(op)
+  override def :\ [B](z: B)(op: (A, B) => B): B = underlying.:\(z)(op)
+  override def reduceLeft[B >: A](op: (B, A) => B): B = underlying.reduceLeft(op)
+  override def reduceRight[B >: A](op: (A, B) => B): B = underlying.reduceRight(op)
+  override def head: A = underlying.head
+  override def headOption: Option[A] = underlying.headOption
+  override def last: A = underlying.last
+  override def lastOption: Option[A] = underlying.lastOption
+  override def copyToBuffer[B >: A](dest: Buffer[B]) = underlying.copyToBuffer(dest)
+  override def copyToArray[B >: A](xs: Array[B], start: Int, len: Int) = underlying.copyToArray(xs, start, len)
+  override def copyToArray[B >: A](xs: Array[B], start: Int) = underlying.copyToArray(xs, start)
+  override def copyToArray[B >: A](xs: Array[B]) = underlying.copyToArray(xs)
+  override def toArray[B >: A: ArrayTag]: Array[B] = underlying.toArray
+  override def toList: List[A] = underlying.toList
+  override def toIterable: Iterable[A] = underlying.toIterable
+  override def toSeq: Seq[A] = underlying.toSeq
+  override def toIndexedSeq = underlying.toIndexedSeq
+  override def toBuffer[B >: A] = underlying.toBuffer
+  override def toSet[B >: A]: immutable.Set[B] = underlying.toSet
+  override def toMap[T, U](implicit ev: A <:< (T, U)): immutable.Map[T, U] = underlying.toMap(ev)
+  override def mkString(start: String, sep: String, end: String): String = underlying.mkString(start, sep, end)
+  override def mkString(sep: String): String = underlying.mkString(sep)
+  override def mkString: String = underlying.mkString
+  override def addString(b: StringBuilder, start: String, sep: String, end: String): StringBuilder = underlying.addString(b, start, sep, end)
+  override def addString(b: StringBuilder, sep: String): StringBuilder = underlying.addString(b, sep)
+  override def addString(b: StringBuilder): StringBuilder = underlying.addString(b)
 }

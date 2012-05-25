@@ -14,15 +14,15 @@ import language.higherKinds
 
 /** A template class for companion objects of "regular" collection classes
  *  represent an unconstrained higher-kinded type. Typically
- *  such classes inherit from trait `GenericTraversableTemplate`.
+ *  such classes inherit from trait `GenericIterableTemplate`.
  *  @tparam  CC   The type constructor representing the collection class.
- *  @see [[scala.collection.generic.GenericTraversableTemplate]]
+ *  @see [[scala.collection.generic.GenericIterableTemplate]]
  *  @author Martin Odersky
  *  @since 2.8
  *  @define coll  collection
  *  @define Coll  `CC`
  */
-abstract class GenericCompanion[+CC[X] <: Traversable[X]] {
+abstract class GenericCompanion[+CC[X] <: Iterable[X]] {
   /** The underlying collection type with unknown element type */
   type Coll = CC[_]
 

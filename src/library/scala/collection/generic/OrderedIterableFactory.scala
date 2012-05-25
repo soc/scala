@@ -12,7 +12,7 @@ package generic
 
 import language.higherKinds
 
-abstract class OrderedTraversableFactory[CC[X] <: Traversable[X] with GenericOrderedTraversableTemplate[X, CC]]
+abstract class OrderedIterableFactory[CC[X] <: Iterable[X] with GenericOrderedIterableTemplate[X, CC]]
 extends GenericOrderedCompanion[CC] {
 
   class GenericCanBuildFrom[A](implicit ord: Ordering[A]) extends CanBuildFrom[CC[_], A, CC[A]] {

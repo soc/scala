@@ -42,7 +42,7 @@ import generic._
 class ArraySeq[A](override val length: Int)
 extends AbstractSeq[A]
    with IndexedSeq[A]
-   with GenericTraversableTemplate[A, ArraySeq]
+   with GenericIterableTemplate[A, ArraySeq]
    with IndexedSeqOptimized[A, ArraySeq[A]]
    with Serializable
 {

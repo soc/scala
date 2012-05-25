@@ -24,7 +24,7 @@ import generic._
  */
 trait LinearSeq[A] extends Seq[A]
                            with scala.collection.LinearSeq[A]
-                           with GenericTraversableTemplate[A, LinearSeq]
+                           with GenericIterableTemplate[A, LinearSeq]
                            with LinearSeqLike[A, LinearSeq[A]] {
   override def companion: GenericCompanion[LinearSeq] = LinearSeq
 }

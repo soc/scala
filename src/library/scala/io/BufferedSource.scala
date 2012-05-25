@@ -40,7 +40,7 @@ class BufferedSource(inputStream: InputStream, bufferSize: Int)(implicit val cod
     map (_.toChar)
   )
 
-  class BufferedLineIterator extends AbstractIterator[String] with Iterator[String] {
+  class BufferedLineIterator extends AbstractIterator[String] {
     // Don't want to lose a buffered char sitting in iter either. Yes,
     // this is ridiculous, but if I can't get rid of Source, and all the
     // Iterator bits are designed into Source, and people create Sources

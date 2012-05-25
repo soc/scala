@@ -102,7 +102,7 @@ extends AbstractMap[A, B]
    *
    *  @param xs     the traversable object.
    */
-  override def ++[B1 >: B](xs: TraversableOnce[(A, B1)]): ListMap[A, B1] =
+  override def ++[B1 >: B](xs: IterableOnce[(A, B1)]): ListMap[A, B1] =
     ((repr: ListMap[A, B1]) /: xs) (_ + _)
 
   /** This creates a new mapping without the given `key`.

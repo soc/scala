@@ -201,8 +201,9 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
   }
 
   private implicit def privateTreeOps(t: Tree): List[Tree] = {
-    (new Traversable[Tree] {
-      def foreach[U](f: Tree => U): Unit = t foreach { x => f(x) ; () }
+    (new Iterable[Tree] {
+      override def foreach[U](f: Tree => U): Unit = t foreach { x => f(x) ; () }
+      override def iterator = toBuffer.iterator
     }).toList
   }
 

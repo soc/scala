@@ -12,7 +12,7 @@ package generic
 import mutable.Builder
 import language.higherKinds
 
-abstract class SetFactory[CC[X] <: Set[X] with GenericTraversableTemplate[X, CC]] extends TraversableFactory[CC] {
+abstract class SetFactory[CC[X] <: Set[X] with GenericIterableTemplate[X, CC]] extends IterableFactory[CC] {
   def newBuilder[A]: Builder[A, CC[A]]
 
   /** $setCanBuildFromInfo

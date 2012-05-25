@@ -31,7 +31,7 @@ class MutableList[A]
 extends AbstractSeq[A]
    with LinearSeq[A]
    with LinearSeqOptimized[A, MutableList[A]]
-   with GenericTraversableTemplate[A, MutableList]
+   with GenericIterableTemplate[A, MutableList]
    with Builder[A, MutableList[A]]
    with Serializable
 {

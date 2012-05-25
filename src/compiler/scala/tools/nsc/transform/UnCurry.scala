@@ -409,7 +409,7 @@ abstract class UnCurry extends InfoTransform
             else localTyper.TyperErrorGen.MissingArrayTagError(tree, tp)
           }
           def traversableArrayTag(tpe: Type): Tree = {
-            (tpe baseType TraversableClass).typeArgs match {
+            (tpe baseType IterableClass).typeArgs match {
               case targ :: _  => getArrayTag(targ)
               case _          => EmptyTree
             }

@@ -309,7 +309,7 @@ object ScalaRunTime {
       // Don't want to a) traverse infinity or b) be overly helpful with peoples' custom
       // collections which may have useful toString methods - ticket #3710
       // or c) print AbstractFiles which are somehow also Iterable[AbstractFile]s.
-      case x: Traversable[_] => !x.hasDefiniteSize || !isScalaClass(x) || isScalaCompilerClass(x)
+      case x: Iterable[_] => !x.hasDefiniteSize || !isScalaClass(x) || isScalaCompilerClass(x)
       // Otherwise, nothing could possibly go wrong
       case _ => false
     }
@@ -340,7 +340,7 @@ object ScalaRunTime {
       case x: AnyRef if isArray(x)      => arrayToString(x)
       case x: collection.Map[_, _]      => x.iterator take maxElements map mapInner mkString (x.stringPrefix + "(", ", ", ")")
       case x: Iterable[_]               => x.iterator take maxElements map inner mkString (x.stringPrefix + "(", ", ", ")")
-      case x: Traversable[_]            => x take maxElements map inner mkString (x.stringPrefix + "(", ", ", ")")
+      case x: Iterable[_]            => x take maxElements map inner mkString (x.stringPrefix + "(", ", ", ")")
       case x: Product1[_] if isTuple(x) => "(" + inner(x._1) + ",)" // that special trailing comma
       case x: Product if isTuple(x)     => x.productIterator map inner mkString ("(", ",", ")")
       case x                            => x.toString
@@ -361,7 +361,7 @@ object ScalaRunTime {
 
     nl + s + "\n"
   }
-  private[scala] def checkZip(what: String, coll1: TraversableOnce[_], coll2: TraversableOnce[_]) {
+  private[scala] def checkZip(what: String, coll1: IterableOnce[_], coll2: IterableOnce[_]) {
     if (sys.props contains "scala.debug.zip") {
       val xs = coll1.toIndexedSeq
       val ys = coll2.toIndexedSeq

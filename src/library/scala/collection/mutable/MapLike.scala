@@ -48,7 +48,7 @@ trait MapLike[A, B, +This <: MapLike[A, B, This] with Map[A, B]]
      with Cloneable[This]
 { self =>
 
-  import scala.collection.Traversable
+  import scala.collection.Iterable
 
   /** A common implementation of `newBuilder` for all mutable maps
    *    in terms of `empty`.
@@ -134,7 +134,7 @@ trait MapLike[A, B, +This <: MapLike[A, B, This] with Map[A, B]]
    *  @return       a new map containing mappings of this map and those provided by `xs`.
    */
   @migration("`++` creates a new map. Use `++=` to add an element to this map and return that map itself.", "2.8.0")
-  override def ++[B1 >: B](xs: TraversableOnce[(A, B1)]): Map[A, B1] =
+  override def ++[B1 >: B](xs: IterableOnce[(A, B1)]): Map[A, B1] =
     clone().asInstanceOf[Map[A, B1]] ++= xs
 
   /** Removes a key from this map, returning the value associated previously
@@ -239,5 +239,5 @@ trait MapLike[A, B, +This <: MapLike[A, B, This] with Map[A, B]]
    *                  with a key equal to a key from `xs`.
    */
   @migration("`--` creates a new map. Use `--=` to remove an element from this map and return that map itself.", "2.8.0")
-  override def --(xs: TraversableOnce[A]): This = clone() --= xs
+  override def --(xs: IterableOnce[A]): This = clone() --= xs
 }

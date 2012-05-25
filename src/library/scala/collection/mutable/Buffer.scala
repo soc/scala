@@ -30,7 +30,7 @@ import generic._
  */
 @cloneable
 trait Buffer[A] extends Seq[A]
-                   with GenericTraversableTemplate[A, Buffer]
+                   with GenericIterableTemplate[A, Buffer]
                    with BufferLike[A, Buffer[A]] {
   override def companion: GenericCompanion[Buffer] = Buffer
 }

@@ -208,7 +208,7 @@ class PathResolver(settings: Settings, context: JavaContext) {
     import context._
 
     // Assemble the elements!
-    def basis = List[Traversable[ClassPath[AbstractFile]]](
+    def basis = List[Iterable[ClassPath[AbstractFile]]](
       classesInPath(javaBootClassPath),             // 1. The Java bootstrap class path.
       contentsOfDirsInPath(javaExtDirs),            // 2. The Java extension class path.
       classesInExpandedPath(javaUserClassPath),     // 3. The Java application class path.

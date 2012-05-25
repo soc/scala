@@ -44,7 +44,7 @@ class Sources(val path: String) {
   private def calculateJars() =
     jars foreach { j => dbg(j) ; catchZip(addSources(new Jar(j).fileishIterator)) }
 
-  private def addSources(fs: TraversableOnce[Fileish]) =
+  private def addSources(fs: IterableOnce[Fileish]) =
     fs foreach { f => if (f.isSourceFile) add(f.name, f) }
 
   private def get(key: String): List[Fileish] =

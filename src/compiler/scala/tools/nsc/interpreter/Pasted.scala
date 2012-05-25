@@ -93,7 +93,7 @@ abstract class Pasted {
    *  Everything else is discarded.  When the end of the transcript is spotted,
    *  all the commands are replayed.
    */
-  def apply(lines: TraversableOnce[String]) = {
+  def apply(lines: IterableOnce[String]) = {
     isRunning = true
     try new PasteAnalyzer(lines.toList) run()
     finally isRunning = false

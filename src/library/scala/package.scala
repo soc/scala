@@ -32,10 +32,10 @@ package object scala {
   val AnyRef = new Specializable {
     override def toString = "object AnyRef"
   }
-  type TraversableOnce[+A] = scala.collection.TraversableOnce[A]
+  type IterableOnce[+A] = scala.collection.IterableOnce[A]
 
-  type Traversable[+A] = scala.collection.Traversable[A]
-  val Traversable = scala.collection.Traversable
+  type Traversable[+A] = scala.collection.Iterable[A]
+  val Traversable = scala.collection.Iterable
 
   type Iterable[+A] = scala.collection.Iterable[A]
   val Iterable = scala.collection.Iterable

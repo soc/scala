@@ -48,7 +48,7 @@ object Stack extends SeqFactory[Stack] {
 class Stack[+A] protected (protected val elems: List[A])
                  extends AbstractSeq[A]
                     with LinearSeq[A]
-                    with GenericTraversableTemplate[A, Stack]
+                    with GenericIterableTemplate[A, Stack]
                     with LinearSeqOptimized[A, Stack[A]]
                     with Serializable {
   override def companion: GenericCompanion[Stack] = Stack
@@ -87,7 +87,7 @@ class Stack[+A] protected (protected val elems: List[A])
    *  @param   xs      the iterator object.
    *  @return the stack with the new elements on top.
    */
-  def pushAll[B >: A](xs: TraversableOnce[B]): Stack[B] =
+  def pushAll[B >: A](xs: IterableOnce[B]): Stack[B] =
     ((this: Stack[B]) /: xs.toIterator)(_ push _)
 
   /** Returns the top element of the stack. An error is signaled if

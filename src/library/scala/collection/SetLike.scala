@@ -220,7 +220,7 @@ extends IterableLike[A, This]
    *  @param elems     the collection containing the added elements.
    *  @return a new $coll with the given elements added.
    */
-  def ++ (elems: TraversableOnce[A]): This = (repr /: elems)(_ + _)
+  def ++ (elems: IterableOnce[A]): This = (repr /: elems)(_ + _)
 
   /** Creates a new set with a given element removed from this set.
    *

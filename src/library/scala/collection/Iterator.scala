@@ -20,13 +20,13 @@ import annotation.migration
  */
 object Iterator {
 
-  /** With the advent of `TraversableOnce` and `Iterator`, it can be useful to have a builder which
+  /** With the advent of `IterableOnce` and `Iterator`, it can be useful to have a builder which
    *  operates on `Iterator`s so they can be treated uniformly along with the collections.
    *  See `scala.util.Random.shuffle` for an example.
    */
-  implicit def IteratorCanBuildFrom[A] = new TraversableOnce.BufferedCanBuildFrom[A, Iterator] {
+  implicit def IteratorCanBuildFrom[A] = new IterableOnce.BufferedCanBuildFrom[A, Iterator] {
     def bufferToColl[B](coll: ArrayBuffer[B]) = coll.iterator
-    def traversableToColl[B](t: Traversable[B]) = t.toIterator
+    def traversableToColl[B](t: Iterable[B]) = t.toIterator
   }
 
   /** The iterator which produces no values. */
@@ -223,7 +223,7 @@ import Iterator.empty
  *  on, as well as the one passed as parameter. Using the old iterators is
  *  undefined and subject to change.
  */
-trait Iterator[+A] extends TraversableOnce[A] {
+trait Iterator[+A] extends IterableOnce[A] {
   self =>
 
   /** Tests whether this iterator can provide another element.
@@ -254,7 +254,7 @@ trait Iterator[+A] extends TraversableOnce[A] {
    *  @return   `false`
    *  @note     Reuse: $preservesIterator
    */
-  def isTraversableAgain = false
+  def isIterableAgain = false
 
   /** Tests whether this Iterator has a known size.
    *
@@ -332,7 +332,7 @@ trait Iterator[+A] extends TraversableOnce[A] {
    *  @usecase def ++(that: => Iterator[A]): Iterator[A]
    *    @inheritdoc
    */
-  def ++[B >: A](that: => TraversableOnce[B]): Iterator[B] = new AbstractIterator[B] {
+  def ++[B >: A](that: => IterableOnce[B]): Iterator[B] = new AbstractIterator[B] {
     // optimize a little bit to prevent n log n behavior.
     private var cur : Iterator[B] = self
     private var selfExhausted : Boolean = false
@@ -359,7 +359,7 @@ trait Iterator[+A] extends TraversableOnce[A] {
    *           `f` to each value produced by this iterator and concatenating the results.
    *  @note    Reuse: $consumesAndProducesIterator
    */
-  def flatMap[B](f: A => TraversableOnce[B]): Iterator[B] = new AbstractIterator[B] {
+  def flatMap[B](f: A => IterableOnce[B]): Iterator[B] = new AbstractIterator[B] {
     private var cur: Iterator[B] = empty
     def hasNext: Boolean =
       cur.hasNext || self.hasNext && { cur = f(self.next).toIterator; hasNext }
@@ -399,7 +399,7 @@ trait Iterator[+A] extends TraversableOnce[A] {
    *                   `p(x, y)` is `true` for all corresponding elements `x` of this iterator
    *                   and `y` of `that`, otherwise `false`
    */
-  def corresponds[B](that: TraversableOnce[B])(p: (A, B) => Boolean): Boolean = {
+  def corresponds[B](that: IterableOnce[B])(p: (A, B) => Boolean): Boolean = {
     val that0 = that.toIterator
     while (hasNext && that0.hasNext)
       if (!p(next, that0.next)) return false
@@ -1130,7 +1130,7 @@ trait Iterator[+A] extends TraversableOnce[A] {
     !hasNext && !that.hasNext
   }
 
-  def toTraversable: Traversable[A] = toList
+  def toIterable: Iterable[A] = toList
   def toIterator: Iterator[A] = self
 
   /** Converts this iterator to a string.

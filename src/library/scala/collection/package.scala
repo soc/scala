@@ -19,7 +19,7 @@ package scala
  * == Using Collections ==
  *
  * It is convienient to treat all collections as either
- * a [[scala.collection.Traversable]] or [[scala.collection.Iterable]], as
+ * a [[scala.collection.Iterable]] or [[scala.collection.Iterable]], as
  * these traits define the vast majority of operations
  * on a collection.
  *
@@ -78,13 +78,15 @@ package scala
 package object collection {
   import scala.collection.generic.CanBuildFrom
   
-  type GenIterable[+A]               = Iterable[A]
   type GenMap[A, +B]                 = Map[A, B]
   type GenSeq[+A]                    = Seq[A]
   type GenSet[A]                     = Set[A]
-  type GenTraversableLike[+A, +Repr] = TraversableLike[A, Repr]
-  type GenTraversableOnce[+A]        = TraversableOnce[A]
-  type GenTraversable[+A]            = Traversable[A]
+  type GenTraversableLike[+A, +Repr] = IterableLike[A, Repr]
+  type GenTraversableOnce[+A]        = IterableOnce[A]
+  type GenTraversable[+A]            = Iterable[A]
+  type GenIterable[+A]               = Iterable[A]
+  type Traversable[+A]               = Iterable[A]
+  type TraversableLike[+A, +Repr]    = IterableLike[A, Repr]
 
   /** Provides a CanBuildFrom instance that builds a specific target collection (`To')
    *  irrespective of the original collection (`From').

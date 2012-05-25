@@ -56,7 +56,7 @@ trait IndexedSeqOptimized[+A, +Repr] extends Any with IndexedSeqLike[A, Repr] { 
     if (start == end) z
     else foldr(start, end - 1, op(this(end - 1), z), op)
 
-  override /*TraversableLike*/
+  override /*IterableLike*/
   def foldLeft[B](z: B)(op: (B, A) => B): B =
     foldl(0, length, z, op)
 
@@ -64,7 +64,7 @@ trait IndexedSeqOptimized[+A, +Repr] extends Any with IndexedSeqLike[A, Repr] { 
   def foldRight[B](z: B)(op: (A, B) => B): B =
     foldr(0, length, z, op)
 
-  override /*TraversableLike*/
+  override /*IterableLike*/
   def reduceLeft[B >: A](op: (B, A) => B): B =
     if (length > 0) foldl(1, length, this(0), op) else super.reduceLeft(op)
 
@@ -120,19 +120,19 @@ trait IndexedSeqOptimized[+A, +Repr] extends Any with IndexedSeqLike[A, Repr] { 
   override /*IterableLike*/
   def head: A = if (isEmpty) super.head else this(0)
 
-  override /*TraversableLike*/
+  override /*IterableLike*/
   def tail: Repr = if (isEmpty) super.tail else slice(1, length)
 
-  override /*TraversableLike*/
+  override /*IterableLike*/
   def last: A = if (length > 0) this(length - 1) else super.last
 
   override /*IterableLike*/
   def init: Repr = if (length > 0) slice(0, length - 1) else super.init
 
-  override /*TraversableLike*/
+  override /*IterableLike*/
   def take(n: Int): Repr = slice(0, n)
 
-  override /*TraversableLike*/
+  override /*IterableLike*/
   def drop(n: Int): Repr = slice(n, length)
 
   override /*IterableLike*/
@@ -141,16 +141,16 @@ trait IndexedSeqOptimized[+A, +Repr] extends Any with IndexedSeqLike[A, Repr] { 
   override /*IterableLike*/
   def dropRight(n: Int): Repr = slice(0, length - n)
 
-  override /*TraversableLike*/
+  override /*IterableLike*/
   def splitAt(n: Int): (Repr, Repr) = (take(n), drop(n))
 
   override /*IterableLike*/
   def takeWhile(p: A => Boolean): Repr = take(prefixLength(p))
 
-  override /*TraversableLike*/
+  override /*IterableLike*/
   def dropWhile(p: A => Boolean): Repr = drop(prefixLength(p))
 
-  override /*TraversableLike*/
+  override /*IterableLike*/
   def span(p: A => Boolean): (Repr, Repr) = splitAt(prefixLength(p))
 
   override /*IterableLike*/

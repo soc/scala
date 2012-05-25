@@ -8,10 +8,11 @@
 
 package scala.collection
 
-
 import generic._
 import immutable.List
-import annotation.unchecked.uncheckedVariance
+import mutable.Builder
+import annotation.{tailrec, migration}
+import annotation.unchecked.{ uncheckedVariance => uV }
 
 /** A template trait for iterable collections of type `Iterable[A]`.
  *  $iterableInfo
@@ -33,11 +34,11 @@ import annotation.unchecked.uncheckedVariance
 
  *    This trait adds methods `iterator`, `sameElements`,
  *    `takeRight`, `dropRight` to the methods inherited
- *    from trait <a href="../Traversable.html" target="ContentFrame">
- *    `Traversable`</a>.
+ *    from trait <a href="../Iterable.html" target="ContentFrame">
+ *    `Iterable`</a>.
 
  *    Note: This trait replaces every method that uses `break` in
- *    `TraversableLike` by an iterator version.
+ *    `IterableLike` by an iterator version.
  *
  *  @author Martin Odersky
  *  @version 2.8
@@ -48,8 +49,678 @@ import annotation.unchecked.uncheckedVariance
  *  @define Coll Iterable
  *  @define coll iterable collection
  */
-trait IterableLike[+A, +Repr] extends Any with Equals with TraversableLike[A, Repr] {
+trait IterableLike[+A, +Repr]
+    extends Any
+       with Equals
+       with HasNewBuilder[A, Repr]
+       with FilterMonadic[A, Repr]
+       with IterableOnce[A] {
   self =>
+  
+  /********* BEGIN TRAVLIKE *************/
+  
+  import Iterable.breaks._
+
+  /** The type implementing this iterable */
+  protected type Self = Repr
+
+  /** The collection of type $coll underlying this `IterableLike` object.
+   *  By default this is implemented as the `IterableLike` object itself,
+   *  but this can be overridden.
+   */
+  def repr: Repr = this.asInstanceOf[Repr]
+
+  final def isIterableAgain: Boolean = true
+  
+  /** The underlying collection seen as an instance of `$Coll`.
+   *  By default this is implemented as the current collection object itself,
+   *  but this can be overridden.
+   */
+  protected[this] def thisCollection: Iterable[A] = this.asInstanceOf[Iterable[A]]
+
+  /** A conversion from collections of type `Repr` to `$Coll` objects.
+   *  By default this is implemented as just a cast, but this can be overridden.
+   */
+  protected[this] def toCollection(repr: Repr): Iterable[A] = repr.asInstanceOf[Iterable[A]]
+
+  /** Creates a new builder for this collection type.
+   */
+  protected[this] def newBuilder: mutable.Builder[A, Repr]
+
+  /** Applies a function `f` to all elements of this $coll.
+   *
+   *  @param  f   the function that is applied for its side-effect to every element.
+   *              The result of function `f` is discarded.
+   *
+   *  @tparam  U  the type parameter describing the result of function `f`.
+   *              This result will always be ignored. Typically `U` is `Unit`,
+   *              but this is not necessary.
+   *
+   *  @usecase def foreach(f: A => Unit): Unit
+   *    @inheritdoc
+   *
+   *    Note: this method underlies the implementation of most other bulk operations.
+   *    It's important to implement this method in an efficient way.
+   *
+   */
+  // def foreach[U](f: A => U): Unit
+
+  /** Tests whether this $coll is empty.
+   *
+   *  @return    `true` if the $coll contain no elements, `false` otherwise.
+   */
+  // def isEmpty: Boolean = {
+  //   var result = true
+  //   breakable {
+  //     for (x <- this) {
+  //       result = false
+  //       break
+  //     }
+  //   }
+  //   result
+  // }
+
+  /** Tests whether this $coll is known to have a finite size.
+   *  All strict collections are known to have finite size. For a non-strict
+   *  collection such as `Stream`, the predicate returns `'''true'''` if all
+   *  elements have been computed. It returns `'''false'''` if the stream is
+   *  not yet evaluated to the end.
+   *
+   *  Note: many collection methods will not work on collections of infinite sizes.
+   *
+   *  @return  `'''true'''` if this collection is known to have finite size,
+   *           `'''false'''` otherwise.
+   */
+  def hasDefiniteSize = true
+
+  def ++[B >: A, That](that: IterableOnce[B])(implicit bf: CanBuildFrom[Repr, B, That]): That = {
+    val b = bf(repr)
+    if (that.isInstanceOf[IndexedSeqLike[_, _]]) b.sizeHint(this, that.size)
+    b ++= thisCollection
+    b ++= that
+    b.result
+  }
+
+  /** As with `++`, returns a new collection containing the elements from the left operand followed by the
+   *  elements from the right operand.
+   *
+   *  It differs from `++` in that the right operand determines the type of
+   *  the resulting collection rather than the left one.
+   *  Mnemonic: the COLon is on the side of the new COLlection type.
+   *
+   *  @param that   the iterable to append.
+   *  @tparam B     the element type of the returned collection.
+   *  @tparam That  $thatinfo
+   *  @param bf     $bfinfo
+   *  @return       a new collection of type `That` which contains all elements
+   *                of this $coll followed by all elements of `that`.
+   *
+   *  @usecase def ++:[B](that: IterableOnce[B]): $Coll[B]
+   *    @inheritdoc
+   * 
+   *    Example:
+   *    {{{
+   *      scala> val x = List(1)
+   *      x: List[Int] = List(1)
+   *
+   *      scala> val y = LinkedList(2)
+   *      y: scala.collection.mutable.LinkedList[Int] = LinkedList(2)
+   *
+   *      scala> val z = x ++: y
+   *      z: scala.collection.mutable.LinkedList[Int] = LinkedList(1, 2)
+   *    }}}
+   *
+   *    @return       a new $coll which contains all elements of this $coll
+   *                  followed by all elements of `that`.
+   */
+  def ++:[B >: A, That](that: IterableOnce[B])(implicit bf: CanBuildFrom[Repr, B, That]): That = {
+    val b = bf(repr)
+    if (that.isInstanceOf[IndexedSeqLike[_, _]]) b.sizeHint(this, that.size)
+    b ++= that
+    b ++= thisCollection
+    b.result
+  }
+
+  /** As with `++`, returns a new collection containing the elements from the
+   *  left operand followed by the elements from the right operand.
+   *
+   *  It differs from `++` in that the right operand determines the type of
+   *  the resulting collection rather than the left one.
+   *  Mnemonic: the COLon is on the side of the new COLlection type.
+   *
+   *  Example:
+   *  {{{
+   *     scala> val x = List(1)
+   *     x: List[Int] = List(1)
+   *
+   *     scala> val y = LinkedList(2)
+   *     y: scala.collection.mutable.LinkedList[Int] = LinkedList(2)
+   *
+   *     scala> val z = x ++: y
+   *     z: scala.collection.mutable.LinkedList[Int] = LinkedList(1, 2)
+   *  }}}
+   *
+   * This overload exists because: for the implementation of `++:` we should
+   *  reuse that of `++` because many collections override it with more
+   *  efficient versions.
+   *
+   *  Since `IterableOnce` has no `++` method, we have to implement that
+   *  directly, but `Iterable` and down can use the overload.
+   *
+   *  @param that   the Iterable to append.
+   *  @tparam B     the element type of the returned collection.
+   *  @tparam That  $thatinfo
+   *  @param bf     $bfinfo
+   *  @return       a new collection of type `That` which contains all elements
+   *                of this $coll followed by all elements of `that`.
+   */
+  def ++:[B >: A, That](that: Iterable[B])(implicit bf: CanBuildFrom[Repr, B, That]): That =
+    (that ++ this)(breakOut)
+
+  def map[B, That](f: A => B)(implicit bf: CanBuildFrom[Repr, B, That]): That = {
+    val b = bf(repr)
+    b.sizeHint(this)
+    for (x <- this) b += f(x)
+    b.result
+  }
+
+  def flatMap[B, That](f: A => IterableOnce[B])(implicit bf: CanBuildFrom[Repr, B, That]): That = {
+    val b = bf(repr)
+    for (x <- this) b ++= f(x)
+    b.result
+  }
+
+  /** Selects all elements of this $coll which satisfy a predicate.
+   *
+   *  @param p     the predicate used to test elements.
+   *  @return      a new $coll consisting of all elements of this $coll that satisfy the given
+   *               predicate `p`. The order of the elements is preserved.
+   */
+  def filter(p: A => Boolean): Repr = {
+    val b = newBuilder
+    for (x <- this)
+      if (p(x)) b += x
+    b.result
+  }
+
+  /** Selects all elements of this $coll which do not satisfy a predicate.
+   *
+   *  @param p     the predicate used to test elements.
+   *  @return      a new $coll consisting of all elements of this $coll that do not satisfy the given
+   *               predicate `p`. The order of the elements is preserved.
+   */
+  def filterNot(p: A => Boolean): Repr = filter(!p(_))
+
+  def collect[B, That](pf: PartialFunction[A, B])(implicit bf: CanBuildFrom[Repr, B, That]): That = {
+    val b = bf(repr)
+    for (x <- this) if (pf.isDefinedAt(x)) b += pf(x)
+    b.result
+  }
+
+  /** Partitions this $coll in two ${coll}s according to a predicate.
+   *
+   *  @param p the predicate on which to partition.
+   *  @return  a pair of ${coll}s: the first $coll consists of all elements that
+   *           satisfy the predicate `p` and the second $coll consists of all elements
+   *           that don't. The relative order of the elements in the resulting ${coll}s
+   *           is the same as in the original $coll.
+   */
+  def partition(p: A => Boolean): (Repr, Repr) = {
+    val l, r = newBuilder
+    for (x <- this) (if (p(x)) l else r) += x
+    (l.result, r.result)
+  }
+
+  def groupBy[K](f: A => K): immutable.Map[K, Repr] = {
+    val m = mutable.Map.empty[K, Builder[A, Repr]]
+    for (elem <- this) {
+      val key = f(elem)
+      val bldr = m.getOrElseUpdate(key, newBuilder)
+      bldr += elem
+    }
+    val b = immutable.Map.newBuilder[K, Repr]
+    for ((k, v) <- m)
+      b += ((k, v.result))
+
+    b.result
+  }
+
+  /** Tests whether a predicate holds for all elements of this $coll.
+   *
+   *  $mayNotTerminateInf
+   *
+   *  @param   p     the predicate used to test elements.
+   *  @return        `true` if the given predicate `p` holds for all elements
+   *                 of this $coll, otherwise `false`.
+   */
+  // def forall(p: A => Boolean): Boolean = {
+  //   var result = true
+  //   breakable {
+  //     for (x <- this)
+  //       if (!p(x)) { result = false; break }
+  //   }
+  //   result
+  // }
+
+  /** Tests whether a predicate holds for some of the elements of this $coll.
+   *
+   *  $mayNotTerminateInf
+   *
+   *  @param   p     the predicate used to test elements.
+   *  @return        `true` if the given predicate `p` holds for some of the
+   *                 elements of this $coll, otherwise `false`.
+   */
+  // def exists(p: A => Boolean): Boolean = {
+  //   var result = false
+  //   breakable {
+  //     for (x <- this)
+  //       if (p(x)) { result = true; break }
+  //   }
+  //   result
+  // }
+
+  /** Finds the first element of the $coll satisfying a predicate, if any.
+   *
+   *  $mayNotTerminateInf
+   *  $orderDependent
+   *
+   *  @param p    the predicate used to test elements.
+   *  @return     an option value containing the first element in the $coll
+   *              that satisfies `p`, or `None` if none exists.
+   */
+  // def find(p: A => Boolean): Option[A] = {
+  //   var result: Option[A] = None
+  //   breakable {
+  //     for (x <- this)
+  //       if (p(x)) { result = Some(x); break }
+  //   }
+  //   result
+  // }
+
+  def scan[B >: A, That](z: B)(op: (B, B) => B)(implicit cbf: CanBuildFrom[Repr, B, That]): That = scanLeft(z)(op)
+
+  def scanLeft[B, That](z: B)(op: (B, A) => B)(implicit bf: CanBuildFrom[Repr, B, That]): That = {
+    val b = bf(repr)
+    b.sizeHint(this, 1)
+    var acc = z
+    b += acc
+    for (x <- this) { acc = op(acc, x); b += acc }
+    b.result
+  }
+
+  @migration("The behavior of `scanRight` has changed. The previous behavior can be reproduced with scanRight.reverse.", "2.9.0")
+  def scanRight[B, That](z: B)(op: (A, B) => B)(implicit bf: CanBuildFrom[Repr, B, That]): That = {
+    var scanned = List(z)
+    var acc = z
+    for (x <- reversed) {
+      acc = op(x, acc)
+      scanned ::= acc
+    }
+    val b = bf(repr)
+    for (elem <- scanned) b += elem
+    b.result
+  }
+
+  /** Selects the first element of this $coll.
+   *  $orderDependent
+   *  @return  the first element of this $coll.
+   *  @throws `NoSuchElementException` if the $coll is empty.
+   */
+  // def head: A = {
+  //   var result: () => A = () => throw new NoSuchElementException
+  //   breakable {
+  //     for (x <- this) {
+  //       result = () => x
+  //       break
+  //     }
+  //   }
+  //   result()
+  // }
+
+  /** Optionally selects the first element.
+   *  $orderDependent
+   *  @return  the first element of this $coll if it is nonempty,
+   *           `None` if it is empty.
+   */
+  def headOption: Option[A] = if (isEmpty) None else Some(head)
+
+  /** Selects all elements except the first.
+   *  $orderDependent
+   *  @return  a $coll consisting of all elements of this $coll
+   *           except the first one.
+   *  @throws `UnsupportedOperationException` if the $coll is empty.
+   */
+  def tail: Repr = {
+    if (isEmpty) throw new UnsupportedOperationException("empty.tail")
+    drop(1)
+  }
+
+  /** Selects the last element.
+    * $orderDependent
+    * @return The last element of this $coll.
+    * @throws NoSuchElementException If the $coll is empty.
+    */
+  def last: A = {
+    var lst = head
+    for (x <- this)
+      lst = x
+    lst
+  }
+
+  /** Optionally selects the last element.
+   *  $orderDependent
+   *  @return  the last element of this $coll$ if it is nonempty,
+   *           `None` if it is empty.
+   */
+  def lastOption: Option[A] = if (isEmpty) None else Some(last)
+
+  /** Selects all elements except the last.
+   *  $orderDependent
+   *  @return  a $coll consisting of all elements of this $coll
+   *           except the last one.
+   *  @throws `UnsupportedOperationException` if the $coll is empty.
+   */
+  def init: Repr = {
+    if (isEmpty) throw new UnsupportedOperationException("empty.init")
+    var lst = head
+    var follow = false
+    val b = newBuilder
+    b.sizeHint(this, -1)
+    for (x <- this) {
+      if (follow) b += lst
+      else follow = true
+      lst = x
+    }
+    b.result
+  }
+  // 
+  // def take(n: Int): Repr = slice(0, n)
+  // 
+  // def drop(n: Int): Repr =
+  //   if (n <= 0) {
+  //     val b = newBuilder
+  //     b.sizeHint(this)
+  //     (b ++= thisCollection).result
+  //   }
+  //   else sliceWithKnownDelta(n, Int.MaxValue, -n)
+  // 
+  // def slice(from: Int, until: Int): Repr =
+  //   sliceWithKnownBound(math.max(from, 0), until)
+
+  // Precondition: from >= 0, until > 0, builder already configured for building.
+  private[this] def sliceInternal(from: Int, until: Int, b: Builder[A, Repr]): Repr = {
+    var i = 0
+    breakable {
+      for (x <- this) {
+        if (i >= from) b += x
+        i += 1
+        if (i >= until) break
+      }
+    }
+    b.result
+  }
+  // Precondition: from >= 0
+  private[scala] def sliceWithKnownDelta(from: Int, until: Int, delta: Int): Repr = {
+    val b = newBuilder
+    if (until <= from) b.result
+    else {
+      b.sizeHint(this, delta)
+      sliceInternal(from, until, b)
+    }
+  }
+  // Precondition: from >= 0
+  private[scala] def sliceWithKnownBound(from: Int, until: Int): Repr = {
+    val b = newBuilder
+    if (until <= from) b.result
+    else {
+      b.sizeHintBounded(until - from, this)
+      sliceInternal(from, until, b)
+    }
+  }
+  // 
+  // def takeWhile(p: A => Boolean): Repr = {
+  //   val b = newBuilder
+  //   breakable {
+  //     for (x <- this) {
+  //       if (!p(x)) break
+  //       b += x
+  //     }
+  //   }
+  //   b.result
+  // }
+
+  def dropWhile(p: A => Boolean): Repr = {
+    val b = newBuilder
+    var go = false
+    for (x <- this) {
+      if (!go && !p(x)) go = true
+      if (go) b += x
+    }
+    b.result
+  }
+
+  def span(p: A => Boolean): (Repr, Repr) = {
+    val l, r = newBuilder
+    var toLeft = true
+    for (x <- this) {
+      toLeft = toLeft && p(x)
+      (if (toLeft) l else r) += x
+    }
+    (l.result, r.result)
+  }
+
+  def splitAt(n: Int): (Repr, Repr) = {
+    val l, r = newBuilder
+    l.sizeHintBounded(n, this)
+    if (n >= 0) r.sizeHint(this, -n)
+    var i = 0
+    for (x <- this) {
+      (if (i < n) l else r) += x
+      i += 1
+    }
+    (l.result, r.result)
+  }
+
+  /** Iterates over the tails of this $coll. The first value will be this
+   *  $coll and the final one will be an empty $coll, with the intervening
+   *  values the results of successive applications of `tail`.
+   *
+   *  @return   an iterator over all the tails of this $coll
+   *  @example  `List(1,2,3).tails = Iterator(List(1,2,3), List(2,3), List(3), Nil)`
+   */
+  def tails: Iterator[Repr] = iterateUntilEmpty(_.tail)
+
+  /** Iterates over the inits of this $coll. The first value will be this
+   *  $coll and the final one will be an empty $coll, with the intervening
+   *  values the results of successive applications of `init`.
+   *
+   *  @return  an iterator over all the inits of this $coll
+   *  @example  `List(1,2,3).inits = Iterator(List(1,2,3), List(1,2), List(1), Nil)`
+   */
+  def inits: Iterator[Repr] = iterateUntilEmpty(_.init)
+
+  /** Copies elements of this $coll to an array.
+   *  Fills the given array `xs` with at most `len` elements of
+   *  this $coll, starting at position `start`.
+   *  Copying will stop once either the end of the current $coll is reached,
+   *  or the end of the array is reached, or `len` elements have been copied.
+   *
+   *  @param  xs     the array to fill.
+   *  @param  start  the starting index.
+   *  @param  len    the maximal number of elements to copy.
+   *  @tparam B      the type of the elements of the array.
+   *
+   *
+   *  @usecase def copyToArray(xs: Array[A], start: Int, len: Int): Unit
+   *    @inheritdoc
+   *
+   *    $willNotTerminateInf
+   */
+  def copyToArray[B >: A](xs: Array[B], start: Int, len: Int) {
+    var i = start
+    val end = (start + len) min xs.length
+    breakable {
+      for (x <- this) {
+        if (i >= end) break
+        xs(i) = x
+        i += 1
+      }
+    }
+  }
+  // override /*IterableLike*/ def copyToArray[B >: A](xs: Array[B], start: Int, len: Int) {
+  //   var i = start
+  //   val end = (start + len) min xs.length
+  //   val it = iterator
+  //   while (i < end && it.hasNext) {
+  //     xs(i) = it.next
+  //     i += 1
+  //   }
+  // }
+
+  def toIterable: Iterable[A] = thisCollection
+  def toIterator: Iterator[A] = iterator  // toSeq.iterator
+  // 
+  // override /*IterableLike*/ def toIterable: Iterable[A] =
+  //   thisCollection
+  // override /*IterableLike*/ def toIterator: Iterator[A] =
+  //   iterator
+
+  /** Converts this $coll to a string.
+   *
+   *  @return   a string representation of this collection. By default this
+   *            string consists of the `stringPrefix` of this $coll, followed
+   *            by all elements separated by commas and enclosed in parentheses.
+   */
+  override def toString = mkString(stringPrefix + "(", ", ", ")")
+
+  /** Defines the prefix of this object's `toString` representation.
+   *
+   *  @return  a string representation which starts the result of `toString`
+   *           applied to this $coll. By default the string prefix is the
+   *           simple name of the collection class $coll.
+   */
+  def stringPrefix : String = {
+    var string = repr.getClass.getName
+    val idx1 = string.lastIndexOf('.' : Int)
+    if (idx1 != -1) string = string.substring(idx1 + 1)
+    val idx2 = string.indexOf('$')
+    if (idx2 != -1) string = string.substring(0, idx2)
+    string
+  }
+
+  /** Creates a non-strict filter of this $coll.
+   *
+   *  Note: the difference between `c filter p` and `c withFilter p` is that
+   *        the former creates a new collection, whereas the latter only
+   *        restricts the domain of subsequent `map`, `flatMap`, `foreach`,
+   *        and `withFilter` operations.
+   *  $orderDependent
+   *
+   *  @param p   the predicate used to test elements.
+   *  @return    an object of class `WithFilter`, which supports
+   *             `map`, `flatMap`, `foreach`, and `withFilter` operations.
+   *             All these operations apply to those elements of this $coll
+   *             which satisfy the predicate `p`.
+   */
+  def withFilter(p: A => Boolean): FilterMonadic[A, Repr] = new WithFilter(p)
+
+  /** A class supporting filtered operations. Instances of this class are
+   *  returned by method `withFilter`.
+   */
+  class WithFilter(p: A => Boolean) extends FilterMonadic[A, Repr] {
+
+    /** Builds a new collection by applying a function to all elements of the
+     *  outer $coll containing this `WithFilter` instance that satisfy predicate `p`.
+     *
+     *  @param f      the function to apply to each element.
+     *  @tparam B     the element type of the returned collection.
+     *  @tparam That  $thatinfo
+     *  @param bf     $bfinfo
+     *  @return       a new collection of type `That` resulting from applying
+     *                the given function `f` to each element of the outer $coll
+     *                that satisfies predicate `p` and collecting the results.
+     *
+     *  @usecase def map[B](f: A => B): $Coll[B]
+     *    @inheritdoc
+     *
+     *    @return       a new $coll resulting from applying the given function
+     *                  `f` to each element of the outer $coll that satisfies
+     *                  predicate `p` and collecting the results.
+     */
+    def map[B, That](f: A => B)(implicit bf: CanBuildFrom[Repr, B, That]): That = {
+      val b = bf(repr)
+      for (x <- self)
+        if (p(x)) b += f(x)
+      b.result
+    }
+
+    /** Builds a new collection by applying a function to all elements of the
+     *  outer $coll containing this `WithFilter` instance that satisfy
+     *  predicate `p` and concatenating the results.
+     *
+     *  @param f      the function to apply to each element.
+     *  @tparam B     the element type of the returned collection.
+     *  @tparam That  $thatinfo
+     *  @param bf     $bfinfo
+     *  @return       a new collection of type `That` resulting from applying
+     *                the given collection-valued function `f` to each element
+     *                of the outer $coll that satisfies predicate `p` and
+     *                concatenating the results.
+     *
+     *  @usecase def flatMap[B](f: A => IterableOnce[B]): $Coll[B]
+     *    @inheritdoc
+     *
+     *    The type of the resulting collection will be guided by the static type
+     *    of the outer $coll.
+     *
+     *    @return       a new $coll resulting from applying the given
+     *                  collection-valued function `f` to each element of the
+     *                  outer $coll that satisfies predicate `p` and concatenating
+     *                  the results.
+     */
+    def flatMap[B, That](f: A => IterableOnce[B])(implicit bf: CanBuildFrom[Repr, B, That]): That = {
+      val b = bf(repr)
+      for (x <- self)
+        if (p(x)) b ++= f(x)
+      b.result
+    }
+
+    /** Applies a function `f` to all elements of the outer $coll containing
+     *  this `WithFilter` instance that satisfy predicate `p`.
+     *
+     *  @param  f   the function that is applied for its side-effect to every element.
+     *              The result of function `f` is discarded.
+     *
+     *  @tparam  U  the type parameter describing the result of function `f`.
+     *              This result will always be ignored. Typically `U` is `Unit`,
+     *              but this is not necessary.
+     *
+     *  @usecase def foreach(f: A => Unit): Unit
+     *    @inheritdoc
+     */
+    def foreach[U](f: A => U): Unit =
+      for (x <- self)
+        if (p(x)) f(x)
+
+    /** Further refines the filter for this $coll.
+     *
+     *  @param q   the predicate used to test elements.
+     *  @return    an object of class `WithFilter`, which supports
+     *             `map`, `flatMap`, `foreach`, and `withFilter` operations.
+     *             All these operations apply to those elements of this $coll which
+     *             satisfy the predicate `q` in addition to the predicate `p`.
+     */
+    def withFilter(q: A => Boolean): WithFilter =
+      new WithFilter(x => p(x) && q(x))
+  }
+
+  // A helper for tails and inits.
+  private def iterateUntilEmpty(f: Iterable[A @uV] => Iterable[A @uV]): Iterator[Repr] = {
+    val it = Iterator.iterate(thisCollection)(f) takeWhile (x => !x.isEmpty)
+    it ++ Iterator(Nil) map (x => (newBuilder ++= x).result)
+  }
+
+  /************************ END TRAVLIKE ***************************/
 
   // def iterator: Iterator[A]
   //
@@ -155,15 +826,17 @@ trait IterableLike[+A, +Repr] extends Any with Equals with TraversableLike[A, Re
   //  *                   If `that` is shorter than this $coll, `thatElem` values are used to pad the result.
   //  */
   // def zipAll[B, A1 >: A, That](that: Iterable[B], thisElem: A1, thatElem: B)(implicit bf: CBF[Repr, (A1, B), That]): That
-
-  override protected[this] def thisCollection: Iterable[A] = this.asInstanceOf[Iterable[A]]
-  override protected[this] def toCollection(repr: Repr): Iterable[A] = repr.asInstanceOf[Iterable[A]]
+  // 
+  // override protected[this] def thisCollection: Iterable[A] = this.asInstanceOf[Iterable[A]]
+  // override protected[this] def toCollection(repr: Repr): Iterable[A] = repr.asInstanceOf[Iterable[A]]
 
   /** Creates a new iterator over all elements contained in this iterable object.
    *
    *  @return the new iterator
    */
   def iterator: Iterator[A]
+  
+  // = toBuffer.iterator
 
   /** Applies a function `f` to all elements of this $coll.
    *
@@ -173,29 +846,34 @@ trait IterableLike[+A, +Repr] extends Any with Equals with TraversableLike[A, Re
    *  @usecase def foreach(f: A => Unit): Unit
    *    @inheritdoc
    */
-  def foreach[U](f: A => U): Unit =
-    iterator.foreach(f)
+  def foreach[U](f: A => U): Unit = iterator foreach f
+  // def foreach[U](f: A => U): Unit
+  
+  def forall(p: A => Boolean): Boolean = iterator forall p
+  def exists(p: A => Boolean): Boolean = iterator exists p
+  def find(p: A => Boolean): Option[A] = iterator find p
+  def isEmpty = !iterator.hasNext
+  override def foldRight[B](z: B)(op: (A, B) => B): B = iterator.foldRight(z)(op)
+  override def reduceRight[B >: A](op: (A, B) => B): B = iterator.reduceRight(op)
+  def head: A = iterator.next
 
-  override /*TraversableLike*/ def forall(p: A => Boolean): Boolean =
-    iterator.forall(p)
-  override /*TraversableLike*/ def exists(p: A => Boolean): Boolean =
-    iterator.exists(p)
-  override /*TraversableLike*/ def find(p: A => Boolean): Option[A] =
-    iterator.find(p)
-  override /*TraversableLike*/ def isEmpty: Boolean =
-    !iterator.hasNext
-  override /*TraversableLike*/ def foldRight[B](z: B)(op: (A, B) => B): B =
-    iterator.foldRight(z)(op)
-  override /*TraversableLike*/ def reduceRight[B >: A](op: (A, B) => B): B =
-    iterator.reduceRight(op)
-  override /*TraversableLike*/ def toIterable: Iterable[A] =
-    thisCollection
-  override /*TraversableLike*/ def toIterator: Iterator[A] =
-    iterator
-  override /*TraversableLike*/ def head: A =
-    iterator.next
+  // override /*IterableLike*/ def forall(p: A => Boolean): Boolean =
+  //   iterator.forall(p)
+  // override /*IterableLike*/ def exists(p: A => Boolean): Boolean =
+  //   iterator.exists(p)
+  // override /*IterableLike*/ def find(p: A => Boolean): Option[A] =
+  //   iterator.find(p)
+  // override /*IterableLike*/ def isEmpty: Boolean =
+  //   !iterator.hasNext
+  // override /*IterableLike*/ def foldRight[B](z: B)(op: (A, B) => B): B =
+  //   iterator.foldRight(z)(op)
+  // override /*IterableLike*/ def reduceRight[B >: A](op: (A, B) => B): B =
+  //   iterator.reduceRight(op)
+  // override /*IterableLike*/ def head: A =
+  //   iterator.next
 
-  override /*TraversableLike*/ def slice(from: Int, until: Int): Repr = {
+  // override 
+  /*IterableLike*/ def slice(from: Int, until: Int): Repr = {
     val lo = math.max(from, 0)
     val elems = until - lo
     val b = newBuilder
@@ -212,7 +890,8 @@ trait IterableLike[+A, +Repr] extends Any with Equals with TraversableLike[A, Re
     }
   }
 
-  override /*TraversableLike*/ def take(n: Int): Repr = {
+  // override 
+  /*IterableLike*/ def take(n: Int): Repr = {
     val b = newBuilder
 
     if (n <= 0) b.result
@@ -228,7 +907,8 @@ trait IterableLike[+A, +Repr] extends Any with Equals with TraversableLike[A, Re
     }
   }
 
-  override /*TraversableLike*/ def drop(n: Int): Repr = {
+  // override 
+  /*IterableLike*/ def drop(n: Int): Repr = {
     val b = newBuilder
     val lo = math.max(0, n)
     b.sizeHint(this, -lo)
@@ -241,7 +921,8 @@ trait IterableLike[+A, +Repr] extends Any with Equals with TraversableLike[A, Re
     (b ++= it).result
   }
 
-  override /*TraversableLike*/ def takeWhile(p: A => Boolean): Repr = {
+  // override 
+  /*IterableLike*/ def takeWhile(p: A => Boolean): Repr = {
     val b = newBuilder
     val it = iterator
     while (it.hasNext) {
@@ -334,16 +1015,6 @@ trait IterableLike[+A, +Repr] extends Any with Equals with TraversableLike[A, Re
     b.result
   }
 
-  override /*TraversableLike*/ def copyToArray[B >: A](xs: Array[B], start: Int, len: Int) {
-    var i = start
-    val end = (start + len) min xs.length
-    val it = iterator
-    while (i < end && it.hasNext) {
-      xs(i) = it.next
-      i += 1
-    }
-  }
-
   def zip[A1 >: A, B, That](that: Iterable[B])(implicit bf: CanBuildFrom[Repr, (A1, B), That]): That = {
     val b = bf(repr)
     val these = this.iterator
@@ -392,5 +1063,5 @@ trait IterableLike[+A, +Repr] extends Any with Equals with TraversableLike[A, Re
    *  @return  `true`, if this $coll can possibly equal `that`, `false` otherwise. The test
    *           takes into consideration only the run-time types of objects but ignores their elements.
    */
-  override /*TraversableLike*/ def canEqual(that: Any) = true
+  override /*IterableLike*/ def canEqual(that: Any) = true
 }

@@ -48,7 +48,7 @@ trait TraceSymbolActivity {
     ++ sym.typeParams
     ++ sym.paramss.flatten
   )
-  private def reachable[T](inputs: Traversable[T], mkSymbol: T => Symbol): Set[Symbol] = {
+  private def reachable[T](inputs: Iterable[T], mkSymbol: T => Symbol): Set[Symbol] = {
     def loop(seen: Set[Symbol], remaining: List[Symbol]): Set[Symbol] = {
       remaining match {
         case Nil          => seen
@@ -103,18 +103,18 @@ trait TraceSymbolActivity {
     sym.name.decode + "#" + sym.id
   }
 
-  private def freq[T, U](xs: collection.Traversable[T])(fn: T => U): List[(U, Int)] = {
+  private def freq[T, U](xs: collection.Iterable[T])(fn: T => U): List[(U, Int)] = {
     val ys = xs groupBy fn mapValues (_.size)
     ys.toList sortBy (-_._2)
   }
 
-  private def showMapFreq[T](xs: collection.Map[T, Traversable[_]])(showFn: T => String) {
+  private def showMapFreq[T](xs: collection.Map[T, Iterable[_]])(showFn: T => String) {
     xs.mapValues(_.size).toList.sortBy(-_._2) take 100 foreach { case (k, size) =>
       show(size, showFn(k))
     }
     println("\n")
   }
-  private def showFreq[T, U](xs: Traversable[T])(groupFn: T => U, showFn: U => String = (x: U) => "" + x) = {
+  private def showFreq[T, U](xs: Iterable[T])(groupFn: T => U, showFn: U => String = (x: U) => "" + x) = {
     showMapFreq(xs.toList groupBy groupFn)(showFn)
   }
   private lazy val findErasurePhase: Phase = {

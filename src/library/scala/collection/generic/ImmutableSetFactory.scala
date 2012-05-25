@@ -12,6 +12,6 @@ package generic
 import mutable.{ Builder, SetBuilder }
 import language.higherKinds
 
-abstract class ImmutableSetFactory[CC[X] <: immutable.Set[X] with SetLike[X, CC[X]] with GenericTraversableTemplate[X, CC]] extends SetFactory[CC] {
+abstract class ImmutableSetFactory[CC[X] <: immutable.Set[X] with SetLike[X, CC[X]] with GenericIterableTemplate[X, CC]] extends SetFactory[CC] {
   def newBuilder[A]: Builder[A, CC[A]] = new SetBuilder[A, CC[A]](empty[A])
 }

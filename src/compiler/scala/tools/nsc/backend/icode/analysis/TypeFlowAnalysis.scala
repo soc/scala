@@ -452,7 +452,7 @@ abstract class TypeFlowAnalysis {
 
     val preCandidates  = mutable.Set.empty[BasicBlock]
 
-    var callerLin: Traversable[BasicBlock] = null
+    var callerLin: Iterable[BasicBlock] = null
 
     override def run {
 
@@ -590,7 +590,7 @@ abstract class TypeFlowAnalysis {
       cm.method.isEffectivelyFinal && cm.method.owner.isEffectivelyFinal
     }
 
-    private def putOnRadar(blocks: Traversable[BasicBlock]) {
+    private def putOnRadar(blocks: Iterable[BasicBlock]) {
       for(bb <- blocks) {
         val preCands = bb.toList collect {
           case cm : opcodes.CALL_METHOD
@@ -606,7 +606,7 @@ abstract class TypeFlowAnalysis {
     private def transitivePreds(b: BasicBlock): Set[BasicBlock] = { transitivePreds(List(b)) }
 
     /* those BBs in the argument are also included in the result */
-    private def transitivePreds(starters: Traversable[BasicBlock]): Set[BasicBlock] = {
+    private def transitivePreds(starters: Iterable[BasicBlock]): Set[BasicBlock] = {
       val result = mutable.Set.empty[BasicBlock]
       var toVisit: List[BasicBlock] = starters.toList.distinct
       while(toVisit.nonEmpty) {
@@ -619,7 +619,7 @@ abstract class TypeFlowAnalysis {
     }
 
     /* those BBs in the argument are also included in the result */
-    private def transitiveSuccs(starters: Traversable[BasicBlock]): Set[BasicBlock] = {
+    private def transitiveSuccs(starters: Iterable[BasicBlock]): Set[BasicBlock] = {
       val result = mutable.Set.empty[BasicBlock]
       var toVisit: List[BasicBlock] = starters.toList.distinct
       while(toVisit.nonEmpty) {
@@ -743,7 +743,7 @@ abstract class TypeFlowAnalysis {
 
     /* this is not a general purpose method to add to the worklist,
      * because the assert is expected to hold only when called from MTFAGrowable.reinit() */
-    private def enqueue(bs: Traversable[BasicBlock]) {
+    private def enqueue(bs: Iterable[BasicBlock]) {
       bs foreach enqueue
     }
 

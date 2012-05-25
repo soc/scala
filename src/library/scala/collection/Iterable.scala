@@ -6,30 +6,16 @@
 **                          |/                                          **
 \*                                                                      */
 
-
-
 package scala.collection
 
 import generic._
-import scala.util.control.Breaks._
-import mutable.Builder
+import scala.util.control.Breaks
 
 /** A base trait for iterable collections.
  *  $iterableInfo
  */
-trait Iterable[+A] extends Traversable[A]
-                      with GenericTraversableTemplate[A, Iterable]
-                      with IterableLike[A, Iterable[A]] {
+trait Iterable[+A] extends IterableLike[A, Iterable[A]] with GenericIterableTemplate[A, Iterable] {
   override def companion: GenericCompanion[Iterable] = Iterable
-
-  /* The following methods are inherited from trait IterableLike
-   *
-  override def iterator: Iterator[A]
-  override def takeRight(n: Int): Iterable[A]
-  override def dropRight(n: Int): Iterable[A]
-  override def sameElements[B >: A](that: Iterable[B]): Boolean
-  */
-
 }
 
 /** $factoryInfo
@@ -37,13 +23,20 @@ trait Iterable[+A] extends Traversable[A]
  *  @define coll iterable collection
  *  @define Coll `Iterable`
  */
-object Iterable extends TraversableFactory[Iterable] {
+object Iterable extends IterableFactory[Iterable] {
+  /** Provides break functionality separate from client code */
+  private[collection] val breaks: Breaks = new Breaks
 
   /** $genericCanBuildFromInfo */
   implicit def canBuildFrom[A]: CanBuildFrom[Coll, A, Iterable[A]] = ReusableCBF.asInstanceOf[GenericCanBuildFrom[A]]
 
-  def newBuilder[A]: Builder[A, Iterable[A]] = immutable.Iterable.newBuilder[A]
+  def newBuilder[A]: mutable.Builder[A, Iterable[A]] = immutable.Iterable.newBuilder[A]
+  
+  def fromForeach[A](fn: (A => Unit) => Unit): Iterable[A] = new AbstractIterable[A] {
+    // override def foreach[U](f: A => Unit): Unit = fn(f)
+    override def iterator = toBuffer.iterator
+  }
 }
 
 /** Explicit instantiation of the `Iterable` trait to reduce class file size in subclasses. */
-private[scala] abstract class AbstractIterable[+A] extends AbstractTraversable[A] with Iterable[A]
+private[scala] abstract class AbstractIterable[+A] extends Iterable[A]

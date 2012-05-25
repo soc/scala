@@ -16,7 +16,7 @@ import language.higherKinds
  *
  *  @since 2.8
  */
-abstract class SeqFactory[CC[X] <: Seq[X] with GenericTraversableTemplate[X, CC]] extends TraversableFactory[CC] {
+abstract class SeqFactory[CC[X] <: Seq[X] with GenericIterableTemplate[X, CC]] extends IterableFactory[CC] {
   /** This method is called in a pattern match { case Seq(...) => }.
    *
    *  @param x the selector value
