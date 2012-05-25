@@ -29,11 +29,11 @@ trait Errors {
     val msg = "implementation restriction: cannot reify symbol %s (%s)".format(sym, sym.accurateKindString)
     throw new ReificationError(defaultErrorPosition, msg)
   }
-
-  def CannotReifyConcreteTypeTagHavingUnresolvedTypeParameters(tpe: Type) = {
-    val msg = "cannot reify ConcreteTypeTag having unresolved type parameter %s".format(tpe)
-    throw new ReificationError(defaultErrorPosition, msg)
-  }
+  // 
+  // def CannotReifyConcreteTypeTagHavingUnresolvedTypeParameters(tpe: Type) = {
+  //   val msg = "cannot reify ConcreteTypeTag having unresolved type parameter %s".format(tpe)
+  //   throw new ReificationError(defaultErrorPosition, msg)
+  // }
 
   // unexpected errors: these can never happen under normal conditions unless there's a bug in the compiler (or in a compiler plugin or in a macro)
   // hence, we fail fast and loudly and don't care about being nice - in this situation noone will appreciate our quiet nicety

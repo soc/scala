@@ -69,11 +69,11 @@ trait Types {
   def reificationIsConcrete = _reificationIsConcrete
   def reificationIsConcrete_=(value: Boolean) {
     _reificationIsConcrete = value
-    if (!value && concrete) {
-      assert(current.isInstanceOf[Type], current)
-      val offender = current.asInstanceOf[Type]
-      CannotReifyConcreteTypeTagHavingUnresolvedTypeParameters(offender)
-    }
+    // if (!value && concrete) {
+    //   assert(current.isInstanceOf[Type], current)
+    //   val offender = current.asInstanceOf[Type]
+    //   CannotReifyConcreteTypeTagHavingUnresolvedTypeParameters(offender)
+    // }
   }
 
   private type SpliceCacheKey = (Symbol, Symbol)
@@ -89,7 +89,7 @@ trait Types {
       if (reifyDebug) println("splicing " + tpe)
 
       if (spliceTypesEnabled) {
-        var tagClass = if (concrete) ConcreteTypeTagClass else TypeTagClass
+        var tagClass = TypeTagClass // if (concrete) ConcreteTypeTagClass else TypeTagClass
         val tagTpe = singleType(prefix.tpe, prefix.tpe member tagClass.name)
 
         // [Eugene] this should be enough for an abstract type, right?

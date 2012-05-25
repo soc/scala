@@ -650,7 +650,6 @@ trait StdNames {
     val materializeArrayTag: NameType  = "materializeArrayTag"
     val materializeClassTag: NameType  = "materializeClassTag"
     val materializeConcreteTypeTag: NameType = "materializeConcreteTypeTag"
-    // val materializeErasureTag: NameType= "materializeErasureTag"
     val materializeTypeTag: NameType   = "materializeTypeTag"
     val mirror : NameType              = "mirror"
     val moduleClass : NameType         = "moduleClass"

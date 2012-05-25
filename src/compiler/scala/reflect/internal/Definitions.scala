@@ -497,18 +497,16 @@ trait Definitions extends reflect.api.StandardDefinitions {
     lazy val ExprModule    = getMember(requiredClass[scala.reflect.api.Exprs], nme.Expr)
 
     lazy val ArrayTagClass         = requiredClass[scala.reflect.ArrayTag[_]]
-    // lazy val ErasureTagClass       = requiredClass[scala.reflect.ErasureTag[_]]
     lazy val ClassTagModule        = requiredModule[scala.reflect.ClassTag[_]]
     lazy val ClassTagClass         = requiredClass[scala.reflect.ClassTag[_]]
     lazy val TypeTagsClass         = requiredClass[scala.reflect.api.TypeTags]
     lazy val TypeTagClass          = getMemberClass(TypeTagsClass, tpnme.TypeTag)
     lazy val TypeTagModule         = getMemberModule(TypeTagsClass, nme.TypeTag)
-    lazy val ConcreteTypeTagClass  = getMemberClass(TypeTagsClass, tpnme.ConcreteTypeTag)
-    lazy val ConcreteTypeTagModule = getMemberModule(TypeTagsClass, nme.ConcreteTypeTag)
+    // lazy val ConcreteTypeTagClass  = getMemberClass(TypeTagsClass, tpnme.ConcreteTypeTag)
+    // lazy val ConcreteTypeTagModule = getMemberModule(TypeTagsClass, nme.ConcreteTypeTag)
 
          def ArrayTagWrap          = getMemberMethod(ArrayTagClass, nme.wrap)
          def ArrayTagNewArray      = getMemberMethod(ArrayTagClass, nme.newArray)
-         // def ErasureTagErasure     = getMemberMethod(ErasureTagClass, nme.erasure)
          def ClassTagTpe           = getMemberMethod(ClassTagClass, nme.tpe)
          def TypeTagTpe            = getMemberMethod(TypeTagClass, nme.tpe)
 
@@ -520,10 +518,9 @@ trait Definitions extends reflect.api.StandardDefinitions {
     lazy val MacroImplAnnotation                      = requiredClass[scala.reflect.makro.internal.macroImpl]
     lazy val MacroInternalPackage                     = getPackageObject("scala.reflect.makro.internal")
          def MacroInternal_materializeArrayTag        = getMemberMethod(MacroInternalPackage, nme.materializeArrayTag)
-         // def MacroInternal_materializeErasureTag      = getMemberMethod(MacroInternalPackage, nme.materializeErasureTag)
          def MacroInternal_materializeClassTag        = getMemberMethod(MacroInternalPackage, nme.materializeClassTag)
          def MacroInternal_materializeTypeTag         = getMemberMethod(MacroInternalPackage, nme.materializeTypeTag)
-         def MacroInternal_materializeConcreteTypeTag = getMemberMethod(MacroInternalPackage, nme.materializeConcreteTypeTag)
+         // def MacroInternal_materializeConcreteTypeTag = getMemberMethod(MacroInternalPackage, nme.materializeConcreteTypeTag)
 
     lazy val ScalaSignatureAnnotation = requiredClass[scala.reflect.ScalaSignature]
     lazy val ScalaLongSignatureAnnotation = requiredClass[scala.reflect.ScalaLongSignature]

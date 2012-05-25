@@ -155,7 +155,7 @@ trait Macros extends Traces {
       case TypeRef(SingleType(NoPrefix, contextParam), sym, List(tparam)) =>
         var wannabe = sym
         while (wannabe.isAliasType) wannabe = wannabe.info.typeSymbol
-        if (wannabe != definitions.TypeTagClass && wannabe != definitions.ConcreteTypeTagClass)
+        if (wannabe != definitions.TypeTagClass)  // && wannabe != definitions.ConcreteTypeTagClass)
           List(param)
         else
           transform(param, tparam.typeSymbol) map (_ :: Nil) getOrElse Nil
@@ -644,11 +644,6 @@ trait Macros extends Traces {
         val c = args(0).asInstanceOf[MacroContext]
         materializeArrayTag_impl(c)(args(1).asInstanceOf[c.Expr[Universe]])(args(2).asInstanceOf[c.TypeTag[_]])
       }),
-      // MacroInternal_materializeErasureTag -> (args => {
-      //   assert(args.length == 3, args)
-      //   val c = args(0).asInstanceOf[MacroContext]
-      //   materializeErasureTag_impl(c)(args(1).asInstanceOf[c.Expr[Universe]])(args(2).asInstanceOf[c.TypeTag[_]])
-      // }),
       MacroInternal_materializeClassTag -> (args => {
         assert(args.length == 3, args)
         val c = args(0).asInstanceOf[MacroContext]
@@ -659,11 +654,11 @@ trait Macros extends Traces {
         val c = args(0).asInstanceOf[MacroContext]
         materializeTypeTag_impl(c)(args(1).asInstanceOf[c.Expr[Universe]])(args(2).asInstanceOf[c.TypeTag[_]])
       }),
-      MacroInternal_materializeConcreteTypeTag -> (args => {
-        assert(args.length == 3, args)
-        val c = args(0).asInstanceOf[MacroContext]
-        materializeConcreteTypeTag_impl(c)(args(1).asInstanceOf[c.Expr[Universe]])(args(2).asInstanceOf[c.TypeTag[_]])
-      })
+      // MacroInternal_materializeConcreteTypeTag -> (args => {
+      //   assert(args.length == 3, args)
+      //   val c = args(0).asInstanceOf[MacroContext]
+      //   materializeConcreteTypeTag_impl(c)(args(1).asInstanceOf[c.Expr[Universe]])(args(2).asInstanceOf[c.TypeTag[_]])
+      // })
     )
   }
   private def macroRuntime(macroDef: Symbol): Option[MacroRuntime] = {
@@ -920,9 +915,9 @@ trait Macros extends Traces {
       param.tpe.typeSymbol match {
         case definitions.TypeTagClass =>
           // do nothing
-        case definitions.ConcreteTypeTagClass =>
-          if (!tpe.isConcrete) context.abort(context.enclosingPosition, "cannot create ConcreteTypeTag from a type %s having unresolved type parameters".format(tpe))
-          // otherwise do nothing
+        // case definitions.ConcreteTypeTagClass =>
+        //   if (!tpe.isConcrete) context.abort(context.enclosingPosition, "cannot create ConcreteTypeTag from a type %s having unresolved type parameters".format(tpe))
+        //   // otherwise do nothing
         case _ =>
           throw new Error("unsupported tpe: " + tpe)
       }
