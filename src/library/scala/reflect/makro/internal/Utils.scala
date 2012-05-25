@@ -12,13 +12,13 @@ package object internal {
   /** This method is required by the compiler and <b>should not be used in client code</b>. */
   def materializeArrayTag_impl[T: c.TypeTag](c: Context)(u: c.Expr[Universe]): c.Expr[ArrayTag[T]] =
     c.Expr[Nothing](c.materializeArrayTag(u.tree, implicitly[c.TypeTag[T]].tpe))(c.TypeTag.Nothing)
-
+  
   /** This method is required by the compiler and <b>should not be used in client code</b>. */
   def materializeErasureTag[T](u: Universe): ErasureTag[T] = macro materializeErasureTag_impl[T]
-
+  
   /** This method is required by the compiler and <b>should not be used in client code</b>. */
-  def materializeErasureTag_impl[T: c.TypeTag](c: Context)(u: c.Expr[Universe]): c.Expr[ErasureTag[T]] =
-    c.Expr[Nothing](c.materializeErasureTag(u.tree, implicitly[c.TypeTag[T]].tpe, concrete = false))(c.TypeTag.Nothing)
+  def materializeErasureTag_impl[T: c.TypeTag](c: Context)(u: c.Expr[Universe]): c.Expr[ErasureTag[T]] = ???
+    // c.Expr[Nothing](c.materializeErasureTag(u.tree, implicitly[c.TypeTag[T]].tpe, concrete = false))(c.TypeTag.Nothing)
 
   /** This method is required by the compiler and <b>should not be used in client code</b>. */
   def materializeClassTag[T](u: Universe): ClassTag[T] = macro materializeClassTag_impl[T]
@@ -75,12 +75,9 @@ package internal {
     def materializeArrayTag(prefix: Tree, tpe: Type): Tree =
       materializeClassTag(prefix, tpe)
 
-    def materializeErasureTag(prefix: Tree, tpe: Type, concrete: Boolean): Tree =
-      if (concrete) materializeClassTag(prefix, tpe) else materializeTypeTag(prefix, tpe, concrete = false)
-
     def materializeClassTag(prefix: Tree, tpe: Type): Tree =
       materializeTag(prefix, tpe, ClassTagModule, {
-        val erasure = c.reifyErasure(tpe, concrete = true)
+        val erasure = c.reifyClass(tpe)
         val factory = TypeApply(Select(Ident(ClassTagModule), "apply"), List(TypeTree(tpe)))
         Apply(factory, List(erasure))
       })

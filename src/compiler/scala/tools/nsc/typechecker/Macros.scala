@@ -644,11 +644,11 @@ trait Macros extends Traces {
         val c = args(0).asInstanceOf[MacroContext]
         materializeArrayTag_impl(c)(args(1).asInstanceOf[c.Expr[Universe]])(args(2).asInstanceOf[c.TypeTag[_]])
       }),
-      MacroInternal_materializeErasureTag -> (args => {
-        assert(args.length == 3, args)
-        val c = args(0).asInstanceOf[MacroContext]
-        materializeErasureTag_impl(c)(args(1).asInstanceOf[c.Expr[Universe]])(args(2).asInstanceOf[c.TypeTag[_]])
-      }),
+      // MacroInternal_materializeErasureTag -> (args => {
+      //   assert(args.length == 3, args)
+      //   val c = args(0).asInstanceOf[MacroContext]
+      //   materializeErasureTag_impl(c)(args(1).asInstanceOf[c.Expr[Universe]])(args(2).asInstanceOf[c.TypeTag[_]])
+      // }),
       MacroInternal_materializeClassTag -> (args => {
         assert(args.length == 3, args)
         val c = args(0).asInstanceOf[MacroContext]

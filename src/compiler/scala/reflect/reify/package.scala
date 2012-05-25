@@ -28,14 +28,14 @@ package object reify {
   def reifyType(global: Global)(typer: global.analyzer.Typer, prefix: global.Tree, tpe: global.Type, dontSpliceAtTopLevel: Boolean = false, concrete: Boolean = false): global.Tree =
     mkReifier(global)(typer, prefix, tpe, dontSpliceAtTopLevel, concrete).reified.asInstanceOf[global.Tree]
 
-  def reifyErasure(global: Global)(typer0: global.analyzer.Typer, tpe: global.Type, concrete: Boolean = true): global.Tree = {
+  def reifyClass(global: Global)(typer0: global.analyzer.Typer, tpe: global.Type): global.Tree = {
     import global._
     import definitions._
     import analyzer.enclosingMacroPosition
 
-    def erasureTagInScope = typer0.context.withMacrosDisabled(typer0.resolveErasureTag(tpe, enclosingMacroPosition, concrete = concrete))
+    def classTagInScope = typer0.context.withMacrosDisabled(typer0.resolveClassTag(tpe, enclosingMacroPosition))
     def arrayTagInScope = typer0.context.withMacrosDisabled(typer0.resolveArrayTag(tpe, enclosingMacroPosition))
-    val inScope = (erasureTagInScope, arrayTagInScope)
+    val inScope = (classTagInScope, arrayTagInScope)
 
     inScope match {
       case (success, _) if !success.isEmpty =>
@@ -45,10 +45,10 @@ package object reify {
       case _ =>
         tpe.normalize match {
           case TypeRef(_, ArrayClass, componentTpe :: Nil) =>
-            val componentErasure = reifyErasure(global)(typer0, componentTpe, concrete)
+            val componentErasure = reifyClass(global)(typer0, componentTpe)
             gen.mkMethodCall(arrayClassMethod, List(componentErasure))
           case _ =>
-            if (tpe.isSpliceable && concrete)
+            if (tpe.isSpliceable)
               throw new ReificationError(enclosingMacroPosition, "tpe %s is an unresolved spliceable type".format(tpe))
             var erasure = tpe.erasure
             if (tpe.typeSymbol.isDerivedValueClass && global.phase.id < global.currentRun.erasurePhase.id) erasure = tpe

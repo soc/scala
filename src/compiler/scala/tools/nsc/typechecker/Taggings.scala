@@ -47,8 +47,8 @@ trait Taggings {
      *  @returns Tree that represents an `scala.reflect.ErasureTag` for `tp` if everything is okay.
      *           EmptyTree if `concrete` is true and the result contains unresolved (i.e. not spliced) type parameters and abstract type members.
      */
-    def resolveErasureTag(tp: Type, pos: Position, concrete: Boolean): Tree = {
-      val taggedTp = appliedType(if (concrete) ClassTagClass else ErasureTagClass, tp)
+    def resolveClassTag(tp: Type, pos: Position): Tree = {
+      val taggedTp = appliedType(ClassTagClass, tp)
       resolveTag(taggedTp, pos)
     }
 

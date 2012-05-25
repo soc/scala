@@ -51,7 +51,7 @@ trait Reifiers {
   /** Given a type, generate a tree that when compiled and executed produces the erasure of the original type.
    *  If ``concrete'' is true, then this function will bail on types, whose erasure includes abstract types (like `ClassTag` does).
    */
-  def reifyErasure(tpe: Type, concrete: Boolean = true): Tree
+  def reifyClass(tpe: Type): Tree
 
   /** Undoes reification of a tree.
    *

@@ -1129,7 +1129,7 @@ trait Implicits {
     private def TagSymbols =  TagMaterializers.keySet
     private val TagMaterializers = Map[Symbol, Symbol](
       ArrayTagClass        -> MacroInternal_materializeArrayTag,
-      ErasureTagClass      -> MacroInternal_materializeErasureTag,
+      // ErasureTagClass      -> MacroInternal_materializeErasureTag,
       ClassTagClass        -> MacroInternal_materializeClassTag,
       TypeTagClass         -> MacroInternal_materializeTypeTag,
       ConcreteTypeTagClass -> MacroInternal_materializeConcreteTypeTag
@@ -1164,7 +1164,7 @@ trait Implicits {
       val prefix = (
         // ClassTags only exist for scala.reflect.mirror, so their materializer
         // doesn't care about prefixes
-        if ((tagClass eq ArrayTagClass) || (tagClass eq ErasureTagClass) || (tagClass eq ClassTagClass)) ReflectMirrorPrefix
+        if ((tagClass eq ArrayTagClass) || (tagClass eq ClassTagClass)) ReflectMirrorPrefix
         else pre match {
           // [Eugene to Martin] this is the crux of the interaction between
           // implicits and reifiers here we need to turn a (supposedly

@@ -497,7 +497,7 @@ trait Definitions extends reflect.api.StandardDefinitions {
     lazy val ExprModule    = getMember(requiredClass[scala.reflect.api.Exprs], nme.Expr)
 
     lazy val ArrayTagClass         = requiredClass[scala.reflect.ArrayTag[_]]
-    lazy val ErasureTagClass       = requiredClass[scala.reflect.ErasureTag[_]]
+    // lazy val ErasureTagClass       = requiredClass[scala.reflect.ErasureTag[_]]
     lazy val ClassTagModule        = requiredModule[scala.reflect.ClassTag[_]]
     lazy val ClassTagClass         = requiredClass[scala.reflect.ClassTag[_]]
     lazy val TypeTagsClass         = requiredClass[scala.reflect.api.TypeTags]
@@ -508,7 +508,7 @@ trait Definitions extends reflect.api.StandardDefinitions {
 
          def ArrayTagWrap          = getMemberMethod(ArrayTagClass, nme.wrap)
          def ArrayTagNewArray      = getMemberMethod(ArrayTagClass, nme.newArray)
-         def ErasureTagErasure     = getMemberMethod(ErasureTagClass, nme.erasure)
+         // def ErasureTagErasure     = getMemberMethod(ErasureTagClass, nme.erasure)
          def ClassTagTpe           = getMemberMethod(ClassTagClass, nme.tpe)
          def TypeTagTpe            = getMemberMethod(TypeTagClass, nme.tpe)
 
@@ -520,7 +520,7 @@ trait Definitions extends reflect.api.StandardDefinitions {
     lazy val MacroImplAnnotation                      = requiredClass[scala.reflect.makro.internal.macroImpl]
     lazy val MacroInternalPackage                     = getPackageObject("scala.reflect.makro.internal")
          def MacroInternal_materializeArrayTag        = getMemberMethod(MacroInternalPackage, nme.materializeArrayTag)
-         def MacroInternal_materializeErasureTag      = getMemberMethod(MacroInternalPackage, nme.materializeErasureTag)
+         // def MacroInternal_materializeErasureTag      = getMemberMethod(MacroInternalPackage, nme.materializeErasureTag)
          def MacroInternal_materializeClassTag        = getMemberMethod(MacroInternalPackage, nme.materializeClassTag)
          def MacroInternal_materializeTypeTag         = getMemberMethod(MacroInternalPackage, nme.materializeTypeTag)
          def MacroInternal_materializeConcreteTypeTag = getMemberMethod(MacroInternalPackage, nme.materializeConcreteTypeTag)
@@ -1016,7 +1016,7 @@ trait Definitions extends reflect.api.StandardDefinitions {
     def getRequiredModule(fullname: String): ModuleSymbol =
       getModule(newTermNameCached(fullname))
 
-    def erasureName[T: ErasureTag] : String = {
+    def erasureName[T: ClassTag] : String = {
       /** We'd like the String representation to be a valid
        *  scala type, so we have to decode the jvm's secret language.
        */
@@ -1024,7 +1024,7 @@ trait Definitions extends reflect.api.StandardDefinitions {
         if (clazz.isArray) "Array[" + erasureString(clazz.getComponentType) + "]"
         else clazz.getName
       }
-      erasureString(implicitly[ErasureTag[T]].erasure)
+      erasureString(implicitly[ClassTag[T]].erasure)
     }
 
     def requiredClass[T: ClassTag] : ClassSymbol = getRequiredClass(erasureName[T])
