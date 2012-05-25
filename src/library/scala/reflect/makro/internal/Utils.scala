@@ -83,7 +83,7 @@ package internal {
       })
 
     def materializeTypeTag(prefix: Tree, tpe: Type, concrete: Boolean): Tree = {
-      val tagModule = if (concrete) ConcreteTypeTagModule else TypeTagModule
+      val tagModule = TypeTagModule // if (concrete) ConcreteTypeTagModule else TypeTagModule
       materializeTag(prefix, tpe, tagModule, c.reifyType(prefix, tpe, dontSpliceAtTopLevel = true, concrete = concrete))
     }
 

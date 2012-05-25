@@ -12,6 +12,7 @@ import mutable.ListBuffer
 import backend.icode._
 import ClassfileConstants._
 import scala.reflect.internal.Flags._
+import annotation.switch
 
 /** ICode reader from Java bytecode.
  *
@@ -226,7 +227,7 @@ abstract class ICodeReader extends ClassfileParser {
       }
 
       val instr = toUnsignedByte(in.nextByte)
-      instr match {
+      (instr: @switch) match {
         case JVM.nop => parseInstruction
         case JVM.aconst_null => code emit CONSTANT(Constant(null))
         case JVM.iconst_m1   => code emit CONSTANT(Constant(-1))

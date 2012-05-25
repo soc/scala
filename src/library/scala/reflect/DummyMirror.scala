@@ -212,8 +212,8 @@ class DummyMirror(cl: ClassLoader) extends api.Mirror {
     def ClassClass = DummyClassSymbol
     def ClassTagClass = DummyClassSymbol
     def ClassTagModule = DummySymbol
-    def ConcreteTypeTagClass = DummyClassSymbol
-    def ConcreteTypeTagModule = DummySymbol
+    // def ConcreteTypeTagClass = DummyClassSymbol
+    // def ConcreteTypeTagModule = DummySymbol
     def ConsClass = DummySymbol
     def DoubleClass = DummyClassSymbol
     def EmptyPackage = DummyPackageSymbol

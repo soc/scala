@@ -129,7 +129,7 @@ trait StdNames {
     final val Symbol: NameType = "Symbol"
     final val ClassTag: NameType = "ClassTag"
     final val TypeTag : NameType = "TypeTag"
-    final val ConcreteTypeTag: NameType = "ConcreteTypeTag"
+    // final val ConcreteTypeTag: NameType = "ConcreteTypeTag"
 
     // fictions we use as both types and terms
     final val ERROR: NameType    = "<error>"
@@ -645,11 +645,11 @@ trait StdNames {
     val macroContext : NameType        = "c"
     val main: NameType                 = "main"
     val manifest: NameType             = "manifest"
-    val manifestToConcreteTypeTag: NameType = "manifestToConcreteTypeTag"
+    // val manifestToConcreteTypeTag: NameType = "manifestToConcreteTypeTag"
     val map: NameType                  = "map"
     val materializeArrayTag: NameType  = "materializeArrayTag"
     val materializeClassTag: NameType  = "materializeClassTag"
-    val materializeConcreteTypeTag: NameType = "materializeConcreteTypeTag"
+    // val materializeConcreteTypeTag: NameType = "materializeConcreteTypeTag"
     val materializeTypeTag: NameType   = "materializeTypeTag"
     val mirror : NameType              = "mirror"
     val moduleClass : NameType         = "moduleClass"

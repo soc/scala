@@ -653,7 +653,7 @@ trait Macros extends Traces {
         assert(args.length == 3, args)
         val c = args(0).asInstanceOf[MacroContext]
         materializeTypeTag_impl(c)(args(1).asInstanceOf[c.Expr[Universe]])(args(2).asInstanceOf[c.TypeTag[_]])
-      }),
+      })
       // MacroInternal_materializeConcreteTypeTag -> (args => {
       //   assert(args.length == 3, args)
       //   val c = args(0).asInstanceOf[MacroContext]

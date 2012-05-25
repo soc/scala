@@ -64,7 +64,7 @@ trait Taggings {
      *           EmptyTree if `concrete` is true and the result contains unresolved (i.e. not spliced) type parameters and abstract type members.
      */
     def resolveTypeTag(pre: Type, tp: Type, pos: Position, concrete: Boolean): Tree = {
-      val taggedTp = appliedType(singleType(pre, pre member TypeTagClass.name, List(tp))
+      val taggedTp = appliedType(singleType(pre, pre member TypeTagClass.name), List(tp))
         // (if (concrete) ConcreteTypeTagClass else TypeTagClass).name), List(tp))
       resolveTag(taggedTp, pos)
     }

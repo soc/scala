@@ -22,72 +22,72 @@ trait MethodSynthesis {
   import CODE._
 
   object synthesisUtil {
-    type CTT[T]  = rm.ConcreteTypeTag[T]
-    type CT[T] = ClassTag[T]
+    // type CTT[T]  = ClassTag[T]
+    // type CT[T] = ClassTag[T]
 
     def ValOrDefDef(sym: Symbol, body: Tree) =
       if (sym.isLazy) ValDef(sym, body)
       else DefDef(sym, body)
+    // 
+    // def applyTypeInternal(tags: List[CTT[_]]): Type = {
+    //   // [Eugene to Paul] needs review!!
+    //   val symbols = tags map compilerSymbolFromTag
+    //   val container :: args = symbols
+    //   val tparams = container.typeConstructor.typeParams
+    // 
+    //   // Conservative at present - if manifests were more usable this could do a lot more.
+    //   // [Eugene to Paul] all right, they are now. what do you have in mind?
+    //   require(symbols forall (_ ne NoSymbol), "Must find all tags: " + symbols)
+    //   require(container.owner.isPackageClass, "Container must be a top-level class in a package: " + container)
+    //   require(tparams.size == args.size, "Arguments must match type constructor arity: " + tparams + ", " + args)
+    // 
+    //   appliedType(container, args map (_.tpe): _*)
+    // }
 
-    def applyTypeInternal(tags: List[CTT[_]]): Type = {
-      // [Eugene to Paul] needs review!!
-      val symbols = tags map compilerSymbolFromTag
-      val container :: args = symbols
-      val tparams = container.typeConstructor.typeParams
-
-      // Conservative at present - if manifests were more usable this could do a lot more.
-      // [Eugene to Paul] all right, they are now. what do you have in mind?
-      require(symbols forall (_ ne NoSymbol), "Must find all tags: " + symbols)
-      require(container.owner.isPackageClass, "Container must be a top-level class in a package: " + container)
-      require(tparams.size == args.size, "Arguments must match type constructor arity: " + tparams + ", " + args)
-
-      appliedType(container, args map (_.tpe): _*)
-    }
-
-    def companionType[T](implicit m: CTT[T]) =
-      getRequiredModule(m.erasure.getName).tpe
+    // def companionType[T](implicit m: ClassTag[T]) =
+    //   getRequiredModule(m.erasure.getName).tpe
 
     // Use these like `applyType[List, Int]` or `applyType[Map, Int, String]`
-    def applyType[CC](implicit m1: CTT[CC]): Type =
-      applyTypeInternal(List(m1))
+    // def applyType[CC](implicit m1: CTT[CC]): Type =
+    //   applyTypeInternal(List(m1))
+    // 
+    // def applyType[CC[X1], X1](implicit m1: CTT[CC[_]], m2: CTT[X1]): Type =
+    //   applyTypeInternal(List(m1, m2))
+    // 
+    // def applyType[CC[X1, X2], X1, X2](implicit m1: CTT[CC[_,_]], m2: CTT[X1], m3: CTT[X2]): Type =
+    //   applyTypeInternal(List(m1, m2, m3))
+    // 
+    // def applyType[CC[X1, X2, X3], X1, X2, X3](implicit m1: CTT[CC[_,_,_]], m2: CTT[X1], m3: CTT[X2], m4: CTT[X3]): Type =
+    //   applyTypeInternal(List(m1, m2, m3, m4))
+    // 
+    // def newMethodType[F](owner: Symbol)(implicit t: CTT[F]): Type = {
+    //   val fnSymbol = compilerSymbolFromTag(t)
+    //   assert(fnSymbol isSubClass FunctionClass(t.tpe.typeArguments.size - 1), (owner, t))
+    //   // [Eugene to Paul] needs review!!
+    //   // val symbols = m.typeArguments map (m => manifestToSymbol(m))
+    //   // val formals = symbols.init map (_.typeConstructor)
+    //   val formals = compilerTypeFromTag(t).typeArguments
+    //   val params  = owner newSyntheticValueParams formals
+    //   MethodType(params, formals.last)
+    // }
 
-    def applyType[CC[X1], X1](implicit m1: CTT[CC[_]], m2: CTT[X1]): Type =
-      applyTypeInternal(List(m1, m2))
-
-    def applyType[CC[X1, X2], X1, X2](implicit m1: CTT[CC[_,_]], m2: CTT[X1], m3: CTT[X2]): Type =
-      applyTypeInternal(List(m1, m2, m3))
-
-    def applyType[CC[X1, X2, X3], X1, X2, X3](implicit m1: CTT[CC[_,_,_]], m2: CTT[X1], m3: CTT[X2], m4: CTT[X3]): Type =
-      applyTypeInternal(List(m1, m2, m3, m4))
-
-    def newMethodType[F](owner: Symbol)(implicit t: CTT[F]): Type = {
-      val fnSymbol = compilerSymbolFromTag(t)
-      assert(fnSymbol isSubClass FunctionClass(t.tpe.typeArguments.size - 1), (owner, t))
-      // [Eugene to Paul] needs review!!
-      // val symbols = m.typeArguments map (m => manifestToSymbol(m))
-      // val formals = symbols.init map (_.typeConstructor)
-      val formals = compilerTypeFromTag(t).typeArguments
-      val params  = owner newSyntheticValueParams formals
-      MethodType(params, formals.last)
-    }
-
-      /** The annotations amongst those found on the original symbol which
-       *  should be propagated to this kind of accessor.
-       */
-      def deriveAnnotations(initial: List[AnnotationInfo], category: Symbol, keepClean: Boolean): List[AnnotationInfo] = {
-        initial filter { ann =>
-          // There are no meta-annotation arguments attached to `ann`
-          if (ann.metaAnnotations.isEmpty) {
-            // A meta-annotation matching `annotKind` exists on `ann`'s definition.
-            (ann.defaultTargets contains category) ||
-            // `ann`'s definition has no meta-annotations, and `keepClean` is true.
-            (ann.defaultTargets.isEmpty && keepClean)
-          }
-          // There are meta-annotation arguments, and one of them matches `annotKind`
-          else ann.metaAnnotations exists (_ matches category)
+    /** The annotations amongst those found on the original symbol which
+     *  should be propagated to this kind of accessor.
+     */
+    def deriveAnnotations(initial: List[AnnotationInfo], category: Symbol, keepClean: Boolean): List[AnnotationInfo] = {
+      initial filter { ann =>
+        // There are no meta-annotation arguments attached to `ann`
+        if (ann.metaAnnotations.isEmpty) {
+          // A meta-annotation matching `annotKind` exists on `ann`'s definition.
+          (ann.defaultTargets contains category) ||
+          // `ann`'s definition has no meta-annotations, and `keepClean` is true.
+          (ann.defaultTargets.isEmpty && keepClean)
         }
+        // There are meta-annotation arguments, and one of them matches `annotKind`
+        else ann.metaAnnotations exists (_ matches category)
       }
-   }
+    }
+  }
   import synthesisUtil._
 
   class ClassMethodSynthesis(val clazz: Symbol, localTyper: Typer) {
