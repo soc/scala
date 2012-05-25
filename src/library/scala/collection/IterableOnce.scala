@@ -722,7 +722,7 @@ trait IterableOnce[+A] extends Any {
 object IterableOnce {
   implicit def orderedIterableOnce[A](xs: IterableOnce[A]) = new OrderOps(xs)
   implicit def numericIterableOnce[A](xs: IterableOnce[A]) = new NumOps(xs)
-  implicit def alternateImplicit[A](trav: IterableOnce[A]) = new ForceImplicitAmbiguity
+  // implicit def alternateImplicit[A](trav: IterableOnce[A]) = new ForceImplicitAmbiguity
   implicit def flattenIterableOnce[A, CC[_]](travs: IterableOnce[CC[A]])(implicit ev: CC[A] => IterableOnce[A]) =
     new FlattenOps[A](travs map ev)
   
@@ -847,8 +847,8 @@ object IterableOnce {
       def next(): A = if (hasNext) it.next() else Iterator.empty.next()
     }
   }
-
-  class ForceImplicitAmbiguity
+  // 
+  // class ForceImplicitAmbiguity
 
   implicit class MonadOps[+A](trav: IterableOnce[A]) {
     def map[B](f: A => B): IterableOnce[B] = trav.toIterator map f
