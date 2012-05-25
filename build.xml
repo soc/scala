@@ -272,6 +272,7 @@ INITIALISATION
       <pathelement location="${forkjoin.jar}"/>
       <pathelement location="${scala-xml.jar}"/>
       <pathelement location="${ant.jar}"/>
+      <pathelement location="build/asm/classes"/>
       <path refid="lib.extra"/>
       <path refid="dependency.classpath"/>
     </path>

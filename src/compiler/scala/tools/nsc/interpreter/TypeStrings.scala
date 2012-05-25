@@ -209,7 +209,7 @@ trait TypeStrings {
     brackets(clazz.getTypeParameters map tvarString: _*)
   }
 
-  private def tparamString[T: TypeTag] : String = {
+  private def tparamString[T: ClassTag] : String = {
     // [Eugene to Paul] needs review!!
     def typeArguments: List[rm.Type] = typeTag[T].tpe.typeArguments
     def typeVariables: List[java.lang.Class[_]] = typeArguments map (targ => rm.typeToClass(targ))
@@ -224,10 +224,10 @@ trait TypeStrings {
    *  practice to rely on toString for correctness) generated the VALID string
    *  representation of the type.
    */
-  def fromTypedValue[T: TypeTag](x: T): String = fromTag[T]
+  def fromTypedValue[T: ClassTag](x: T): String = fromTag[T]
   def fromValue(value: Any): String            = if (value == null) "Null" else fromClazz(anyClass(value))
   def fromClazz(clazz: JClass): String         = scalaName(clazz) + tparamString(clazz)
-  def fromTag[T: TypeTag] : String             = scalaName(typeTag[T].erasure) + tparamString[T]
+  def fromTag[T: ClassTag] : String             = scalaName(typeTag[T].erasure) + tparamString[T]
 
   /** Reducing fully qualified noise for some common packages.
    */

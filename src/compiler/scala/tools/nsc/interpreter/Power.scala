@@ -42,7 +42,7 @@ Lost after 18/flatten {
 
 /** A class for methods to be injected into the intp in power mode.
  */
-class Power[ReplValsImpl <: ReplVals : TypeTag](val intp: IMain, replVals: ReplValsImpl) {
+class Power[ReplValsImpl <: ReplVals : ClassTag](val intp: IMain, replVals: ReplValsImpl) {
   import intp.{ beQuietDuring, typeOfExpression, interpret, parse }
   import intp.global._
   import definitions.{ compilerTypeFromTag, compilerSymbolFromTag, getClassIfDefined, getModuleIfDefined }
@@ -162,7 +162,7 @@ class Power[ReplValsImpl <: ReplVals : TypeTag](val intp: IMain, replVals: ReplV
   }
 
   trait LowPriorityInternalInfo {
-    implicit def apply[T: TypeTag] : InternalInfo[T] = new InternalInfo[T](None)
+    implicit def apply[T: ClassTag] : InternalInfo[T] = new InternalInfo[T](None)
   }
   object InternalInfo extends LowPriorityInternalInfo { }
 
@@ -173,12 +173,12 @@ class Power[ReplValsImpl <: ReplVals : TypeTag](val intp: IMain, replVals: ReplV
    *  of the conveniences exist on that wrapper.
    */
   trait LowPriorityInternalInfoWrapper {
-    implicit def apply[T: TypeTag] : InternalInfoWrapper[T] = new InternalInfoWrapper[T](None)
+    implicit def apply[T: ClassTag] : InternalInfoWrapper[T] = new InternalInfoWrapper[T](None)
   }
   object InternalInfoWrapper extends LowPriorityInternalInfoWrapper {
 
   }
-  class InternalInfoWrapper[T: TypeTag](value: Option[T] = None) {
+  class InternalInfoWrapper[T: ClassTag](value: Option[T] = None) {
     def ? : InternalInfo[T] = new InternalInfo[T](value)
   }
 
@@ -186,8 +186,8 @@ class Power[ReplValsImpl <: ReplVals : TypeTag](val intp: IMain, replVals: ReplV
    *    translate tag type arguments into applied types
    *    customizable symbol filter (had to hardcode no-spec to reduce noise)
    */
-  class InternalInfo[T: TypeTag](value: Option[T] = None) {
-    private def newInfo[U: TypeTag](value: U): InternalInfo[U] = new InternalInfo[U](Some(value))
+  class InternalInfo[T: ClassTag](value: Option[T] = None) {
+    private def newInfo[U: ClassTag](value: U): InternalInfo[U] = new InternalInfo[U](Some(value))
     private def isSpecialized(s: Symbol) = s.name.toString contains "$mc"
     private def isImplClass(s: Symbol)   = s.name.toString endsWith "$class"
 
@@ -236,9 +236,9 @@ class Power[ReplValsImpl <: ReplVals : TypeTag](val intp: IMain, replVals: ReplV
     def ancestorDeclares(name: String) = ancestors filter (_.info member newTermName(name) ne NoSymbol)
     def baseTypes                      = tpe.baseTypeSeq.toList
 
-    def <:<[U: TypeTag](other: U) = tpe <:< newInfo(other).tpe
-    def lub[U: TypeTag](other: U) = intp.global.lub(List(tpe, newInfo(other).tpe))
-    def glb[U: TypeTag](other: U) = intp.global.glb(List(tpe, newInfo(other).tpe))
+    def <:<[U: ClassTag](other: U) = tpe <:< newInfo(other).tpe
+    def lub[U: ClassTag](other: U) = intp.global.lub(List(tpe, newInfo(other).tpe))
+    def glb[U: ClassTag](other: U) = intp.global.glb(List(tpe, newInfo(other).tpe))
 
     override def toString = value match {
       case Some(x)  => "%s (%s)".format(x, shortClass)
@@ -362,7 +362,7 @@ class Power[ReplValsImpl <: ReplVals : TypeTag](val intp: IMain, replVals: ReplV
     implicit lazy val powerSymbolOrdering: Ordering[Symbol] = Ordering[Name] on (_.name)
     implicit lazy val powerTypeOrdering: Ordering[Type]     = Ordering[Symbol] on (_.typeSymbol)
 
-    implicit def replInternalInfo[T: TypeTag](x: T): InternalInfoWrapper[T] = new InternalInfoWrapper[T](Some(x))
+    implicit def replInternalInfo[T: ClassTag](x: T): InternalInfoWrapper[T] = new InternalInfoWrapper[T](Some(x))
     implicit def replEnhancedStrings(s: String): RichReplString = new RichReplString(s)
     implicit def replMultiPrinting[T: Prettifier](xs: TraversableOnce[T]): MultiPrettifierClass[T] =
       new MultiPrettifierClass[T](xs.toSeq)
@@ -378,12 +378,12 @@ class Power[ReplValsImpl <: ReplVals : TypeTag](val intp: IMain, replVals: ReplV
 
   trait ReplUtilities {
     // [Eugene to Paul] needs review!
-    // def module[T: TypeTag] = getModuleIfDefined(typeTag[T].erasure.getName stripSuffix nme.MODULE_SUFFIX_STRING)
-    // def clazz[T: TypeTag] = getClassIfDefined(typeTag[T].erasure.getName)
-    def module[T: TypeTag] = typeTag[T].sym.suchThat(_.isPackage)
-    def clazz[T: TypeTag] = typeTag[T].sym.suchThat(_.isClass)
-    def info[T: TypeTag] = InternalInfo[T]
-    def ?[T: TypeTag] = InternalInfo[T]
+    // def module[T: ClassTag] = getModuleIfDefined(typeTag[T].erasure.getName stripSuffix nme.MODULE_SUFFIX_STRING)
+    // def clazz[T: ClassTag] = getClassIfDefined(typeTag[T].erasure.getName)
+    def module[T: ClassTag] = typeTag[T].sym.suchThat(_.isPackage)
+    def clazz[T: ClassTag] = typeTag[T].sym.suchThat(_.isClass)
+    def info[T: ClassTag] = InternalInfo[T]
+    def ?[T: ClassTag] = InternalInfo[T]
     def url(s: String) = {
       try new URL(s)
       catch { case _: MalformedURLException =>
