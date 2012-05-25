@@ -15,6 +15,7 @@ import generic.CanBuildFrom
 import annotation.{ elidable, implicitNotFound }
 import annotation.elidable.ASSERTION
 import language.{ implicitConversions, existentials }
+import scala.runtime.ScalaRunTime
 
 /** The `Predef` object provides definitions that are accessible in all Scala
  *  compilation units without explicit qualification.
@@ -266,6 +267,9 @@ object Predef extends LowPriorityImplicits {
   def printf(text: String, xs: Any*) = Console.print(text.format(xs: _*))
 
   // views --------------------------------------------------------------
+
+  implicit def arrayTagToClassManifest[T](elemTag: ArrayTag[T]): ClassManifest[T] =
+    ClassManifest.fromClass[T](ScalaRunTime.arrayElementClass(elemTag).asInstanceOf[Class[T]])
 
   implicit def tuple2ToZippedOps[T1, T2](x: (T1, T2))                           = new runtime.Tuple2Zipped.Ops(x)
   implicit def tuple3ToZippedOps[T1, T2, T3](x: (T1, T2, T3))                   = new runtime.Tuple3Zipped.Ops(x)
