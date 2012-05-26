@@ -43,8 +43,6 @@ extends AbstractSeq[A]
   protected var last0: LinkedList[A] = first0
   protected var len: Int = 0
 
-  def toQueue = new Queue(first0, last0, len)
-
   /** Is the list empty?
    */
   override def isEmpty = len == 0

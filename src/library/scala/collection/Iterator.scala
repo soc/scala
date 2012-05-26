@@ -523,13 +523,13 @@ trait Iterator[+A] extends IterableOnce[A] {
     val self = buffered
     class PartitionIterator(p: A => Boolean) extends AbstractIterator[A] {
       var other: PartitionIterator = _
-      val lookahead = new mutable.Queue[A]
+      val lookahead = mutable.ListBuffer[A]()
       def skip() =
         while (self.hasNext && !p(self.head)) {
           other.lookahead += self.next
         }
       def hasNext = !lookahead.isEmpty || { skip(); self.hasNext }
-      def next() = if (!lookahead.isEmpty) lookahead.dequeue()
+      def next() = if (!lookahead.isEmpty) lookahead.remove(0)
                    else { skip(); self.next() }
     }
     val l = new PartitionIterator(p)
@@ -557,7 +557,7 @@ trait Iterator[+A] extends IterableOnce[A] {
      */
     class Leading extends AbstractIterator[A] {
       private var isDone = false
-      val lookahead = new mutable.Queue[A]
+      val lookahead = mutable.ListBuffer[A]()
       def advance() = {
         self.hasNext && p(self.head) && {
           lookahead += self.next
@@ -573,7 +573,7 @@ trait Iterator[+A] extends IterableOnce[A] {
         if (lookahead.isEmpty)
           advance()
 
-        lookahead.dequeue()
+        lookahead.remove(0)
       }
     }
     val leading = new Leading
@@ -1036,7 +1036,7 @@ trait Iterator[+A] extends IterableOnce[A] {
    *  @note   Reuse: $consumesOneAndProducesTwoIterators
    */
   def duplicate: (Iterator[A], Iterator[A]) = {
-    val gap = new scala.collection.mutable.Queue[A]
+    val gap = mutable.ListBuffer[A]()
     var ahead: Iterator[A] = null
     class Partner extends AbstractIterator[A] {
       def hasNext: Boolean = self.synchronized {
@@ -1046,13 +1046,13 @@ trait Iterator[+A] extends IterableOnce[A] {
         if (gap.isEmpty) ahead = this
         if (this eq ahead) {
           val e = self.next()
-          gap enqueue e
+          gap += e
           e
-        } else gap.dequeue
+        } else gap.remove(0)
       }
       // to verify partnerhood we use reference equality on gap because
       // type testing does not discriminate based on origin.
-      private def compareGap(queue: scala.collection.mutable.Queue[A]) = gap eq queue
+      private def compareGap(queue: mutable.ListBuffer[A]) = gap eq queue
       override def hashCode = gap.hashCode
       override def equals(other: Any) = other match {
         case x: Partner   => x.compareGap(gap) && gap.isEmpty

@@ -217,12 +217,6 @@ class PriorityQueue[A](implicit val ord: Ordering[A])
   override def hashCode(): Int =
     throw new UnsupportedOperationException("unsuitable as hash key")
 
-  /** Returns a regular queue containing the same elements.
-   *
-   *  Note: the order of elements is undefined.
-   */
-  def toQueue: Queue[A] = new Queue[A] ++= this.iterator
-
   /** Returns a textual representation of a queue as a string.
    *
    *  @return the string representation of this queue.
