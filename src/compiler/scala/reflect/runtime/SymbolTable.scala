@@ -6,7 +6,7 @@ package runtime
  *  It can be used either from the reflexive mirror itself (class Mirror), or else from
  *  a runtime compiler that uses reflection to get a class information (class scala.tools.nsc.ReflectGlobal)
  */
-trait SymbolTable extends internal.SymbolTable with JavaToScala with ScalaToJava with ClassLoaders with SymbolLoaders with SynchronizedOps {
+trait SymbolTable extends internal.SymbolTable with JavaToScala with ScalaToJava with ClassLoaders with SymbolLoaders {
 
   def info(msg: => String) =
     if (settings.verbose.value) println("[reflect-compiler] "+msg)
