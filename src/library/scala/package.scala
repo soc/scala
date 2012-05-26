@@ -28,6 +28,9 @@ package object scala {
   type AbstractMethodError             = java.lang.AbstractMethodError
   type InterruptedException            = java.lang.InterruptedException
 
+  @deprecated("instead of `@serializable class C`, use `class C extends Serializable`", "2.9.0")
+  type serializable = annotation.serializable
+
   // A dummy used by the specialization annotation.
   val AnyRef = new AnyRef {
     override def toString = "object AnyRef"
