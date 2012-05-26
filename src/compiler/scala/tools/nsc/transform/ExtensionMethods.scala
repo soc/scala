@@ -60,10 +60,10 @@ abstract class ExtensionMethods extends Transform with TypingTransformers {
    */
   def extensionMethod(imeth: Symbol): Symbol = atPhase(currentRun.refchecksPhase) {
     val companionInfo = imeth.owner.companionModule.info
-    val candidates = extensionNames(imeth) map (companionInfo.decl(_))
-    val matching = candidates filter (alt => normalize(alt.tpe, imeth.owner) matches imeth.tpe)
-    assert(matching.nonEmpty, "no extension method found for "+imeth+" among "+candidates+"/"+extensionNames(imeth))
-    matching.next
+    def candidates = extensionNames(imeth) map (companionInfo.decl(_))
+    val matching = candidates filter (alt => normalize(alt.tpe, imeth.owner) matches imeth.tpe) toList;
+    assert(matching.nonEmpty, "no extension method found for "+imeth+" among "+candidates.mkString(",")+"/"+extensionNames(imeth).mkString(","))
+    matching.head
   }
 
   private def normalize(stpe: Type, clazz: Symbol): Type = stpe match {

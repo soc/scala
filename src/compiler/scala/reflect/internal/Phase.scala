@@ -35,7 +35,7 @@ abstract class Phase(val prev: Phase) {
   def description: String = name
   // Will running with -Ycheck:name work?
   def checkable: Boolean = true
-  def specialized: Boolean = false
+  def tailcalled: Boolean = false
   def erasedTypes: Boolean = false
   def flatClasses: Boolean = false
   def refChecked: Boolean = false

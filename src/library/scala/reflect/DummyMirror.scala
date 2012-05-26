@@ -273,7 +273,6 @@ class DummyMirror(cl: ClassLoader) extends api.Mirror {
     val MODULE_VAR_SUFFIX: NameType = DummyName
     val ROOT: NameType = DummyName
     val PACKAGE: NameType = DummyName
-    val SPECIALIZED_SUFFIX: NameType = DummyName
     val ERROR: NameType = DummyName
     val NO_NAME: NameType = DummyName
     val WILDCARD: NameType = DummyName
@@ -298,7 +297,6 @@ class DummyMirror(cl: ClassLoader) extends api.Mirror {
     val OUTER_SYNTH: TermName = DummyName
     val SELECTOR_DUMMY: TermName = DummyName
     val SELF: TermName = DummyName
-    val SPECIALIZED_INSTANCE: TermName = DummyName
     val STAR: TermName = DummyName
     val THIS: TermName = DummyName
     val BITMAP_NORMAL: TermName = DummyName
@@ -365,8 +363,6 @@ class DummyMirror(cl: ClassLoader) extends api.Mirror {
     def segments(name: String, assumeTerm: Boolean): List[Name] = notSupported()
     def originalName(name: Name): Name = notSupported()
     def stripModuleSuffix(name: Name): Name = notSupported()
-    def unspecializedName(name: Name): Name = notSupported()
-    def splitSpecializedName(name: Name): (Name, String, String) = notSupported()
     def dropLocalSuffix(name: Name): Name = notSupported()
     def expandedName(name: TermName, base: Symbol, separator: String = EXPAND_SEPARATOR_STRING): TermName = notSupported()
     def expandedSetterName(name: TermName, base: Symbol): TermName = notSupported()
@@ -392,7 +388,6 @@ class DummyMirror(cl: ClassLoader) extends api.Mirror {
     val MODULE_VAR_SUFFIX: NameType = DummyName
     val ROOT: NameType = DummyName
     val PACKAGE: NameType = DummyName
-    val SPECIALIZED_SUFFIX: NameType = DummyName
     val ERROR: NameType = DummyName
     val NO_NAME: NameType = DummyName
     val WILDCARD: NameType = DummyName

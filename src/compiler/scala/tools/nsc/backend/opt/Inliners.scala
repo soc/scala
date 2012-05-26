@@ -112,7 +112,7 @@ abstract class Inliners extends SubComponent {
       any anonymous-closure-class any whose instances are given as argument to C invocations.
    */
   def isMonadicMethod(sym: Symbol) = {
-    nme.unspecializedName(sym.name) match {
+    sym.name match {
       case nme.foreach | nme.filter | nme.withFilter | nme.map | nme.flatMap => true
       case _                                                                 => false
     }

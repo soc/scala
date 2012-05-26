@@ -363,11 +363,6 @@ trait Definitions extends reflect.api.StandardDefinitions {
       (sym.name == name) && (sym.owner == PredefModule.moduleClass)
     )
 
-    /** Specialization.
-     */
-    lazy val SpecializableModule  = requiredModule[Specializable]
-    lazy val GroupOfSpecializable = getMember(SpecializableModule, tpnme.Group)
-
     lazy val ConsoleModule: Symbol      = requiredModule[scala.Console.type]
     lazy val ScalaRunTimeModule: Symbol = requiredModule[scala.runtime.ScalaRunTime.type]
     lazy val SymbolModule: Symbol       = requiredModule[scala.Symbol.type]
@@ -596,37 +591,11 @@ trait Definitions extends reflect.api.StandardDefinitions {
 
     def tupleField(n: Int, j: Int) = getMember(TupleClass(n), nme.productAccessorName(j))
     // NOTE: returns true for NoSymbol since it's included in the TupleClass array -- is this intensional?
-    def isTupleSymbol(sym: Symbol) = TupleClass contains unspecializedSymbol(sym)
+    def isTupleSymbol(sym: Symbol) = TupleClass contains sym
     def isProductNClass(sym: Symbol) = ProductClass contains sym
 
-    def unspecializedSymbol(sym: Symbol): Symbol = {
-      if (sym hasFlag SPECIALIZED) {
-        // add initialization from its generic class constructor
-        val genericName = nme.unspecializedName(sym.name)
-        val member = sym.owner.info.decl(genericName.toTypeName)
-        member
-      }
-      else sym
-    }
-
-    // Checks whether the given type is true for the given condition,
-    // or if it is a specialized subtype of a type for which it is true.
-    //
-    // Origins notes:
-    // An issue was introduced with specialization in that the implementation
-    // of "isTupleType" in Definitions relied upon sym == TupleClass(elems.length).
-    // This test is untrue for specialized tuples, causing mysterious behavior
-    // because only some tuples are specialized.
-    def isPossiblySpecializedType(tp: Type)(cond: Type => Boolean) = {
-      cond(tp) || (tp match {
-        case TypeRef(pre, sym, args) if sym hasFlag SPECIALIZED =>
-          cond(tp baseType unspecializedSymbol(sym))
-        case _ =>
-          false
-      })
-    }
     // No normalization.
-    def isTupleTypeDirect(tp: Type) = isPossiblySpecializedType(tp) {
+    def isTupleTypeDirect(tp: Type) = tp match {
       case TypeRef(_, sym, args) if args.nonEmpty =>
         val len = args.length
         len <= MaxTupleArity && sym == TupleClass(len)
@@ -931,11 +900,9 @@ trait Definitions extends reflect.api.StandardDefinitions {
     lazy val ScalaInlineClass           = requiredClass[scala.inline]
     lazy val ScalaNoInlineClass         = requiredClass[scala.noinline]
     lazy val SerialVersionUIDAttr       = requiredClass[scala.SerialVersionUID]
-    lazy val SpecializedClass           = requiredClass[scala.specialized]
     lazy val ThrowsClass                = requiredClass[scala.throws]
     lazy val TransientAttr              = requiredClass[scala.transient]
     lazy val UncheckedClass             = requiredClass[scala.unchecked]
-    lazy val UnspecializedClass         = requiredClass[scala.annotation.unspecialized]
     lazy val VolatileAttr               = requiredClass[scala.volatile]
 
     // Meta-annotations
@@ -1189,7 +1156,6 @@ trait Definitions extends reflect.api.StandardDefinitions {
     /** Is symbol a value class? */
     def isPrimitiveValueClass(sym: Symbol) = ScalaValueClasses contains sym
     def isNonUnitValueClass(sym: Symbol)   = isPrimitiveValueClass(sym) && (sym != UnitClass)
-    def isSpecializableClass(sym: Symbol)  = isPrimitiveValueClass(sym) || (sym == AnyRefClass)
     def isPrimitiveValueType(tp: Type)     = isPrimitiveValueClass(tp.typeSymbol)
 
     /** Is symbol a boxed value class, e.g. java.lang.Integer? */

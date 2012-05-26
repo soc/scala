@@ -404,8 +404,8 @@ class Global(var currentSettings: Settings, var reporter: Reporter) extends Symb
     override def erasedTypes: Boolean = isErased
     private val isFlat = prev.name == "flatten" || prev.flatClasses
     override def flatClasses: Boolean = isFlat
-    private val isSpecialized = prev.name == "specialize" || prev.specialized
-    override def specialized: Boolean = isSpecialized
+    private val isTailCalled = prev.name == "tailcalls" || prev.tailcalled
+    override def tailcalled: Boolean = isTailCalled
     private val isRefChecked = prev.name == "refchecks" || prev.refChecked
     override def refChecked: Boolean = isRefChecked
 
@@ -517,13 +517,6 @@ class Global(var currentSettings: Settings, var reporter: Reporter) extends Symb
     val runsAfter = List("tailcalls")
     val runsRightAfter = None
   } with ExplicitOuter
-
-  // phaseName = "specialize"
-  object specializeTypes extends {
-    val global: Global.this.type = Global.this
-    val runsAfter = List("")
-    val runsRightAfter = Some("tailcalls")
-  } with SpecializeTypes
 
   // phaseName = "erasure"
   override object erasure extends {
@@ -673,7 +666,6 @@ class Global(var currentSettings: Settings, var reporter: Reporter) extends Symb
       refChecks               -> "reference/override checking, translate nested objects",
       uncurry                 -> "uncurry, translate function values to anonymous classes",
       tailCalls               -> "replace tail calls by jumps",
-      specializeTypes         -> "@specialized-driven class and method specialization",
       explicitOuter           -> "this refs to outer pointers, translate patterns",
       erasure                 -> "erase types, add interfaces for traits",
       postErasure             -> "clean up erased inline classes",
@@ -893,7 +885,6 @@ class Global(var currentSettings: Settings, var reporter: Reporter) extends Symb
   @inline final def afterMixin[T](op: => T): T          = afterPhase(currentRun.mixinPhase)(op)
   @inline final def afterPickler[T](op: => T): T        = afterPhase(currentRun.picklerPhase)(op)
   @inline final def afterRefchecks[T](op: => T): T      = afterPhase(currentRun.refchecksPhase)(op)
-  @inline final def afterSpecialize[T](op: => T): T     = afterPhase(currentRun.specializePhase)(op)
   @inline final def afterTyper[T](op: => T): T          = afterPhase(currentRun.typerPhase)(op)
   @inline final def afterUncurry[T](op: => T): T        = afterPhase(currentRun.uncurryPhase)(op)
   @inline final def beforeErasure[T](op: => T): T       = beforePhase(currentRun.erasurePhase)(op)
@@ -903,7 +894,6 @@ class Global(var currentSettings: Settings, var reporter: Reporter) extends Symb
   @inline final def beforeMixin[T](op: => T): T         = beforePhase(currentRun.mixinPhase)(op)
   @inline final def beforePickler[T](op: => T): T       = beforePhase(currentRun.picklerPhase)(op)
   @inline final def beforeRefchecks[T](op: => T): T     = beforePhase(currentRun.refchecksPhase)(op)
-  @inline final def beforeSpecialize[T](op: => T): T    = beforePhase(currentRun.specializePhase)(op)
   @inline final def beforeTyper[T](op: => T): T         = beforePhase(currentRun.typerPhase)(op)
   @inline final def beforeUncurry[T](op: => T): T       = beforePhase(currentRun.uncurryPhase)(op)
 
@@ -1192,7 +1182,7 @@ class Global(var currentSettings: Settings, var reporter: Reporter) extends Symb
     // val selectivecpsPhase            = phaseNamed("selectivecps")
     val uncurryPhase                 = phaseNamed("uncurry")
     // val tailcallsPhase               = phaseNamed("tailcalls")
-    val specializePhase              = phaseNamed("specialize")
+    // val specializePhase              = phaseNamed("specialize")
     val explicitouterPhase           = phaseNamed("explicitouter")
     val erasurePhase                 = phaseNamed("erasure")
     // val lazyvalsPhase                = phaseNamed("lazyvals")

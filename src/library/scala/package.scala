@@ -29,7 +29,7 @@ package object scala {
   type InterruptedException            = java.lang.InterruptedException
 
   // A dummy used by the specialization annotation.
-  val AnyRef = new Specializable {
+  val AnyRef = new AnyRef {
     override def toString = "object AnyRef"
   }
   type IterableOnce[+A] = scala.collection.IterableOnce[A]

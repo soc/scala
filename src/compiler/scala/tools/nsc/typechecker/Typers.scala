@@ -1349,9 +1349,6 @@ trait Typers extends Modes with Adaptations with Taggings {
         case x =>
           unit.error(clazz.pos, "value class needs to have exactly one public val parameter")
       }
-      for (tparam <- clazz.typeParams)
-        if (tparam hasAnnotation definitions.SpecializedClass)
-          unit.error(tparam.pos, "type parameter of value class may not be specialized")
     }
 
     def parentTypes(templ: Template): List[Tree] =
@@ -1978,12 +1975,6 @@ trait Typers extends Modes with Adaptations with Taggings {
       val typedMods = typedModifiers(tdef.mods)
       // complete lazy annotations
       val annots = tdef.symbol.annotations
-
-      // @specialized should not be pickled when compiling with -no-specialize
-      if (settings.nospecialization.value && currentRun.compiles(tdef.symbol)) {
-        tdef.symbol.removeAnnotation(definitions.SpecializedClass)
-        tdef.symbol.deSkolemize.removeAnnotation(definitions.SpecializedClass)
-      }
 
       val rhs1 = checkNoEscaping.privates(tdef.symbol, typedType(tdef.rhs))
       checkNonCyclic(tdef.symbol)

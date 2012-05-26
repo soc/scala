@@ -8,8 +8,6 @@
 
 package scala
 
-import Specializable._
-
 /** Annotate type parameters on which code should be automatically
  *  specialized. For example:
  *  {{{
@@ -26,7 +24,4 @@ import Specializable._
  */
 // class tspecialized[T](group: Group[T]) extends annotation.StaticAnnotation {
 
-class specialized(group: SpecializedGroup) extends annotation.StaticAnnotation {
-  def this(types: Specializable*) = this(new Group(types.toList))
-  def this() = this(Everything)
-}
+class specialized extends annotation.StaticAnnotation

@@ -25,7 +25,6 @@ trait StandardNames {
     val NO_NAME: NameType
     val PACKAGE: NameType
     val ROOT: NameType
-    val SPECIALIZED_SUFFIX: NameType
     val WILDCARD: NameType
 
     def flattenedName(segments: Name*): NameType
@@ -67,7 +66,6 @@ trait StandardNames {
     val OUTER_SYNTH: TermName
     val SELECTOR_DUMMY: TermName
     val SELF: TermName
-    val SPECIALIZED_INSTANCE: TermName
     val STAR: TermName
     val THIS: TermName
 
@@ -141,9 +139,7 @@ trait StandardNames {
     def dropLocalSuffix(name: Name): Name
     def originalName(name: Name): Name
     def stripModuleSuffix(name: Name): Name
-    def unspecializedName(name: Name): Name
     def segments(name: String, assumeTerm: Boolean): List[Name]
-    def splitSpecializedName(name: Name): (Name, String, String)
   }
 
   trait AbsTypeNames extends AbsNames {

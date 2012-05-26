@@ -5032,7 +5032,7 @@ trait Types extends api.Types { self: SymbolTable =>
   private def isSameSpecializedSkolem(sym1: Symbol, sym2: Symbol, pre1: Type, pre2: Type) = {
     sym1.isExistentialSkolem && sym2.isExistentialSkolem &&
     sym1.name == sym2.name &&
-    phase.specialized &&
+    phase.tailcalled &&
     sym1.info =:= sym2.info &&
     pre1 =:= pre2
   }
