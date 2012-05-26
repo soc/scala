@@ -21,7 +21,7 @@ import ast._
 import ast.parser._
 import typechecker._
 import transform._
-import backend.icode.{ ICodes, GenICode, ICodeCheckers }
+import backend.icode.{ ICodes, GenICode }
 import backend.{ ScalaPrimitives, Platform, JavaPlatform }
 import backend.jvm.GenASM
 import backend.opt.{ Inliners, ClosureElimination, DeadCodeElimination }
@@ -637,13 +637,6 @@ class Global(var currentSettings: Settings, var reporter: Reporter) extends Symb
     val global: Global.this.type = Global.this
   } with TreeCheckers
 
-  /** Icode verification */
-  object icodeCheckers extends {
-    val global: Global.this.type = Global.this
-  } with ICodeCheckers
-
-  object icodeChecker extends icodeCheckers.ICodeChecker()
-
   object typer extends analyzer.Typer(
     analyzer.NoContext.make(EmptyTree, Global.this.definitions.RootClass, newScope)
   )
@@ -1254,15 +1247,14 @@ class Global(var currentSettings: Settings, var reporter: Reporter) extends Symb
 
     protected def runCheckers() {
       val toCheck  = globalPhase.prev
-      val canCheck = toCheck.checkable
+      val canCheck = toCheck.checkable && globalPhase.id < icodePhase.id
       val fmt      = if (canCheck) "[Now checking: %s]" else "[Not checkable: %s]"
 
       inform(fmt format toCheck.name)
 
       if (canCheck) {
         phase = globalPhase
-        if (globalPhase.id >= icodePhase.id) icodeChecker.checkICodes
-        else treeChecker.checkTrees
+        treeChecker.checkTrees
       }
     }
 
