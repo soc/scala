@@ -1,7 +1,8 @@
 #!/bin/sh
 #
 
-scalac="$SCALA_HOME/bin/scalac"
+home=${SCALAC_HOME:-$(dirname $BASH_SOURCE)/../build/quick}
+scalac="$home/bin/scalac"
 
 for f in $(cd files/pos && ls -1 *.scala); do
   base=${f%%.scala}
