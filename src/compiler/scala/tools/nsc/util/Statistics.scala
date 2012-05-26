@@ -125,7 +125,6 @@ abstract class StatisticsInfo {
       inform("  of which in app impl   : " + subtypeAppInfos)
       inform("  of which in improv     : " + subtypeImprovCount)
       inform("#sametype                : " + sametypeCount)
-      inform("ms type-flow-analysis: " + analysis.timer.millis)
 
       if (phase.name == "typer") {
         inform("time spent typechecking    : " + showRelTyper(typerNanos))
