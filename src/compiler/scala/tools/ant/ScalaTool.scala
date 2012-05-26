@@ -186,7 +186,7 @@ class ScalaTool extends ScalaMatchingTask {
 
     // Converts a variable like @SCALA_HOME@ to ${SCALA_HOME} when pre = "${" and post = "}"
     private def transposeVariableMarkup(text: String, pre: String, post: String) : String = {
-      val chars = scala.io.Source.fromString(text)
+      val chars = text.iterator
       val builder = new StringBuilder()
 
       while (chars.hasNext) {

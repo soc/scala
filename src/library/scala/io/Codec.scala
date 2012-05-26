@@ -64,7 +64,10 @@ class Codec(val charSet: Charset) {
       (_ replaceWith _decodingReplacement, _decodingReplacement != null)
     )
 
-  def wrap(body: => Int): Int =
+  @inline final def wrapString(body: => String): String =
+    try body catch { case e: CharacterCodingException => _decodingReplacement }
+  
+  @inline final def wrap(body: => Int): Int =
     try body catch { case e: CharacterCodingException => _onCodingException(e) }
 
   // call a series of side effecting methods on an object, finally returning the object
@@ -90,9 +93,9 @@ object Codec extends LowPriorityCodecImplicits {
    *  the fact that you can influence anything at all via -Dfile.encoding
    *  as an accident, with any anomalies considered "not a bug".
    */
-  def defaultCharsetCodec                   = apply(Charset.defaultCharset)
-  def fileEncodingCodec                     = apply(util.Properties.encodingString)
-  def default                               = defaultCharsetCodec
+  def defaultCharsetCodec = apply(Charset.defaultCharset)
+  def fileEncodingCodec   = apply(util.Properties.encodingString)
+  def default             = defaultCharsetCodec
 
   def apply(encoding: String): Codec        = new Codec(Charset forName encoding)
   def apply(charSet: Charset): Codec        = new Codec(charSet)
@@ -101,36 +104,32 @@ object Codec extends LowPriorityCodecImplicits {
     new Codec(decoder.charset()) { override def decoder = _decoder }
   }
 
-  @migration("This method was previously misnamed `toUTF8`. Converts from Array[Byte] to Array[Char].", "2.9.0")
-  def fromUTF8(bytes: Array[Byte]): Array[Char] = fromUTF8(bytes, 0, bytes.length)
+  def fromUTF8(bytes: Array[Byte]): Array[Char] =
+    fromUTF8(bytes, 0, bytes.length)
+
   def fromUTF8(bytes: Array[Byte], offset: Int, len: Int): Array[Char] = {
     val bbuffer = java.nio.ByteBuffer.wrap(bytes, offset, len)
     val cbuffer = UTF8.charSet decode bbuffer
     val chars   = new Array[Char](cbuffer.remaining())
-    cbuffer get chars
 
+    cbuffer get chars
     chars
   }
 
-  @migration("This method was previously misnamed `fromUTF8`. Converts from character sequence to Array[Byte].", "2.9.0")
-  def toUTF8(cs: CharSequence): Array[Byte] = {
-    val cbuffer = java.nio.CharBuffer.wrap(cs, 0, cs.length)
-    val bbuffer = UTF8.charSet encode cbuffer
-    val bytes = new Array[Byte](bbuffer.remaining())
-    bbuffer get bytes
+  def toUTF8(cs: CharSequence): Array[Byte] =
+    toUTF8(java.nio.CharBuffer.wrap(cs, 0, cs.length))
 
-    bytes
-  }
-  def toUTF8(chars: Array[Char], offset: Int, len: Int): Array[Byte] = {
-    val cbuffer = java.nio.CharBuffer.wrap(chars, offset, len)
-    val bbuffer = UTF8.charSet encode cbuffer
-    val bytes = new Array[Byte](bbuffer.remaining())
-    bbuffer get bytes
+  def toUTF8(chars: Array[Char], offset: Int, len: Int): Array[Byte] =
+    toUTF8(java.nio.CharBuffer.wrap(chars, offset, len))
 
+  def toUTF8(cbuffer: java.nio.CharBuffer): Array[Byte] = {
+    val bbuffer = UTF8.charSet encode cbuffer
+    val bytes   = new Array[Byte](bbuffer.remaining())
+    bbuffer get bytes
     bytes
   }
 
-  implicit def string2codec(s: String) = apply(s)
-  implicit def charset2codec(c: Charset) = apply(c)
-  implicit def decoder2codec(cd: CharsetDecoder) = apply(cd)
+  implicit def string2codec(s: String): Codec           = apply(s)
+  implicit def charset2codec(c: Charset): Codec         = apply(c)
+  implicit def decoder2codec(cd: CharsetDecoder): Codec = apply(cd)
 }

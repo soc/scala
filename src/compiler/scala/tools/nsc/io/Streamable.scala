@@ -9,7 +9,7 @@ package io
 import java.net.{ URI, URL }
 import java.io.{ BufferedInputStream, InputStream, PrintStream }
 import java.io.{ BufferedReader, InputStreamReader, Closeable => JCloseable }
-import scala.io.{ Codec, BufferedSource, Source }
+import scala.io.Codec
 import collection.mutable.ArrayBuffer
 import Path.fail
 
@@ -76,11 +76,20 @@ object Streamable {
      */
     def creationCodec: Codec = implicitly[Codec]
 
-    def chars(): BufferedSource = chars(creationCodec)
-    def chars(codec: Codec): BufferedSource = Source.fromInputStream(inputStream())(codec)
+    def chars(): Iterator[Char] = chars(creationCodec)
+    def chars(codec: Codec): Iterator[Char] = {
+      val reader = bufferedReader()
+      ( Iterator continually (codec wrap reader.read())
+          takeWhile (_ != -1)
+          map (_.toChar)
+      )
+    }
 
     def lines(): Iterator[String] = lines(creationCodec)
-    def lines(codec: Codec): Iterator[String] = chars(codec).getLines()
+    def lines(codec: Codec): Iterator[String] = {
+      val reader = bufferedReader()
+      Iterator continually (codec wrapString reader.readLine()) takeWhile (_ != null)
+    }
 
     /** Obtains an InputStreamReader wrapped around a FileInputStream.
      */

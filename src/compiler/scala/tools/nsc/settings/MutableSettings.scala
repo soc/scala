@@ -11,7 +11,6 @@ package settings
 import io.{ AbstractFile, Path, PlainFile, VirtualDirectory }
 import scala.tools.util.StringOps
 import scala.collection.mutable.ListBuffer
-import scala.io.Source
 
 /** A mutable Settings object.
  */
@@ -202,10 +201,11 @@ class MutableSettings(val errorFn: String => Unit)
 
   /** Retrieves the contents of resource "${id}.class.path" from `loader`
   * (wrapped in Some) or None if the resource does not exist.*/
-  private def getClasspath(id: String, loader: ClassLoader): Option[String] =
-    Option(loader).flatMap(ld => Option(ld.getResource(id + ".class.path"))).map { cp =>
-       Source.fromURL(cp).mkString
-    }
+  private def getClasspath(id: String, loader: ClassLoader): Option[String] = (
+    Option(loader)
+      flatMap (ld => Option(ld.getResource(id + ".class.path")))
+          map (cp => io.Streamable slurp cp)
+  )
 
   // a wrapper for all Setting creators to keep our list up to date
   private def add[T <: Setting](s: T): T = {

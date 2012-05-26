@@ -95,11 +95,6 @@ object PagedSeq {
    */
   def fromFile(source: String): PagedSeq[Char] =
     fromFile(new File(source))
-
-  /** Constructs a paged character sequence from a scala.io.Source value
-   */
-  def fromSource(source: io.Source) =
-    fromLines(source.getLines())
 }
 
 
