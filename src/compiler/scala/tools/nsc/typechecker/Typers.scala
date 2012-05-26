@@ -4002,14 +4002,10 @@ trait Typers extends Modes with Adaptations with Taggings {
               //if (fun2.hasSymbol && fun2.symbol.name == nme.apply && fun2.symbol.owner == ArrayClass) {
               // But this causes cyclic reference for Array class in Cleanup. It is easy to overcome this
               // by calling ArrayClass.info here (or some other place before specialize).
-              if (fun2.symbol == Array_apply && !res.isErrorTyped) {
-                val checked = gen.mkCheckInit(res)
-                // this check is needed to avoid infinite recursion in Duplicators
-                // (calling typed1 more than once for the same tree)
-                if (checked ne res) typed { atPos(tree.pos)(checked) }
-                else res
-              } else
-                res
+              fun2.symbol match {
+                case Array_apply if !res.isErrorTyped => typedPos(tree.pos)(gen.mkCheckInit(res))
+                case _                                => res
+              }
             case SilentTypeError(err) =>
               onError({issue(err); setError(tree)})
           }
