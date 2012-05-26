@@ -46,16 +46,11 @@ trait SymbolTrackers {
   object SymbolTracker {
     def containsSymbol(t: Tree) = t.symbol != null && t.symbol != NoSymbol
 
-    // This is noise reduction only.
-    def dropSymbol(sym: Symbol) = sym.ownerChain exists (_ hasFlag Flags.SPECIALIZED)
-
     def symbolSnapshot(unit: CompilationUnit): Map[Symbol, Set[Tree]] = {
       if (unit.body == null) Map()
       else unit.body filter containsSymbol groupBy (_.symbol) mapValues (_.toSet) toMap
     }
-    def apply(unit: CompilationUnit) = new SymbolTracker(
-      () => symbolSnapshot(unit) filterNot { case (k, _) => dropSymbol(k) }
-    )
+    def apply(unit: CompilationUnit) = new SymbolTracker(() => symbolSnapshot(unit))
   }
 
   class SymbolTracker(snapshotFn: () => Map[Symbol, Set[Tree]]) {

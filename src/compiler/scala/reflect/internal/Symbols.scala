@@ -2388,7 +2388,7 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
       this
     }
 
-    private val validAliasFlags = SUPERACCESSOR | PARAMACCESSOR | MIXEDIN | SPECIALIZED
+    private val validAliasFlags = SUPERACCESSOR | PARAMACCESSOR | MIXEDIN
 
     override def alias: Symbol =
       if (hasFlag(validAliasFlags)) initialize.referenced

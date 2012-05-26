@@ -103,7 +103,7 @@ trait Phased {
 
     lazy val all = List(
       Parser, Namer, Packageobjects, Typer, Superaccessors, Pickler, Refchecks,
-      Selectiveanf, Liftcode, Selectivecps, Uncurry, Tailcalls, Specialize,
+      Selectiveanf, Liftcode, Selectivecps, Uncurry, Tailcalls,
       Explicitouter, Erasure, Lazyvals, Lambdalift, Constructors, Flatten, Mixin,
       Cleanup, Icode, Inliner, Closelim, Dce, Jvm, Terminal
     )
@@ -136,7 +136,6 @@ trait Phased {
   case object Selectivecps extends PhaseName
   case object Uncurry extends PhaseName
   case object Tailcalls extends PhaseName
-  case object Specialize extends PhaseName
   case object Explicitouter extends PhaseName
   case object Erasure extends PhaseName
   case object Lazyvals extends PhaseName

@@ -104,10 +104,8 @@ trait StdNames {
     val NAME_JOIN_NAME: NameType     = NAME_JOIN_STRING
     val PACKAGE: NameType            = "package"
     val ROOT: NameType               = "<root>"
-    val SPECIALIZED_SUFFIX: NameType = "$sp"
 
-    // value types (and AnyRef) are all used as terms as well
-    // as (at least) arguments to the @specialize annotation.
+    // value types all have companions as well
     final val Boolean: NameType = "Boolean"
     final val Byte: NameType    = "Byte"
     final val Char: NameType    = "Char"
@@ -308,14 +306,8 @@ trait StdNames {
     val SELECTOR_DUMMY: NameType           = "<unapply-selector>"
     val SELF: NameType                     = "$this"
     val SETTER_SUFFIX: NameType            = encode("_=")
-    val SPECIALIZED_INSTANCE: NameType     = "specInstance$"
     val STAR: NameType                     = "*"
     val THIS: NameType                     = "_$this"
-
-    @deprecated("Use SPECIALIZED_SUFFIX", "2.10.0")
-    def SPECIALIZED_SUFFIX_STRING = SPECIALIZED_SUFFIX.toString
-    @deprecated("Use SPECIALIZED_SUFFIX", "2.10.0")
-    def SPECIALIZED_SUFFIX_NAME: TermName = SPECIALIZED_SUFFIX.toTermName
 
     def isConstructorName(name: Name)       = name == CONSTRUCTOR || name == MIXIN_CONSTRUCTOR
     def isExceptionResultName(name: Name)   = name startsWith EXCEPTION_RESULT_PREFIX
@@ -364,12 +356,6 @@ trait StdNames {
       } else name
     }
 
-    def unspecializedName(name: Name): Name = (
-      if (name endsWith SPECIALIZED_SUFFIX)
-      name.subName(0, name.lastIndexOf('m') - 1)
-      else name
-    )
-
     /*
     def anonNumberSuffix(name: Name): Name = {
       ("" + name) lastIndexOf '$' match {
@@ -381,27 +367,6 @@ trait StdNames {
       }
     }
     */
-
-    /** Return the original name and the types on which this name
-    *  is specialized. For example,
-    *  {{{
-    *     splitSpecializedName("foo$mIcD$sp") == ('foo', "I", "D")
-    *  }}}
-    *  `foo$mIcD$sp` is the name of a method specialized on two type
-    *  parameters, the first one belonging to the method itself, on Int,
-    *  and another one belonging to the enclosing class, on Double.
-    */
-    def splitSpecializedName(name: Name): (Name, String, String) =
-    if (name endsWith SPECIALIZED_SUFFIX) {
-      val name1 = name dropRight SPECIALIZED_SUFFIX.length
-      val idxC  = name1 lastIndexOf 'c'
-      val idxM  = name1 lastIndexOf 'm'
-
-      (name1.subName(0, idxM - 1),
-      name1.subName(idxC + 1, name1.length).toString,
-      name1.subName(idxM + 1, idxC).toString)
-    } else
-    (name, "", "")
 
     def getterName(name: TermName): TermName     = if (isLocalName(name)) localToGetter(name) else name
     def getterToLocal(name: TermName): TermName  = name append LOCAL_SUFFIX_STRING

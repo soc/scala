@@ -280,12 +280,6 @@ trait Definitions extends reflect.api.StandardDefinitions {
     lazy val AnyRefClass = newAlias(ScalaPackageClass, tpnme.AnyRef, ObjectClass.tpe)
     lazy val ObjectClass = getRequiredClass(sn.Object.toString)
 
-    // Note: this is not the type alias AnyRef, it's a companion-like
-    // object used by the @specialize annotation.
-    lazy val AnyRefModule = getMember(ScalaPackageClass, nme.AnyRef)
-    @deprecated("Use AnyRefModule", "2.10.0")
-    def Predef_AnyRef = AnyRefModule
-
     lazy val AnyValClass: ClassSymbol = (ScalaPackageClass.info member tpnme.AnyVal orElse {
       val anyval    = enterNewClass(ScalaPackageClass, tpnme.AnyVal, List(AnyClass.tpe, NotNullClass.tpe), ABSTRACT)
       val av_constr = anyval.newClassConstructor(NoPosition)

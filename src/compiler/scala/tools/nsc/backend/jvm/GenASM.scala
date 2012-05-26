@@ -1040,7 +1040,7 @@ abstract class GenASM extends SubComponent with BytecodeWriters {
     val ExcludedForwarderFlags = {
       import Flags._
       // Should include DEFERRED but this breaks findMember.
-      ( CASE | SPECIALIZED | LIFTED | PROTECTED | STATIC | EXPANDEDNAME | BridgeAndPrivateFlags )
+      ( CASE | LIFTED | PROTECTED | STATIC | EXPANDEDNAME | BridgeAndPrivateFlags )
     }
 
     /** Add a forwarder for method m. Used only from addForwarders(). */

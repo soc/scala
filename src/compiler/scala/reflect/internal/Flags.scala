@@ -55,7 +55,7 @@ import scala.collection.{ mutable, immutable }
 // 37:       IMPLCLASS    PRESUPER/M
 // 38:      TRANS_FLAG
 // 39:          LOCKED
-// 40:     SPECIALIZED
+// 40:
 // 41:   DEFAULTINIT/M
 // 42:         VBRIDGE
 // 43:         VARARGS
@@ -158,7 +158,7 @@ class Flags extends ModifierFlags {
   final val TRANS_FLAG    = 1L << 38      // transient flag guaranteed to be reset after each phase.
 
   final val LOCKED        = 1L << 39      // temporary flag to catch cyclic dependencies
-  final val SPECIALIZED   = 1L << 40      // symbol is a generated specialized member
+  // final val SPECIALIZED   = 1L << 40      // symbol is a generated specialized member
   final val VBRIDGE       = 1L << 42      // symbol is a varargs bridge
 
   final val VARARGS       = 1L << 43      // symbol is a Java-style varargs method
@@ -242,7 +242,7 @@ class Flags extends ModifierFlags {
   /** These modifiers appear in TreePrinter output. */
   final val PrintableFlags =
     ExplicitFlags | BridgeFlags | LOCAL | SYNTHETIC | STABLE | CASEACCESSOR | MACRO |
-    ACCESSOR | SUPERACCESSOR | PARAMACCESSOR | STATIC | SPECIALIZED | SYNCHRONIZED
+    ACCESSOR | SUPERACCESSOR | PARAMACCESSOR | STATIC | SYNCHRONIZED
 
   /** When a symbol for a field is created, only these flags survive
    *  from Modifiers.  Others which may be applied at creation time are:
@@ -394,7 +394,7 @@ class Flags extends ModifierFlags {
     case           IMPLCLASS => "<implclass/presuper>"                // (1L << 37)
     case          TRANS_FLAG => "<trans_flag>"                        // (1L << 38)
     case              LOCKED => "<locked>"                            // (1L << 39)
-    case         SPECIALIZED => "<specialized>"                       // (1L << 40)
+    case      0x10000000000L => ""                                    // (1L << 40)
     case         DEFAULTINIT => "<defaultinit>"                       // (1L << 41)
     case             VBRIDGE => "<vbridge>"                           // (1L << 42)
     case             VARARGS => "<varargs>"                           // (1L << 43)
