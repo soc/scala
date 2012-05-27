@@ -28,6 +28,22 @@ package object util {
 
   def freqrank[T](xs: Traversable[(T, Int)]): List[(Int, T)] = xs.toList map (_.swap) sortBy (-_._1)
 
+  def className(clazz: Class[_]): String = {
+    if (clazz.getName matches """^.*?\$\d+$""")
+      (clazz.getSuperclass :: clazz.getInterfaces.toList) filterNot (_ == classOf[Object]) match {
+        case Nil    => "Object"
+        case xs     => xs map className mkString " with "
+      }
+    else
+      clazz.getName split '.' last
+  }
+  def classyStrings(xs: AnyRef*) = {
+    xs.toList map (x => "" + x + " (" + className(x.getClass) + ")")
+  }
+  def listyStrings(xss: Seq[AnyRef]*) = {
+    xss.toList collect { case xs if xs.nonEmpty => xs.mkString("(", ",", ")") }
+  }
+
   /** Execute code and then wait for all non-daemon Threads
    *  created and begun during its execution to complete.
    */
