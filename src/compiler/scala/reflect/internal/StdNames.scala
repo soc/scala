@@ -247,7 +247,6 @@ trait StdNames {
     final val DeprecatedATTR: NameType             = "Deprecated"
     final val ExceptionsATTR: NameType             = "Exceptions"
     final val InnerClassesATTR: NameType           = "InnerClasses"
-    final val JacoMetaATTR: NameType               = "JacoMeta"
     final val LineNumberTableATTR: NameType        = "LineNumberTable"
     final val LocalVariableTableATTR: NameType     = "LocalVariableTable"
     final val RuntimeAnnotationATTR: NameType      = "RuntimeVisibleAnnotations"   // RetentionPolicy.RUNTIME
@@ -294,6 +293,7 @@ trait StdNames {
     val FAKE_LOCAL_THIS: NameType          = "this$"
     val INITIALIZER: NameType              = CONSTRUCTOR // Is this buying us something?
     val LAZY_LOCAL: NameType               = "$lzy"
+    val LAZY_SLOW_SUFFIX: NameType         = "$lzycompute"
     val LOCAL_SUFFIX_STRING                = " "
     val MIRROR_FREE_PREFIX: NameType       = "free$"
     val MIRROR_FREE_THIS_SUFFIX: NameType  = "$this"
@@ -331,6 +331,11 @@ trait StdNames {
     def isTraitSetterName(name: Name)       = isSetterName(name) && (name containsName TRAIT_SETTER_SEPARATOR_STRING)
     def isSingletonName(name: Name)         = name endsWith SINGLETON_SUFFIX
     def isModuleName(name: Name)            = name endsWith MODULE_SUFFIX_NAME
+
+    def isDeprecatedIdentifierName(name: Name) = name.toTermName match {
+      case nme.`then` | nme.`macro` => true
+      case _                        => false
+    }
 
     def isOpAssignmentName(name: Name) = name match {
       case raw.NE | raw.LE | raw.GE | EMPTY => false
@@ -634,6 +639,8 @@ trait StdNames {
     val lang: NameType                 = "lang"
     val length: NameType               = "length"
     val lengthCompare: NameType        = "lengthCompare"
+    val liftedTree: NameType           = "liftedTree"
+    val `macro` : NameType             = "macro"
     val macroThis : NameType           = "_this"
     val macroContext : NameType        = "c"
     val main: NameType                 = "main"
@@ -690,6 +697,7 @@ trait StdNames {
     val staticModule : NameType        = "staticModule"
     val synchronized_ : NameType       = "synchronized"
     val tail: NameType                 = "tail"
+    val `then` : NameType              = "then"
     val thisModuleType: NameType       = "thisModuleType"
     val this_ : NameType               = "this"
     val throw_ : NameType              = "throw"
@@ -758,7 +766,6 @@ trait StdNames {
   object fulltpnme extends TypeNames {
     val RuntimeNothing: NameType = "scala.runtime.Nothing$"
     val RuntimeNull: NameType    = "scala.runtime.Null$"
-    val JavaLangEnum: NameType   = "java.lang.Enum"
   }
 
   /** Java binary names, like scala/runtime/Nothing$.
@@ -814,9 +821,10 @@ trait StdNames {
 
     val BITMAP_NORMAL: NameType              = BITMAP_PREFIX + ""           // initialization bitmap for public/protected lazy vals
     val BITMAP_TRANSIENT: NameType           = BITMAP_PREFIX + "trans$"     // initialization bitmap for transient lazy vals
-    val BITMAP_PRIVATE: NameType             = BITMAP_PREFIX + "priv$"      // initialization bitmap for private lazy vals
     val BITMAP_CHECKINIT: NameType           = BITMAP_PREFIX + "init$"      // initialization bitmap for checkinit values
     val BITMAP_CHECKINIT_TRANSIENT: NameType = BITMAP_PREFIX + "inittrans$" // initialization bitmap for transient checkinit values
+
+    def newLazyValSlowComputeName(lzyValName: Name) = lzyValName append LAZY_SLOW_SUFFIX
 
     def isModuleVarName(name: Name): Boolean =
       stripAnonNumberSuffix(name) endsWith MODULE_VAR_SUFFIX

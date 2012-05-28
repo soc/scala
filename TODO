@@ -1,0 +1,17 @@
+Make a hook for VirtualDirectory
+ - you should be able to set the directory to any whatever interface
+
+No static object for every line; see what sparks does
+
+
+
+var x = 5
+x = 6
+dataset map (_ + 1)
+
+
+class A {
+  class B { 
+    class C
+  }
+}

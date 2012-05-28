@@ -59,12 +59,24 @@ trait GenTraversableLike[+A, +Repr] extends Any with GenTraversableOnce[A] with 
 
   def size: Int
 
+  /** Selects the first element of this $coll.
+   *  $orderDependent
+   *  @return  the first element of this $coll.
+   *  @throws `NoSuchElementException` if the $coll is empty.
+   */
   def head: A
-
+  
+  /** Optionally selects the first element.
+   *  $orderDependent
+   *  @return  the first element of this $coll if it is nonempty,
+   *           `None` if it is empty.
+   */
+  def headOption: Option[A]
+  
   /** Tests whether this $coll can be repeatedly traversed.
    *  @return   `true`
    */
-  final def isTraversableAgain = true
+  def isTraversableAgain: Boolean
 
   /** Selects all elements except the first.
    *  $orderDependent
@@ -72,11 +84,30 @@ trait GenTraversableLike[+A, +Repr] extends Any with GenTraversableOnce[A] with 
    *           except the first one.
    *  @throws `UnsupportedOperationException` if the $coll is empty.
    */
-  def tail: Repr = {
-    if (isEmpty) throw new UnsupportedOperationException("empty.tail")
-    drop(1)
-  }
+  def tail: Repr
 
+  /** Selects the last element.
+    * $orderDependent
+    * @return The last element of this $coll.
+    * @throws NoSuchElementException If the $coll is empty.
+    */
+  def last: A
+  
+  /** Optionally selects the last element.
+   *  $orderDependent
+   *  @return  the last element of this $coll$ if it is nonempty,
+   *           `None` if it is empty.
+   */
+  def lastOption: Option[A]
+  
+  /** Selects all elements except the last.
+   *  $orderDependent
+   *  @return  a $coll consisting of all elements of this $coll
+   *           except the last one.
+   *  @throws `UnsupportedOperationException` if the $coll is empty.
+   */
+  def init: Repr
+  
   /** Computes a prefix scan of the elements of the collection.
    *
    *  Note: The neutral element `z` may be applied more than once.
@@ -258,7 +289,7 @@ trait GenTraversableLike[+A, +Repr] extends Any with GenTraversableOnce[A] with 
 
   /** Selects all elements of this $coll which satisfy a predicate.
    *
-   *  @param p     the predicate used to test elements.
+   *  @param pred  the predicate used to test elements.
    *  @return      a new $coll consisting of all elements of this $coll that satisfy the given
    *               predicate `p`. Their order may not be preserved.
    */
@@ -266,7 +297,7 @@ trait GenTraversableLike[+A, +Repr] extends Any with GenTraversableOnce[A] with 
 
   /** Selects all elements of this $coll which do not satisfy a predicate.
    *
-   *  @param p     the predicate used to test elements.
+   *  @param pred  the predicate used to test elements.
    *  @return      a new $coll consisting of all elements of this $coll that do not satisfy the given
    *               predicate `p`. Their order may not be preserved.
    */
@@ -274,11 +305,11 @@ trait GenTraversableLike[+A, +Repr] extends Any with GenTraversableOnce[A] with 
 
   /** Partitions this $coll in two ${coll}s according to a predicate.
    *
-   *  @param p the predicate on which to partition.
-   *  @return  a pair of ${coll}s: the first $coll consists of all elements that
-   *           satisfy the predicate `p` and the second $coll consists of all elements
-   *           that don't. The relative order of the elements in the resulting ${coll}s
-   *           may not be preserved.
+   *  @param pred the predicate on which to partition.
+   *  @return     a pair of ${coll}s: the first $coll consists of all elements that
+   *              satisfy the predicate `p` and the second $coll consists of all elements
+   *              that don't. The relative order of the elements in the resulting ${coll}s
+   *              may not be preserved.
    */
   def partition(pred: A => Boolean): (Repr, Repr)
 
@@ -323,8 +354,8 @@ trait GenTraversableLike[+A, +Repr] extends Any with GenTraversableOnce[A] with 
    *  }}}
    *  $orderDependent
    *
-   *  @param from   the lowest index to include from this $coll.
-   *  @param until  the lowest index to EXCLUDE from this $coll.
+   *  @param unc_from   the lowest index to include from this $coll.
+   *  @param unc_until  the lowest index to EXCLUDE from this $coll.
    *  @return  a $coll containing the elements greater than or equal to
    *           index `from` extending up to (but not including) index `until`
    *           of this $coll.
@@ -344,7 +375,7 @@ trait GenTraversableLike[+A, +Repr] extends Any with GenTraversableOnce[A] with 
 
   /** Takes longest prefix of elements that satisfy a predicate.
    *  $orderDependent
-   *  @param   p  The predicate used to test elements.
+   *  @param   pred  The predicate used to test elements.
    *  @return  the longest prefix of this $coll whose elements all satisfy
    *           the predicate `p`.
    */
@@ -357,7 +388,7 @@ trait GenTraversableLike[+A, +Repr] extends Any with GenTraversableOnce[A] with 
    *  predicate `p` does not cause any side-effects.
    *  $orderDependent
    *
-   *  @param p the test predicate
+   *  @param pred the test predicate
    *  @return  a pair consisting of the longest prefix of this $coll whose
    *           elements all satisfy `p`, and the rest of this $coll.
    */
@@ -365,7 +396,7 @@ trait GenTraversableLike[+A, +Repr] extends Any with GenTraversableOnce[A] with 
 
   /** Drops longest prefix of elements that satisfy a predicate.
    *  $orderDependent
-   *  @param   p  The predicate used to test elements.
+   *  @param   pred  The predicate used to test elements.
    *  @return  the longest suffix of this $coll whose first element
    *           does not satisfy the predicate `p`.
    */
@@ -379,4 +410,13 @@ trait GenTraversableLike[+A, +Repr] extends Any with GenTraversableOnce[A] with 
    */
   def stringPrefix: String
 
+}
+
+object GenTraversableLike {
+  /** Manufacture a conversion from collection representation type `Repr` to
+   *  its corresponding `GenTraversableLike` given an implicitly available
+   *  instance of `FromRepr[Repr]`.
+   *  @see [[scala.collection.generic.FromRepr]]
+   */
+  implicit def fromRepr[Repr](implicit fr : FromRepr[Repr]) = fr.hasElem
 }

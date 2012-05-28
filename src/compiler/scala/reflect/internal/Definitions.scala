@@ -404,6 +404,7 @@ trait Definitions extends reflect.api.StandardDefinitions {
     lazy val JavaSerializableClass = requiredClass[java.io.Serializable] modifyInfo fixupAsAnyTrait
     lazy val ComparableClass       = requiredClass[java.lang.Comparable[_]] modifyInfo fixupAsAnyTrait
     lazy val JavaCloneableClass    = requiredClass[java.lang.Cloneable]
+    lazy val JavaNumberClass       = requiredClass[java.lang.Number]
     lazy val RemoteInterfaceClass  = requiredClass[java.rmi.Remote]
     lazy val RemoteExceptionClass  = requiredClass[java.rmi.RemoteException]
 
@@ -432,6 +433,10 @@ trait Definitions extends reflect.api.StandardDefinitions {
 
     def isPrimitiveArray(tp: Type) = tp match {
       case TypeRef(_, ArrayClass, arg :: Nil) => isPrimitiveValueClass(arg.typeSymbol)
+      case _                                  => false
+    }
+    def isReferenceArray(tp: Type) = tp match {
+      case TypeRef(_, ArrayClass, arg :: Nil) => arg <:< AnyRefClass.tpe
       case _                                  => false
     }
     def isArrayOfSymbol(tp: Type, elem: Symbol) = tp match {
@@ -605,6 +610,7 @@ trait Definitions extends reflect.api.StandardDefinitions {
     def isTupleTypeOrSubtype(tp: Type) = isTupleType(tp)
 
     def tupleField(n: Int, j: Int) = getMember(TupleClass(n), nme.productAccessorName(j))
+    // NOTE: returns true for NoSymbol since it's included in the TupleClass array -- is this intensional?
     def isTupleSymbol(sym: Symbol) = TupleClass contains unspecializedSymbol(sym)
     def isProductNClass(sym: Symbol) = ProductClass contains sym
 
@@ -892,6 +898,7 @@ trait Definitions extends reflect.api.StandardDefinitions {
     // boxed classes
     lazy val ObjectRefClass         = requiredClass[scala.runtime.ObjectRef[_]]
     lazy val VolatileObjectRefClass = requiredClass[scala.runtime.VolatileObjectRef[_]]
+    lazy val RuntimeStaticsModule   = getRequiredModule("scala.runtime.Statics")
     lazy val BoxesRunTimeModule     = getRequiredModule("scala.runtime.BoxesRunTime")
     lazy val BoxesRunTimeClass      = BoxesRunTimeModule.moduleClass
     lazy val BoxedNumberClass       = getClass(sn.BoxedNumber)
@@ -1149,7 +1156,7 @@ trait Definitions extends reflect.api.StandardDefinitions {
      */
     private def getModuleOrClass(path: Name): Symbol = getModuleOrClass(path, path.length)
 
-    private def getClassByName(fullname: Name): Symbol = {
+    def getClassByName(fullname: Name): Symbol = {
       var result = getModuleOrClass(fullname.toTypeName)
       while (result.isAliasType) result = result.info.typeSymbol
       result
@@ -1202,7 +1209,7 @@ trait Definitions extends reflect.api.StandardDefinitions {
     def isPrimitiveValueClass(sym: Symbol) = ScalaValueClasses contains sym
     def isNonUnitValueClass(sym: Symbol)   = isPrimitiveValueClass(sym) && (sym != UnitClass)
     def isSpecializableClass(sym: Symbol)  = isPrimitiveValueClass(sym) || (sym == AnyRefClass)
-    def isScalaValueType(tp: Type)         = ScalaValueClasses contains tp.typeSymbol
+    def isPrimitiveValueType(tp: Type)     = isPrimitiveValueClass(tp.typeSymbol)
 
     /** Is symbol a boxed value class, e.g. java.lang.Integer? */
     def isBoxedValueClass(sym: Symbol) = boxedValueClassesSet(sym)

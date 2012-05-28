@@ -9,7 +9,6 @@ package typechecker
 import scala.collection.{ mutable, immutable }
 import scala.tools.util.StringOps.{ countElementsAsString, countAsString }
 import symtab.Flags.{ PRIVATE, PROTECTED }
-import scala.tools.util.EditDistance.similarString
 
 trait ContextErrors {
   self: Analyzer =>
@@ -171,36 +170,7 @@ trait ContextErrors {
         NormalTypeError(tree, "reference to " + name + " is ambiguous;\n" + msg)
 
       def SymbolNotFoundError(tree: Tree, name: Name, owner: Symbol, startingIdentCx: Context) = {
-        /*** Disabled pending investigation of performance impact.
-
-        // This laborious determination arrived at to keep the tests working.
-        val calcSimilar = (
-          name.length > 2 && (
-               startingIdentCx.reportErrors
-            || startingIdentCx.enclClassOrMethod.reportErrors
-          )
-        )
-        // avoid calculating if we're in "silent" mode.
-        // name length check to limit unhelpful suggestions for e.g. "x" and "b1"
-        val similar = {
-          if (!calcSimilar) ""
-          else {
-            val allowed = (
-              startingIdentCx.enclosingContextChain
-                flatMap (ctx => ctx.scope.toList ++ ctx.imports.flatMap(_.allImportedSymbols))
-                filter (sym => sym.isTerm == name.isTermName)
-                filterNot (sym => sym.isPackage || sym.isSynthetic || sym.hasMeaninglessName)
-            )
-            val allowedStrings = (
-              allowed.map("" + _.name).distinct.sorted
-                filterNot (s => (s contains '$') || (s contains ' '))
-            )
-            similarString("" + name, allowedStrings)
-          }
-        }
-        */
-        val similar = ""
-        NormalTypeError(tree, "not found: "+decodeWithKind(name, owner) + similar)
+        NormalTypeError(tree, "not found: "+decodeWithKind(name, owner))
       }
 
       // typedAppliedTypeTree
@@ -343,7 +313,7 @@ trait ContextErrors {
         issueNormalTypeError(tree, "macros cannot be eta-expanded")
         setError(tree)
       }
-      
+
       def MacroPartialApplicationError(tree: Tree) = {
         issueNormalTypeError(tree, "macros cannot be partially applied")
         setError(tree)
@@ -592,9 +562,9 @@ trait ContextErrors {
       def AbstractExistentiallyOverParamerizedTpeError(tree: Tree, tp: Type) =
         issueNormalTypeError(tree, "can't existentially abstract over parameterized type " + tp)
 
-      // classTagTree
-      def MissingClassTagError(tree: Tree, tp: Type) = {
-        issueNormalTypeError(tree, "cannot find class tag for element type "+tp)
+      // resolveArrayTag
+      def MissingArrayTagError(tree: Tree, tp: Type) = {
+        issueNormalTypeError(tree, "cannot find array tag for element type "+tp)
         setError(tree)
       }
 
@@ -622,19 +592,23 @@ trait ContextErrors {
         setError(tree)
       }
 
-      // checkNoDoubleDefs...
-      // @PP: I hacked the filename in (context0.unit) to work around SI-4893.  It would be
-      // much better if every symbol could offer some idea of where it came from, else
-      // the obviously untrue claim that something has been defined twice can only frustrate.
-      // There's no direct test because partest doesn't work, but to reproduce, separately
-      // compile the next two lines:
-      //    package object foo { val x: Class[_] = null }
-      //    package foo
       def DefDefinedTwiceError(sym0: Symbol, sym1: Symbol) = {
+        // Most of this hard work is associated with SI-4893.
         val isBug = sym0.isAbstractType && sym1.isAbstractType && (sym0.name startsWith "_$")
-        issueSymbolTypeError(sym0, sym1+" is defined twice in " + context0.unit
-          + ( if (isBug) "\n(this error is likely due to a bug in the scala compiler involving wildcards in package objects)" else "" )
+        val addendums = List(
+          if (sym0.associatedFile eq sym1.associatedFile)
+            Some("conflicting symbols both originated in file '%s'".format(sym0.associatedFile.canonicalPath))
+          else if ((sym0.associatedFile ne null) && (sym1.associatedFile ne null))
+            Some("conflicting symbols originated in files '%s' and '%s'".format(sym0.associatedFile.canonicalPath, sym1.associatedFile.canonicalPath))
+          else None ,
+          if (isBug) Some("Note: this may be due to a bug in the compiler involving wildcards in package objects") else None
         )
+        val addendum = addendums.flatten match {
+          case Nil    => ""
+          case xs     => xs.mkString("\n  ", "\n  ", "")
+        }
+
+        issueSymbolTypeError(sym0, sym1+" is defined twice" + addendum)
       }
 
       // cyclic errors
@@ -716,34 +690,44 @@ trait ContextErrors {
         setError(tree)
       }
 
-      def NoBestMethodAlternativeError(tree: Tree, argtpes: List[Type], pt: Type) = {
+      // side-effect on the tree, break the overloaded type cycle in infer
+      @inline
+      private def setErrorOnLastTry(lastTry: Boolean, tree: Tree) = if (lastTry) setError(tree)
+      
+      def NoBestMethodAlternativeError(tree: Tree, argtpes: List[Type], pt: Type, lastTry: Boolean) = {
         issueNormalTypeError(tree,
           applyErrorMsg(tree, " cannot be applied to ", argtpes, pt))
         // since inferMethodAlternative modifies the state of the tree
         // we have to set the type of tree to ErrorType only in the very last
-        // fallback action that is done in the inference (tracking it manually is error prone).
+        // fallback action that is done in the inference.
         // This avoids entering infinite loop in doTypeApply.
-        if (implicitly[Context].reportErrors) setError(tree)
+        setErrorOnLastTry(lastTry, tree)
       }
 
       def AmbiguousMethodAlternativeError(tree: Tree, pre: Type, best: Symbol,
-            firstCompeting: Symbol, argtpes: List[Type], pt: Type) = {
-        val msg0 =
-          "argument types " + argtpes.mkString("(", ",", ")") +
-         (if (pt == WildcardType) "" else " and expected result type " + pt)
-        val (pos, msg) = ambiguousErrorMsgPos(tree.pos, pre, best, firstCompeting, msg0)
-        // discover last attempt in a similar way as for NoBestMethodAlternativeError
-        if (implicitly[Context].ambiguousErrors) setError(tree)
-        issueAmbiguousTypeError(pre, best, firstCompeting, AmbiguousTypeError(tree, pos, msg))
+            firstCompeting: Symbol, argtpes: List[Type], pt: Type, lastTry: Boolean) = {
+        
+        if (!(argtpes exists (_.isErroneous)) && !pt.isErroneous) {
+          val msg0 =
+            "argument types " + argtpes.mkString("(", ",", ")") +
+           (if (pt == WildcardType) "" else " and expected result type " + pt)
+          val (pos, msg) = ambiguousErrorMsgPos(tree.pos, pre, best, firstCompeting, msg0)
+          issueAmbiguousTypeError(pre, best, firstCompeting, AmbiguousTypeError(tree, pos, msg))
+          setErrorOnLastTry(lastTry, tree)
+        } else setError(tree) // do not even try further attempts because they should all fail
+                              // even if this is not the last attempt (because of the SO's possibility on the horizon)
+        
       }
 
-      def NoBestExprAlternativeError(tree: Tree, pt: Type) =
+      def NoBestExprAlternativeError(tree: Tree, pt: Type, lastTry: Boolean) = {
         issueNormalTypeError(tree, withAddendum(tree.pos)(typeErrorMsg(tree.symbol.tpe, pt, isPossiblyMissingArgs(tree.symbol.tpe, pt))))
+        setErrorOnLastTry(lastTry, tree)
+      }
 
-      def AmbiguousExprAlternativeError(tree: Tree, pre: Type, best: Symbol, firstCompeting: Symbol, pt: Type) = {
+      def AmbiguousExprAlternativeError(tree: Tree, pre: Type, best: Symbol, firstCompeting: Symbol, pt: Type, lastTry: Boolean) = {
         val (pos, msg) = ambiguousErrorMsgPos(tree.pos, pre, best, firstCompeting, "expected type " + pt)
-        setError(tree)
         issueAmbiguousTypeError(pre, best, firstCompeting, AmbiguousTypeError(tree, pos, msg))
+        setErrorOnLastTry(lastTry, tree)
       }
 
       // checkBounds
@@ -900,8 +884,12 @@ trait ContextErrors {
         val s1 = if (prevSym.isModule) "case class companion " else ""
         val s2 = if (prevSym.isSynthetic) "(compiler-generated) " + s1 else ""
         val s3 = if (prevSym.isCase) "case class " + prevSym.name else "" + prevSym
+        val where = if (currentSym.owner.isPackageClass != prevSym.owner.isPackageClass) {
+                      val inOrOut = if (prevSym.owner.isPackageClass) "outside of" else "in"
+                      " %s package object %s".format(inOrOut, ""+prevSym.effectiveOwner.name)
+                    } else ""
 
-        issueSymbolTypeError(currentSym, prevSym.name + " is already defined as " + s2 + s3)
+        issueSymbolTypeError(currentSym, prevSym.name + " is already defined as " + s2 + s3 + where)
       }
 
       def MaxParametersCaseClassError(tree: Tree) =
@@ -1060,14 +1048,24 @@ trait ContextErrors {
         setError(arg)
       } else arg
     }
+    
+    def WarnAfterNonSilentRecursiveInference(param: Symbol, arg: Tree)(implicit context: Context) = {
+      val note = "type-checking the invocation of "+ param.owner +" checks if the named argument expression '"+ param.name + " = ...' is a valid assignment\n"+
+                 "in the current scope. The resulting type inference error (see above) can be fixed by providing an explicit type in the local definition for "+ param.name +"."
+      context.warning(arg.pos, note)
+    }
 
     def UnknownParameterNameNamesDefaultError(arg: Tree, name: Name)(implicit context: Context) = {
       issueNormalTypeError(arg, "unknown parameter name: " + name)
       setError(arg)
     }
 
-    def DoubleParamNamesDefaultError(arg: Tree, name: Name)(implicit context: Context) = {
-      issueNormalTypeError(arg, "parameter specified twice: "+ name)
+    def DoubleParamNamesDefaultError(arg: Tree, name: Name, pos: Int, otherName: Option[Name])(implicit context: Context) = {
+      val annex = otherName match {
+        case Some(oName) => "\nNote that that '"+ oName +"' is not a parameter name of the invoked method."
+        case None => ""
+      }
+      issueNormalTypeError(arg, "parameter '"+ name +"' is already specified at parameter position "+ pos + annex)
       setError(arg)
     }
 

@@ -182,6 +182,7 @@ PROPERTIES
 
   <!-- Sets location of build folders -->
   <property name="build.dir" value="${basedir}/build"/>
+  <property name="build-asm.dir" value="${build.dir}/asm"/>
   <property name="build-locker.dir" value="${build.dir}/locker"/>
   <property name="build-palo.dir" value="${build.dir}/palo"/>
   <property name="build-quick.dir" value="${build.dir}/quick"/>
@@ -337,7 +338,9 @@ INITIALISATION
   <!-- scalac.args.optimise is selectively overridden in certain antcall tasks. -->
     <property name="scalac.args.optimise" value=""/>
   <!-- scalac.args.quickonly are added to quick.* targets but not others (particularly, locker.)
-       This is to facilitate testing new command line options which do not yet exist in starr. -->
+       This is to facilitate testing new command line options which do not yet exist in starr.
+       Note: These are also used by strap since they may affect JVM target or other and we'd like
+       to be able to test binary stability of features. -->
     <property name="scalac.args.quickonly" value=""/>
     <property name="scalac.args.all" value="${scalac.args.always} ${scalac.args} ${scalac.args.optimise}"/>
     <property name="scalac.args.quick" value="${scalac.args.all} ${scalac.args.quickonly}"/>
@@ -383,6 +386,7 @@ INITIALISATION
     <echo message="        java args: ${env.ANT_OPTS} ${jvm.opts}" />
     <echo message="       javac args: ${javac.args}" />
     <echo message="      scalac args: ${scalac.args.all}" />
+    <echo message="scalac quick args: ${scalac.args.quick}" />
     <echo message="         git date: ${git.commit.date}" />
     <echo message="         git hash: ${git.commit.sha}" />
     <echo message="    maven version: ${maven.version.number}"/>
@@ -410,10 +414,43 @@ INITIALISATION
   </target>
 
 <!-- ===========================================================================
+LOCAL Adapted ASM
+============================================================================ -->
+
+  <target name="asm.start" depends="init">
+    <condition property="asm.available">
+      <available file="${build-asm.dir}/asm.complete"/>
+    </condition>
+  </target>
+
+  <target name="asm.lib" depends="asm.start" unless="asm.available">
+    <stopwatch name="asm.lib.timer"/>
+    <mkdir dir="${build-asm.dir}/classes/"/>
+    <javac
+      srcdir="${src.dir}/asm"
+      destdir="${build-asm.dir}/classes"
+      classpath="${build-asm.dir}/classes"
+      includes="**/*.java"
+      target="1.5" source="1.5">
+        <compilerarg line="${javac.args} -XDignore.symbol.file"/>
+    </javac>
+    <touch file="${build-asm.dir}/asm.complete" verbose="no"/>
+    <stopwatch name="asm.lib.timer" action="total"/>
+  </target>
+
+
+  <target name="asm.done" depends="asm.lib">
+    <path id="asm.classpath">
+      <pathelement location="${build-asm.dir}/classes/"/>
+    </path>
+  </target>
+
+
+<!-- ===========================================================================
 LOCAL REFERENCE BUILD (LOCKER)
 ============================================================================ -->
 
-  <target name="locker.start" depends="init">
+  <target name="locker.start" depends="asm.done">
     <condition property="locker.available">
       <available file="${build-locker.dir}/all.complete"/>
     </condition>
@@ -490,6 +527,7 @@ LOCAL REFERENCE BUILD (LOCKER)
         <pathelement location="${build-locker.dir}/classes/library"/>
         <pathelement location="${build-locker.dir}/classes/compiler"/>
         <path refid="aux.libs"/>
+        <path refid="asm.classpath"/>
         <pathelement location="${jline.jar}"/>
       </compilationpath>
     </scalacfork>
@@ -521,11 +559,13 @@ LOCAL REFERENCE BUILD (LOCKER)
     <path id="locker.classpath">
       <pathelement location="${build-locker.dir}/classes/library"/>
       <pathelement location="${build-locker.dir}/classes/compiler"/>
+      <path refid="asm.classpath"/>
       <path refid="aux.libs"/>
     </path>
     <path id="quick.classpath">
       <pathelement location="${build-quick.dir}/classes/library"/>
       <pathelement location="${build-quick.dir}/classes/compiler"/>
+      <path refid="asm.classpath"/>
       <path refid="aux.libs"/>
     </path>
   </target>
@@ -593,6 +633,7 @@ PACKED LOCKER BUILD (PALO)
     <mkdir dir="${build-palo.dir}/lib"/>
     <jar destfile="${build-palo.dir}/lib/scala-compiler.jar" manifest="${basedir}/META-INF/MANIFEST.MF">
       <fileset dir="${build-locker.dir}/classes/compiler"/>
+      <fileset dir="${build-asm.dir}/classes/"/>
       <!-- filemode / dirmode: see trac ticket #1294 -->
       <zipfileset dirmode="755" filemode="644" src="${lib.dir}/fjbg.jar"/>
       <zipfileset dirmode="755" filemode="644" src="${lib.dir}/msil.jar"/>
@@ -665,6 +706,7 @@ QUICK BUILD (QUICK)
         <include name="continuations/**"/>
         <include name="swing/**"/>
         <include name="actors/**"/>
+        <include name="actors-migration/**"/>
       </srcfiles>
     </uptodate>
   </target>
@@ -774,6 +816,7 @@ QUICK BUILD (QUICK)
         <pathelement location="${build-quick.dir}/classes/library"/>
         <pathelement location="${build-quick.dir}/classes/compiler"/>
         <path refid="aux.libs"/>
+        <path refid="asm.classpath"/>
         <pathelement location="${jline.jar}"/>
       </compilationpath>
     </scalacfork>
@@ -848,7 +891,32 @@ QUICK BUILD (QUICK)
     <stopwatch name="quick.plugins.timer" action="total"/>
   </target>
 
-  <target name="quick.pre-scalacheck" depends="quick.plugins">
+  <target name="quick.pre-actors-migration" depends="quick.plugins">
+    <uptodate property="quick.actors-migration.available" targetfile="${build-quick.dir}/actors-migration.complete">
+      <srcfiles dir="${src.dir}/actors-migration"/>
+    </uptodate>
+  </target>
+
+  <target name="quick.actors-migration" depends="quick.pre-actors-migration" unless="quick.actors-migration.available">
+    <stopwatch name="quick.actors-migration.timer"/>
+    <mkdir dir="${build-quick.dir}/classes/actors-migration"/>
+    <scalacfork
+      destdir="${build-quick.dir}/classes/actors-migration"
+      compilerpathref="quick.classpath"
+      params="${scalac.args.quick}"
+      srcdir="${src.dir}/actors-migration"
+      jvmargs="${scalacfork.jvmargs}">
+      <include name="**/*.scala"/>
+      <compilationpath>
+        <pathelement location="${build-quick.dir}/classes/library"/>
+        <pathelement location="${build-quick.dir}/classes/actors-migration"/>
+      </compilationpath>
+    </scalacfork>
+    <touch file="${build-quick.dir}/actors-migration.complete" verbose="no"/>
+    <stopwatch name="quick.actors-migration.timer" action="total"/>
+  </target>
+
+  <target name="quick.pre-scalacheck" depends="quick.actors-migration">
     <uptodate property="quick.scalacheck.available" targetfile="${build-quick.dir}/scalacheck.complete">
       <srcfiles dir="${src.dir}/scalacheck"/>
     </uptodate>
@@ -860,7 +928,7 @@ QUICK BUILD (QUICK)
     <scalacfork
       destdir="${build-quick.dir}/classes/scalacheck"
       compilerpathref="quick.classpath"
-      params="${scalac.args.all}"
+      params="${scalac.args.quick}"
       srcdir="${src.dir}/scalacheck"
       jvmargs="${scalacfork.jvmargs}">
       <include name="**/*.scala"/>
@@ -1007,6 +1075,7 @@ QUICK BUILD (QUICK)
     <path id="quick.classpath">
       <pathelement location="${build-quick.dir}/classes/library"/>
       <pathelement location="${build-quick.dir}/classes/compiler"/>
+      <path refid="asm.classpath"/>
       <path refid="aux.libs"/>
     </path>
   </target>
@@ -1052,6 +1121,9 @@ PACKED QUICK BUILD (PACK)
         <include name="scala/actors/**"/>
       </fileset>
   </jar>
+  <jar destfile="${build-pack.dir}/lib/scala-actors-migration.jar">
+      <fileset dir="${build-quick.dir}/classes/actors-migration"/>
+  </jar>
   </target>
 
   <target name="pack.pre-comp" depends="pack.lib">
@@ -1070,6 +1142,7 @@ PACKED QUICK BUILD (PACK)
     <mkdir dir="${build-pack.dir}/lib"/>
     <jar destfile="${build-pack.dir}/lib/scala-compiler.jar" manifest="${build-pack.dir}/META-INF/MANIFEST.MF">
       <fileset dir="${build-quick.dir}/classes/compiler"/>
+      <fileset dir="${build-asm.dir}/classes"/>
       <!-- filemode / dirmode: see trac ticket #1294 -->
       <zipfileset dirmode="755" filemode="644" src="${fjbg.jar}"/>
       <zipfileset dirmode="755" filemode="644" src="${msil.jar}"/>
@@ -1182,6 +1255,7 @@ PACKED QUICK BUILD (PACK)
       <pathelement location="${build-pack.dir}/lib/scala-partest.jar"/>
       <pathelement location="${build-pack.dir}/lib/scalap.jar"/>
       <pathelement location="${build-pack.dir}/lib/scala-actors.jar"/>
+      <pathelement location="${build-pack.dir}/lib/scala-actors-migration.jar"/>
       <pathelement location="${ant.jar}"/>
       <pathelement location="${jline.jar}"/>
       <path refid="lib.extra"/>
@@ -1233,7 +1307,7 @@ BOOTSTRAPPING BUILD (STRAP)
       destdir="${build-strap.dir}/classes/library"
       compilerpathref="pack.classpath"
       srcpath="${src.dir}/library"
-      params="${scalac.args.all}"
+      params="${scalac.args.quick}"
       srcdir="${src.dir}/library"
       jvmargs="${scalacfork.jvmargs}">
       <include name="**/*.scala"/>
@@ -1242,7 +1316,7 @@ BOOTSTRAPPING BUILD (STRAP)
     <scalacfork
       destdir="${build-strap.dir}/classes/library"
       compilerpathref="pack.classpath"
-      params="${scalac.args.all}"
+      params="${scalac.args.quick}"
       srcdir="${src.dir}/actors"
       jvmargs="${scalacfork.jvmargs}">
       <include name="**/*.scala"/>
@@ -1251,7 +1325,7 @@ BOOTSTRAPPING BUILD (STRAP)
     <scalacfork
       destdir="${build-strap.dir}/classes/library"
       compilerpathref="pack.classpath"
-      params="${scalac.args.all}"
+      params="${scalac.args.quick}"
       srcdir="${src.dir}/swing"
       jvmargs="${scalacfork.jvmargs}">
       <include name="**/*.scala"/>
@@ -1284,10 +1358,11 @@ BOOTSTRAPPING BUILD (STRAP)
   <target name="strap.comp" depends="strap.pre-comp" unless="strap.comp.available">
     <stopwatch name="strap.comp.timer"/>
     <mkdir dir="${build-strap.dir}/classes/compiler"/>
+    <!-- TODO If we have cross dependencies, move this below scalacfork... -->
     <scalacfork
       destdir="${build-strap.dir}/classes/compiler"
       compilerpathref="pack.classpath"
-      params="${scalac.args.all}"
+      params="${scalac.args.quick}"
       srcdir="${src.dir}/compiler"
       jvmargs="${scalacfork.jvmargs}">
       <include name="**/*.scala"/>
@@ -1295,6 +1370,7 @@ BOOTSTRAPPING BUILD (STRAP)
         <pathelement location="${build-strap.dir}/classes/library"/>
         <pathelement location="${build-strap.dir}/classes/compiler"/>
         <path refid="aux.libs"/>
+        <path refid="asm.classpath"/>
         <pathelement location="${jline.jar}"/>
       </compilationpath>
     </scalacfork>
@@ -1334,7 +1410,7 @@ BOOTSTRAPPING BUILD (STRAP)
     <scalacfork
       destdir="${build-strap.dir}/classes/continuations-plugin"
       compilerpathref="pack.classpath"
-      params="${scalac.args.all}"
+      params="${scalac.args.quick}"
       srcdir="${src.dir}/continuations/plugin"
       jvmargs="${scalacfork.jvmargs}">
       <include name="**/*.scala"/>
@@ -1357,7 +1433,7 @@ BOOTSTRAPPING BUILD (STRAP)
     <scalacfork
       destdir="${build-strap.dir}/classes/library"
       compilerpathref="pack.classpath"
-      params="${scalac.args.all} -Xplugin-require:continuations -P:continuations:enable"
+      params="${scalac.args.quick} -Xplugin-require:continuations -P:continuations:enable"
       srcdir="${src.dir}/continuations/library"
       jvmargs="${scalacfork.jvmargs}">
       <include name="**/*.scala"/>
@@ -1374,7 +1450,7 @@ BOOTSTRAPPING BUILD (STRAP)
     <scalacfork
       destdir="${build-strap.dir}/classes/scalacheck"
       compilerpathref="pack.classpath"
-      params="${scalac.args.all}"
+      params="${scalac.args.quick}"
       srcdir="${src.dir}/scalacheck"
       jvmargs="${scalacfork.jvmargs}">
       <include name="**/*.scala"/>
@@ -1396,7 +1472,7 @@ BOOTSTRAPPING BUILD (STRAP)
     <scalacfork
       destdir="${build-strap.dir}/classes/scalap"
       compilerpathref="pack.classpath"
-      params="${scalac.args.all}"
+      params="${scalac.args.quick}"
       srcdir="${src.dir}/scalap"
       jvmargs="${scalacfork.jvmargs}">
       <include name="**/*.scala"/>
@@ -1438,7 +1514,7 @@ BOOTSTRAPPING BUILD (STRAP)
     <scalacfork
       destdir="${build-strap.dir}/classes/partest"
       compilerpathref="pack.classpath"
-      params="${scalac.args.all}"
+      params="${scalac.args.quick}"
       srcdir="${src.dir}/partest"
       jvmargs="${scalacfork.jvmargs}">
       <include name="**/*.scala"/>
@@ -1640,6 +1716,7 @@ DOCUMENTATION
         <include name="library/**"/>
         <include name="swing/**"/>
         <include name="actors/**"/>
+        <include name="actors-migration/**"/>
       </source-includes>
     </doc-uptodate-check>
   </target>
@@ -1660,6 +1737,7 @@ DOCUMENTATION
       docRootContent="${src.dir}/library/rootdoc.txt"
       implicits="on" diagrams="on">
       <src>
+        <files includes="${src.dir}/actors-migration"/>
         <files includes="${src.dir}/actors"/>
         <files includes="${src.dir}/library/scala"/>
         <files includes="${src.dir}/swing"/>
@@ -1837,9 +1915,31 @@ DOCUMENTATION
     <stopwatch name="docs.continuations-plugin.timer" action="total"/>
   </target>
 
+  <target name="docs.pre-actors-migration" depends="docs.continuations-plugin">
+    <doc-uptodate-check name="actors-migration" srcdir="${src.dir}/actors-migration" />
+  </target>
+
+  <target name="docs.actors-migration" depends="docs.pre-actors-migration" unless="docs.actors-migration.available">
+    <stopwatch name="docs.actors-migration.timer"/>
+    <mkdir dir="${build-docs.dir}/actors-migration"/>
+    <scaladoc
+      destdir="${build-docs.dir}/actors-migration"
+      doctitle="Actors Migration Kit"
+      docversion="${version.number}"
+      sourcepath="${src.dir}"
+      classpathref="pack.classpath"
+      srcdir="${src.dir}/actors-migration"
+      addparams="${scalac.args.all}"
+      implicits="on" diagrams="on">
+      <include name="**/*.scala"/>
+    </scaladoc>
+    <touch file="${build-docs.dir}/actors-migration.complete" verbose="no"/>
+    <stopwatch name="docs.actors-migration.timer" action="total"/>
+  </target>
+
   <target name="docs.done" depends="docs.man"/>
 
-  <target name="docs.all" depends="docs.jline, docs.comp, docs.man, docs.lib, docs.scalap, docs.partest, docs.continuations-plugin"/>
+  <target name="docs.all" depends="docs.jline, docs.comp, docs.man, docs.lib, docs.scalap, docs.partest, docs.continuations-plugin, docs.actors-migration"/>
 
   <target name="docs.clean">
     <delete dir="${build-docs.dir}" includeemptydirs="yes" quiet="yes" failonerror="no"/>
@@ -1856,6 +1956,7 @@ BOOTRAPING TEST AND TEST SUITE
       <exclude name="bin/**"/>
       <exclude name="*.complete"/>
       <exclude name="misc/scala-devel/plugins/*.jar"/>
+      <exclude name="classes/actors-migration/**"/>
     </same>
   </target>
 
@@ -2033,6 +2134,9 @@ DISTRIBUTION
     </jar>
     <jar destfile="${dist.dir}/src/scala-actors-src.jar">
       <fileset dir="${src.dir}/actors"/>
+    </jar>
+    <jar destfile="${dist.dir}/src/scala-actors-migration-src.jar">
+      <fileset dir="${src.dir}/actors-migration"/>
     </jar>
     <jar destfile="${dist.dir}/src/scalap-src.jar">
       <fileset dir="${src.dir}/scalap"/>
@@ -2214,6 +2318,12 @@ POSITIONS
       <param name="test.srcs" value="${src.dir}/actors"/>
     </antcall>
     <antcall target="test.positions.sub" inheritRefs="true">
+      <param name="test.srcs" value="${src.dir}/actors-migration"/>
+    </antcall>
+    <antcall target="test.positions.sub" inheritRefs="true">
+      <param name="test.srcs" value="${src.dir}/dbc"/>
+    </antcall>
+    <antcall target="test.positions.sub" inheritRefs="true">
       <param name="test.srcs" value="${src.dir}/swing"/>
     </antcall>
     <antcall target="test.positions.sub" inheritRefs="true">
@@ -2279,50 +2389,6 @@ POSITIONS
 <!-- ===========================================================================
 MISCELLANEOUS
 ============================================================================ -->
-
-  <target name="yourkit.init">
-    <property name="yourkit.home" value="/Applications/YourKit.app"/>
-    <property name="yourkit.api.jar" value="${yourkit.home}/lib/yjp-controller-api-redist.jar"/>
-    <property name="yourkit.agent" value="${yourkit.home}/bin/mac/libyjpagent.jnilib"/>
-    <property name="yourkit.jvm.opts" value="-agentpath:${yourkit.agent}"/>
-    <property name="yourkit.scalac.opts" value="-Yprofile:all"/>
-  </target>
-
-  <!-- Builds yourkit wrapper/jar and copies into lib/extra. -->
-  <target name="yourkit.build" depends="locker.done,yourkit.init">
-    <copy file="${yourkit.api.jar}" todir="${lib-extra.dir}"/>
-    <property name="yourkit.build.dir" value="${build-quick.dir}/classes/yourkit"/>
-    <mkdir dir="${yourkit.build.dir}"/>
-
-    <scalacfork
-      destdir="${yourkit.build.dir}"
-      compilerpathref="locker.classpath"
-      params="${scalac.args.all}"
-      srcdir="${src.dir}/yourkit"
-      jvmargs="${scalacfork.jvmargs}">
-      <include name="**/*.scala"/>
-      <compilationpath>
-        <path refid="locker.classpath"/>
-      </compilationpath>
-    </scalacfork>
-    <jar destfile="${lib-extra.dir}/scalac-yourkit.jar">
-      <fileset dir="${yourkit.build.dir}"/>
-    </jar>
-  </target>
-
-  <!-- Builds quick.lib/comp with profiling enabled. -->
-  <target name="yourkit.run" depends="yourkit.build">
-    <antcall target="clean"/>
-    <ant target="quick.lib" inheritall="false" inheritrefs="false">
-      <property name="jvm.opts" value="${yourkit.jvm.opts}"/>
-      <property name="scalac.args" value="${yourkit.scalac.opts}"/>
-    </ant>
-    <ant target="quick.comp" inheritall="false" inheritrefs="false">
-      <property name="jvm.opts" value="${yourkit.jvm.opts}"/>
-      <property name="scalac.args" value="${yourkit.scalac.opts}"/>
-    </ant>
-    <antcall target="build"/>
-  </target>
 
   <target name="graph.init">
     <taskdef name="vizant" classname="vizant.Vizant" classpath="${lib-ant.dir}/vizant.jar"/>

@@ -160,7 +160,7 @@ object Predef extends LowPriorityImplicits {
    *  is at least `ASSERTION`.
    *
    *  @see elidable
-   *  @param p   the expression to test
+   *  @param assertion   the expression to test
    */
   @elidable(ASSERTION)
   def assert(assertion: Boolean) {
@@ -173,8 +173,8 @@ object Predef extends LowPriorityImplicits {
    *  is at least `ASSERTION`.
    *
    *  @see elidable
-   *  @param p   the expression to test
-   *  @param msg a String to include in the failure message
+   *  @param assertion   the expression to test
+   *  @param message     a String to include in the failure message
    */
   @elidable(ASSERTION) @inline
   final def assert(assertion: Boolean, message: => Any) {
@@ -189,7 +189,7 @@ object Predef extends LowPriorityImplicits {
    *  will not be generated if `-Xelide-below` is at least `ASSERTION`.
    *
    *  @see elidable
-   *  @param p   the expression to test
+   *  @param assumption   the expression to test
    */
   @elidable(ASSERTION)
   def assume(assumption: Boolean) {
@@ -204,8 +204,8 @@ object Predef extends LowPriorityImplicits {
    *  will not be generated if `-Xelide-below` is at least `ASSERTION`.
    *
    *  @see elidable
-   *  @param p   the expression to test
-   *  @param msg a String to include in the failure message
+   *  @param assumption   the expression to test
+   *  @param message      a String to include in the failure message
    */
   @elidable(ASSERTION) @inline
   final def assume(assumption: Boolean, message: => Any) {
@@ -217,7 +217,7 @@ object Predef extends LowPriorityImplicits {
    *  This method is similar to `assert`, but blames the caller of the method
    *  for violating the condition.
    *
-   *  @param p   the expression to test
+   *  @param requirement   the expression to test
    */
   def require(requirement: Boolean) {
     if (!requirement)
@@ -228,8 +228,8 @@ object Predef extends LowPriorityImplicits {
    *  This method is similar to `assert`, but blames the caller of the method
    *  for violating the condition.
    *
-   *  @param p   the expression to test
-   *  @param msg a String to include in the failure message
+   *  @param requirement   the expression to test
+   *  @param message       a String to include in the failure message
    */
   @inline final def require(requirement: Boolean, message: => Any) {
     if (!requirement)
@@ -311,7 +311,7 @@ object Predef extends LowPriorityImplicits {
   implicit def tuple2ToZippedOps[T1, T2](x: (T1, T2))                           = new runtime.Tuple2Zipped.Ops(x)
   implicit def tuple3ToZippedOps[T1, T2, T3](x: (T1, T2, T3))                   = new runtime.Tuple3Zipped.Ops(x)
   implicit def seqToCharSequence(xs: collection.IndexedSeq[Char]): CharSequence = new runtime.SeqCharSequence(xs)
-  implicit def arrayToCharSequence(xs: Array[Char]): CharSequence               = new runtime.ArrayCharSequence(xs)
+  implicit def arrayToCharSequence(xs: Array[Char]): CharSequence               = new runtime.ArrayCharSequence(xs, 0, xs.length)
 
   implicit def genericArrayOps[T](xs: Array[T]): ArrayOps[T] = (xs match {
     case x: Array[AnyRef]  => refArrayOps[AnyRef](x)
@@ -451,14 +451,14 @@ object Predef extends LowPriorityImplicits {
   }
 
   /** A type for which there is always an implicit value.
-   *  @see fallbackCanBuildFrom in Array.scala
+   *  @see [[scala.Array$]], method `fallbackCanBuildFrom`
    */
   class DummyImplicit
 
   object DummyImplicit {
 
     /** An implicit value yielding a `DummyImplicit`.
-     *   @see fallbackCanBuildFrom in Array.scala
+     *   @see [[scala.Array$]], method `fallbackCanBuildFrom`
      */
     implicit def dummyImplicit: DummyImplicit = new DummyImplicit
   }
