@@ -1509,33 +1509,27 @@ trait Types extends api.Types { self: SymbolTable =>
     if (period != currentPeriod) {
       tpe.baseTypeSeqPeriod = currentPeriod
       if (!isValidForBaseClasses(period)) {
-        if (tpe.parents.exists(_.exists(_.isInstanceOf[TypeVar]))) {
-          // rename type vars to fresh type params, take base type sequence of
-          // resulting type, and rename back all the entries in that sequence
-          var tvs = Set[TypeVar]()
-          for (p <- tpe.parents)
-            for (t <- p) t match {
-              case tv: TypeVar => tvs += tv
-              case _ =>
-            }
-          val varToParamMap: Map[Type, Symbol] =
-            mapFrom[TypeVar, Type, Symbol](tvs.toList)(_.origin.typeSymbol.cloneSymbol)
-          val paramToVarMap = varToParamMap map (_.swap)
+        val tvs = tpe.parents flatMap typeVarsInType
+        // rename type vars to fresh type params, take base type sequence of
+        // resulting type, and rename back all the entries in that sequence
+        if (tvs.nonEmpty) {
+          val clones        = tvs map (_.origin.typeSymbol.cloneSymbol)
+          val varToParamMap = tvs zip clones toMap
+          val paramToVarMap = clones zip tvs toMap
           val varToParam = new TypeMap {
-            def apply(tp: Type) = varToParamMap get tp match {
-              case Some(sym) => sym.tpe
-              case _ => mapOver(tp)
-            }
+            def apply(tp: Type) =
+              if (tvs contains tp) tvs(tp).tpe else mapOver(tp)
           }
           val paramToVar = new TypeMap {
             def apply(tp: Type) = tp match {
-              case TypeRef(_, tsym, _) if paramToVarMap.isDefinedAt(tsym) => paramToVarMap(tsym)
-              case _ => mapOver(tp)
+              case TypeRef(_, tsym, _) if clones contains tsym => paramToVarMap(tsym)
+              case _                                           => mapOver(tp)
             }
           }
           val bts = copyRefinedType(tpe.asInstanceOf[RefinedType], tpe.parents map varToParam, varToParam mapOver tpe.decls).baseTypeSeq
           tpe.baseTypeSeqCache = bts lateMap paramToVar
-        } else {
+        }
+        else {
           incCounter(compoundBaseTypeSeqCount)
           tpe.baseTypeSeqCache = undetBaseTypeSeq
           tpe.baseTypeSeqCache = if (tpe.typeSymbol.isRefinementClass)

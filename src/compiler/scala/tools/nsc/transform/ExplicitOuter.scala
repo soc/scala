@@ -80,12 +80,6 @@ abstract class ExplicitOuter extends InfoTransform
     }
   }
 
-  /** Issue a migration warning for instance checks which might be on an Array and
-   *  for which the type parameter conforms to Seq, because these answers changed in 2.8.
-   */
-  def isArraySeqTest(lhs: Type, rhs: Type) =
-    (ArrayClass.tpe <:< lhs.widen) && (rhs.widen matchesPattern SeqClass.tpe)
-
   def outerAccessor(clazz: Symbol): Symbol = {
     val firstTry = clazz.info.decl(nme.expandedName(nme.OUTER, clazz))
     if (firstTry != NoSymbol && firstTry.outerSource == clazz) firstTry
@@ -541,13 +535,6 @@ abstract class ExplicitOuter extends InfoTransform
                 }
               case _ =>
             }
-          }
-
-          if (settings.Xmigration28.value) tree match {
-            case TypeApply(fn @ Select(qual, _), args) if fn.symbol == Object_isInstanceOf || fn.symbol == Any_isInstanceOf =>
-              if (isArraySeqTest(qual.tpe, args.head.tpe))
-                unit.warning(tree.pos, "An Array will no longer match as Seq[_].")
-            case _ => ()
           }
 
           val x = super.transform(tree)
