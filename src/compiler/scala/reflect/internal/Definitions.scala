@@ -143,9 +143,8 @@ trait Definitions extends reflect.api.StandardDefinitions {
       lazy val Boolean_not = getMember(BooleanClass, nme.UNARY_!)
 
     lazy val ScalaNumericValueClasses = ScalaValueClasses filterNot Set[Symbol](UnitClass, BooleanClass)
-
-    def ScalaValueClassesNoUnit = ScalaValueClasses filterNot (_ eq UnitClass)
-    def ScalaValueClasses: List[ClassSymbol] = List(
+    lazy val ScalaValueClassesNoUnit = ScalaValueClasses filterNot (_ eq UnitClass)
+    lazy val ScalaValueClasses: List[ClassSymbol] = List(
       UnitClass,
       BooleanClass,
       ByteClass,
@@ -156,8 +155,8 @@ trait Definitions extends reflect.api.StandardDefinitions {
       FloatClass,
       DoubleClass
     )
-    def ScalaValueClassCompanions: List[Symbol] = ScalaValueClasses map (_.companionSymbol)
-    def ScalaPrimitiveValueClasses: List[ClassSymbol] = ScalaValueClasses
+    lazy val ScalaValueClassCompanions: List[Symbol] = ScalaValueClasses map (_.companionSymbol)
+    lazy val ScalaPrimitiveValueClasses: List[ClassSymbol] = ScalaValueClasses
   }
 
   abstract class DefinitionsClass extends AbsDefinitions with ValueClassDefinitions {
