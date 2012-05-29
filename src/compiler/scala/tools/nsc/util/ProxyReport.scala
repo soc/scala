@@ -40,17 +40,6 @@ trait ProxyReport {
     def TypeClass             = getType("Type")
     def SimpleTypeProxy       = getType("SimpleTypeProxy")
     def RewrappingTypeProxy   = getType("RewrappingTypeProxy")
-
-    def IterableForwarder    = getGeneric("IterableForwarder")
-    def SeqForwarder         = getGeneric("SeqForwarder")
-    def IterableLike         = getColl("IterableLike")
-    def IterableProxy        = getColl("IterableProxyLike")
-    def MapLike              = getColl("MapLike")
-    def MapProxy             = getColl("MapProxyLike")
-    def SeqLike              = getColl("SeqLike")
-    def SeqProxy             = getColl("SeqProxyLike")
-    def SetLike              = getColl("SetLike")
-    def SetProxy             = getColl("SetProxyLike")
   }
   import classes._
 
@@ -96,13 +85,7 @@ trait Unwrapped {
 
   lazy val wrappers = List(
     TypeClass        -> SimpleTypeProxy,
-    TypeClass        -> RewrappingTypeProxy,
-    IterableClass    -> IterableForwarder,
-    SeqClass         -> SeqForwarder,
-    IterableLike     -> IterableProxy,
-    MapLike          -> MapProxy,
-    SetLike          -> SetProxy,
-    SeqLike          -> SeqProxy
+    TypeClass        -> RewrappingTypeProxy
   )
 
   def generate(dir: io.Directory) = {

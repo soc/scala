@@ -12,7 +12,7 @@ package scala.collection
 package mutable
 
 import generic._
-import immutable.{List, Nil, ::}
+import immutable.{ ListSerializeEnd, List, Nil, :: }
 import java.io._
 
 /** A `Buffer` implementation back up by a list. It provides constant time
@@ -44,24 +44,80 @@ import java.io._
 @SerialVersionUID(3419063961353022662L)
 final class ListBuffer[A]
       extends AbstractBuffer[A]
-         with Buffer[A]
          with GenericIterableTemplate[A, ListBuffer]
          with BufferLike[A, ListBuffer[A]]
          with Builder[A, List[A]]
-         with SeqForwarder[A]
          with Serializable
 {
-  override def companion: GenericCompanion[ListBuffer] = ListBuffer
-
   import scala.collection.Iterable
-  import scala.collection.immutable.ListSerializeEnd
-
+  
+  override def companion: GenericCompanion[ListBuffer] = ListBuffer
+  private def underlying: immutable.Seq[A] = start
   private var start: List[A] = Nil
   private var last0: ::[A] = _
   private var exported: Boolean = false
   private var len = 0
 
-  protected def underlying: immutable.Seq[A] = start
+  override def /: [B](z: B)(op: (B, A) => B): B = underlying./:(z)(op)
+  override def :\ [B](z: B)(op: (A, B) => B): B = underlying.:\(z)(op)
+  override def addString(b: StringBuilder): StringBuilder = underlying.addString(b)
+  override def addString(b: StringBuilder, sep: String): StringBuilder = underlying.addString(b, sep)
+  override def addString(b: StringBuilder, start: String, sep: String, end: String): StringBuilder = underlying.addString(b, start, sep, end)
+  override def contains(elem: Any): Boolean = underlying contains elem
+  override def containsSlice[B](that: collection.Seq[B]): Boolean = underlying containsSlice that
+  override def copyToArray[B >: A](xs: Array[B]) = underlying.copyToArray(xs)
+  override def copyToArray[B >: A](xs: Array[B], start: Int) = underlying.copyToArray(xs, start)
+  override def copyToArray[B >: A](xs: Array[B], start: Int, len: Int) = underlying.copyToArray(xs, start, len)
+  override def copyToBuffer[B >: A](dest: Buffer[B]) = underlying.copyToBuffer(dest)
+  override def corresponds[B](that: collection.Seq[B])(p: (A,B) => Boolean): Boolean = underlying.corresponds(that)(p)
+  override def count(p: A => Boolean): Int = underlying count p
+  override def endsWith[B](that: collection.Seq[B]): Boolean = underlying endsWith that
+  override def exists(p: A => Boolean): Boolean = underlying exists p
+  override def find(p: A => Boolean): Option[A] = underlying find p
+  override def foldLeft[B](z: B)(op: (B, A) => B): B = underlying.foldLeft(z)(op)
+  override def foldRight[B](z: B)(op: (A, B) => B): B = underlying.foldRight(z)(op)
+  override def forall(p: A => Boolean): Boolean = underlying forall p
+  override def foreach[B](f: A => B): Unit = underlying foreach f
+  override def hasDefiniteSize = underlying.hasDefiniteSize
+  override def head: A = underlying.head
+  override def headOption: Option[A] = underlying.headOption
+  override def indexOfSlice[B >: A](that: collection.Seq[B]): Int = underlying indexOfSlice that
+  override def indexOfSlice[B >: A](that: collection.Seq[B], from: Int): Int = underlying.indexOfSlice(that, from)
+  override def indexOf[B >: A](elem: B): Int = underlying indexOf elem
+  override def indexOf[B >: A](elem: B, from: Int): Int = underlying.indexOf(elem, from)
+  override def indexWhere(p: A => Boolean): Int = underlying indexWhere p
+  override def indexWhere(p: A => Boolean, from: Int): Int = underlying.indexWhere(p, from)
+  override def indices: Range = underlying.indices
+  override def isDefinedAt(x: Int): Boolean = underlying isDefinedAt x
+  override def isEmpty: Boolean = underlying.isEmpty
+  override def last: A = underlying.last
+  override def lastIndexOfSlice[B >: A](that: collection.Seq[B]): Int = underlying lastIndexOfSlice that
+  override def lastIndexOfSlice[B >: A](that: collection.Seq[B], end: Int): Int = underlying.lastIndexOfSlice(that, end)
+  override def lastIndexOf[B >: A](elem: B): Int = underlying lastIndexOf elem
+  override def lastIndexOf[B >: A](elem: B, end: Int): Int = underlying.lastIndexOf(elem, end)
+  override def lastIndexWhere(p: A => Boolean): Int = underlying lastIndexWhere p
+  override def lastIndexWhere(p: A => Boolean, end: Int): Int = underlying.lastIndexWhere(p, end)
+  override def lastOption: Option[A] = underlying.lastOption
+  override def lengthCompare(len: Int): Int = underlying lengthCompare len
+  override def mkString(sep: String): String = underlying.mkString(sep)
+  override def mkString(start: String, sep: String, end: String): String = underlying.mkString(start, sep, end)
+  override def mkString: String = underlying.mkString
+  override def nonEmpty: Boolean = underlying.nonEmpty
+  override def prefixLength(p: A => Boolean) = underlying prefixLength p
+  override def reduceLeft[B >: A](op: (B, A) => B): B = underlying.reduceLeft(op)
+  override def reduceRight[B >: A](op: (A, B) => B): B = underlying.reduceRight(op)
+  override def reverseIterator: Iterator[A] = underlying.reverseIterator
+  override def sameElements[B >: A](that: Iterable[B]): Boolean = underlying.sameElements(that)
+  override def segmentLength(p: A => Boolean, from: Int): Int = underlying.segmentLength(p, from)
+  override def startsWith[B](that: collection.Seq[B]): Boolean = underlying startsWith that
+  override def startsWith[B](that: collection.Seq[B], offset: Int): Boolean = underlying.startsWith(that, offset)
+  override def toArray[B >: A: ArrayTag]: Array[B] = underlying.toArray
+  override def toBuffer[B >: A] = underlying.toBuffer
+  override def toIndexedSeq = underlying.toIndexedSeq
+  override def toIterable: Iterable[A] = underlying.toIterable
+  override def toMap[T, U](implicit ev: A <:< (T, U)): immutable.Map[T, U] = underlying.toMap(ev)
+  override def toSeq: collection.Seq[A] = underlying.toSeq
+  override def toSet[B >: A]: immutable.Set[B] = underlying.toSet
 
   private def writeObject(out: ObjectOutputStream) {
     // write start
@@ -115,10 +171,9 @@ final class ListBuffer[A]
   override def size = length
 
   // Implementations of abstract methods in Buffer
-
   override def apply(n: Int): A =
     if (n < 0 || n >= len) throw new IndexOutOfBoundsException(n.toString())
-    else super.apply(n)
+    else underlying.apply(n)
 
   /** Replaces element at index `n` with the new element
    *  `newelem`. Takes time linear in the buffer size. (except the
