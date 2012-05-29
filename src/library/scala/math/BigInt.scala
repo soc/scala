@@ -17,25 +17,13 @@ import language.implicitConversions
  *  @since 2.1
  */
 object BigInt {
-
-  private val minCached = -1024
-  private val maxCached = 1024
-  private val cache = new Array[BigInt](maxCached - minCached + 1)
-  private val minusOne = BigInteger.valueOf(-1)
-
   /** Constructs a `BigInt` whose value is equal to that of the
    *  specified integer value.
    *
    *  @param i the specified integer value
    *  @return  the constructed `BigInt`
    */
-  def apply(i: Int): BigInt =
-    if (minCached <= i && i <= maxCached) {
-      val offset = i - minCached
-      var n = cache(offset)
-      if (n eq null) { n = new BigInt(BigInteger.valueOf(i)); cache(offset) = n }
-      n
-    } else new BigInt(BigInteger.valueOf(i))
+  def apply(i: Int): BigInt = new BigInt(BigInteger.valueOf(i))
 
   /** Constructs a `BigInt` whose value is equal to that of the
    *  specified long value.
@@ -43,15 +31,12 @@ object BigInt {
    *  @param l the specified long value
    *  @return  the constructed `BigInt`
    */
-  def apply(l: Long): BigInt =
-    if (minCached <= l && l <= maxCached) apply(l.toInt)
-    else new BigInt(BigInteger.valueOf(l))
+  def apply(l: Long): BigInt = new BigInt(BigInteger.valueOf(l))
 
   /** Translates a byte array containing the two's-complement binary
    *  representation of a BigInt into a BigInt.
    */
-  def apply(x: Array[Byte]): BigInt =
-    new BigInt(new BigInteger(x))
+  def apply(x: Array[Byte]): BigInt = new BigInt(new BigInteger(x))
 
   /** Translates the sign-magnitude representation of a BigInt into a BigInt.
    */
@@ -106,9 +91,9 @@ class BigInt(val bigInteger: BigInteger) extends ScalaNumber with ScalaNumericCo
   /** Compares this BigInt with the specified value for equality.
    */
   override def equals(that: Any): Boolean = that match {
-    case that: BigInt     => this equals that
+    case that: BigInt  => this equals that
     case that: Decimal => that.toBigIntExact exists (this equals _)
-    case _                => super.equals(that)
+    case _             => super.equals(that)
   }
   protected[math] def isWhole = true
   def underlying = bigInteger
