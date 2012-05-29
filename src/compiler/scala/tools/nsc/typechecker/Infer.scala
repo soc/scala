@@ -749,16 +749,17 @@ trait Infer {
      * Todo: Try to make isApplicable always safe (i.e. not cause TypeErrors).
      * The chance of TypeErrors should be reduced through context errors
      */
-    private[typechecker] def isApplicableSafe(undetparams: List[Symbol], ftpe: Type,
-                                              argtpes0: List[Type], pt: Type): Boolean = {
-      val silentContext = context.makeSilent(false)
-      val typer0 = newTyper(silentContext)
-      val res1 = typer0.infer.isApplicable(undetparams, ftpe, argtpes0, pt)
-      if (pt != WildcardType && silentContext.hasErrors) {
+    private[typechecker] def isApplicableSafe(undetparams: List[Symbol], ftpe: Type, argtpes0: List[Type], pt: Type): Boolean = {
+      val silentContext                = context.makeSilent(false)
+      val typer0                       = newTyper(silentContext)
+      def isApplicable(expected: Type) = typer0.infer.isApplicable(undetparams, ftpe, argtpes0, expected)
+
+      val res = isApplicable(pt)
+      if (pt == WildcardType || !silentContext.hasErrors) res
+      else {
         silentContext.flushBuffer()
-        val res2 = typer0.infer.isApplicable(undetparams, ftpe, argtpes0, WildcardType)
-        if (silentContext.hasErrors) false else res2
-      } else res1
+        isApplicable(WildcardType) && !silentContext.hasErrors
+      }
     }
 
     /** Is type <code>ftpe1</code> strictly more specific than type <code>ftpe2</code>
