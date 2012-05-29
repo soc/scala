@@ -12,7 +12,7 @@ package scala.collection
 package mutable
 
 import generic._
-import annotation.{migration, bridge}
+import annotation.migration
 
 /** A template trait for buffers of type `Buffer[A]`.
  *

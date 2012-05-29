@@ -10,7 +10,7 @@ package scala.collection
 
 import generic._
 import mutable.{ Builder, SetBuilder }
-import annotation.{migration, bridge}
+import annotation.migration
 
 /** A template trait for sets.
  *

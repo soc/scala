@@ -4,7 +4,7 @@
  */
 package scala.reflect.internal
 
-import annotation.{ tailrec, switch }
+import annotation.switch
 import java.lang.{ Character => JCharacter }
 
 /** Contains constants and classifier methods for characters */

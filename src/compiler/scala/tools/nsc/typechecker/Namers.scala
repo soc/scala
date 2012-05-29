@@ -600,9 +600,7 @@ trait Namers extends MethodSynthesis {
       case DefDef(_, nme.CONSTRUCTOR, _, _, _, _) =>
         assignAndEnterFinishedSymbol(tree)
       case DefDef(mods, name, tparams, _, _, _) =>
-        val bridgeFlag = if (mods hasAnnotationNamed tpnme.bridgeAnnot) BRIDGE else 0
-        val sym = assignAndEnterSymbol(tree) setFlag bridgeFlag
-
+        val sym = assignAndEnterSymbol(tree)
         if (name == nme.copy || tree.symbol.name.startsWith(nme.copy + nme.DEFAULT_GETTER_STRING))
           enterCopyMethodOrGetter(tree, tparams)
         else

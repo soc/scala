@@ -11,7 +11,7 @@ package scala.collection
 import generic._
 import immutable.List
 import mutable.Builder
-import annotation.{tailrec, migration}
+import annotation.migration
 import annotation.unchecked.{ uncheckedVariance => uV }
 
 /** A template trait for iterable collections of type `Iterable[A]`.

@@ -12,7 +12,6 @@ import java.util.concurrent.locks.ReentrantLock
 import session._
 import scala.util.Properties.{ jdkHome, javaVersion }
 import scala.tools.util.{ Javap }
-import scala.annotation.tailrec
 import scala.collection.mutable.ListBuffer
 import util.{ ClassPath, Exceptional, stringFromWriter, stringFromStream }
 import interpreter._

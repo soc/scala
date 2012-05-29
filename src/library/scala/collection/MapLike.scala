@@ -11,7 +11,7 @@ package scala.collection
 
 import generic._
 import mutable.{ Builder, MapBuilder }
-import annotation.{migration, bridge}
+import annotation.migration
 
 /** A template trait for maps, which associate keys with values.
  *

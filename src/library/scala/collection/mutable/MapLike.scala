@@ -11,7 +11,7 @@ package scala.collection
 package mutable
 
 import generic._
-import annotation.{migration, bridge}
+import annotation.migration
 
 /** A template trait for mutable maps.
  *  $mapNote
