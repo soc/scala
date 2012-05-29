@@ -874,7 +874,6 @@ trait Definitions extends reflect.api.StandardDefinitions {
     // Annotations
     lazy val ElidableMethodClass        = requiredClass[scala.annotation.elidable]
     lazy val ImplicitNotFoundClass      = requiredClass[scala.annotation.implicitNotFound]
-    lazy val MigrationAnnotationClass   = requiredClass[scala.annotation.migration]
     lazy val ScalaStrictFPAttr          = requiredClass[scala.annotation.strictfp]
     lazy val SerializableAttr           = requiredClass[scala.annotation.serializable] // @serializable is deprecated
     lazy val SwitchClass                = requiredClass[scala.annotation.switch]

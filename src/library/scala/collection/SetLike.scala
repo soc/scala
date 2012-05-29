@@ -10,7 +10,6 @@ package scala.collection
 
 import generic._
 import mutable.{ Builder, SetBuilder }
-import annotation.migration
 
 /** A template trait for sets.
  *
@@ -180,12 +179,6 @@ extends IterableLike[A, This]
     copyToBuffer(result)
     result
   }
-
-  // note: this is only overridden here to add the migration annotation,
-  // which I hope to turn into an Xlint style warning as the migration aspect
-  // is not central to its importance.
-  @migration("Set.map now returns a Set, so it will discard duplicate values.", "2.8.0")
-  override def map[B, That](f: A => B)(implicit bf: CanBuildFrom[This, B, That]): That = super.map(f)(bf)
 
   /** Tests if some element is contained in this set.
    *

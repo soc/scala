@@ -67,12 +67,6 @@ abstract class ExplicitOuter extends InfoTransform
 
   private val innerClassConstructorParamName: TermName = newTermName("arg" + nme.OUTER)
 
-  /** Issue a migration warning for instance checks which might be on an Array and
-   *  for which the type parameter conforms to Seq, because these answers changed in 2.8.
-   */
-  def isArraySeqTest(lhs: Type, rhs: Type) =
-    (ArrayClass.tpe <:< lhs.widen) && (rhs.widen matchesPattern SeqClass.tpe)
-
   def outerAccessor(clazz: Symbol): Symbol = {
     val firstTry = clazz.info.decl(nme.expandedName(nme.OUTER, clazz))
     if (firstTry != NoSymbol && firstTry.outerSource == clazz) firstTry

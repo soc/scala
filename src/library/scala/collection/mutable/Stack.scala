@@ -14,7 +14,6 @@ package mutable
 import generic._
 import collection.immutable.{List, Nil}
 import collection.Iterator
-import annotation.migration
 
 /** Factory object for the `mutable.Stack` class.
  *
@@ -162,7 +161,6 @@ extends AbstractSeq[A]
    *
    *  @return the created list.
    */
-  @migration("`toList` traverses in FIFO order.", "2.8.0")
   override def toList: List[A] = elems
 
   /** This method clones the stack.

@@ -11,7 +11,6 @@ package scala.collection
 import generic._
 import immutable.List
 import mutable.Builder
-import annotation.migration
 import annotation.unchecked.{ uncheckedVariance => uV }
 
 /** A template trait for iterable collections of type `Iterable[A]`.
@@ -348,7 +347,6 @@ trait IterableLike[+A, +Repr]
     b.result
   }
 
-  @migration("The behavior of `scanRight` has changed. The previous behavior can be reproduced with scanRight.reverse.", "2.9.0")
   def scanRight[B, That](z: B)(op: (A, B) => B)(implicit bf: CanBuildFrom[Repr, B, That]): That = {
     var scanned = List(z)
     var acc = z

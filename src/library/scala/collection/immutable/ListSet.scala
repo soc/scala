@@ -10,7 +10,7 @@ package scala.collection
 package immutable
 
 import generic._
-import annotation.{tailrec, bridge}
+import annotation.tailrec
 import mutable.{ ListBuffer, Builder }
 
 /** $factoryInfo

@@ -6,13 +6,10 @@
 **                          |/                                          **
 \*                                                                      */
 
-
-
 package scala.collection
 package generic
 
 import mutable.Builder
-import annotation.migration
 import annotation.unchecked.uncheckedVariance
 import language.higherKinds
 
@@ -158,8 +155,7 @@ trait GenericIterableTemplate[+A, +CC[X] <: Iterable[X]] extends HasNewBuilder[A
    *  @throws `IllegalArgumentException` if all collections in this $coll
    *          are not of the same size.
    */
-  @migration("`transpose` throws an `IllegalArgumentException` if collections are not uniformly sized.", "2.9.0")
-  def transpose[B](implicit asIterable: A => /*<:<!!!*/ IterableOnce[B]): CC[CC[B] @uncheckedVariance] = {
+  def transpose[B](implicit asIterable: A => IterableOnce[B]): CC[CC[B] @uncheckedVariance] = {
     if (isEmpty)
       return genericBuilder[CC[B]].result
 

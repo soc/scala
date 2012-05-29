@@ -10,7 +10,6 @@ package scala.collection
 package mutable
 
 import java.lang.{ StringBuilder => JavaStringBuilder }
-import annotation.migration
 import immutable.StringLike
 
 /** A builder for mutable sequence of characters.  This class provides an API
@@ -403,7 +402,6 @@ final class StringBuilder(private val underlying: JavaStringBuilder)
    *
    *  @return   the reversed StringBuilder
    */
-  @migration("`reverse` returns a new instance.  Use `reverseContents` to update in place and return that StringBuilder itself.", "2.8.0")
   override def reverse: StringBuilder = new StringBuilder(new JavaStringBuilder(underlying).reverse)
 
   override def clone(): StringBuilder = new StringBuilder(new JavaStringBuilder(underlying))

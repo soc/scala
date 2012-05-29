@@ -10,7 +10,6 @@ package scala.collection
 package mutable
 
 import generic._
-import annotation.{ migration, bridge }
 
 /** A template trait for mutable sets of type `mutable.Set[A]`.
  *  @tparam A    the type of the elements of the set
@@ -135,7 +134,6 @@ trait SetLike[A, +This <: SetLike[A, This] with Set[A]]
    *  @param elem  the element to add.
    *  @return      a new set consisting of elements of this set and `elem`.
    */
-  @migration("`+` creates a new set. Use `+=` to add an element to this set and return that set itself.", "2.8.0")
   override def + (elem: A): This = clone() += elem
 
   /** Creates a new set consisting of all the elements of this set and two or more
@@ -149,7 +147,6 @@ trait SetLike[A, +This <: SetLike[A, This] with Set[A]]
    *  @return      a new set consisting of all the elements of this set, `elem1`,
    *               `elem2` and those in `elems`.
    */
-  @migration("`+` creates a new set. Use `+=` to add an element to this set and return that set itself.", "2.8.0")
   override def + (elem1: A, elem2: A, elems: A*): This =
     clone() += elem1 += elem2 ++= elems
 
@@ -161,7 +158,6 @@ trait SetLike[A, +This <: SetLike[A, This] with Set[A]]
    *  @param xs        the traversable object.
    *  @return          a new set consisting of elements of this set and those in `xs`.
    */
-  @migration("`++` creates a new set. Use `++=` to add elements to this set and return that set itself.", "2.8.0")
   override def ++(xs: IterableOnce[A]): This = clone() ++= xs
 
   /** Creates a new set consisting of all the elements of this set except `elem`.
@@ -169,7 +165,6 @@ trait SetLike[A, +This <: SetLike[A, This] with Set[A]]
    *  @param elem  the element to remove.
    *  @return      a new set consisting of all the elements of this set except `elem`.
    */
-  @migration("`-` creates a new set. Use `-=` to remove an element from this set and return that set itself.", "2.8.0")
   override def -(elem: A): This = clone() -= elem
 
   /** Creates a new set consisting of all the elements of this set except the two
@@ -181,7 +176,6 @@ trait SetLike[A, +This <: SetLike[A, This] with Set[A]]
    *  @return      a new set consisting of all the elements of this set except
    *               `elem1`, `elem2` and `elems`.
    */
-  @migration("`-` creates a new set. Use `-=` to remove an element from this set and return that set itself.", "2.8.0")
   override def -(elem1: A, elem2: A, elems: A*): This =
     clone() -= elem1 -= elem2 --= elems
 
@@ -192,6 +186,5 @@ trait SetLike[A, +This <: SetLike[A, This] with Set[A]]
    *  @return         a new set consisting of all the elements of this set except
    *                  elements from `xs`.
    */
-  @migration("`--` creates a new set. Use `--=` to remove elements from this set and return that set itself.", "2.8.0")
   override def --(xs: IterableOnce[A]): This = clone() --= xs
 }
