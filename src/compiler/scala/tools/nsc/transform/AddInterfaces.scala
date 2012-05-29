@@ -48,7 +48,7 @@ abstract class AddInterfaces extends InfoTransform { self: Erasure =>
       (     sym.isMethod
         && !sym.isLabel
         && !sym.isPrivate
-        && (!(sym hasFlag BRIDGE) || sym.hasBridgeAnnotation) // count @bridge annotated classes as interface members
+        && !sym.hasFlag(BRIDGE)
         && !sym.isConstructor
         && !sym.isImplOnly
       )

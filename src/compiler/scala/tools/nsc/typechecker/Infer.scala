@@ -1454,7 +1454,7 @@ trait Infer {
 
         //println("trying "+alts1+(alts1 map (_.tpe))+(alts1 map (_.locationString))+" for "+pt)
         def improves(sym1: Symbol, sym2: Symbol): Boolean =
-          sym2 == NoSymbol || sym2.hasAnnotation(BridgeClass) ||
+          sym2 == NoSymbol ||
           { val tp1 = pre.memberType(sym1)
             val tp2 = pre.memberType(sym2)
             (tp2 == ErrorType ||
@@ -1576,7 +1576,7 @@ trait Infer {
 
           def improves(sym1: Symbol, sym2: Symbol) = {
             // util.trace("improve "+sym1+sym1.locationString+" on "+sym2+sym2.locationString)
-            sym2 == NoSymbol || sym2.isError || sym2.hasAnnotation(BridgeClass) ||
+            sym2 == NoSymbol || sym2.isError ||
             isStrictlyMoreSpecific(followApply(pre.memberType(sym1)),
                                    followApply(pre.memberType(sym2)), sym1, sym2)
           }

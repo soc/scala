@@ -1347,7 +1347,7 @@ abstract class RefChecks extends InfoTransform with reflect.internal.transform.R
      *  in either a deprecated member or a scala bridge method, issue a warning.
      */
     private def checkDeprecated(sym: Symbol, pos: Position) {
-      if (sym.isDeprecated && !currentOwner.ownerChain.exists(x => x.isDeprecated || x.hasBridgeAnnotation)) {
+      if (sym.isDeprecated && !currentOwner.ownerChain.exists(x => x.isDeprecated)) {
         unit.deprecationWarning(pos, "%s%s is deprecated%s".format(
           sym, sym.locationString, sym.deprecationMessage map (": " + _) getOrElse "")
         )

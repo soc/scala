@@ -2529,8 +2529,7 @@ trait Typers extends Modes with Adaptations with Taggings {
                 (e.sym.isType || inBlock || (e.sym.tpe matches e1.sym.tpe)))
               // default getters are defined twice when multiple overloads have defaults. an
               // error for this is issued in RefChecks.checkDefaultsInOverloaded
-              if (!e.sym.isErroneous && !e1.sym.isErroneous && !e.sym.hasDefaultFlag &&
-                  !e.sym.hasAnnotation(BridgeClass) && !e1.sym.hasAnnotation(BridgeClass)) {
+              if (!e.sym.isErroneous && !e1.sym.isErroneous && !e.sym.hasDefaultFlag) {
                 log("Double definition detected:\n  " +
                     ((e.sym.getClass, e.sym.info, e.sym.ownerChain)) + "\n  " +
                     ((e1.sym.getClass, e1.sym.info, e1.sym.ownerChain)))

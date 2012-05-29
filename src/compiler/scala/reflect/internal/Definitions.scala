@@ -873,7 +873,6 @@ trait Definitions extends reflect.api.StandardDefinitions {
     lazy val StaticAnnotationClass      = requiredClass[scala.annotation.StaticAnnotation]
 
     // Annotations
-    lazy val BridgeClass                = requiredClass[scala.annotation.bridge]
     lazy val ElidableMethodClass        = requiredClass[scala.annotation.elidable]
     lazy val ImplicitNotFoundClass      = requiredClass[scala.annotation.implicitNotFound]
     lazy val MigrationAnnotationClass   = requiredClass[scala.annotation.migration]
