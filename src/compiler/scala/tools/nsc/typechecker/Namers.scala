@@ -666,7 +666,7 @@ trait Namers extends MethodSynthesis {
     }
 
     def monoTypeCompleter(tree: Tree) = mkTypeCompleter(tree) { sym =>
-      logAndValidate(sym) {
+      validate {
         val tp = initializeLowerBounds(typeSig(tree))
         sym setInfo {
           if (sym.isJavaDefined) RestrictJavaArraysMap(tp)
@@ -675,20 +675,10 @@ trait Namers extends MethodSynthesis {
         // this early test is there to avoid infinite baseTypes when
         // adding setters and getters --> bug798
         val needsCycleCheck = (sym.isAliasType || sym.isAbstractType) && !sym.isParameter
-        if (needsCycleCheck && !typer.checkNonCyclic(tree.pos, tp))
-          sym setInfo ErrorType
+
+        if (needsCycleCheck && !typer.checkNonCyclic(tree.pos, tp)) sym setInfo ErrorType
+        else sym
       }
-      // tree match {
-      //   case ClassDef(_, _, _, impl) =>
-      //     val parentsOK = (
-      //          treeInfo.isInterface(sym, impl.body)
-      //       || (sym eq ArrayClass)
-      //       || (sym isSubClass AnyValClass)
-      //     )
-      //     if (!parentsOK)
-      //       ensureParent(sym, AnyRefClass)
-      //   case _ => ()
-      // }
     }
 
     def moduleClassTypeCompleter(tree: Tree) = {
@@ -700,14 +690,12 @@ trait Namers extends MethodSynthesis {
     }
 
     def accessorTypeCompleter(tree: ValDef, isSetter: Boolean = false) = mkTypeCompleter(tree) { sym =>
-      logAndValidate(sym) {
-        sym setInfo {
-          if (isSetter)
-            MethodType(List(sym.newSyntheticValueParam(typeSig(tree))), UnitClass.tpe)
-          else
-            NullaryMethodType(typeSig(tree))
-        }
-      }
+      validate(sym setInfo {
+        if (isSetter)
+          MethodType(List(sym.newSyntheticValueParam(typeSig(tree))), UnitClass.tpe)
+        else
+          NullaryMethodType(typeSig(tree))
+      })
     }
 
     def selfTypeCompleter(tree: Tree) = mkTypeCompleter(tree) { sym =>
@@ -1320,23 +1308,6 @@ trait Namers extends MethodSynthesis {
       if (info0 ne info1) clazz setInfo info1
     }
 
-    class LogTransitions[S](onEnter: S => String, onExit: S => String) {
-      val enabled = settings.debug.value
-      @inline final def apply[T](entity: S)(body: => T): T = {
-        if (enabled) log(onEnter(entity))
-        try body
-        finally if (enabled) log(onExit(entity))
-      }
-    }
-    private val logDefinition = new LogTransitions[Symbol](
-      sym => "[define] >> " + sym.flagString + " " + sym.fullLocationString,
-      sym => "[define] << " + sym
-    )
-    private def logAndValidate(sym: Symbol)(body: => Unit) {
-      logDefinition(sym)(body)
-      validate(sym)
-    }
-
     /** Convert Java generic array type T[] to (T with Object)[]
      *  (this is necessary because such arrays have a representation which is incompatible
      *   with arrays of primitive types.)
@@ -1348,9 +1319,8 @@ trait Namers extends MethodSynthesis {
      */
     private object RestrictJavaArraysMap extends TypeMap {
       def apply(tp: Type): Type = tp match {
-        case TypeRef(pre, ArrayClass, List(elemtp))
-        if elemtp.typeSymbol.isAbstractType && !(elemtp <:< ObjectClass.tpe) =>
-          TypeRef(pre, ArrayClass, List(intersectionType(List(elemtp, ObjectClass.tpe))))
+        case TypeRef(pre, ArrayClass, elem :: Nil) if elem.typeSymbol.isAbstractType && !(elem <:< ObjectClass.tpe) =>
+          arrayType(intersectionType(List(elem, ObjectClass.tpe)))
         case _ =>
           mapOver(tp)
       }
@@ -1363,7 +1333,8 @@ trait Namers extends MethodSynthesis {
      *   - `def` modifier never for parameters of case classes
      *   - declarations only in mixins or abstract classes (when not @native)
      */
-    def validate(sym: Symbol) {
+    def validate(body: => Symbol): Symbol = {
+      val sym = body
       import SymValidateErrors._
       def fail(kind: SymValidateErrors.Value) = SymbolValidationError(sym, kind)
 
@@ -1434,6 +1405,7 @@ trait Namers extends MethodSynthesis {
       // @PP: I added this as a sanity check because these flags are supposed to be
       // converted to ABSOVERRIDE before arriving here.
       checkNoConflict(ABSTRACT, OVERRIDE)
+      sym
     }
   }
 
