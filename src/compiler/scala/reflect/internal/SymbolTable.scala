@@ -114,13 +114,24 @@ abstract class SymbolTable extends api.Universe
   type RunId = Int
   final val NoRunId = 0
 
-  // sigh, this has to be public or atPhase doesn't inline.
-  var phStack: List[Phase] = Nil
+  final val PhaseStackSize = 64
+  var phStack: Array[Phase] = Array.fill(PhaseStackSize)(NoPhase)
+  var phStackIndex = 0
+
   private var ph: Phase = NoPhase
   private var per = NoPeriod
 
-  final def atPhaseStack: List[Phase] = phStack
-  final def phase: Phase = ph
+  final def pushPhase(p: Phase) {
+    phStack(phStackIndex) = phase
+    phStackIndex += 1
+    phase = p
+  }
+  final def popPhase() {
+    phStackIndex -= 1
+    phase = phStack(phStackIndex)
+  }
+  final def atPhaseStack = ph :: (phStack take phStackIndex).toList.reverse
+  final def phase = ph
 
   def atPhaseStackMessage = atPhaseStack match {
     case Nil    => ""
@@ -132,16 +143,6 @@ abstract class SymbolTable extends api.Universe
     assert((p ne null) && p != NoPhase, p)
     ph = p
     per = period(currentRunId, p.id)
-  }
-  final def pushPhase(ph: Phase): Phase = {
-    val current = phase
-    phase = ph
-    phStack ::= ph
-    current
-  }
-  final def popPhase(ph: Phase) {
-    phStack = phStack.tail
-    phase = ph
   }
 
   /** The current compiler run identifier. */
@@ -174,11 +175,9 @@ abstract class SymbolTable extends api.Universe
 
   /** Perform given operation at given phase. */
   @inline final def atPhase[T](ph: Phase)(op: => T): T = {
-    val saved = pushPhase(ph)
-    try op
-    finally popPhase(saved)
+    pushPhase(ph)
+    try op finally popPhase()
   }
-
 
   /** Since when it is to be "at" a phase is inherently ambiguous,
    *  a couple unambiguously named methods.
