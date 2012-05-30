@@ -1196,7 +1196,7 @@ trait Implicits {
     private def mot(tp: Type): Tree = {
       val tp1 = tp.normalize.deconst 
       tp1 match {
-        case TypeRef(_, ArrayClass, tp :: Nil) =>
+        case ArrayOf(tp) =>
           gen.mkMethodCall(
             ClassManifestModule,
             newTermName("arrayType"),

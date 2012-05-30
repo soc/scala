@@ -80,8 +80,8 @@ trait ScalaToJava extends ConversionUtil { self: SymbolTable =>
    */
   def typeToJavaClass(tpe: Type): jClass[_] = tpe match {
     case ExistentialType(_, rtpe) => typeToJavaClass(rtpe)
-    case TypeRef(_, ArrayClass, List(elemtpe)) => jArrayClass(typeToJavaClass(elemtpe))
-    case TypeRef(_, sym, _) => classToJava(sym)
-    case _ => throw new NoClassDefFoundError("no Java class corresponding to "+tpe+" found")
+    case ArrayOf(elemtpe)         => jArrayClass(typeToJavaClass(elemtpe))
+    case TypeRef(_, sym, _)       => classToJava(sym)
+    case _                        => throw new NoClassDefFoundError("no Java class corresponding to "+tpe+" found")
   }
 }

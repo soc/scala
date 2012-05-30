@@ -1226,7 +1226,7 @@ trait Infer {
         tp.normalize match {
           case SingleType(pre, _) =>
             check(pre, bound)
-          case TypeRef(_, ArrayClass, arg :: _) =>
+          case ArrayOf(arg) =>
             check(arg, bound)
           case tp @ TypeRef(pre, sym, args) =>
             (  (sym.isAbstractType && !isLocalBinding(sym))

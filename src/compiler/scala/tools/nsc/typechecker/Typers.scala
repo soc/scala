@@ -3056,8 +3056,7 @@ trait Typers extends Modes with Adaptations with Taggings {
           val typedFun = typed(fun, forFunMode(mode), WildcardType)
           if (typedFun.symbol.owner == ArrayModule.moduleClass && typedFun.symbol.name == nme.apply)
             pt match {
-              case TypeRef(_, ArrayClass, targ :: _) =>
-                trees2ConstArg(args, targ)
+              case ArrayOf(targ) => trees2ConstArg(args, targ)
               case _ =>
                 // For classfile annotations, pt can only be T:
                 //   BT = Int, .., String, Class[_], JavaAnnotClass

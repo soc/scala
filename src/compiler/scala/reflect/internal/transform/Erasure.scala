@@ -37,13 +37,10 @@ trait Erasure {
      *  otherwise None. Existentials on any level are ignored.
      */
     def unapply(tp: Type): Option[(Int, Type)] = tp.normalize match {
-      case TypeRef(_, ArrayClass, List(arg)) =>
+      case ArrayOf(arg) =>
         genericCore(arg) match {
           case NoType =>
-            unapply(arg) match {
-              case Some((level, core)) => Some((level + 1, core))
-              case None => None
-            }
+            unapply(arg) map { case (level, core) => ((level + 1, core)) }
           case core =>
             Some((1, core))
         }

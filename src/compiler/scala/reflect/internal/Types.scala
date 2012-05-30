@@ -809,8 +809,8 @@ trait Types extends api.Types { self: SymbolTable =>
      */
     def matchesPattern(that: Type): Boolean = {
       (this <:< that) || ((this, that) match {
-        case (TypeRef(_, ArrayClass, List(arg1)), TypeRef(_, ArrayClass, List(arg2))) if arg2.typeSymbol.typeParams.nonEmpty =>
-          arg1 matchesPattern arg2
+        case (t1: ArrayTypeRef, t2: ArrayTypeRef) if t2.elementType.typeSymbol.typeParams.nonEmpty =>
+          t1.elementType matchesPattern t2.elementType
         case (_, TypeRef(_, _, args)) =>
           val newtp = existentialAbstraction(args map (_.typeSymbol), that)
           !(that =:= newtp) && (this <:< newtp)
@@ -2116,6 +2116,19 @@ trait Types extends api.Types { self: SymbolTable =>
       }
     override def kind = "AliasTypeRef"
   }
+  
+  object ArrayOf {
+    def unapply(tp: Type): Option[Type] = tp match {
+      case x: ArrayTypeRef  => Some(x.elementType)
+      case _                => None
+    }
+  }
+
+  class ArrayTypeRef(val elementType: Type) extends ArgsTypeRef(ScalaPackageClass.thisType, ArrayClass, elementType :: Nil) with ClassTypeRef {
+    def isPrimitiveArray = isPrimitiveValueClass(sym)
+    def isReferenceArray = elementType <:< AnyRefClass.tpe
+    def isArrayOfSymbol(sym: Symbol) = elementType.typeSymbol == sym
+  }
 
   trait AbstractTypeRef extends NonClassTypeRef {
     require(sym.isAbstractType, sym)
@@ -2354,6 +2367,7 @@ trait Types extends api.Types { self: SymbolTable =>
       if (args.nonEmpty) {
         if (sym.isAliasType)              new ArgsTypeRef(pre, sym, args) with AliasTypeRef
         else if (sym.isAbstractType)      new ArgsTypeRef(pre, sym, args) with AbstractTypeRef
+        else if (sym eq ArrayClass)       new ArrayTypeRef(args.head)
         else                              new ArgsTypeRef(pre, sym, args) with ClassTypeRef
       }
       else {

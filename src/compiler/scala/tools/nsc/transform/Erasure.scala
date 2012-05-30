@@ -45,9 +45,10 @@ abstract class Erasure extends AddInterfaces
         tp match {
           case st: SubType =>
             traverse(st.supertype)
+          case ArrayOf(arg) =>
+            traverse(arg)
           case TypeRef(pre, sym, args) =>
-            if (sym == ArrayClass) args foreach traverse
-            else if (sym.isTypeParameterOrSkolem || sym.isExistentiallyBound || !args.isEmpty) result = true
+            if (sym.isTypeParameterOrSkolem || sym.isExistentiallyBound || !args.isEmpty) result = true
             else if (sym.isClass) traverse(rebindInnerClass(pre, sym)) // #2585
             else if (!sym.owner.isPackageClass) traverse(pre)
           case PolyType(_, _) | ExistentialType(_, _) =>

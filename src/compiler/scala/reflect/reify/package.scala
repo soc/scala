@@ -44,7 +44,7 @@ package object reify {
         gen.mkMethodCall(arrayElementClassMethod, List(success))
       case _ =>
         tpe.normalize match {
-          case TypeRef(_, ArrayClass, componentTpe :: Nil) =>
+          case ArrayOf(componentTpe) =>
             val componentErasure = reifyClass(global)(typer0, componentTpe)
             gen.mkMethodCall(arrayClassMethod, List(componentErasure))
           case _ =>
