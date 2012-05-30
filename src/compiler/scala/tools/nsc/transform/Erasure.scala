@@ -325,7 +325,7 @@ abstract class Erasure extends AddInterfaces
   // is a primitive and what arrived boxed.
   private lazy val interceptedMethods = Set[Symbol](Any_##, Object_##, Any_getClass) ++ (
     // Each value class has its own getClass for ultra-precise class object typing.
-    ScalaValueClasses map (_.tpe member nme.getClass_)
+    ScalaPrimitiveValueClasses map (_.tpe member nme.getClass_)
   )
 
 // -------- erasure on trees ------------------------------------------

@@ -39,8 +39,6 @@ trait StandardDefinitions extends StandardTypes {
     def ArrayModule: Symbol
     def ArrayModule_overloadedApply: Symbol
     def Array_apply: Symbol
-    def Array_clone: Symbol
-    def Array_length: Symbol
     def Array_update: Symbol
     def ByNameParamClass: Symbol
     def ClassTagModule: Symbol

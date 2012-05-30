@@ -203,8 +203,6 @@ class DummyMirror(cl: ClassLoader) extends api.Mirror {
     def ArrayModule = DummySymbol
     def ArrayModule_overloadedApply = DummySymbol
     def Array_apply = DummySymbol
-    def Array_clone = DummySymbol
-    def Array_length = DummySymbol
     def Array_update = DummySymbol
     def BooleanClass = DummyClassSymbol
     def ByteClass = DummyClassSymbol
