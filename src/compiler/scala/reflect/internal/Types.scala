@@ -2415,7 +2415,7 @@ trait Types extends api.Types { self: SymbolTable =>
 
     override def paramss: List[List[Symbol]] = params :: resultType.paramss
 
-    override def paramTypes = params map (_.tpe)
+    override lazy val paramTypes = params map (_.tpe)
 
     override def boundSyms = resultType.boundSyms ++ params
 
