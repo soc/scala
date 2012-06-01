@@ -117,7 +117,7 @@ trait Opcodes { self: ICodes =>
       override def consumed = 0
       override def produced = 1
 
-      override def producedTypes = List(REFERENCE(clasz))
+      override def producedTypes = REFERENCE(clasz) :: Nil
     }
 
     /** Loads a constant on the stack.
@@ -129,7 +129,7 @@ trait Opcodes { self: ICodes =>
       override def consumed = 0
       override def produced = 1
 
-      override def producedTypes = List(toTypeKind(constant.tpe))
+      override def producedTypes = toTypeKind(constant.tpe) :: Nil
     }
 
     /** Loads an element of an array. The array and the index should
@@ -141,8 +141,8 @@ trait Opcodes { self: ICodes =>
       override def consumed = 2
       override def produced = 1
 
-      override def consumedTypes = List(ARRAY(kind), INT)
-      override def producedTypes = List(kind)
+      override def consumedTypes = ARRAY(kind) :: INT :: Nil
+      override def producedTypes = kind :: Nil
     }
 
     /** Load a local variable on the stack. It can be a method argument.
@@ -153,7 +153,7 @@ trait Opcodes { self: ICodes =>
       override def consumed = 0
       override def produced = 1
 
-      override def producedTypes = List(local.kind)
+      override def producedTypes = local.kind :: Nil
     }
 
     /** Load a field on the stack. The object to which it refers should be
@@ -169,8 +169,8 @@ trait Opcodes { self: ICodes =>
       override def consumed = if (isStatic) 0 else 1
       override def produced = 1
 
-      override def consumedTypes = if (isStatic) Nil else List(REFERENCE(field.owner));
-      override def producedTypes = List(toTypeKind(field.tpe));
+      override def consumedTypes = if (isStatic) Nil else REFERENCE(field.owner) :: Nil;
+      override def producedTypes = toTypeKind(field.tpe) :: Nil;
 
       // more precise information about how to load this field
       // see #4283
@@ -186,7 +186,7 @@ trait Opcodes { self: ICodes =>
       override def consumed = 0
       override def produced = 1
 
-      override def producedTypes = List(REFERENCE(module))
+      override def producedTypes = REFERENCE(module) :: Nil
     }
 
     /** Store a value into an array at a specified index.
@@ -196,8 +196,7 @@ trait Opcodes { self: ICodes =>
     case class STORE_ARRAY_ITEM(kind: TypeKind) extends Instruction {
       override def consumed = 3
       override def produced = 0
-
-      override def consumedTypes = List(ARRAY(kind), INT, kind)
+      override def consumedTypes = ARRAY(kind) :: INT :: kind :: Nil
     }
 
     /** Store a value into a local variable. It can be an argument.
@@ -208,7 +207,7 @@ trait Opcodes { self: ICodes =>
       override def consumed = 1
       override def produced = 0
 
-      override def consumedTypes = List(local.kind)
+      override def consumedTypes = local.kind :: Nil
     }
 
     /** Store a value into a field.
@@ -223,11 +222,10 @@ trait Opcodes { self: ICodes =>
       override def consumed = if(isStatic) 1 else 2;
       override def produced = 0;
 
-      override def consumedTypes =
-        if (isStatic)
-          List(toTypeKind(field.tpe))
-        else
-          List(REFERENCE(field.owner), toTypeKind(field.tpe));
+      override def consumedTypes = {
+        val xs = toTypeKind(field.tpe) :: Nil
+        if (isStatic) xs else REFERENCE(field.owner) :: xs
+      }
     }
 
     /** Store a value into the 'this' pointer.
@@ -237,7 +235,7 @@ trait Opcodes { self: ICodes =>
     case class STORE_THIS(kind: TypeKind) extends Instruction {
       override def consumed = 1
       override def produced = 0
-      override def consumedTypes = List(kind)
+      override def consumedTypes = kind :: Nil
     }
 
     /** Call a primitive function.
@@ -263,35 +261,35 @@ trait Opcodes { self: ICodes =>
       override def produced = 1
 
       override def consumedTypes = primitive match {
-        case Negation(kind)        => List(kind)
-        case Test(_, kind, true)   => List(kind)
-        case Test(_, kind, false)  => List(kind, kind)
-        case Comparison(_, kind)   => List(kind, kind)
-        case Arithmetic(NOT, kind) => List(kind)
-        case Arithmetic(_, kind)   => List(kind, kind)
-        case Logical(_, kind)      => List(kind, kind)
-        case Shift(_, kind)        => List(kind, INT)
-        case Conversion(from, _)   => List(from)
-        case ArrayLength(kind)     => List(ARRAY(kind))
-        case StringConcat(kind)    => List(ConcatClass, kind)
+        case Negation(kind)        => kind :: Nil
+        case Test(_, kind, true)   => kind :: Nil
+        case Test(_, kind, false)  => kind :: kind :: Nil
+        case Comparison(_, kind)   => kind :: kind :: Nil
+        case Arithmetic(NOT, kind) => kind :: Nil
+        case Arithmetic(_, kind)   => kind :: kind :: Nil
+        case Logical(_, kind)      => kind :: kind :: Nil
+        case Shift(_, kind)        => kind :: INT :: Nil
+        case Conversion(from, _)   => from :: Nil
+        case ArrayLength(kind)     => ARRAY(kind) :: Nil
+        case StringConcat(kind)    => ConcatClass :: kind :: Nil
         case StartConcat           => Nil
-        case EndConcat             => List(ConcatClass)
+        case EndConcat             => ConcatClass :: Nil
       }
 
-      override def producedTypes = primitive match {
-        case Negation(kind)      => List(kind)
-        case Test(_, _, true)    => List(BOOL)
-        case Test(_, _, false)   => List(BOOL)
-        case Comparison(_, _)    => List(INT)
-        case Arithmetic(_, kind) => List(kind)
-        case Logical(_, kind)    => List(kind)
-        case Shift(_, kind)      => List(kind)
-        case Conversion(_, to)   => List(to)
-        case ArrayLength(_)      => List(INT)
-        case StringConcat(_)     => List(ConcatClass)
-        case StartConcat         => List(ConcatClass)
-        case EndConcat           => List(REFERENCE(global.definitions.StringClass))
-      }
+      override def producedTypes = (primitive match {
+        case Negation(kind)      => kind
+        case Test(_, _, true)    => BOOL
+        case Test(_, _, false)   => BOOL
+        case Comparison(_, _)    => INT
+        case Arithmetic(_, kind) => kind
+        case Logical(_, kind)    => kind
+        case Shift(_, kind)      => kind
+        case Conversion(_, to)   => to
+        case ArrayLength(_)      => INT
+        case StringConcat(_)     => ConcatClass
+        case StartConcat         => ConcatClass
+        case EndConcat           => REFERENCE(global.definitions.StringClass)
+      }) :: Nil
    }
 
     /** This class represents a CALL_METHOD instruction
@@ -341,7 +339,7 @@ trait Opcodes { self: ICodes =>
       private def producedType: TypeKind = toTypeKind(method.info.resultType)
       override def producedTypes =
         if (produced == 0) Nil
-        else List(producedType)
+        else producedType :: Nil
 
       /** object identity is equality for CALL_METHODs. Needed for
        *  being able to store such instructions into maps, when more
@@ -417,8 +415,8 @@ trait Opcodes { self: ICodes =>
 
       override def consumed = 1
       override def produced = 1
-      override val consumedTypes = List(ObjectReference)
-      override def producedTypes = List(typ)
+      override val consumedTypes = ObjectReference :: Nil
+      override def producedTypes = typ :: Nil
     }
 
     /** This class represents a SWITCH instruction
@@ -436,7 +434,7 @@ trait Opcodes { self: ICodes =>
       override def consumed = 1
       override def produced = 0
 
-      override val consumedTypes = List(INT)
+      override val consumedTypes = INT :: Nil
 
       def flatTagsCount: Int = { var acc = 0; var rest = tags; while(rest.nonEmpty) { acc += rest.head.length; rest = rest.tail }; acc } // a one-liner
     }
@@ -473,7 +471,7 @@ trait Opcodes { self: ICodes =>
       override def consumed = 2
       override def produced = 0
 
-      override val consumedTypes = List(kind, kind)
+      override val consumedTypes = kind :: kind :: Nil
     }
 
     /** This class represents a CZJUMP instruction
@@ -494,7 +492,7 @@ trait Opcodes { self: ICodes =>
       override def consumed = 1
       override def produced = 0
 
-      override val consumedTypes = List(kind)
+      override val consumedTypes = kind :: Nil
     }
 
 
@@ -506,7 +504,7 @@ trait Opcodes { self: ICodes =>
       override def consumed = if (kind == UNIT) 0 else 1
       override def produced = 0
 
-      // TODO override val consumedTypes = List(kind)
+      // TODO override val consumedTypes = kind :: Nil
     }
 
     /** This class represents a THROW instruction
