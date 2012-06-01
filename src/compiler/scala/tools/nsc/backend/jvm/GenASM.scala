@@ -1379,6 +1379,7 @@ abstract class GenASM extends SubComponent with BytecodeWriters {
         clasz.methods flatMap (_.code.instructions) collect { case CALL_METHOD(sym, _) => sym }
       ).toSet
 
+      /**
       val privates: Set[Symbol] = (
         clasz.methods collect { case m if m.symbol.isPrivate && m.symbol.name != nme.readResolve => m.symbol }
       ).toSet
@@ -1386,6 +1387,7 @@ abstract class GenASM extends SubComponent with BytecodeWriters {
       val uncalledPrivates = privates filterNot called
       if (uncalledPrivates.nonEmpty)
         println("uncalledPrivates in " + clasz.symbol + " are " + uncalledPrivates.mkString(", "))
+      **/
 
       clasz.fields  foreach genField
       clasz.methods foreach { im => genMethod(im, c.symbol.isInterface) }
