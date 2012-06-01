@@ -31,13 +31,13 @@ trait Importers { self: SymbolTable =>
     // fixups and maps prevent stackoverflows in importer
     var pendingSyms = 0
     var pendingTpes = 0
-    lazy val fixups = collection.mutable.MutableList[Function0[Unit]]()
+    lazy val fixups = collection.mutable.ListBuffer[Function0[Unit]]()
     def addFixup(fixup: => Unit): Unit = fixups += (() => fixup)
     def tryFixup(): Unit = {
       if (pendingSyms == 0 && pendingTpes == 0) {
         val fixups = this.fixups.toList
         this.fixups.clear()
-        fixups foreach { _() }
+        fixups foreach (f => f())
       }
     }
 

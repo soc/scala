@@ -211,7 +211,6 @@ trait TypeStrings {
   private def tparamString[T: ClassTag] : String = {
     // [Eugene to Paul] needs review!!
     def typeArguments: List[rm.Type] = typeTag[T].tpe.typeArguments
-    def typeVariables: List[java.lang.Class[_]] = typeArguments map (targ => rm.typeToClass(targ))
     brackets(typeArguments map (jc => tvarString(List(jc))): _*)
   }
 
@@ -243,13 +242,6 @@ trait TypeStrings {
       case (res, (k, v)) => res.replaceAll(k, v)
     }
   }
-
-  val typeTransforms = List(
-    "java.lang." -> "",
-    "scala.collection.immutable." -> "immutable.",
-    "scala.collection.mutable." -> "mutable.",
-    "scala.collection.generic." -> "generic."
-  )
 }
 
 object TypeStrings extends TypeStrings { }
