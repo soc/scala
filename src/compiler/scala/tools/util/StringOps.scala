@@ -38,7 +38,7 @@ trait StringOps {
 
   def decompose(str: String, sep: Char): List[String] = {
     def ws(start: Int): List[String] =
-      if (start == str.length) List()
+      if (start == str.length) Nil
       else if (str.charAt(start) == sep) ws(start + 1)
       else {
         val end = str.indexOf(sep, start)

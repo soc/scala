@@ -76,7 +76,7 @@ abstract class Constructors extends Transform with ast.TreeDSL {
           !(sym.isGetter && sym.accessed.isVariable) &&
           !sym.isSetter
         override def transform(tree: Tree): Tree = tree match {
-          case Apply(Select(This(_), _), List()) =>
+          case Apply(Select(This(_), _), Nil) =>
             // references to parameter accessor methods of own class become references to parameters
             // outer accessors become references to $outer parameter
             if (isParamRef(tree.symbol))
@@ -158,7 +158,7 @@ abstract class Constructors extends Transform with ast.TreeDSL {
           // methods with constant result type get literals as their body
           // all methods except the primary constructor go into template
           stat.symbol.tpe match {
-            case MethodType(List(), tp @ ConstantType(c)) =>
+            case MethodType(Nil, tp @ ConstantType(c)) =>
               defBuf += deriveDefDef(stat)(Literal(c) setPos _.pos setType tp)
             case _ =>
               if (stat.symbol.isPrimaryConstructor) ()
@@ -194,7 +194,7 @@ abstract class Constructors extends Transform with ast.TreeDSL {
       val accessedSyms = new TreeSet[Symbol]((x, y) => x isLess y)
 
       // a list of outer accessor symbols and their bodies
-      var outerAccessors: List[(Symbol, Tree)] = List()
+      var outerAccessors: List[(Symbol, Tree)] = Nil
 
       // Could symbol's definition be omitted, provided it is not accessed?
       // This is the case if the symbol is defined in the current class, and
@@ -264,7 +264,7 @@ abstract class Constructors extends Transform with ast.TreeDSL {
       def addGetter(sym: Symbol): Symbol = {
         val getr = addAccessor(
           sym, nme.getterName(sym.name), getterFlags(sym.flags))
-        getr setInfo MethodType(List(), sym.tpe)
+        getr setInfo MethodType(Nil, sym.tpe)
         defBuf += localTyper.typedPos(sym.pos)(DefDef(getr, Select(This(clazz), sym)))
         getr
       }
@@ -344,7 +344,7 @@ abstract class Constructors extends Transform with ast.TreeDSL {
                         if (getter != NoSymbol)
                           applyMethodTyper.typed {
                             atPos(tree.pos) {
-                              Apply(Select(qual, getter), List())
+                              Apply(Select(qual, getter), Nil)
                             }
                           }
                         else tree
@@ -368,14 +368,14 @@ abstract class Constructors extends Transform with ast.TreeDSL {
 
             val applyMethodDef = DefDef(
               sym = applyMethod,
-              vparamss = List(List()),
+              vparamss = List(Nil),
               rhs = Block(applyMethodStats, gen.mkAttributedRef(BoxedUnit_UNIT)))
 
             ClassDef(
               sym = closureClass,
               constrMods = Modifiers(0),
               vparamss = List(List(outerFieldDef)),
-              argss = List(List()),
+              argss = List(Nil),
               body = List(applyMethodDef),
               superPos = impl.pos)
           }

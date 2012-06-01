@@ -378,7 +378,7 @@ trait Implicits {
     incCounter(implicitSearchCount)
 
     /** The type parameters to instantiate */
-    val undetParams = if (isView) List() else context.outer.undetparams
+    val undetParams = if (isView) Nil else context.outer.undetparams
 
     /** The expected type with all undetermined type parameters replaced with wildcards. */
     def approximate(tp: Type) = deriveTypeWithWildcards(undetParams)(tp)
@@ -933,7 +933,7 @@ trait Implicits {
             case Some(infos1) =>
               if (infos1.nonEmpty && !(pre =:= infos1.head.pre.prefix)) {
                 println("amb prefix: "+pre+"#"+sym+" "+infos1.head.pre.prefix+"#"+sym)
-                infoMap(sym) = List() // ambiguous prefix - ignore implicit members
+                infoMap(sym) = Nil // ambiguous prefix - ignore implicit members
               }
             case None =>
               if (pre.isStable) {

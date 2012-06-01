@@ -149,7 +149,7 @@ trait ToolBoxes extends { self: Universe =>
               if (tree.hasSymbol && tree.symbol.isFreeTerm) {
                 tree match {
                   case Ident(_) =>
-                    Apply(Ident(freeTermNames(tree.symbol)), List())
+                    Apply(Ident(freeTermNames(tree.symbol)), Nil)
                   case _ =>
                     throw new Error("internal error: %s (%s, %s) is not supported".format(tree, tree.productPrefix, tree.getClass))
                 }
@@ -179,8 +179,8 @@ trait ToolBoxes extends { self: Universe =>
                   List(TypeTree(ObjectClass.tpe)),
                   emptyValDef,
                   NoMods,
-                  List(),
-                  List(List()),
+                  Nil,
+                  List(Nil),
                   List(methdef),
                   NoPosition))
           trace("wrapped: ")(showAttributed(moduledef, true, true, settings.Yshowsymkinds.value))

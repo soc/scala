@@ -122,7 +122,7 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
           if (tparams.isEmpty) return (actuals1 corresponds formals1)(_ <:< _)
 
           if (targs.length == tparams.length)
-            isApplicableType(List(), tpe.instantiateTypeParams(tparams, targs))
+            isApplicableType(Nil, tpe.instantiateTypeParams(tparams, targs))
           else if (targs.nonEmpty)
             false
           else {
@@ -135,7 +135,7 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
               solve(tvars, tparams, List.fill(tparams.length)(COVARIANT), upper = false)
           }
         }
-        isApplicableType(List(), pre.memberType(alt))
+        isApplicableType(Nil, pre.memberType(alt))
       }
       def isAsGood(alt1: Symbol, alt2: Symbol): Boolean = {
         alt1 == alt2 ||
@@ -1564,7 +1564,7 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
 
     def alternatives: List[Symbol] =
       if (isOverloaded) info.asInstanceOf[OverloadedType].alternatives
-      else List(this)
+      else this :: Nil
 
     def filter(cond: Symbol => Boolean): Symbol =
       if (isOverloaded) {
@@ -2438,7 +2438,7 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
         //   def apply(tp: Type): Type = tp match {
         //     // any symbol that occurs in a java sig, not just java symbols
         //     // see http://lampsvn.epfl.ch/trac/scala/ticket/2454#comment:14
-        //     case TypeRef(pre, sym, List()) if !sym.typeParams.isEmpty =>
+        //     case TypeRef(pre, sym, Nil) if !sym.typeParams.isEmpty =>
         //       val eparams = typeParamsToExistentials(sym, sym.typeParams)
         //       existentialAbstraction(eparams, TypeRef(pre, sym, eparams map (_.tpe)))
         //     case _ =>
@@ -2617,7 +2617,7 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
      *
      *  {{{
      *    tsym.info = TypeBounds(Nothing, Number)
-     *    tsym.tpe  = TypeRef(NoPrefix, T, List())
+     *    tsym.tpe  = TypeRef(NoPrefix, T, Nil)
      *  }}}
      */
     override def tpe: Type = {
@@ -2629,7 +2629,7 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
           if (isInitialized) tpePeriod = currentPeriod
           tpeCache = NoType
           val targs =
-            if (phase.erasedTypes && this != ArrayClass) List()
+            if (phase.erasedTypes && this != ArrayClass) Nil
             else unsafeTypeParams map (_.typeConstructor)
             //@M! use typeConstructor to generate dummy type arguments,
             // sym.tpe should not be called on a symbol that's supposed to be a higher-kinded type
@@ -3057,9 +3057,9 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
     override def enclosingPackageClass: Symbol = this
     override def enclMethod: Symbol = this
     override def associatedFile = null
-    override def ownerChain: List[Symbol] = List()
+    override def ownerChain: List[Symbol] = Nil
     override def ownersIterator: Iterator[Symbol] = Iterator.empty
-    override def alternatives: List[Symbol] = List()
+    override def alternatives: List[Symbol] = Nil
     override def reset(completer: Type): this.type = this
     override def info: Type = NoType
     override def existentialBound: Type = NoType

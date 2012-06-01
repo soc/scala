@@ -35,7 +35,7 @@ trait PostErasure extends InfoTransform with TypingTransformers {
         case // new C(arg).underlying  ==>  arg
           Apply(sel @ Select(
             Apply(Select(New(tpt), nme.CONSTRUCTOR), List(arg)),
-            acc), List())
+            acc), Nil)
         if atPhase(currentRun.erasurePhase) {
           tpt.tpe.typeSymbol.isDerivedValueClass &&
           sel.symbol == tpt.tpe.typeSymbol.firstParamAccessor
@@ -57,7 +57,7 @@ trait PostErasure extends InfoTransform with TypingTransformers {
           localTyper.typed(result)
 
         case // arg.asInstanceOf[T]  ==>  arg      if arg.tpe == T
-          Apply(TypeApply(cast @ Select(arg, asinstanceof), List(tpt)), List())
+          Apply(TypeApply(cast @ Select(arg, asinstanceof), List(tpt)), Nil)
         if cast.symbol == Object_asInstanceOf && arg.tpe =:= tpt.tpe => // !!! <:< ?
           if (settings.debug.value) log("Shortening "+tree+" -> "+arg)
           arg

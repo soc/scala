@@ -32,7 +32,7 @@ import util.Statistics._
     // Int(2)
   case TypeRef(pre, sym, args) =>
     // pre.sym[targs]
-    // Outer.this.C would be represented as TypeRef(ThisType(Outer), C, List())
+    // Outer.this.C would be represented as TypeRef(ThisType(Outer), C, Nil)
   case RefinedType(parents, defs) =>
     // parent1 with ... with parentn { defs }
   case ExistentialType(tparams, result) =>
@@ -48,7 +48,7 @@ import util.Statistics._
     // same as RefinedType except as body of class
   case MethodType(paramtypes, result) =>
     // (paramtypes)result
-    // For instance def m(): T is represented as MethodType(List(), T)
+    // For instance def m(): T is represented as MethodType(Nil, T)
   case NullaryMethodType(result) => // eliminated by uncurry
     // an eval-by-name type
     // For instance def m: T is represented as NullaryMethodType(T)
@@ -118,7 +118,7 @@ trait Types extends api.Types { self: SymbolTable =>
 
   class UndoLog extends Clearable {
     private type UndoPairs = List[(TypeVar, TypeConstraint)]
-    private var log: UndoPairs = List()
+    private var log: UndoPairs = Nil
 
     // register with the auto-clearing cache manager
     perRunCaches.recordCache(this)
@@ -233,9 +233,9 @@ trait Types extends api.Types { self: SymbolTable =>
     override def resultType(actuals: List[Type]) = maybeRewrap(underlying.resultType(actuals))
     override def finalResultType = maybeRewrap(underlying.finalResultType)
     override def paramSectionCount = 0
-    override def paramss: List[List[Symbol]] = List()
-    override def params: List[Symbol] = List()
-    override def paramTypes: List[Type] = List()
+    override def paramss: List[List[Symbol]] = Nil
+    override def params: List[Symbol] = Nil
+    override def paramTypes: List[Type] = Nil
     override def typeArgs = underlying.typeArgs
     override def notNull = maybeRewrap(underlying.notNull)
     override def instantiateTypeParams(formals: List[Symbol], actuals: List[Type]) = underlying.instantiateTypeParams(formals, actuals)
@@ -458,7 +458,7 @@ trait Types extends api.Types { self: SymbolTable =>
      *  For a TypeBounds type, the parents of its hi bound.
      *  inherited by typerefs, singleton types, and refinement types,
      *  The empty list for all other types */
-    def parents: List[Type] = List()
+    def parents: List[Type] = Nil
 
     /** For a class with nonEmpty parents, the first parent.
      *  Otherwise some specific fixed top type.
@@ -475,14 +475,14 @@ trait Types extends api.Types { self: SymbolTable =>
     def prefixChain: List[Type] = this match {
       case TypeRef(pre, _, _) => pre :: pre.prefixChain
       case SingleType(pre, _) => pre :: pre.prefixChain
-      case _ => List()
+      case _ => Nil
     }
 
     /** This type, without its type arguments @M */
     def typeConstructor: Type = this
 
     /** For a typeref, its arguments. The empty list for all other types */
-    def typeArgs: List[Type] = List()
+    def typeArgs: List[Type] = Nil
 
     /** A list of placeholder types derived from the type parameters.
      *  Used by RefinedType and TypeRef.
@@ -513,19 +513,19 @@ trait Types extends api.Types { self: SymbolTable =>
 
     /** For a method or poly type, a list of its value parameter sections,
      *  the empty list for all other types */
-    def paramss: List[List[Symbol]] = List()
+    def paramss: List[List[Symbol]] = Nil
 
     /** For a method or poly type, its first value parameter section,
      *  the empty list for all other types */
-    def params: List[Symbol] = List()
+    def params: List[Symbol] = Nil
 
     /** For a method or poly type, the types of its first value parameter section,
      *  the empty list for all other types */
-    def paramTypes: List[Type] = List()
+    def paramTypes: List[Type] = Nil
 
     /** For a (potentially wrapped) poly type, its type parameters,
      *  the empty list for all other types */
-    def typeParams: List[Symbol] = List()
+    def typeParams: List[Symbol] = Nil
 
     /** For a (potentially wrapped) poly or existential type, its bound symbols,
      *  the empty list for all other types */
@@ -561,7 +561,7 @@ trait Types extends api.Types { self: SymbolTable =>
      *  Functions on types are also implemented as PolyTypes.
      *
      *  Example: (in the below, <List> is the type constructor of List)
-     *    TypeRef(pre, <List>, List()) is replaced by
+     *    TypeRef(pre, <List>, Nil) is replaced by
      *    PolyType(X, TypeRef(pre, <List>, List(X)))
      */
     def normalize = this // @MAT
@@ -901,7 +901,7 @@ trait Types extends api.Types { self: SymbolTable =>
      *  in reverse linearization order, starting with the class itself and ending
      *  in class Any.
      */
-    def baseClasses: List[Symbol] = List()
+    def baseClasses: List[Symbol] = Nil
 
     /**
      *  @param sym the class symbol
@@ -977,7 +977,7 @@ trait Types extends api.Types { self: SymbolTable =>
     def load(sym: Symbol) {}
 
     private def findDecl(name: Name, excludedFlags: Int): Symbol = {
-      var alts: List[Symbol] = List()
+      var alts: List[Symbol] = Nil
       var sym: Symbol = NoSymbol
       var e: ScopeEntry = decls.lookupEntry(name)
       while (e ne null) {
@@ -1098,8 +1098,8 @@ trait Types extends api.Types { self: SymbolTable =>
     }
     /** The (existential or otherwise) skolems and existentially quantified variables which are free in this type */
     def skolemsExceptMethodTypeParams: List[Symbol] = {
-      var boundSyms: List[Symbol] = List()
-      var skolems: List[Symbol] = List()
+      var boundSyms: List[Symbol] = Nil
+      var skolems: List[Symbol] = Nil
       for (t <- this) {
         t match {
           case ExistentialType(quantified, qtpe) =>
@@ -1193,8 +1193,8 @@ trait Types extends api.Types { self: SymbolTable =>
     override def typeOfThis: Type = typeSymbol.typeOfThis
     override def bounds: TypeBounds = TypeBounds(this, this)
     override def prefix: Type = NoType
-    override def typeArgs: List[Type] = List()
-    override def typeParams: List[Symbol] = List()
+    override def typeArgs: List[Type] = Nil
+    override def typeParams: List[Symbol] = Nil
 */
   }
 
@@ -1634,7 +1634,7 @@ trait Types extends api.Types { self: SymbolTable =>
           typeParams,
           RefinedType(
             parents map {
-              case TypeRef(pre, sym, List()) => TypeRef(pre, sym, dummyArgs)
+              case TypeRef(pre, sym, Nil) => TypeRef(pre, sym, dummyArgs)
               case p => p
             },
             decls,
@@ -1862,7 +1862,7 @@ trait Types extends api.Types { self: SymbolTable =>
   object ClassInfoType extends ClassInfoTypeExtractor
 
   class PackageClassInfoType(decls: Scope, clazz: Symbol)
-  extends ClassInfoType(List(), decls, clazz)
+  extends ClassInfoType(Nil, decls, clazz)
 
   /** A class representing a constant type.
    *
@@ -3725,7 +3725,7 @@ trait Types extends api.Types { self: SymbolTable =>
   class TypeConstraint(lo0: List[Type], hi0: List[Type], numlo0: Type, numhi0: Type, avoidWidening0: Boolean = false) {
     def this(lo0: List[Type], hi0: List[Type]) = this(lo0, hi0, NoType, NoType)
     def this(bounds: TypeBounds) = this(List(bounds.lo), List(bounds.hi))
-    def this() = this(List(), List())
+    def this() = this(Nil, Nil)
 
     /*  Syncnote: Type constraints are assumed to be used from only one
      *  thread. They are not exposed in api.Types and are used only locally
@@ -4153,7 +4153,7 @@ trait Types extends api.Types { self: SymbolTable =>
   def rawToExistential = new TypeMap {
     private var expanded = immutable.Set[Symbol]()
     def apply(tp: Type): Type = tp match {
-      case TypeRef(pre, sym, List()) if isRawIfWithoutArgs(sym) =>
+      case TypeRef(pre, sym, Nil) if isRawIfWithoutArgs(sym) =>
         if (expanded contains sym) AnyRefClass.tpe
         else try {
           expanded += sym
@@ -4227,8 +4227,8 @@ trait Types extends api.Types { self: SymbolTable =>
 
   /** A map to compute the asSeenFrom method  */
   class AsSeenFromMap(pre: Type, clazz: Symbol) extends TypeMap with KeepOnlyTypeConstraints {
-    var capturedSkolems: List[Symbol] = List()
-    var capturedParams: List[Symbol] = List()
+    var capturedSkolems: List[Symbol] = Nil
+    var capturedParams: List[Symbol] = Nil
     var capturedPre = emptySymMap
 
     override def mapOver(tree: Tree, giveup: ()=>Nothing): Tree = {
@@ -5084,7 +5084,7 @@ trait Types extends api.Types { self: SymbolTable =>
   /*
   todo: change to:
   def normalizePlus(tp: Type) = tp match {
-    case TypeRef(pre, sym, List()) =>
+    case TypeRef(pre, sym, Nil) =>
       if (!sym.isInitialized) sym.rawInfo.load(sym)
       if (sym.isJavaDefined && !sym.typeParams.isEmpty) rawToExistential(tp)
       else tp.normalize
@@ -5825,9 +5825,9 @@ trait Types extends api.Types { self: SymbolTable =>
         tp1.isImplicit == tp2.isImplicit
       case (PolyType(tparams1, res1), PolyType(tparams2, res2)) =>
         matchesQuantified(tparams1, tparams2, res1, res2)
-      case (NullaryMethodType(rtp1), MethodType(List(), rtp2)) =>
+      case (NullaryMethodType(rtp1), MethodType(Nil, rtp2)) =>
         matchesType(rtp1, rtp2, alwaysMatchSimple)
-      case (MethodType(List(), rtp1), NullaryMethodType(rtp2)) =>
+      case (MethodType(Nil, rtp1), NullaryMethodType(rtp2)) =>
         matchesType(rtp1, rtp2, alwaysMatchSimple)
       case (ExistentialType(tparams1, res1), ExistentialType(tparams2, res2)) =>
         matchesQuantified(tparams1, tparams2, res1, res2)
@@ -6107,7 +6107,7 @@ trait Types extends api.Types { self: SymbolTable =>
 
   /** A minimal type list which has a given list of types as its base type sequence */
   def spanningTypes(ts: List[Type]): List[Type] = ts match {
-    case List() => List()
+    case Nil => Nil
     case first :: rest =>
       first :: spanningTypes(
         rest filter (t => !first.typeSymbol.isSubClass(t.typeSymbol)))
@@ -6116,7 +6116,7 @@ trait Types extends api.Types { self: SymbolTable =>
   /** Eliminate from list of types all elements which are a supertype
    *  of some other element of the list. */
   private def elimSuper(ts: List[Type]): List[Type] = ts match {
-    case List() => List()
+    case Nil => Nil
     case t :: ts1 =>
       val rest = elimSuper(ts1 filter (t1 => !(t <:< t1)))
       if (rest exists (t1 => t1 <:< t)) rest else t :: rest
@@ -6136,7 +6136,7 @@ trait Types extends api.Types { self: SymbolTable =>
    *  of some other element of the list. */
   private def elimSub(ts: List[Type], depth: Int): List[Type] = {
     def elimSub0(ts: List[Type]): List[Type] = ts match {
-      case List() => List()
+      case Nil => Nil
       case t :: ts1 =>
         val rest = elimSub0(ts1 filter (t1 => !isSubType(t1, t, decr(depth))))
         if (rest exists (t1 => isSubType(t, t1, decr(depth)))) rest else t :: rest
@@ -6153,7 +6153,7 @@ trait Types extends api.Types { self: SymbolTable =>
   private def stripExistentialsAndTypeVars(ts: List[Type]): (List[Type], List[Symbol]) = {
     val quantified = ts flatMap {
       case ExistentialType(qs, _) => qs
-      case t => List()
+      case t => Nil
     }
     def stripType(tp: Type) = tp match {
       case ExistentialType(_, res) =>
@@ -6229,7 +6229,7 @@ trait Types extends api.Types { self: SymbolTable =>
   private val glbResults = new mutable.HashMap[(Int, List[Type]), Type]
 
   def lub(ts: List[Type]): Type = ts match {
-    case List() => NothingClass.tpe
+    case Nil => NothingClass.tpe
     case List(t) => t
     case _ =>
       try {
@@ -6243,7 +6243,7 @@ trait Types extends api.Types { self: SymbolTable =>
   /** The least upper bound wrt <:< of a list of types */
   private def lub(ts: List[Type], depth: Int): Type = {
     def lub0(ts0: List[Type]): Type = elimSub(ts0, depth) match {
-      case List() => NothingClass.tpe
+      case Nil => NothingClass.tpe
       case List(t) => t
       case ts @ PolyType(tparams, _) :: _ =>
         val tparams1 = map2(tparams, matchingBounds(ts, tparams).transpose)((tparam, bounds) =>
@@ -6373,7 +6373,7 @@ trait Types extends api.Types { self: SymbolTable =>
 
   /** The greatest lower bound wrt <:< of a list of types */
   def glb(ts: List[Type]): Type = elimSuper(ts) match {
-    case List() => AnyClass.tpe
+    case Nil => AnyClass.tpe
     case List(t) => t
     case ts0 =>
       try {
@@ -6385,7 +6385,7 @@ trait Types extends api.Types { self: SymbolTable =>
   }
 
   private def glb(ts: List[Type], depth: Int): Type = elimSuper(ts) match {
-    case List() => AnyClass.tpe
+    case Nil => AnyClass.tpe
     case List(t) => t
     case ts0 => glbNorm(ts0, depth)
   }
@@ -6394,7 +6394,7 @@ trait Types extends api.Types { self: SymbolTable =>
    *  wrt elimSuper */
   protected def glbNorm(ts: List[Type], depth: Int): Type = {
     def glb0(ts0: List[Type]): Type = ts0 match {
-      case List() => AnyClass.tpe
+      case Nil => AnyClass.tpe
       case List(t) => t
       case ts @ PolyType(tparams, _) :: _ =>
         val tparams1 = map2(tparams, matchingBounds(ts, tparams).transpose)((tparam, bounds) =>
@@ -6429,7 +6429,7 @@ trait Types extends api.Types { self: SymbolTable =>
           case RefinedType(ps, decls) =>
             val dss = ps flatMap refinedToDecls
             if (decls.isEmpty) dss else decls :: dss
-          case _ => List()
+          case _ => Nil
         }
         val ts1 = ts flatMap refinedToParents
         val glbBase = intersectionType(ts1, glbOwner)

@@ -69,11 +69,11 @@ trait EtaExpansion { self: Analyzer =>
           val vname: Name = freshName()
           // Problem with ticket #2351 here
           defs += atPos(tree.pos) {
-            val rhs = if (byName) Function(List(), tree) else tree
+            val rhs = if (byName) Function(Nil, tree) else tree
             ValDef(Modifiers(SYNTHETIC), vname.toTermName, TypeTree(), rhs)
           }
           atPos(tree.pos.focus) {
-            if (byName) Apply(Ident(vname), List()) else Ident(vname)
+            if (byName) Apply(Ident(vname), Nil) else Ident(vname)
           }
         }
       val tree1 = tree match {

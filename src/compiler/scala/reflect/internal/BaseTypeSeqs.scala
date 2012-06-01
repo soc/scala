@@ -173,10 +173,10 @@ trait BaseTypeSeqs {
   /** A merker object for a base type sequence that's no yet computed.
    *  used to catch inheritance cycles
    */
-  val undetBaseTypeSeq: BaseTypeSeq = newBaseTypeSeq(List(), Array())
+  val undetBaseTypeSeq: BaseTypeSeq = newBaseTypeSeq(Nil, Array())
 
   /** Create a base type sequence consisting of a single type */
-  def baseTypeSingletonSeq(tp: Type): BaseTypeSeq = newBaseTypeSeq(List(), Array(tp))
+  def baseTypeSingletonSeq(tp: Type): BaseTypeSeq = newBaseTypeSeq(Nil, Array(tp))
 
   /** Create the base type sequence of a compound type wuth given tp.parents */
   def compoundBaseTypeSeq(tp: Type): BaseTypeSeq = {
@@ -218,7 +218,7 @@ trait BaseTypeSeqs {
             minSym = nextSym
           i += 1
         }
-        var minTypes: List[Type] = List()
+        var minTypes: List[Type] = Nil
         i = 0
         while (i < nparents) {
           if (nextTypeSymbol(i) == minSym) {

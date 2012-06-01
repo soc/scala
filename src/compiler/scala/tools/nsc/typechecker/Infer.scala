@@ -219,7 +219,7 @@ trait Infer {
     def isPossiblyMissingArgs(found: Type, req: Type) = (found.resultApprox ne found) && isWeaklyCompatible(found.resultApprox, req)
 
     def explainTypes(tp1: Type, tp2: Type) =
-      withDisambiguation(List(), tp1, tp2)(global.explainTypes(tp1, tp2))
+      withDisambiguation(Nil, tp1, tp2)(global.explainTypes(tp1, tp2))
 
     /* -- Tests & Checks---------------------------------------------------- */
 
@@ -784,13 +784,13 @@ trait Infer {
         if (isVarArgsList(params) && isVarArgsList(ftpe2.params))
           argtpes = argtpes map (argtpe =>
             if (isRepeatedParamType(argtpe)) argtpe.typeArgs.head else argtpe)
-        isApplicable(List(), ftpe2, argtpes, WildcardType)
+        isApplicable(Nil, ftpe2, argtpes, WildcardType)
       case PolyType(tparams, NullaryMethodType(res)) =>
         isAsSpecific(PolyType(tparams, res), ftpe2)
       case PolyType(tparams, mt: MethodType) if mt.isImplicit =>
         isAsSpecific(PolyType(tparams, mt.resultType), ftpe2)
       case PolyType(_, MethodType(params, _)) if params.nonEmpty =>
-        isApplicable(List(), ftpe2, params map (_.tpe), WildcardType)
+        isApplicable(Nil, ftpe2, params map (_.tpe), WildcardType)
       // case NullaryMethodType(res) =>
       //   isAsSpecific(res, ftpe2)
       case ErrorType =>
@@ -810,7 +810,7 @@ trait Infer {
           case PolyType(tparams, mt: MethodType) =>
             !mt.isImplicit || isAsSpecific(ftpe1, PolyType(tparams, mt.resultType))
           case _ =>
-            isAsSpecificValueType(ftpe1, ftpe2, List(), List())
+            isAsSpecificValueType(ftpe1, ftpe2, Nil, Nil)
         }
     }
     private def isAsSpecificValueType(tpe1: Type, tpe2: Type, undef1: List[Symbol], undef2: List[Symbol]): Boolean = (tpe1, tpe2) match {
@@ -905,7 +905,7 @@ trait Infer {
         case _ => false
       }
       def hasStrictlyBetterResult =
-        resultIsBetter(tpe1, tpe2, List(), List()) && !resultIsBetter(tpe2, tpe1, List(), List())
+        resultIsBetter(tpe1, tpe2, Nil, Nil) && !resultIsBetter(tpe2, tpe1, Nil, Nil)
       if (!isMethod(tpe1))
         isMethod(tpe2) || hasStrictlyBetterResult
 
@@ -990,7 +990,7 @@ trait Infer {
 
       if (keepNothings || (targs eq null)) { //@M: adjustTypeArgs fails if targs==null, neg/t0226
         substExpr(tree, tparams, targs, pt)
-        List()
+        Nil
       } else {
         val AdjustedTypeArgs.Undets(okParams, okArgs, leftUndet) = adjustTypeArgs(tparams, tvars, targs)
         printInference(
@@ -1072,7 +1072,7 @@ trait Infer {
           } else Nil
         }
         catch ifNoInstance { msg =>
-          NoMethodInstanceError(fn, args, msg); List()
+          NoMethodInstanceError(fn, args, msg); Nil
         }
     }
 
@@ -1299,7 +1299,7 @@ trait Infer {
             ()
         }
       }
-      check(tp, List())
+      check(tp, Nil)
     }
 
     /** Type intersection of simple type tp1 with general type tp2.

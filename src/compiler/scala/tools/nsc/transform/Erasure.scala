@@ -346,10 +346,10 @@ abstract class Erasure extends AddInterfaces
           cast @ Select(
             Apply(
               sel @ Select(arg, acc),
-              List()),
+              Nil),
             asinstanceof),
           List(tpt)),
-        List())
+        Nil)
       if cast.symbol == Object_asInstanceOf &&
         tpt.tpe.typeSymbol.isDerivedValueClass &&
         sel.symbol == tpt.tpe.typeSymbol.firstParamAccessor =>
@@ -563,7 +563,7 @@ abstract class Erasure extends AddInterfaces
               case _ =>
                 log("not boxed: "+tree)
                 val tree0 = adaptToType(tree, clazz.tpe)
-                cast(Apply(Select(tree0, clazz.firstParamAccessor), List()), pt)
+                cast(Apply(Select(tree0, clazz.firstParamAccessor), Nil), pt)
             }
           case _ =>
             pt.typeSymbol match {
@@ -615,7 +615,7 @@ abstract class Erasure extends AddInterfaces
       } else if (tree.tpe.isInstanceOf[MethodType] && tree.tpe.params.isEmpty) {
         // [H] this assert fails when trying to typecheck tree !(SomeClass.this.bitmap) for single lazy val
         //assert(tree.symbol.isStable, "adapt "+tree+":"+tree.tpe+" to "+pt)
-        adaptToType(Apply(tree, List()) setPos tree.pos setType tree.tpe.resultType, pt)
+        adaptToType(Apply(tree, Nil) setPos tree.pos setType tree.tpe.resultType, pt)
 //      } else if (pt <:< tree.tpe)
 //        cast(tree, pt)
       } else if (isPrimitiveValueType(pt) && !isPrimitiveValueType(tree.tpe))
@@ -641,7 +641,7 @@ abstract class Erasure extends AddInterfaces
       //Console.println("adaptMember: " + tree);
       val x = 2 + 2
       tree match {
-        case Apply(TypeApply(sel @ Select(qual, name), List(targ)), List())
+        case Apply(TypeApply(sel @ Select(qual, name), List(targ)), Nil)
         if tree.symbol == Any_asInstanceOf =>
           val qual1 = typedQualifier(qual, NOmode, ObjectClass.tpe) // need to have an expected type, see #3037
           val qualClass = qual1.tpe.typeSymbol
@@ -650,12 +650,12 @@ abstract class Erasure extends AddInterfaces
 
           if (isNumericValueClass(qualClass) && isNumericValueClass(targClass))
             // convert numeric type casts
-            atPos(tree.pos)(Apply(Select(qual1, "to" + targClass.name), List()))
+            atPos(tree.pos)(Apply(Select(qual1, "to" + targClass.name), Nil))
           else
 */
           if (isPrimitiveValueType(targ.tpe) || isErasedValueType(targ.tpe)) unbox(qual1, targ.tpe)
           else tree
-        case Apply(TypeApply(sel @ Select(qual, name), List(targ)), List())
+        case Apply(TypeApply(sel @ Select(qual, name), List(targ)), Nil)
         if tree.symbol == Any_isInstanceOf =>
           targ.tpe match {
             case ErasedValueType(clazz) => targ.setType(clazz.tpe)
@@ -686,7 +686,7 @@ abstract class Erasure extends AddInterfaces
               tree.symbol = NoSymbol
             else if (qual1.tpe.isInstanceOf[MethodType] && qual1.tpe.params.isEmpty) {
               assert(qual1.symbol.isStable, qual1.symbol);
-              qual1 = Apply(qual1, List()) setPos qual1.pos setType qual1.tpe.resultType
+              qual1 = Apply(qual1, Nil) setPos qual1.pos setType qual1.tpe.resultType
             } else if (!(qual1.isInstanceOf[Super] || (qual1.tpe.typeSymbol isSubClass tree.symbol.owner))) {
               assert(tree.symbol.owner != ArrayClass)
               qual1 = cast(qual1, tree.symbol.owner.tpe)
@@ -901,7 +901,7 @@ abstract class Erasure extends AddInterfaces
           copyDefDef(tree)(tparams = Nil)
         case TypeDef(_, _, _, _) =>
           EmptyTree
-        case Apply(instanceOf @ TypeApply(fun @ Select(qual, name), args @ List(arg)), List()) // !!! todo: simplify by having GenericArray also extract trees
+        case Apply(instanceOf @ TypeApply(fun @ Select(qual, name), args @ List(arg)), Nil) // !!! todo: simplify by having GenericArray also extract trees
               if ((fun.symbol == Any_isInstanceOf || fun.symbol == Object_isInstanceOf) &&
                   unboundedGenericArrayLevel(arg.tpe) > 0) =>
           val level = unboundedGenericArrayLevel(arg.tpe)
@@ -1001,7 +1001,7 @@ abstract class Erasure extends AddInterfaces
                     TypeApply(
                       Select(q(), Object_isInstanceOf) setPos sel.pos,
                       List(TypeTree(tp) setPos targ.pos)) setPos fn.pos,
-                    List()) setPos tree.pos
+                    Nil) setPos tree.pos
                 targ.tpe match {
                   case SingleType(_, _) | ThisType(_) | SuperType(_, _) =>
                     val cmpOp = if (targ.tpe <:< AnyValClass.tpe) Any_equals else Object_eq

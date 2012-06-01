@@ -77,7 +77,7 @@ trait TreePrinters extends api.TreePrinters { self: SymbolTable =>
 
     def printSeq[a](ls: List[a])(printelem: a => Unit)(printsep: => Unit) {
       ls match {
-        case List() =>
+        case Nil =>
         case List(x) => printelem(x)
         case x :: rest => printelem(x); printsep; printSeq(rest)(printelem)(printsep)
       }

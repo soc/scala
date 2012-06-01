@@ -89,7 +89,7 @@ trait Trees extends api.Trees { self: SymbolTable =>
     override def toString = "Modifiers(%s, %s, %s)".format(flagString, annotations mkString ", ", positions)
   }
 
-  def Modifiers(flags: Long, privateWithin: Name): Modifiers = Modifiers(flags, privateWithin, List())
+  def Modifiers(flags: Long, privateWithin: Name): Modifiers = Modifiers(flags, privateWithin, Nil)
   def Modifiers(flags: Long): Modifiers = Modifiers(flags, tpnme.EMPTY)
 
   def Modifiers(mods: Set[Modifier],
@@ -396,7 +396,7 @@ trait Trees extends api.Trees { self: SymbolTable =>
     override def toString() = "TreeTypeSubstituter("+from+","+to+")"
   }
 
-  lazy val EmptyTreeTypeSubstituter = new TreeTypeSubstituter(List(), List())
+  lazy val EmptyTreeTypeSubstituter = new TreeTypeSubstituter(Nil, Nil)
 
   class TreeSymSubstTraverser(val from: List[Symbol], val to: List[Symbol]) extends TypeMapTreeSubstituter(new SubstSymMap(from, to)) {
     override def toString() = "TreeSymSubstTraverser/" + substituterString("Symbol", "Symbol", from, to)

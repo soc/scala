@@ -275,7 +275,7 @@ trait NamesDefaults { self: Analyzer =>
         case ((sym, byName, repeated), arg) =>
           val body =
             if (byName) {
-              val res = blockTyper.typed(Function(List(), arg))
+              val res = blockTyper.typed(Function(Nil, arg))
               new ChangeOwnerTraverser(context.owner, res.symbol) traverse arg // fixes #2290
               res
             } else {

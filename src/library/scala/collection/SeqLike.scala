@@ -570,7 +570,7 @@ trait SeqLike[+A, +Repr] extends Any with IterableLike[A, Repr] {
   }
 
   def reverse: Repr = {
-    var xs: List[A] = List()
+    var xs: List[A] = Nil
     for (x <- this)
       xs = x :: xs
     val b = newBuilder
@@ -581,7 +581,7 @@ trait SeqLike[+A, +Repr] extends Any with IterableLike[A, Repr] {
   }
 
   def reverseMap[B, That](f: A => B)(implicit bf: CanBuildFrom[Repr, B, That]): That = {
-    var xs: List[A] = List()
+    var xs: List[A] = Nil
     for (x <- this)
       xs = x :: xs
     val b = bf(repr)

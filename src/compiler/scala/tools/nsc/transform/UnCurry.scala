@@ -84,7 +84,7 @@ abstract class UnCurry extends InfoTransform
     }
 
     private lazy val serialVersionUIDAnnotation =
-      AnnotationInfo(SerialVersionUIDAttr.tpe, List(Literal(Constant(0))), List())
+      AnnotationInfo(SerialVersionUIDAttr.tpe, List(Literal(Constant(0))), Nil)
 
     // I don't have a clue why I'm catching TypeErrors here, but it's better
     // than spewing stack traces at end users for internal errors. Examples
@@ -184,12 +184,12 @@ abstract class UnCurry extends InfoTransform
 
     /** Undo eta expansion for parameterless and nullary methods */
     def deEta(fun: Function): Tree = fun match {
-      case Function(List(), Apply(expr, List())) if treeInfo.isExprSafeToInline(expr) =>
+      case Function(Nil, Apply(expr, Nil)) if treeInfo.isExprSafeToInline(expr) =>
         if (expr hasSymbolWhich (_.isLazy))
           fun
         else
           expr
-      case Function(List(), expr) if isByNameRef(expr) =>
+      case Function(Nil, expr) if isByNameRef(expr) =>
         noApply += expr
         expr
       case _ =>
@@ -266,7 +266,7 @@ abstract class UnCurry extends InfoTransform
 
           localTyper.typedPos(fun.pos) {
             Block(
-              List(ClassDef(anonClass, NoMods, List(List()), List(List()), List(applyMethodDef), fun.pos)),
+              List(ClassDef(anonClass, NoMods, List(Nil), List(Nil), List(applyMethodDef), fun.pos)),
               Typed(New(anonClass.tpe), TypeTree(fun.tpe)))
           }
 
@@ -369,7 +369,7 @@ abstract class UnCurry extends InfoTransform
 
       localTyper.typedPos(fun.pos) {
         Block(
-          List(ClassDef(anonClass, NoMods, List(List()), List(List()), List(applyOrElseMethodDef, isDefinedAtMethodDef), fun.pos)),
+          List(ClassDef(anonClass, NoMods, List(Nil), List(Nil), List(applyOrElseMethodDef, isDefinedAtMethodDef), fun.pos)),
           Typed(New(anonClass.tpe), TypeTree(fun.tpe)))
       }
     }

@@ -79,7 +79,7 @@ trait Erasure {
     def mergeParents(parents: List[Type]): Type
 
     def eraseNormalClassRef(pre: Type, clazz: Symbol): Type =
-      typeRef(apply(rebindInnerClass(pre, clazz)), clazz, List()) // #2585
+      typeRef(apply(rebindInnerClass(pre, clazz)), clazz, Nil) // #2585
 
     protected def eraseDerivedValueClassRef(clazz: Symbol): Type =
       scalaErasure(underlyingOfValueClass(clazz))
@@ -191,7 +191,7 @@ trait Erasure {
           if (restpe.typeSymbol == UnitClass) erasedTypeRef(UnitClass)
           else specialErasureAvoiding(clazz, (mt.resultType(params map (_.tpe)))))
       case TypeRef(pre, `clazz`, args) =>
-        typeRef(pre, clazz, List())
+        typeRef(pre, clazz, Nil)
       case _ =>
         specialScalaErasure(tpe)
     }

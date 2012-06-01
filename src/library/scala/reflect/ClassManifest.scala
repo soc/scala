@@ -136,7 +136,7 @@ trait ClassManifest[T] extends OptManifest[T] with ClassTag[T] with Equals with 
     // it's safe to assume T <: AnyRef here because the method is overridden for all value type manifests
     new ArrayBuilder.ofRef[T with AnyRef]()(this.asInstanceOf[ClassManifest[T with AnyRef]]).asInstanceOf[ArrayBuilder[T]]
 
-  def typeArguments: List[OptManifest[_]] = List()
+  def typeArguments: List[OptManifest[_]] = Nil
 
   protected def argString =
     if (typeArguments.nonEmpty) typeArguments.mkString("[", ", ", "]")

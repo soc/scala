@@ -244,7 +244,7 @@ trait JavaToScala extends ConversionUtil { self: SymbolTable =>
       clazz setInfo new LazyPolyType(jclazz.getTypeParameters.toList map createTypeParameter)
       if (module != NoSymbol) {
         module setInfo module.moduleClass.tpe
-        module.moduleClass setInfo new LazyPolyType(List())
+        module.moduleClass setInfo new LazyPolyType(Nil)
       }
     }
 
@@ -265,7 +265,7 @@ trait JavaToScala extends ConversionUtil { self: SymbolTable =>
       }
       clazz setInfo GenPolyType(tparams, new ClassInfoType(parents, newScope, clazz))
       if (module != NoSymbol) {
-        module.moduleClass setInfo new ClassInfoType(List(), newScope, module.moduleClass)
+        module.moduleClass setInfo new ClassInfoType(Nil, newScope, module.moduleClass)
       }
 
       def enter(sym: Symbol, mods: Int) =
@@ -394,7 +394,7 @@ trait JavaToScala extends ConversionUtil { self: SymbolTable =>
   private def lookup(clazz: Symbol, jname: String): Symbol =
     clazz.info.decl(newTermName(jname)) orElse {
       (clazz.info.decls.iterator filter (approximateMatch(_, jname))).toList match {
-        case List()    => NoSymbol
+        case Nil    => NoSymbol
         case List(sym) => sym
         case alts      => clazz.newOverloaded(alts.head.tpe.prefix, alts)
       }
@@ -580,7 +580,7 @@ trait JavaToScala extends ConversionUtil { self: SymbolTable =>
             lub(jwild.getLowerBounds.toList map typeToScala),
             glb(jwild.getUpperBounds.toList map typeToScala map objToAny)))
         tparams += tparam
-        typeRef(NoPrefix, tparam, List())
+        typeRef(NoPrefix, tparam, Nil)
       case _ =>
         typeToScala(arg)
     }
@@ -596,7 +596,7 @@ trait JavaToScala extends ConversionUtil { self: SymbolTable =>
         arrayType(typeToScala(jclazz.getComponentType))
       else {
         val clazz = classToScala(jclazz)
-        rawToExistential(typeRef(clazz.owner.thisType, clazz, List()))
+        rawToExistential(typeRef(clazz.owner.thisType, clazz, Nil))
       }
     case japplied: ParameterizedType =>
       val (pre, sym) = typeToScala(japplied.getRawType) match {
@@ -610,7 +610,7 @@ trait JavaToScala extends ConversionUtil { self: SymbolTable =>
       arrayType(typeToScala(jarr.getGenericComponentType))
     case jtvar: jTypeVariable[_] =>
       val tparam = tparamToScala(jtvar)
-      typeRef(NoPrefix, tparam, List())
+      typeRef(NoPrefix, tparam, Nil)
   }
 
   /**

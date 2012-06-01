@@ -399,7 +399,7 @@ abstract class Mixin extends InfoTransform with ast.TreeDSL {
           // Companion module isn't visible for anonymous class at this point anyway
           assert(clazz.sourceModule != NoSymbol || clazz.isAnonymousClass,
             clazz + " has no sourceModule: sym = " + sym + " sym.tpe = " + sym.tpe)
-          parents1 = List()
+          parents1 = Nil
           decls1 = newScopeWith(decls.toList filter isImplementedStatically: _*)
         } else if (!parents.isEmpty) {
           parents1 = parents.head :: (parents.tail map toInterface)
@@ -546,11 +546,11 @@ abstract class Mixin extends InfoTransform with ast.TreeDSL {
             }
             tree
           }
-        case Apply(tapp @ TypeApply(fn, List(arg)), List()) =>
+        case Apply(tapp @ TypeApply(fn, List(arg)), Nil) =>
           if (arg.tpe.typeSymbol.isImplClass) {
             val ifacetpe = toInterface(arg.tpe)
             arg.tpe = ifacetpe
-            tapp.tpe = MethodType(List(), ifacetpe)
+            tapp.tpe = MethodType(Nil, ifacetpe)
             tree.tpe = ifacetpe
           }
           tree
@@ -786,7 +786,7 @@ abstract class Mixin extends InfoTransform with ast.TreeDSL {
 
       def mkFastPathLazyBody(clazz: Symbol, lzyVal: Symbol, cond: Tree, syncBody: List[Tree],
                              stats: List[Tree], retVal: Tree): Tree = {
-        mkFastPathBody(clazz, lzyVal, cond, syncBody, stats, retVal, gen.mkAttributedThis(clazz), List())
+        mkFastPathBody(clazz, lzyVal, cond, syncBody, stats, retVal, gen.mkAttributedThis(clazz), Nil)
       }
       
       def mkFastPathBody(clazz: Symbol, lzyVal: Symbol, cond: Tree, syncBody: List[Tree],
@@ -1067,7 +1067,7 @@ abstract class Mixin extends InfoTransform with ast.TreeDSL {
             val rhs          = gen.newModule(sym, vdef.symbol.tpe)
             val assignAndRet = gen.mkAssignAndReturn(vdef.symbol, rhs)
             val attrThis     = gen.mkAttributedThis(clazz)
-            val rhs1         = mkInnerClassAccessorDoubleChecked(attrThis, assignAndRet, sym, List())
+            val rhs1         = mkInnerClassAccessorDoubleChecked(attrThis, assignAndRet, sym, Nil)
 
             addDefDef(sym, rhs1)
           }
@@ -1212,7 +1212,7 @@ abstract class Mixin extends InfoTransform with ast.TreeDSL {
 
           typedPos(tree.pos)((qual DOT getter)())
 
-        case Assign(Apply(lhs @ Select(qual, _), List()), rhs) =>
+        case Assign(Apply(lhs @ Select(qual, _), Nil), rhs) =>
           // assign to fields in some implementation class via an abstract
           // setter in the interface.
           def setter = lhs.symbol.setter(

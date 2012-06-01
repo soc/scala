@@ -24,9 +24,9 @@ trait UnCurry {
         case MethodType(h :: t, restpe) if h.isImplicit =>
           apply(MethodType(h.cloneSymbol.resetFlag(IMPLICIT) :: t, restpe))
         case NullaryMethodType(restpe) =>
-          apply(MethodType(List(), restpe))
+          apply(MethodType(Nil, restpe))
         case TypeRef(pre, ByNameParamClass, arg :: Nil) =>
-          apply(functionType(List(), arg))
+          apply(functionType(Nil, arg))
         case TypeRef(pre, RepeatedParamClass, arg :: Nil) =>
           apply(seqType(arg))
         case TypeRef(pre, JavaRepeatedParamClass, arg :: Nil) =>

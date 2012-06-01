@@ -23,13 +23,13 @@ trait Trees { self: Universe =>
     def modifiers: Set[Modifier]
     def hasModifier(mod: Modifier): Boolean
     def privateWithin: Name  // default: EmptyTypeName
-    def annotations: List[Tree] // default: List()
+    def annotations: List[Tree] // default: Nil
     def mapAnnotations(f: List[Tree] => List[Tree]): Modifiers
   }
 
   def Modifiers(mods: Set[Modifier] = Set(),
                 privateWithin: Name = EmptyTypeName,
-                annotations: List[Tree] = List()): Modifiers
+                annotations: List[Tree] = Nil): Modifiers
 
   /** Tree is the basis for scala's abstract syntax. The nodes are
    *  implemented as case classes, and the parameters which initialize
@@ -1635,8 +1635,8 @@ trait Trees { self: Universe =>
   case LabelDef(name, params, rhs) =>
      // used for tailcalls and like
      // while/do are desugared to label defs as follows:
-     // while (cond) body ==> LabelDef($L, List(), if (cond) { body; L$() } else ())
-     // do body while (cond) ==> LabelDef($L, List(), body; if (cond) L$() else ())
+     // while (cond) body ==> LabelDef($L, Nil, if (cond) { body; L$() } else ())
+     // do body while (cond) ==> LabelDef($L, Nil, body; if (cond) L$() else ())
   case Import(expr, selectors) =>                                 (eliminated by typecheck)
      // import expr.{selectors}
      // Selectors are a list of pairs of names (from, to).

@@ -84,9 +84,9 @@ abstract class RefChecks extends InfoTransform with reflect.internal.transform.R
   )
 
   def overridesTypeInPrefix(tp1: Type, tp2: Type, prefix: Type): Boolean = (tp1.normalize, tp2.normalize) match {
-    case (MethodType(List(), rtp1), NullaryMethodType(rtp2)) =>
+    case (MethodType(Nil, rtp1), NullaryMethodType(rtp2)) =>
       rtp1 <:< rtp2
-    case (NullaryMethodType(rtp1), MethodType(List(), rtp2)) =>
+    case (NullaryMethodType(rtp1), MethodType(Nil, rtp2)) =>
       rtp1 <:< rtp2
     case (TypeRef(_, sym, _),  _) if sym.isModuleClass =>
       overridesTypeInPrefix(NullaryMethodType(tp1), tp2, prefix)
@@ -248,7 +248,7 @@ abstract class RefChecks extends InfoTransform with reflect.internal.transform.R
 
       def printMixinOverrideErrors() {
         mixinOverrideErrors.toList match {
-          case List() =>
+          case Nil =>
           case List(MixinOverrideError(_, msg)) =>
             unit.error(clazz.pos, msg)
           case MixinOverrideError(member, msg) :: others =>

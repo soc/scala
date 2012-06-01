@@ -186,7 +186,7 @@ self =>
 
   class UnitParser(val unit: global.CompilationUnit, patches: List[BracePatch]) extends SourceFileParser(unit.source) {
 
-    def this(unit: global.CompilationUnit) = this(unit, List())
+    def this(unit: global.CompilationUnit) = this(unit, Nil)
 
     override def newScanner = new UnitScanner(unit, patches)
 
@@ -313,21 +313,21 @@ self =>
     def checkNoEscapingPlaceholders[T](op: => T): T = {
       val savedPlaceholderParams = placeholderParams
       val savedPlaceholderTypes = placeholderTypes
-      placeholderParams = List()
-      placeholderTypes = List()
+      placeholderParams = Nil
+      placeholderTypes = Nil
 
       val res = op
 
       placeholderParams match {
         case vd :: _ =>
           syntaxError(vd.pos, "unbound placeholder parameter", false)
-          placeholderParams = List()
+          placeholderParams = Nil
         case _ =>
       }
       placeholderTypes match {
         case td :: _ =>
           syntaxError(td.pos, "unbound wildcard type", false)
-          placeholderTypes = List()
+          placeholderTypes = Nil
         case _ =>
       }
       placeholderParams = savedPlaceholderParams
@@ -338,13 +338,13 @@ self =>
 
     def placeholderTypeBoundary(op: => Tree): Tree = {
       val savedPlaceholderTypes = placeholderTypes
-      placeholderTypes = List()
+      placeholderTypes = Nil
       var t = op
       if (!placeholderTypes.isEmpty && t.isInstanceOf[AppliedTypeTree]) {
         val expos = t.pos
         ensureNonOverlapping(t, placeholderTypes)
         t = atPos(expos) { ExistentialTypeTree(t, placeholderTypes.reverse) }
-        placeholderTypes = List()
+        placeholderTypes = Nil
       }
       placeholderTypes = placeholderTypes ::: savedPlaceholderTypes
       t
@@ -1132,11 +1132,11 @@ self =>
 
     def expr(location: Int): Tree = {
       var savedPlaceholderParams = placeholderParams
-      placeholderParams = List()
+      placeholderParams = Nil
       var res = expr0(location)
       if (!placeholderParams.isEmpty && !isWildcard(res)) {
         res = atPos(res.pos){ Function(placeholderParams.reverse, res) }
-        placeholderParams = List()
+        placeholderParams = Nil
       }
       placeholderParams = placeholderParams ::: savedPlaceholderParams
       res
@@ -2357,7 +2357,7 @@ self =>
             case LBRACE   => atPos(in.offset) { constrBlock(vparamss) }
             case _        => accept(EQUALS) ; atPos(in.offset) { constrExpr(vparamss) }
           }
-          DefDef(mods, nme.CONSTRUCTOR, List(), vparamss, TypeTree(), rhs)
+          DefDef(mods, nme.CONSTRUCTOR, Nil, vparamss, TypeTree(), rhs)
         }
       }
       else {
@@ -2523,11 +2523,11 @@ self =>
           val tstart = (in.offset :: classContextBounds.map(_.pos.startOrPoint)).min
           if (!classContextBounds.isEmpty && mods.isTrait) {
             syntaxError("traits cannot have type parameters with context bounds `: ...' nor view bounds `<% ...'", false)
-            classContextBounds = List()
+            classContextBounds = Nil
           }
           val constrAnnots = constructorAnnotations()
           val (constrMods, vparamss) =
-            if (mods.isTrait) (Modifiers(Flags.TRAIT), List())
+            if (mods.isTrait) (Modifiers(Flags.TRAIT), Nil)
             else (accessModifierOpt(), paramClauses(name, classContextBounds, mods.isCase))
           var mods1 = mods
           if (mods.isTrait && in.token == SUBTYPE)
@@ -2602,15 +2602,15 @@ self =>
               List(treeCopy.TypeDef(tdef, mods | Flags.PRESUPER, name, tparams, rhs))
             case stat if !stat.isEmpty =>
               syntaxError(stat.pos, "only type definitions and concrete field definitions allowed in early object initialization section", false)
-              List()
-            case _ => List()
+              Nil
+            case _ => Nil
           }
           in.nextToken()
           val (parents, argss) = templateParents(isTrait)
           val (self1, body1) = templateBodyOpt(isTrait)
           (parents, argss, self1, earlyDefs ::: body1)
         } else {
-          (List(), List(List()), self, body)
+          (Nil, List(Nil), self, body)
         }
       } else {
         val (parents, argss) = templateParents(isTrait)
@@ -2637,7 +2637,7 @@ self =>
         else {
           newLineOptWhenFollowedBy(LBRACE)
           val (self, body) = templateBodyOpt(false)
-          (List(), List(List()), self, body)
+          (Nil, List(Nil), self, body)
         }
       )
       def anyrefParents() = {
@@ -2682,7 +2682,7 @@ self =>
         if (in.token == LPAREN)
           syntaxError((if (traitParentSeen) "parents of traits" else "traits or objects")+
                       " may not have parameters", true)
-        (emptyValDef, List())
+        (emptyValDef, Nil)
       }
     }
 
@@ -2939,7 +2939,7 @@ self =>
             val pkg = pkgQualId()
 
             if (in.token == EOF) {
-              ts += makePackaging(start, pkg, List())
+              ts += makePackaging(start, pkg, Nil)
             } else if (isStatSep) {
               in.nextToken()
               ts += makePackaging(start, pkg, topstats())

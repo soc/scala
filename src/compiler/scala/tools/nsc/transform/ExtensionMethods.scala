@@ -96,7 +96,7 @@ abstract class ExtensionMethods extends Transform with TypingTransformers {
 
     private def allParams(tpe: Type): List[Symbol] = tpe match {
       case MethodType(params, res) => params ::: allParams(res)
-      case _ => List()
+      case _ => Nil
     }
 
     override def transform(tree: Tree): Tree = {

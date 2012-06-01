@@ -156,7 +156,7 @@ trait Scanners extends ScannersCommon {
      *            (the STRINGLIT appears twice in succession on the stack iff the
      *             expression is a multiline string literal).
      */
-    var sepRegions: List[Int] = List()
+    var sepRegions: List[Int] = Nil
 
 // Get next token ------------------------------------------------------------
 
@@ -1059,7 +1059,7 @@ trait Scanners extends ScannersCommon {
     def parenBalance(token: Int) = 0
 
     /** overridden in UnitScanners */
-    def healBraces(): List[BracePatch] = List()
+    def healBraces(): List[BracePatch] = Nil
 
     /** Initialization method: read first char, then first token
      */
@@ -1187,7 +1187,7 @@ trait Scanners extends ScannersCommon {
   /** A scanner over a given compilation unit
    */
   class UnitScanner(unit: CompilationUnit, patches: List[BracePatch]) extends SourceFileScanner(unit.source) {
-    def this(unit: CompilationUnit) = this(unit, List())
+    def this(unit: CompilationUnit) = this(unit, Nil)
 
     override def warning(off: Offset, msg: String)              = unit.warning(unit.position(off), msg)
     override def deprecationWarning(off: Offset, msg: String)   = unit.deprecationWarning(unit.position(off), msg)
@@ -1196,12 +1196,12 @@ trait Scanners extends ScannersCommon {
 
     private var bracePatches: List[BracePatch] = patches
 
-    lazy val parensAnalyzer = new ParensAnalyzer(unit, List())
+    lazy val parensAnalyzer = new ParensAnalyzer(unit, Nil)
 
     override def parenBalance(token: Int) = parensAnalyzer.balance(token)
 
     override def healBraces(): List[BracePatch] = {
-      var patches: List[BracePatch] = List()
+      var patches: List[BracePatch] = Nil
       if (!parensAnalyzer.tabSeen) {
         var bal = parensAnalyzer.balance(RBRACE)
         while (bal < 0) {
@@ -1360,7 +1360,7 @@ trait Scanners extends ScannersCommon {
     }
 
     def insertPatch(patches: List[BracePatch], patch: BracePatch): List[BracePatch] = patches match {
-      case List() => List(patch)
+      case Nil => List(patch)
       case bp :: bps => if (patch.off < bp.off) patch :: patches
                         else bp :: insertPatch(bps, patch)
     }
@@ -1379,7 +1379,7 @@ trait Scanners extends ScannersCommon {
 
     def insertRBrace(): List[BracePatch] = {
       def insert(bps: List[BracePair]): List[BracePatch] = bps match {
-        case List() => patches
+        case Nil => patches
         case (bp @ BracePair(loff, lindent, roff, rindent, nested)) :: bps1 =>
           if (lindent <= rindent) insert(bps1)
           else {
@@ -1406,7 +1406,7 @@ trait Scanners extends ScannersCommon {
 
     def deleteRBrace(): List[BracePatch] = {
       def delete(bps: List[BracePair]): List[BracePatch] = bps match {
-        case List() => patches
+        case Nil => patches
         case BracePair(loff, lindent, roff, rindent, nested) :: bps1 =>
           if (lindent >= rindent) delete(bps1)
           else {

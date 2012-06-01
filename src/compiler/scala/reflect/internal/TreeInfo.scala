@@ -89,7 +89,7 @@ abstract class TreeInfo {
       tree.symbol.isStable && isExprSafeToInline(qual)
     case TypeApply(fn, _) =>
       isExprSafeToInline(fn)
-    case Apply(fn, List()) =>
+    case Apply(fn, Nil) =>
       /* Note: After uncurry, field accesses are represented as Apply(getter, Nil),
        * so an Apply can also be pure.
        * However, before typing, applications of nullary functional values are also

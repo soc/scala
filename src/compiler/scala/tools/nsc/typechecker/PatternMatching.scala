@@ -975,7 +975,7 @@ trait PatternMatching extends Transform with TypingTransformers with ast.TreeDSL
           // TODO: [SPEC] the spec requires `eq` instead of `==` for singleton types
           // this implies sym.isStable
           case SingleType(_, sym)                       => and(equalsTest(CODE.REF(sym), testedBinder), typeTest(testedBinder, expectedTp.widen))
-          // must use == to support e.g. List() == Nil
+          // must use == to support e.g. Nil == Nil
           case ThisType(sym) if sym.isModule            => and(equalsTest(CODE.REF(sym), testedBinder), typeTest(testedBinder, expectedTp.widen))
           case ConstantType(const)                      => equalsTest(Literal(const), testedBinder)
 
@@ -1941,8 +1941,8 @@ trait PatternMatching extends Transform with TypingTransformers with ast.TreeDSL
 
     def exhaustive(prevBinder: Symbol, cases: List[List[TreeMaker]], pt: Type): List[String] = if (uncheckableType(prevBinder.info)) Nil else {
       // customize TreeMakersToConds (which turns a tree of tree makers into a more abstract DAG of tests)
-      // - approximate the pattern `List()` (unapplySeq on List with empty length) as `Nil`,
-      //   otherwise the common (xs: List[Any]) match { case List() => case x :: xs => } is deemed unexhaustive
+      // - approximate the pattern `Nil` (unapplySeq on List with empty length) as `Nil`,
+      //   otherwise the common (xs: List[Any]) match { case Nil => case x :: xs => } is deemed unexhaustive
       // - back off (to avoid crying exhaustive too often) when:
       //    - there are guards -->
       //    - there are extractor calls (that we can't secretly/soundly) rewrite
@@ -1951,7 +1951,7 @@ trait PatternMatching extends Transform with TypingTransformers with ast.TreeDSL
         override def treeMakerToCond(tm: TreeMaker): Cond = tm match {
           case p@ExtractorTreeMaker(extractor, Some(lenCheck), testedBinder, _) =>
             p.checkedLength match {
-              // pattern: `List()`  (interpret as `Nil`)
+              // pattern: `Nil`  (interpret as `Nil`)
               // TODO: make it more general List(1, 2) => 1 :: 2 :: Nil
               case Some(0) if testedBinder.tpe.typeSymbol == ListClass => // extractor.symbol.owner == SeqFactory
                 EqualityCond(binderToUniqueTree(p.prevBinder), unique(Ident(NilModule) setType NilModule.tpe))

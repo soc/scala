@@ -97,19 +97,19 @@ trait Trees extends reflect.internal.Trees { self: Global =>
 
     val constrs = {
       if (constrMods hasFlag TRAIT) {
-        if (body forall treeInfo.isInterfaceMember) List()
+        if (body forall treeInfo.isInterfaceMember) Nil
         else List(
           atPos(wrappingPos(superPos, lvdefs)) (
-            DefDef(NoMods, nme.MIXIN_CONSTRUCTOR, List(), List(List()), TypeTree(), Block(lvdefs, Literal(Constant())))))
+            DefDef(NoMods, nme.MIXIN_CONSTRUCTOR, Nil, List(Nil), TypeTree(), Block(lvdefs, Literal(Constant())))))
       } else {
         // convert (implicit ... ) to ()(implicit ... ) if its the only parameter section
         if (vparamss1.isEmpty || !vparamss1.head.isEmpty && vparamss1.head.head.mods.isImplicit)
-          vparamss1 = List() :: vparamss1;
+          vparamss1 = Nil :: vparamss1;
         val superRef: Tree = atPos(superPos)(gen.mkSuperSelect)
         val superCall = (superRef /: argss) (Apply)
         List(
           atPos(wrappingPos(superPos, lvdefs ::: argss.flatten)) (
-            DefDef(constrMods, nme.CONSTRUCTOR, List(), vparamss1, TypeTree(), Block(lvdefs ::: List(superCall), Literal(Constant())))))
+            DefDef(constrMods, nme.CONSTRUCTOR, Nil, vparamss1, TypeTree(), Block(lvdefs ::: List(superCall), Literal(Constant())))))
       }
     }
     constrs foreach (ensureNonOverlapping(_, parents ::: gvdefs))

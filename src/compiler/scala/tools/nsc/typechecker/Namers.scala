@@ -957,7 +957,7 @@ trait Namers extends MethodSynthesis {
           }
           resultPt match {
             case NullaryMethodType(rtpe) => resultPt = rtpe
-            case MethodType(List(), rtpe) => resultPt = rtpe
+            case MethodType(Nil, rtpe) => resultPt = rtpe
             case _ =>
           }
           if (tpt.isEmpty) {
@@ -970,7 +970,7 @@ trait Namers extends MethodSynthesis {
       // Add a () parameter section if this overrides some method with () parameters.
       if (clazz.isClass && vparamss.isEmpty && overriddenSymbol.alternatives.exists(
         _.info.isInstanceOf[MethodType])) {
-        vparamSymss = List(List())
+        vparamSymss = List(Nil)
       }
       mforeach(vparamss) { vparam =>
         if (vparam.tpt.isEmpty) {
@@ -1003,7 +1003,7 @@ trait Namers extends MethodSynthesis {
         )
         // #2382: return type of default getters are always @uncheckedVariance
         if (meth.hasDefault)
-          rt.withAnnotation(AnnotationInfo(uncheckedVarianceClass.tpe, List(), List()))
+          rt.withAnnotation(AnnotationInfo(uncheckedVarianceClass.tpe, Nil, Nil))
         else rt
       })
     }

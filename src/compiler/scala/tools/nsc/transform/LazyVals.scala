@@ -133,7 +133,7 @@ abstract class LazyVals extends Transform with TypingTransformers with ast.TreeD
                     }
                 })
                 toAdd0
-            } else List()
+            } else Nil
           deriveTemplate(tree)(_ => innerClassBitmaps ++ stats)
         }
 
@@ -192,7 +192,7 @@ abstract class LazyVals extends Transform with TypingTransformers with ast.TreeD
     def mkSlowPathDef(clazz: Symbol, lzyVal: Symbol, cond: Tree, syncBody: List[Tree],
                       stats: List[Tree], retVal: Tree): Tree = {
       val defSym = clazz.newMethod(nme.newLazyValSlowComputeName(lzyVal.name), lzyVal.pos, STABLE | PRIVATE)
-      defSym setInfo MethodType(List(), lzyVal.tpe.resultType)
+      defSym setInfo MethodType(Nil, lzyVal.tpe.resultType)
       defSym.owner = lzyVal.owner
       if (bitmaps.contains(lzyVal))
         bitmaps(lzyVal).map(_.owner = defSym)
@@ -204,7 +204,7 @@ abstract class LazyVals extends Transform with TypingTransformers with ast.TreeD
     def mkFastPathBody(clazz: Symbol, lzyVal: Symbol, cond: Tree, syncBody: List[Tree],
                        stats: List[Tree], retVal: Tree): (Tree, Tree) = {
       val slowPathDef: Tree = mkSlowPathDef(clazz, lzyVal, cond, syncBody, stats, retVal)
-      (If(cond, Apply(ID(slowPathDef.symbol), List()), retVal), slowPathDef)
+      (If(cond, Apply(ID(slowPathDef.symbol), Nil), retVal), slowPathDef)
     }
 
     /** return a 'lazified' version of rhs. Rhs should conform to the

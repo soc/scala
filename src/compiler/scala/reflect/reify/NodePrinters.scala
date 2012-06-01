@@ -33,9 +33,9 @@ trait NodePrinters { self: scala.tools.nsc.ast.NodePrinters =>
         s = s.replace("scala.collection.immutable.", "")
         s = "List\\[List\\[.*?\\].*?\\]".r.replaceAllIn(s, "List")
         s = "List\\[.*?\\]".r.replaceAllIn(s, "List")
-        s = s.replace("immutable.this.Nil", "List()")
+        s = s.replace("immutable.this.Nil", "Nil")
         s = s.replace("modifiersFromInternalFlags", "Modifiers")
-        s = s.replace("Modifiers(0L, newTypeName(\"\"), List())", "Modifiers()")
+        s = s.replace("Modifiers(0L, newTypeName(\"\"), Nil)", "Modifiers()")
         s = """Modifiers\((\d+)[lL], newTypeName\("(.*?)"\), List\((.*?)\)\)""".r.replaceAllIn(s, m => {
           val buf = new collection.mutable.ListBuffer[String]
 

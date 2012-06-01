@@ -135,7 +135,7 @@ trait Scopes extends api.Scopes { self: SymbolTable =>
           enterAllInHash(e.next, n + 1)
           enterInHash(e)
         } else {
-          var entries: List[ScopeEntry] = List()
+          var entries: List[ScopeEntry] = Nil
           var ee = e
           while (ee ne null) {
             entries = ee :: entries

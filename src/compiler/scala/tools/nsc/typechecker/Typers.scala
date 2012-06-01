@@ -63,8 +63,8 @@ trait Typers extends Modes with Adaptations with Taggings {
 /* needed for experimental version where early types can be type arguments
   class EarlyMap(clazz: Symbol) extends TypeMap {
     def apply(tp: Type): Type = tp match {
-      case TypeRef(NoPrefix, sym, List()) if (sym hasFlag PRESUPER) =>
-        TypeRef(ThisType(clazz), sym, List())
+      case TypeRef(NoPrefix, sym, Nil) if (sym hasFlag PRESUPER) =>
+        TypeRef(ThisType(clazz), sym, Nil)
       case _ =>
         mapOver(tp)
     }
@@ -393,7 +393,7 @@ trait Typers extends Modes with Adaptations with Taggings {
       private def check[T <: Tree](owner: Symbol, scope: Scope, pt: Type, tree: T): T = {
         this.owner = owner
         this.scope = scope
-        hiddenSymbols = List()
+        hiddenSymbols = Nil
         val tp1 = apply(tree.tpe)
         if (hiddenSymbols.isEmpty) tree setType tp1
         else if (hiddenSymbols exists (_.isErroneous)) HiddenSymbolWithError(tree)
@@ -684,7 +684,7 @@ trait Typers extends Modes with Adaptations with Taggings {
       }
       if (tree.tpe.isInstanceOf[MethodType] && pre.isStable && sym.tpe.params.isEmpty &&
           (isStableContext(tree, mode, pt) || sym.isModule))
-        tree.setType(MethodType(List(), singleType(pre, sym))) // TODO: should this be a NullaryMethodType?
+        tree.setType(MethodType(Nil, singleType(pre, sym))) // TODO: should this be a NullaryMethodType?
       else tree
     }
 
@@ -888,7 +888,7 @@ trait Typers extends Modes with Adaptations with Taggings {
           } else
             typed(tree0, mode, pt)
         } else if (!meth.isConstructor && mt.params.isEmpty) { // (4.3)
-          adapt(typed(Apply(tree, List()) setPos tree.pos), mode, pt, original)
+          adapt(typed(Apply(tree, Nil) setPos tree.pos), mode, pt, original)
         } else if (context.implicitsEnabled) {
           MissingArgsForMethodTpeError(tree, meth)
         } else {
@@ -1373,7 +1373,7 @@ trait Typers extends Modes with Adaptations with Taggings {
         // Determine
         //  - supertparams: Missing type parameters from supertype
         //  - supertpe: Given supertype, polymorphic in supertparams
-        val supertparams = if (supertpt.hasSymbol) supertpt.symbol.typeParams else List()
+        val supertparams = if (supertpt.hasSymbol) supertpt.symbol.typeParams else Nil
         var supertpe = supertpt.tpe
         if (!supertparams.isEmpty)
           supertpe = PolyType(supertparams, appliedType(supertpe, supertparams map (_.tpeHK)))
@@ -1588,7 +1588,7 @@ trait Typers extends Modes with Adaptations with Taggings {
         for (ann <- clazz.getAnnotation(DeprecatedAttr)) {
           val m = companionSymbolOf(clazz, context)
           if (m != NoSymbol)
-            m.moduleClass.addAnnotation(AnnotationInfo(ann.atp, ann.args, List()))
+            m.moduleClass.addAnnotation(AnnotationInfo(ann.atp, ann.args, Nil))
         }
       }
       treeCopy.ClassDef(cdef, typedMods, cdef.name, tparams1, impl2)
@@ -1797,7 +1797,7 @@ trait Typers extends Modes with Adaptations with Taggings {
         case Block(stats, expr) if !stats.isEmpty =>
           decompose(stats.last)
         case _ =>
-          (call, List())
+          (call, Nil)
       }
       val (superConstr, superArgs) = decompose(rhs)
       assert(superConstr.symbol ne null, superConstr)//debug
@@ -1995,7 +1995,7 @@ trait Typers extends Modes with Adaptations with Taggings {
         case ldef @ LabelDef(_, _, _) =>
           if (ldef.symbol == NoSymbol)
             ldef.symbol = namer.enterInScope(
-              context.owner.newLabel(ldef.name, ldef.pos) setInfo MethodType(List(), UnitClass.tpe))
+              context.owner.newLabel(ldef.name, ldef.pos) setInfo MethodType(Nil, UnitClass.tpe))
         case _ =>
       }
     }
@@ -2017,7 +2017,7 @@ trait Typers extends Modes with Adaptations with Taggings {
         } else {
           context.scope.unlink(ldef.symbol)
           val sym2 = namer.enterInScope(
-            context.owner.newLabel(ldef.name, ldef.pos) setInfo MethodType(List(), restpe))
+            context.owner.newLabel(ldef.name, ldef.pos) setInfo MethodType(Nil, restpe))
           val rhs2 = typed(resetAllAttrs(ldef.rhs), restpe)
           ldef.params foreach (param => param.tpe = param.symbol.tpe)
           deriveLabelDef(ldef)(_ => rhs2) setSymbol sym2 setType restpe
@@ -2215,7 +2215,7 @@ trait Typers extends Modes with Adaptations with Taggings {
 
       private val anonClass = context.owner.newAnonymousFunctionClass(tree.pos)
 
-      anonClass addAnnotation AnnotationInfo(SerialVersionUIDAttr.tpe, List(Literal(Constant(0))), List())
+      anonClass addAnnotation AnnotationInfo(SerialVersionUIDAttr.tpe, List(Literal(Constant(0))), Nil)
 
       def deriveFormals =
         if (targs.isEmpty) Nil
@@ -2336,7 +2336,7 @@ trait Typers extends Modes with Adaptations with Taggings {
 
       def translated =
         if (members.head eq EmptyTree) setError(tree)
-        else typed(atPos(tree.pos)(Block(List(ClassDef(anonClass, NoMods, List(List()), List(List()), members, tree.pos.focus)), atPos(tree.pos.focus)(New(anonClass.tpe)))), mode, pt)
+        else typed(atPos(tree.pos)(Block(List(ClassDef(anonClass, NoMods, List(Nil), List(Nil), members, tree.pos.focus)), atPos(tree.pos.focus)(New(anonClass.tpe)))), mode, pt)
     }
 
     // Function(params, Match(sel, cases)) ==> new <Partial>Function { def apply<OrElse>(params) = `translateMatch('sel match { cases }')` }
@@ -2877,7 +2877,7 @@ trait Typers extends Modes with Adaptations with Taggings {
                 case _ => tp
               }
 
-              /** This is translating uses of List() into Nil.  This is less
+              /** This is translating uses of Nil into Nil.  This is less
                *  than ideal from a consistency standpoint, but it shouldn't be
                *  altered without due caution.
                *  ... this also causes bootstrapping cycles if List_apply is
@@ -3090,7 +3090,7 @@ trait Typers extends Modes with Adaptations with Taggings {
               reportAnnotationError(UnexpectedTreeAnnotation(fun))
               (setError(fun), outerArgss)
           }
-        extract(ann, List())
+        extract(ann, Nil)
       }
 
       val res = if (fun.isErroneous) annotationError
@@ -3144,7 +3144,7 @@ trait Typers extends Modes with Adaptations with Taggings {
             }
 
             if (hasError) annotationError
-            else AnnotationInfo(annType, List(), nvPairs map {p => (p._1.asInstanceOf[Name], p._2.get)}).setOriginal(Apply(typedFun, args).setPos(ann.pos)) // [Eugene+] why do we need this cast?
+            else AnnotationInfo(annType, Nil, nvPairs map {p => (p._1.asInstanceOf[Name], p._2.get)}).setOriginal(Apply(typedFun, args).setPos(ann.pos)) // [Eugene+] why do we need this cast?
           }
         } else if (requireJava) {
           reportAnnotationError(NestedAnnotationError(ann, annType))
@@ -3186,7 +3186,7 @@ trait Typers extends Modes with Adaptations with Taggings {
 
           def annInfo(t: Tree): AnnotationInfo = t match {
             case Apply(Select(New(tpt), nme.CONSTRUCTOR), args) =>
-              AnnotationInfo(annType, args, List()).setOriginal(typedAnn).setPos(t.pos)
+              AnnotationInfo(annType, args, Nil).setOriginal(typedAnn).setPos(t.pos)
 
             case Block(stats, expr) =>
               context.warning(t.pos, "Usage of named or default arguments transformed this annotation\n"+
@@ -3830,11 +3830,11 @@ trait Typers extends Modes with Adaptations with Taggings {
 
       def typedEta(expr1: Tree): Tree = expr1.tpe match {
         case TypeRef(_, ByNameParamClass, _) =>
-          val expr2 = Function(List(), expr1) setPos expr1.pos
+          val expr2 = Function(Nil, expr1) setPos expr1.pos
           new ChangeOwnerTraverser(context.owner, expr2.symbol).traverse(expr2)
           typed1(expr2, mode, pt)
         case NullaryMethodType(restpe) =>
-          val expr2 = Function(List(), expr1) setPos expr1.pos
+          val expr2 = Function(Nil, expr1) setPos expr1.pos
           new ChangeOwnerTraverser(context.owner, expr2.symbol).traverse(expr2)
           typed1(expr2, mode, pt)
         case PolyType(_, MethodType(formals, _)) =>
@@ -4567,7 +4567,7 @@ trait Typers extends Modes with Adaptations with Taggings {
         case New(tpt: Tree) =>
           typedNew(tpt)
 
-        case Typed(expr, Function(List(), EmptyTree)) =>
+        case Typed(expr, Function(Nil, EmptyTree)) =>
           // find out whether the programmer is trying to eta-expand a macro def
           // to do that we need to typecheck the tree first (we need a symbol of the eta-expandee)
           // that typecheck must not trigger macro expansions, so we explicitly prohibit them

@@ -42,7 +42,7 @@ extends AbstractMap[A, B]
 
   override def empty = ListMap.empty[A, B]
 
-  private var elems: List[(A, B)] = List()
+  private var elems: List[(A, B)] = Nil
   private var siz: Int = 0
 
   def get(key: A): Option[B] = elems find (_._1 == key) map (_._2)
@@ -55,7 +55,7 @@ extends AbstractMap[A, B]
     else if (elems.head._1 == key) { siz -= 1; elems.tail }
     else elems.head :: remove(key, elems.tail)
 
-  override def clear() = { elems = List(); siz = 0 }
+  override def clear() = { elems = Nil; siz = 0 }
   override def size: Int = siz
 }
 

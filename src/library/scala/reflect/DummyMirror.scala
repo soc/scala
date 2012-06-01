@@ -468,7 +468,7 @@ class DummyMirror(cl: ClassLoader) extends api.Mirror {
     def thisPrefix: Type = notSupported()
     def selfType: Type = notSupported()
     def alternatives: List[Symbol] = notSupported()
-    def resolveOverloaded(pre: Type = NoPrefix, targs: Seq[Type] = List(), actuals: Seq[Type]): Symbol = notSupported()
+    def resolveOverloaded(pre: Type = NoPrefix, targs: Seq[Type] = Nil, actuals: Seq[Type]): Symbol = notSupported()
     def newNestedSymbol(name: Name, pos: Position, flags: Long, isClass: Boolean): Symbol = notSupported()
     def setInternalFlags(flags: Long): this.type = notSupported()
     def setTypeSignature(tpe: Type): this.type = notSupported()

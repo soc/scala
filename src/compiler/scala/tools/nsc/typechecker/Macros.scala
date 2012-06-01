@@ -853,14 +853,14 @@ trait Macros extends Traces {
     // we need to take care of all possible combos of nullary/empty-paramlist macro defs vs nullary/empty-arglist invocations
     // nullary def + nullary invocation => paramss and argss match, everything is okay
     // nullary def + empty-arglist invocation => illegal Scala code, impossible, everything is okay
-    // empty-paramlist def + nullary invocation => uh-oh, we need to append a List() to argss
+    // empty-paramlist def + nullary invocation => uh-oh, we need to append a Nil to argss
     // empty-paramlist def + empty-arglist invocation => paramss and argss match, everything is okay
     // that's almost it, but we need to account for the fact that paramss might have context bounds that mask the empty last paramlist
     val paramss_without_evidences = transformTypeTagEvidenceParams(paramss, (param, tparam) => None)
     val isEmptyParamlistDef = paramss_without_evidences.nonEmpty && paramss_without_evidences.last.isEmpty
     val isEmptyArglistInvocation = argss.nonEmpty && argss.last.isEmpty
     if (isEmptyParamlistDef && !isEmptyArglistInvocation) {
-      macroLogVerbose("isEmptyParamlistDef && !isEmptyArglistInvocation: appending a List() to argss")
+      macroLogVerbose("isEmptyParamlistDef && !isEmptyArglistInvocation: appending a Nil to argss")
       argss = argss :+ Nil
     }
 

@@ -124,7 +124,7 @@ trait JavaParsers extends ast.parser.ParsersCommon with JavaScanners {
       Template(
         parents,
         emptyValDef,
-        if (treeInfo.firstConstructor(stats) == EmptyTree) makeConstructor(List()) :: stats
+        if (treeInfo.firstConstructor(stats) == EmptyTree) makeConstructor(Nil) :: stats
         else stats)
 
     def makeSyntheticParam(count: Int, tpt: Tree): ValDef =
@@ -136,7 +136,7 @@ trait JavaParsers extends ast.parser.ParsersCommon with JavaScanners {
 
     def makeConstructor(formals: List[Tree]) = {
       val vparams = mapWithIndex(formals)((p, i) => makeSyntheticParam(i + 1, p))
-      DefDef(Modifiers(Flags.JAVA), nme.CONSTRUCTOR, List(), List(vparams), TypeTree(), blankExpr)
+      DefDef(Modifiers(Flags.JAVA), nme.CONSTRUCTOR, Nil, List(vparams), TypeTree(), blankExpr)
     }
 
     // ------------- general parsing ---------------------------
@@ -315,7 +315,7 @@ trait JavaParsers extends ast.parser.ParsersCommon with JavaScanners {
             TypeDef(
               Modifiers(Flags.JAVA | Flags.DEFERRED),
               newTypeName("_$"+ (wildcards.length + 1)),
-              List(),
+              Nil,
               TypeBoundsTree(lo, hi))
           }
           wildcards += tdef
@@ -342,7 +342,7 @@ trait JavaParsers extends ast.parser.ParsersCommon with JavaScanners {
         in.nextToken
         annotation()
       }
-      List() // don't pass on annotations for now
+      Nil // don't pass on annotations for now
     }
 
     /** Annotation ::= TypeName [`(` AnnotationArgument {`,` AnnotationArgument} `)`]
@@ -448,7 +448,7 @@ trait JavaParsers extends ast.parser.ParsersCommon with JavaScanners {
         val tparams = repsep(typeParam, COMMA)
         acceptClosingAngle()
         tparams
-      } else List()
+      } else Nil
 
     def typeParam(): TypeDef =
       atPos(in.currentPos) {
@@ -460,7 +460,7 @@ trait JavaParsers extends ast.parser.ParsersCommon with JavaScanners {
           } else {
             scalaDot(tpnme.Any)
           }
-        TypeDef(Modifiers(Flags.JAVA | Flags.DEFERRED | Flags.PARAM), name, List(),
+        TypeDef(Modifiers(Flags.JAVA | Flags.DEFERRED | Flags.PARAM), name, Nil,
                 TypeBoundsTree(scalaDot(tpnme.Nothing), hi))
       }
 
@@ -473,12 +473,12 @@ trait JavaParsers extends ast.parser.ParsersCommon with JavaScanners {
         }
         val ts = buf.toList
         if (ts.tail.isEmpty) ts.head
-        else CompoundTypeTree(Template(ts, emptyValDef, List()))
+        else CompoundTypeTree(Template(ts, emptyValDef, Nil))
       }
 
     def formalParams(): List[ValDef] = {
       accept(LPAREN)
-      val vparams = if (in.token == RPAREN) List() else repsep(formalParam, COMMA)
+      val vparams = if (in.token == RPAREN) Nil else repsep(formalParam, COMMA)
       accept(RPAREN)
       vparams
     }
@@ -513,7 +513,7 @@ trait JavaParsers extends ast.parser.ParsersCommon with JavaScanners {
 
     def termDecl(mods: Modifiers, parentToken: Int): List[Tree] = {
       val inInterface = definesInterface(parentToken)
-      val tparams = if (in.token == LT) typeParams() else List()
+      val tparams = if (in.token == LT) typeParams() else Nil
       val isVoid = in.token == VOID
       var rtpt =
         if (isVoid) {
@@ -551,7 +551,7 @@ trait JavaParsers extends ast.parser.ParsersCommon with JavaScanners {
               if (parentToken == AT && in.token == DEFAULT) {
                 val annot =
                   atPos(pos) {
-                    New(Select(scalaDot(nme.runtime), tpnme.AnnotationDefaultATTR), List(List()))
+                    New(Select(scalaDot(nme.runtime), tpnme.AnnotationDefaultATTR), List(Nil))
                   }
                 mods1 = mods1 withAnnotations List(annot)
                 skipTo(SEMI)
@@ -635,7 +635,7 @@ trait JavaParsers extends ast.parser.ParsersCommon with JavaScanners {
     def makeCompanionObject(cdef: ClassDef, statics: List[Tree]): Tree =
       atPos(cdef.pos) {
         ModuleDef(cdef.mods & (Flags.AccessFlags | Flags.JAVA), cdef.name.toTermName,
-                  makeTemplate(List(), statics))
+                  makeTemplate(Nil, statics))
       }
 
     def importCompanionObject(cdef: ClassDef): Tree =
@@ -690,7 +690,7 @@ trait JavaParsers extends ast.parser.ParsersCommon with JavaScanners {
       val names = buf.toList
       if (names.length < 2) {
         syntaxError(pos, "illegal import", false)
-        List()
+        Nil
       } else {
         val qual = ((Ident(names.head): Tree) /: names.tail.init) (Select(_, _))
         val lastname = names.last
@@ -707,7 +707,7 @@ trait JavaParsers extends ast.parser.ParsersCommon with JavaScanners {
         in.nextToken
         repsep(typ, COMMA)
       } else {
-        List()
+        Nil
       }
 
     def classDecl(mods: Modifiers): List[Tree] = {
@@ -783,7 +783,7 @@ trait JavaParsers extends ast.parser.ParsersCommon with JavaScanners {
           if (!tparams1.isEmpty) rhs = AppliedTypeTree(rhs, tparams1 map (tp => Ident(tp.name)))
           List(TypeDef(Modifiers(Flags.PROTECTED), name, tparams1, rhs))
         case _ =>
-          List()
+          Nil
       }
       val sdefs = statics.toList
       val idefs = members.toList ::: (sdefs flatMap forwarders)
@@ -808,7 +808,7 @@ trait JavaParsers extends ast.parser.ParsersCommon with JavaScanners {
       for (stat <- templ.body; tpt <- getValueMethodType(stat))
         templ = makeTemplate(annotationParents, makeConstructor(List(tpt)) :: templ.body)
       addCompanionObject(statics, atPos(pos) {
-        ClassDef(mods, name, List(), templ)
+        ClassDef(mods, name, Nil, templ)
       })
     }
 
@@ -836,16 +836,16 @@ trait JavaParsers extends ast.parser.ParsersCommon with JavaScanners {
           in.nextToken
           typeBodyDecls(ENUM, name)
         } else {
-          (List(), List())
+          (Nil, Nil)
         }
       val predefs = List(
         DefDef(
-          Modifiers(Flags.JAVA | Flags.STATIC), nme.values, List(),
-          List(List()),
+          Modifiers(Flags.JAVA | Flags.STATIC), nme.values, Nil,
+          List(Nil),
           arrayOf(enumType),
           blankExpr),
         DefDef(
-          Modifiers(Flags.JAVA | Flags.STATIC), nme.valueOf, List(),
+          Modifiers(Flags.JAVA | Flags.STATIC), nme.valueOf, Nil,
           List(List(makeParam("x", TypeTree(StringClass.tpe)))),
           enumType,
           blankExpr))
@@ -853,7 +853,7 @@ trait JavaParsers extends ast.parser.ParsersCommon with JavaScanners {
       val superclazz =
         AppliedTypeTree(javaLangDot(tpnme.Enum), List(enumType))
       addCompanionObject(consts ::: statics ::: predefs, atPos(pos) {
-        ClassDef(mods, name, List(),
+        ClassDef(mods, name, Nil,
                  makeTemplate(superclazz :: interfaces, body))
       })
     }

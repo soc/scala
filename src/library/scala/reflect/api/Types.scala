@@ -74,7 +74,7 @@ trait Types { self: Universe =>
      *  Functions on types are also implemented as PolyTypes.
      *
      *  Example: (in the below, <List> is the type constructor of List)
-     *    TypeRef(pre, <List>, List()) is replaced by
+     *    TypeRef(pre, <List>, Nil) is replaced by
      *    PolyType(X, TypeRef(pre, <List>, List(X)))
      */
     def normalize: Type     // !!! Alternative name? "normalize" is used to mean too many things.

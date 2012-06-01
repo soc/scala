@@ -12,7 +12,7 @@ class Statistics extends scala.reflect.internal.util.Statistics {
 
   var microsByType = new ClassCounts
   var visitsByType = new ClassCounts
-  var pendingTreeTypes: List[Class[_]] = List()
+  var pendingTreeTypes: List[Class[_]] = Nil
   var typerTime: Long = 0L
 
   val typedApplyCount = new Counter

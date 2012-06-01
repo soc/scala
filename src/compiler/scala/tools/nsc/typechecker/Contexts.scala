@@ -30,7 +30,7 @@ trait Contexts { self: Analyzer =>
 
   private val startContext = {
     NoContext.make(
-    global.Template(List(), emptyValDef, List()) setSymbol global.NoSymbol setType global.NoType,
+    global.Template(Nil, emptyValDef, Nil) setSymbol global.NoSymbol setType global.NoType,
     global.definitions.RootClass,
     global.definitions.RootClass.info.decls)
   }
@@ -102,11 +102,11 @@ trait Contexts { self: Analyzer =>
                                             // template or package definition
     var enclMethod: Context = _             // The next outer context whose tree is a method
     var variance: Int = _                   // Variance relative to enclosing class
-    private var _undetparams: List[Symbol] = List() // Undetermined type parameters,
+    private var _undetparams: List[Symbol] = Nil // Undetermined type parameters,
                                                     // not inherited to child contexts
     var depth: Int = 0
-    var imports: List[ImportInfo] = List()   // currently visible imports
-    var openImplicits: List[(Type,Tree)] = List()   // types for which implicit arguments
+    var imports: List[ImportInfo] = Nil   // currently visible imports
+    var openImplicits: List[(Type,Tree)] = Nil   // types for which implicit arguments
                                              // are currently searched
     // for a named application block (Tree) the corresponding NamedApplyInfo
     var namedApplyBlockInfo: Option[(Tree, NamedApplyInfo)] = None
@@ -125,7 +125,7 @@ trait Contexts { self: Analyzer =>
     var checking = false
     var retyping = false
 
-    var savedTypeBounds: List[(Symbol, Type)] = List() // saved type bounds
+    var savedTypeBounds: List[(Symbol, Type)] = Nil // saved type bounds
        // for type parameters which are narrowed in a GADT
 
     var typingIndentLevel: Int = 0
@@ -145,7 +145,7 @@ trait Contexts { self: Analyzer =>
 
     def extractUndetparams() = {
       val tparams = undetparams
-      undetparams = List()
+      undetparams = Nil
       tparams
     }
 
@@ -567,7 +567,7 @@ trait Contexts { self: Analyzer =>
         }
         sym.setInfo(info)
       }
-      savedTypeBounds = List()
+      savedTypeBounds = Nil
       current
     }
 
@@ -599,8 +599,8 @@ trait Contexts { self: Analyzer =>
     private def collectImplicitImports(imp: ImportInfo): List[ImplicitInfo] = {
       val pre = imp.qual.tpe
       def collect(sels: List[ImportSelector]): List[ImplicitInfo] = sels match {
-        case List() =>
-          List()
+        case Nil =>
+          Nil
         case List(ImportSelector(nme.WILDCARD, _, _, _)) =>
           collectImplicits(pre.implicitMembers, pre, imported = true)
         case ImportSelector(from, _, to, _) :: sels1 =>
@@ -619,7 +619,7 @@ trait Contexts { self: Analyzer =>
     def implicitss: List[List[ImplicitInfo]] = {
       if (implicitsRunId != currentRunId) {
         implicitsRunId = currentRunId
-        implicitsCache = List()
+        implicitsCache = Nil
         val newImplicits: List[ImplicitInfo] =
           if (owner != nextOuter.owner && owner.isClass && !owner.isPackageClass && !inSelfSuperCall) {
             if (!owner.isInitialized) return nextOuter.implicitss
@@ -638,7 +638,7 @@ trait Contexts { self: Analyzer =>
           } else if (owner.isPackageClass) {
             // the corresponding package object may contain implicit members.
             collectImplicits(owner.tpe.implicitMembers, owner.tpe)
-          } else List()
+          } else Nil
         implicitsCache = if (newImplicits.isEmpty) nextOuter.implicitss
                          else newImplicits :: nextOuter.implicitss
       }
@@ -703,10 +703,10 @@ trait Contexts { self: Analyzer =>
       qual.tpe.members flatMap (transformImport(tree.selectors, _))
 
     private def transformImport(selectors: List[ImportSelector], sym: Symbol): List[Symbol] = selectors match {
-      case List() => List()
+      case Nil => Nil
       case List(ImportSelector(nme.WILDCARD, _, _, _)) => List(sym)
       case ImportSelector(from, _, to, _) :: _ if from == sym.name =>
-        if (to == nme.WILDCARD) List()
+        if (to == nme.WILDCARD) Nil
         else List(sym.cloneSymbol(sym.owner, sym.rawflags, to))
       case _ :: rest => transformImport(rest, sym)
     }

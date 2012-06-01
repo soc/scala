@@ -531,7 +531,7 @@ abstract class ClassfileParser {
     staticScope = newScope
 
     val classInfo = ClassInfoType(parseParents, instanceScope, clazz)
-    val staticInfo = ClassInfoType(List(), staticScope, moduleClass)
+    val staticInfo = ClassInfoType(Nil, staticScope, moduleClass)
 
     if (!isScala && !isScalaRaw)
       enterOwnInnerClasses
@@ -1005,7 +1005,7 @@ abstract class ClassfileParser {
           }
       }
       if (hasError) None
-      else Some(AnnotationInfo(attrType, List(), nvpairs.toList))
+      else Some(AnnotationInfo(attrType, Nil, nvpairs.toList))
     } catch {
       case f: FatalError => throw f // don't eat fatal errors, they mean a class was not found
       case ex: Throwable =>

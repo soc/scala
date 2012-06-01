@@ -80,13 +80,13 @@ self: scala.tools.nsc.Global =>
   /** A singleton list of a non-empty range from `lo` to `hi`, or else the empty List */
   private def maybeFree(lo: Int, hi: Int) =
     if (lo < hi) List(free(lo, hi))
-    else List()
+    else Nil
 
   /** Insert `pos` into ranges `rs` if possible;
    *  otherwise add conflicting trees to `conflicting`.
    */
   private def insert(rs: List[Range], t: Tree, conflicting: ListBuffer[Tree]): List[Range] = rs match {
-    case List() =>
+    case Nil =>
       assert(conflicting.nonEmpty)
       rs
     case r :: rs1 =>
@@ -135,7 +135,7 @@ self: scala.tools.nsc.Global =>
         if (conflicting.nonEmpty) return conflicting.toList map (t => (t, ct))
       }
     }
-    List()
+    Nil
   }
 
   // -------------- setting positions -------------------------------
@@ -231,7 +231,7 @@ self: scala.tools.nsc.Global =>
             }
 
           findOverlapping(tree.children flatMap solidDescendants) match {
-            case List() => ;
+            case Nil => ;
             case xs => {
               positionError("Overlapping trees "+xs.map { case (x, y) => (x.id, y.id) }.mkString("", ", ", "")) {
                 reportTree("Ancestor", tree)

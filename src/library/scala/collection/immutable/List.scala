@@ -31,13 +31,13 @@ import java.io._
  *  val days = List("Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday")
  *
  *  // Make a list element-by-element
- *  val when = "AM" :: "PM" :: List()
+ *  val when = "AM" :: "PM" :: Nil
  *
  *  // Pattern match
  *  days match {
  *    case firstDay :: otherDays =>
  *      println("The first day of the week is: " + firstDay)
- *    case List() =>
+ *    case Nil =>
  *      println("There don't seem to be any week days.")
  *  }
  *  }}}
