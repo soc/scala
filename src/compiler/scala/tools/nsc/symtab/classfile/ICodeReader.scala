@@ -10,6 +10,7 @@ package classfile
 import scala.collection.{ mutable, immutable }
 import mutable.ListBuffer
 import backend.icode._
+import classfile.{ ClassfileConstants => JVM }
 import ClassfileConstants._
 import scala.reflect.internal.Flags._
 import annotation.switch
@@ -191,10 +192,9 @@ abstract class ICodeReader extends ClassfileParser {
 
   var maxStack: Int = _
   var maxLocals: Int = _
-  val JVM = ClassfileConstants // shorter, uppercase alias for use in case patterns
+  var pc = 0
 
   def toUnsignedByte(b: Byte): Int = b.toInt & 0xff
-  var pc = 0
 
   /** Parse java bytecode into ICode */
   def parseByteCode() {
@@ -660,9 +660,9 @@ abstract class ICodeReader extends ClassfileParser {
     else instanceCode
 
   class LinearCode {
-    var instrs: ListBuffer[(Int, Instruction)] = new ListBuffer
-    var jmpTargets: mutable.Set[Int] = perRunCaches.newSet[Int]()
-    var locals: mutable.Map[Int, List[(Local, TypeKind)]] = perRunCaches.newMap()
+    val instrs     = ListBuffer[(Int, Instruction)]()
+    val jmpTargets = perRunCaches.newSet[Int]()
+    val locals     = perRunCaches.newMap[Int, List[(Local, TypeKind)]]()
 
     var containsDUPX = false
     var containsNEW  = false
@@ -692,14 +692,12 @@ abstract class ICodeReader extends ClassfileParser {
       var otherBlock: BasicBlock = NoBasicBlock
       var disableJmpTarget = false
 
-      for ((pc, instr) <- instrs.iterator) {
+      for ((pc, instr) <- instrs.toList) {
 //        Console.println("> " + pc + ": " + instr);
         if (jmpTargets(pc)) {
           otherBlock = blocks(pc)
           if (!bb.closed && otherBlock != bb) {
-            bb.emit(JUMP(otherBlock))
-            bb.close
-//            Console.println("\t> closing bb: " + bb)
+            bb emitOnly JUMP(otherBlock)
           }
           bb = otherBlock
 //          Console.println("\t> entering bb: " + bb)
@@ -722,10 +720,7 @@ abstract class ICodeReader extends ClassfileParser {
           case LSWITCH(tags, targets) =>
             bb.emitOnly(SWITCH(tags, targets map blocks))
 
-          case RETURN(_) =>
-            bb emitOnly instr
-
-          case THROW(clasz) =>
+          case RETURN(_) | THROW(_) =>
             bb emitOnly instr
 
           case _ =>

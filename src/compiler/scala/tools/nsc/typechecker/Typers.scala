@@ -194,7 +194,7 @@ trait Typers extends Modes with Adaptations with Taggings {
         case PolyType(_, _) => EmptyTree
         case _ =>
           def wrapImplicit(from: Type): Tree = {
-            val result = inferImplicit(tree, functionType(List(from), to), reportAmbiguous, true, context, saveErrors)
+            val result = inferImplicit(tree, functionType(from :: Nil, to), reportAmbiguous, true, context, saveErrors)
             if (result.subst != EmptyTreeTypeSubstituter) {
               result.subst traverse tree
               notifyUndetparamsInferred(result.subst.from, result.subst.to)
@@ -3726,7 +3726,7 @@ trait Typers extends Modes with Adaptations with Taggings {
               && thenTp =:= elseTp
                ) (thenp1.tpe, false) // use unpacked type
             // TODO: skolemize (lub of packed types) when that no longer crashes on files/pos/t4070b.scala
-            else ptOrLub(List(thenp1.tpe, elsep1.tpe), pt)
+            else ptOrLub(thenp1.tpe :: elsep1.tpe :: Nil, pt)
 
           if (needAdapt) { //isNumericValueType(owntype)) {
             thenp1 = adapt(thenp1, mode, owntype)

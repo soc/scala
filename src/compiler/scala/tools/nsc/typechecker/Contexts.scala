@@ -50,9 +50,9 @@ trait Contexts { self: Analyzer =>
     assert(isDefinitionsInitialized, "definitions uninitialized")
 
     if (settings.noimports.value) Nil
-    else if (unit.isJava) List(JavaLangPackage)
-    else if (settings.nopredef.value || treeInfo.noPredefImportForUnit(unit.body)) List(JavaLangPackage, ScalaPackage)
-    else List(JavaLangPackage, ScalaPackage, PredefModule)
+    else if (unit.isJava) UnqualifiedPackages take 1    // java
+    else if (settings.nopredef.value || treeInfo.noPredefImportForUnit(unit.body)) UnqualifiedPackages take 2 // java, scala
+    else UnqualifiedPackages  // java, scala, predef
   }
 
   def rootContext(unit: CompilationUnit): Context             = rootContext(unit, EmptyTree, false)
@@ -561,7 +561,7 @@ trait Contexts { self: Analyzer =>
         debuglog("resetting " + sym + " to " + info);
         sym.info match {
           case TypeBounds(lo, hi) if (hi <:< lo && lo <:< hi) =>
-            current = current.instantiateTypeParams(List(sym), List(lo))
+            current = current.instantiateTypeParams(sym :: Nil, lo :: Nil)
 //@M TODO: when higher-kinded types are inferred, probably need a case PolyType(_, TypeBounds(...)) if ... =>
           case _ =>
         }
@@ -704,10 +704,10 @@ trait Contexts { self: Analyzer =>
 
     private def transformImport(selectors: List[ImportSelector], sym: Symbol): List[Symbol] = selectors match {
       case Nil => Nil
-      case List(ImportSelector(nme.WILDCARD, _, _, _)) => List(sym)
+      case List(ImportSelector(nme.WILDCARD, _, _, _)) => sym :: Nil
       case ImportSelector(from, _, to, _) :: _ if from == sym.name =>
         if (to == nme.WILDCARD) Nil
-        else List(sym.cloneSymbol(sym.owner, sym.rawflags, to))
+        else sym.cloneSymbol(sym.owner, sym.rawflags, to) :: Nil
       case _ :: rest => transformImport(rest, sym)
     }
 

@@ -315,6 +315,7 @@ trait Definitions extends reflect.api.StandardDefinitions {
     // Modules whose members are in the default namespace
     lazy val UnqualifiedOwners: Set[Symbol]  = Set(PredefModule, ScalaPackage, JavaLangPackage).map(_.moduleClass)
 
+    lazy val UnqualifiedPackages = List(JavaLangPackage, ScalaPackage, PredefModule)
     lazy val PredefModule      = requiredModule[scala.Predef.type]
 
       def Predef_classOf      = getMember(PredefModule, nme.classOf)

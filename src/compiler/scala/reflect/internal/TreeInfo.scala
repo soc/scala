@@ -511,7 +511,7 @@ abstract class TreeInfo {
     }
 
     (  isUnitInScala(body, nme.Predef)
-    || containsLeadingPredefImport(List(body)))
+    || containsLeadingPredefImport(body :: Nil))
   }
 
   def isAbsTypeDef(tree: Tree) = tree match {
