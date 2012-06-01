@@ -71,7 +71,6 @@ trait SymbolTrackers {
     private def isFlagsChange(sym: Symbol) = changed.flags contains sym
 
     private implicit def NodeOrdering: Ordering[Node] = Ordering by (_.root)
-    private def ownersString(sym: Symbol, num: Int) = sym.ownerChain drop 1 take num mkString " -> "
 
     object Node {
       def nodes(syms: Set[Symbol]): List[Node] = {

@@ -15,8 +15,6 @@ class Sources(val path: String) {
   def size                = cache.asScala.values map (_.length) sum
   def isEmpty             = path == ""
 
-  private var debug = false
-  private def dbg(msg: => Any) = if (debug) Console println msg
   private val partitioned = ClassPath toPaths expandedPath partition (_.isDirectory)
 
   val dirs   = partitioned._1 map (_.toDirectory)
@@ -35,14 +33,14 @@ class Sources(val path: String) {
 
   private def catchZip(body: => Unit): Unit = {
     try body
-    catch { case x: ZipException => dbg("Caught: " + x) }
+    catch { case x: ZipException => }
   }
 
   private def calculateDirs() =
-    dirs foreach { d => dbg(d) ; catchZip(addSources(d.deepFiles map (x => Fileish(x)))) }
+    dirs foreach { d => catchZip(addSources(d.deepFiles map (x => Fileish(x)))) }
 
   private def calculateJars() =
-    jars foreach { j => dbg(j) ; catchZip(addSources(new Jar(j).fileishIterator)) }
+    jars foreach { j => catchZip(addSources(new Jar(j).fileishIterator)) }
 
   private def addSources(fs: IterableOnce[Fileish]) =
     fs foreach { f => if (f.isSourceFile) add(f.name, f) }

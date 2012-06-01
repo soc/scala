@@ -35,8 +35,6 @@ trait DestructureTypes {
     def wrapSequence(nodes: List[Node]): Node
     def wrapAtom[U](value: U): Node
 
-    private implicit def liftToTerm(name: String): TermName = newTermName(name)
-
     private val openSymbols = collection.mutable.Set[Symbol]()
 
     private def nodeList[T](elems: List[T], mkNode: T => Node): Node =

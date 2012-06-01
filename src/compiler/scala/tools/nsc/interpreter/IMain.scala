@@ -145,7 +145,6 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
   import reporter.{ printMessage, withoutTruncating }
 
   // This exists mostly because using the reporter too early leads to deadlock.
-  private def echo(msg: String) { Console println msg }
   private def _initSources = List(new BatchSourceFile("<init>", "class $repl_$init { }"))
   private def _initialize() = {
     try {
@@ -464,18 +463,6 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
   private def buildRequest(line: String, trees: List[Tree]): Request = {
     executingRequest = new Request(line, trees)
     executingRequest
-  }
-
-  // rewriting "5 // foo" to "val x = { 5 // foo }" creates broken code because
-  // the close brace is commented out.  Strip single-line comments.
-  // ... but for error message output reasons this is not used, and rather than
-  // enclosing in braces it is constructed like "val x =\n5 // foo".
-  private def removeComments(line: String): String = {
-    showCodeIfDebugging(line) // as we're about to lose our // show
-    line.lines map (s => s indexOf "//" match {
-      case -1   => s
-      case idx  => s take idx
-    }) mkString "\n"
   }
 
   private def safePos(t: Tree, alt: Int): Int =
@@ -1180,7 +1167,6 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
      *  with "// show" and see what's going on.
      */
     def isShow    = code.lines exists (_.trim endsWith "// show")
-    def isShowRaw = code.lines exists (_.trim endsWith "// raw")
 
     // old style
     beSilentDuring(parse(code)) foreach { ts =>

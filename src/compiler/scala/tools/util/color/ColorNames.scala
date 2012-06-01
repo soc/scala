@@ -14,7 +14,7 @@ trait ColorNames {
   type ColorType
   def translateCode(ansiCode: String): ColorType
 
-  private implicit def liftAnsiCode(code: String): ColorType = translateCode(code)
+  @inline private implicit def liftAnsiCode(code: String): ColorType = translateCode(code)
 
   // Possible alternative names or aliases, also from the perl:
   //

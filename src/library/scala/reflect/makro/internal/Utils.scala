@@ -86,14 +86,6 @@ package internal {
       catch { case terr @ c.TypeError(pos, msg) => failTag(terr) }
     }
 
-    private def nonSyntheticManifestInScope(tpe: Type) = {
-      val ManifestClass = staticClass("scala.reflect.Manifest")
-      val ManifestModule = staticModule("scala.reflect.Manifest")
-      val manifest = c.inferImplicitValue(appliedType(ManifestClass.asTypeConstructor, List(tpe)))
-      val notOk = manifest.isEmpty || (manifest exists (sub => sub.symbol != null && (sub.symbol == ManifestModule || sub.symbol.owner == ManifestModule)))
-      if (notOk) EmptyTree else manifest
-    }
-
     def materializeExpr(prefix: Tree, expr: Tree): Tree = {
       val result = translatingReificationErrors(c.reifyTree(prefix, expr))
       try c.typeCheck(result)

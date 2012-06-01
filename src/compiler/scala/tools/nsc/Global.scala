@@ -1005,9 +1005,6 @@ class Global(var currentSettings: Settings, var reporter: Reporter) extends Symb
     /** A flag whether macro expansions failed */
     var macroExpansionFailed = false
 
-    /** To be initialized from firstPhase. */
-    private var terminalPhase: Phase = NoPhase
-
     private val unitbuf = new mutable.ListBuffer[CompilationUnit]
     val compiledFiles   = new mutable.HashSet[String]
 

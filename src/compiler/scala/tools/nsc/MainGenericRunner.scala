@@ -52,19 +52,6 @@ class MainGenericRunner {
     else if (settings.version.value)      return errorFn("Scala code runner %s -- %s".format(versionString, copyrightString))
     else if (command.shouldStopWithInfo)  return errorFn(command getInfoMessage sampleCompiler)
 
-    def isE   = !settings.execute.isDefault
-    def dashe = settings.execute.value
-
-    def isI   = !settings.loadfiles.isDefault
-    def dashi = settings.loadfiles.value
-
-    def combinedCode  = {
-      val files   = if (isI) dashi map (file => File(file).slurp()) else Nil
-      val str     = if (isE) List(dashe) else Nil
-
-      files ++ str mkString "\n\n"
-    }
-
     def runTarget(): Either[Throwable, Boolean] = howToRun match {
       case AsObject =>
         ObjectRunner.runAndCatch(settings.classpathURLs, thingToRun, command.arguments)

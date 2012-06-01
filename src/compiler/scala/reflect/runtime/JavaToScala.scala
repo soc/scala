@@ -332,9 +332,6 @@ trait JavaToScala extends ConversionUtil { self: SymbolTable =>
   private def wrapIsLocalClass(clazz: jClass[_]): Boolean =
     wrapClassCheck(false)(clazz.isLocalClass)
 
-  private def wrapGetSimpleName(clazz: jClass[_]): String =
-    wrapClassCheck("")(clazz.getSimpleName)
-
   /**
    * The Scala owner of the Scala class corresponding to the Java class `jclazz`
    */

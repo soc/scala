@@ -64,9 +64,6 @@ abstract class LambdaLift extends InfoTransform {
     /** Buffers for lifted out classes and methods */
     private val liftedDefs = new LinkedHashMap[Symbol, List[Tree]]
 
-    /** True if we are transforming under a ReferenceToBoxed node */
-    private var isBoxedRef = false
-
     private type SymSet = TreeSet[Symbol]
 
     private def newSymSet = new TreeSet[Symbol](_ isLess _)

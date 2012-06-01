@@ -823,7 +823,6 @@ abstract class RefChecks extends InfoTransform with reflect.internal.transform.R
 
   // Variance Checking --------------------------------------------------------
 
-    private val ContraVariance = -1
     private val NoVariance = 0
     private val CoVariance = 1
     private val AnyVariance = 2
@@ -1093,8 +1092,6 @@ abstract class RefChecks extends InfoTransform with reflect.internal.transform.R
         def isMaybeAnyValue(s: Symbol) = isPrimitiveValueClass(unboxedValueClass(s)) || isMaybeValue(s)
         // used to short-circuit unrelatedTypes check if both sides are special
         def isSpecial(s: Symbol) = isMaybeAnyValue(s) || isAnyNumber(s)
-        // unused
-        def possibleNumericCount = onSyms(_ filter (x => isNumeric(x) || isMaybeValue(x)) size)
         val nullCount            = onSyms(_ filter (_ == NullClass) size)
 
         def nonSensibleWarning(what: String, alwaysEqual: Boolean) = {
@@ -1149,7 +1146,7 @@ abstract class RefChecks extends InfoTransform with reflect.internal.transform.R
           }
         }
 
-        // possibleNumericCount is insufficient or this will warn on e.g. Boolean == j.l.Boolean
+        // Boolean == j.l.Boolean
         if (isWarnable && nullCount == 0 && !(isSpecial(receiver) && isSpecial(actual))) {
           // better to have lubbed and lost
           def warnIfLubless(): Unit = {

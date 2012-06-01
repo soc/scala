@@ -86,8 +86,6 @@ abstract class UnCurry extends InfoTransform
     private lazy val serialVersionUIDAnnotation =
       AnnotationInfo(SerialVersionUIDAttr.tpe, List(Literal(Constant(0))), List())
 
-    private var nprinted = 0
-
     // I don't have a clue why I'm catching TypeErrors here, but it's better
     // than spewing stack traces at end users for internal errors. Examples
     // which hit at this point should not be hard to come by, but the immediate
@@ -518,19 +516,6 @@ abstract class UnCurry extends InfoTransform
         finally needTryLift = saved
       }
 
-      /** Transform tree `t` to { def f = t; f } where `f` is a fresh name
-       */
-      def liftTree(tree: Tree) = {
-        debuglog("lifting tree at: " + (tree.pos))
-        val sym = currentOwner.newMethod(unit.freshTermName("liftedTree"), tree.pos)
-        sym.setInfo(MethodType(List(), tree.tpe))
-        tree.changeOwner(currentOwner -> sym)
-        localTyper.typedPos(tree.pos)(Block(
-          List(DefDef(sym, List(Nil), tree)),
-          Apply(Ident(sym), Nil)
-        ))
-      }
-
       def withInConstructorFlag(inConstructorFlag: Long)(f: => Tree): Tree = {
         val saved = this.inConstructorFlag
         this.inConstructorFlag = inConstructorFlag
@@ -718,10 +703,6 @@ abstract class UnCurry extends InfoTransform
       if (!dd.symbol.hasAnnotation(VarargsClass) || !repeatedParams.contains(dd.symbol))
         return flatdd
 
-      def toSeqType(tp: Type): Type = {
-        val arg = elementType(ArrayClass, tp)
-        seqType(arg)
-      }
       def toArrayType(tp: Type): Type = {
         val arg = elementType(SeqClass, tp)
         // to prevent generation of an `Object` parameter from `Array[T]` parameter later

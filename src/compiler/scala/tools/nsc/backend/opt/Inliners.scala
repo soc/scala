@@ -738,7 +738,6 @@ abstract class Inliners extends SubComponent {
         case Public     => true
       }
       private def sameSymbols = caller.sym == inc.sym
-      private def sameOwner   = caller.owner == inc.owner
 
       /** A method is safe to inline when:
        *    - it does not contain calls to private methods when called from another class

@@ -4331,24 +4331,11 @@ trait Types extends api.Types { self: SymbolTable =>
                 // have to deconst because it may be a Class[T].
                 pre.baseType(symclazz).deconst match {
                   case TypeRef(_, basesym, baseargs) =>
-
                    def instParam(ps: List[Symbol], as: List[Type]): Type =
                       if (ps.isEmpty) throwError
                       // @M! don't just replace the whole thing, might be followed by type application
                       else if (sym eq ps.head) appliedType(as.head, args mapConserve (this)) // @M: was as.head
                       else instParam(ps.tail, as.tail)
-
-                    /** Relaxed version of instParams which matches on names not symbols.
-                     *  This is a last fallback in interactive mode because races in calls
-                     *  from the IDE to the compiler may in rare cases lead to symbols referring
-                     *  to type parameters that are no longer current.
-                     */
-                    def instParamRelaxed(ps: List[Symbol], as: List[Type]): Type =
-                      if (ps.isEmpty) throwError
-                      else if (sym.name == ps.head.name)
-                        // @M! don't just replace the whole thing, might be followed by type application
-                        appliedType(as.head, args mapConserve (this)) // @M: was as.head
-                      else instParamRelaxed(ps.tail, as.tail)
 
                     //Console.println("instantiating " + sym + " from " + basesym + " with " + basesym.typeParams + " and " + baseargs+", pre = "+pre+", symclazz = "+symclazz);//DEBUG
                     if (sameLength(basesym.typeParams, baseargs))

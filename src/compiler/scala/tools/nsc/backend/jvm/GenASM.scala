@@ -32,20 +32,6 @@ abstract class GenASM extends SubComponent with BytecodeWriters {
   /** Create a new phase */
   override def newPhase(p: Phase): Phase = new AsmPhase(p)
 
-  private def outputDirectory(sym: Symbol): AbstractFile =
-    settings.outputDirs outputDirFor beforeFlatten(sym.sourceFile)
-
-  private def getFile(base: AbstractFile, clsName: String, suffix: String): AbstractFile = {
-    var dir = base
-    val pathParts = clsName.split("[./]").toList
-    for (part <- pathParts.init) {
-      dir = dir.subdirectoryNamed(part)
-    }
-    dir.fileNamed(pathParts.last + suffix)
-  }
-  private def getFile(sym: Symbol, clsName: String, suffix: String): AbstractFile =
-    getFile(outputDirectory(sym), clsName, suffix)
-
   /** JVM code generation phase
    */
   class AsmPhase(prev: Phase) extends ICodePhase(prev) {
@@ -220,8 +206,6 @@ abstract class GenASM extends SubComponent with BytecodeWriters {
   )
 
   private def mkFlags(args: Int*) = args.foldLeft(0)(_ | _)
-
-  @inline final private def hasPublicBitSet(flags: Int) = ((flags & asm.Opcodes.ACC_PUBLIC) != 0)
 
   /**
    * Return the Java modifiers for the given symbol.
@@ -1396,12 +1380,12 @@ abstract class GenASM extends SubComponent with BytecodeWriters {
       ).toSet
 
       val privates: Set[Symbol] = (
-        clasz.methods collect { case m if m.symbol.isPrivate => m.symbol }
+        clasz.methods collect { case m if m.symbol.isPrivate && m.symbol.name != nme.readResolve => m.symbol }
       ).toSet
       
       val uncalledPrivates = privates filterNot called
       if (uncalledPrivates.nonEmpty)
-        println("uncalledPrivates: " + uncalledPrivates)
+        println("uncalledPrivates in " + clasz.symbol + " are " + uncalledPrivates.mkString(", "))
 
       clasz.fields  foreach genField
       clasz.methods foreach { im => genMethod(im, c.symbol.isInterface) }

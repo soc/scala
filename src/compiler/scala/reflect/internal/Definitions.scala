@@ -1128,17 +1128,6 @@ trait Definitions extends reflect.api.StandardDefinitions {
     //   }
     // }
 
-    /** Surgery on the value classes.  Without this, AnyVals defined in source
-     *  files end up with an AnyRef parent.  It is likely there is a better way
-     *  to evade that AnyRef.
-     */
-    private def setParents(sym: Symbol, parents: List[Type]): Symbol = sym.rawInfo match {
-      case ClassInfoType(_, scope, clazz) =>
-        sym setInfo ClassInfoType(parents, scope, clazz)
-      case _ =>
-        sym
-    }
-
     def init() {
       if (isInitialized) return
 
