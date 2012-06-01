@@ -460,7 +460,7 @@ self =>
         acceptStatSep()
 
     def errorTypeTree    = TypeTree() setType ErrorType setPos o2p(in.offset)
-    def errorTermTree    = Literal(Constant(null)) setPos o2p(in.offset)
+    def errorTermTree    = gen.mkNull setPos o2p(in.offset)
     def errorPatternTree = Ident(nme.WILDCARD) setPos o2p(in.offset)
 
     /** Check that type parameter is not by name or repeated. */
@@ -1931,7 +1931,7 @@ self =>
     def annotationExpr(): Tree = atPos(in.offset) {
       val t = exprSimpleType()
       if (in.token == LPAREN) New(t, multipleArgumentExprs())
-      else New(t, Nil :: Nil)
+      else New(t, NilNil)
     }
 
 /* -------- PARAMETERS ------------------------------------------- */
@@ -2572,7 +2572,7 @@ self =>
         // TODO: the insertion of List(Nil) here is where "new Foo" becomes
         // indistinguishable from "new Foo()".
         if (in.token == LPAREN && !isTrait) multipleArgumentExprs()
-        else Nil :: Nil
+        else NilNil
       )
 
       while (in.token == WITH) {
@@ -2610,7 +2610,7 @@ self =>
           val (self1, body1) = templateBodyOpt(isTrait)
           (parents, argss, self1, earlyDefs ::: body1)
         } else {
-          (Nil, Nil :: Nil, self, body)
+          (Nil, NilNil, self, body)
         }
       } else {
         val (parents, argss) = templateParents(isTrait)
@@ -2637,7 +2637,7 @@ self =>
         else {
           newLineOptWhenFollowedBy(LBRACE)
           val (self, body) = templateBodyOpt(false)
-          (Nil, Nil :: Nil, self, body)
+          (Nil, NilNil, self, body)
         }
       )
       def anyrefParents() = {
@@ -2650,7 +2650,7 @@ self =>
       def anyvalConstructor() = (
         // Not a well-formed constructor, has to be finished later - see note
         // regarding AnyVal constructor in AddInterfaces.
-        DefDef(NoMods, nme.CONSTRUCTOR, Nil, Nil :: Nil, TypeTree(), Block(Nil, Literal(Constant())))
+        DefDef(NoMods, nme.CONSTRUCTOR, Nil, NilNil, TypeTree(), Block(Nil, Literal(Constant())))
       )
       val tstart0 = if (body.isEmpty && in.lastOffset < tstart) in.lastOffset else tstart
 

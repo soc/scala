@@ -6,6 +6,8 @@
 package scala.tools
 
 package object nsc {
+  final val NilNil: List[List[Nothing]] = Nil :: Nil
+
   type Phase = scala.reflect.internal.Phase
   val NoPhase = scala.reflect.internal.NoPhase
 

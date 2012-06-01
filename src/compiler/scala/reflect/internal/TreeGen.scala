@@ -233,6 +233,9 @@ abstract class TreeGen extends api.AbsTreeGen {
   /** Builds a list with given head and tail. */
   def mkNil: Tree = mkAttributedRef(NilModule)
 
+  def mkUnit: Tree = Literal(Constant(()))
+  def mkNull: Tree = Literal(Constant(null))
+
   /** Builds a tree representing an undefined local, as in
    *    var x: T = _
    *  which is appropriate to the given Type.

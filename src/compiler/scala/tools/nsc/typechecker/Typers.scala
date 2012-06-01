@@ -1125,7 +1125,7 @@ trait Typers extends Modes with Adaptations with Taggings {
                     if (sym == UnitClass && tree.tpe <:< AnyClass.tpe) { // (12)
                       if (settings.warnValueDiscard.value)
                         context.unit.warning(tree.pos, "discarded non-Unit value")
-                      return typed(atPos(tree.pos)(Block(List(tree), Literal(Constant()))), mode, pt)
+                      return typed(atPos(tree.pos)(Block(tree :: Nil, Literal(Constant()))), mode, pt)
                     } else if (isNumericValueClass(sym) && isNumericSubType(tree.tpe, pt)) {
                       if (settings.warnNumericWiden.value)
                         context.unit.warning(tree.pos, "implicit numeric widening")
@@ -1148,7 +1148,7 @@ trait Typers extends Modes with Adaptations with Taggings {
                     debuglog(msg)
                     val silentContext = context.makeImplicit(context.ambiguousErrors)
                     val res = newTyper(silentContext).typed(
-                      new ApplyImplicitView(coercion, List(tree)) setPos tree.pos, mode, pt)
+                      new ApplyImplicitView(coercion, tree :: Nil) setPos tree.pos, mode, pt)
                     if (silentContext.hasErrors) context.issue(silentContext.errBuffer.head) else return res
                   }
                 }

@@ -56,7 +56,7 @@ abstract class TreeGen extends reflect.internal.TreeGen with TreeDSL {
   def mkUnchecked(expr: Tree): Tree = atPos(expr.pos) {
     // This can't be "Annotated(New(UncheckedClass), expr)" because annotations
     // are very picky about things and it crashes the compiler with "unexpected new".
-    Annotated(New(scalaDot(UncheckedClass.name), Nil :: Nil), expr)
+    Annotated(New(scalaDot(UncheckedClass.name), NilNil), expr)
   }
   // if it's a Match, mark the selector unchecked; otherwise nothing.
   def mkUncheckedMatch(tree: Tree) = tree match {
@@ -116,13 +116,8 @@ abstract class TreeGen extends reflect.internal.TreeGen with TreeDSL {
 
   def mkCached(cvar: Symbol, expr: Tree): Tree = {
     val cvarRef = mkUnattributedRef(cvar)
-    Block(
-      List(
-        If(Apply(Select(cvarRef, nme.eq), List(Literal(Constant(null)))),
-           Assign(cvarRef, expr),
-           EmptyTree)),
-      cvarRef
-    )
+    val cond    = If(Apply(Select(cvarRef, nme.eq), gen.mkNull :: Nil), Assign(cvarRef, expr), EmptyTree)
+    Block(cond :: Nil, cvarRef)
   }
 
   // Builds a tree of the form "{ lhs = rhs ; lhs  }"
@@ -171,7 +166,7 @@ abstract class TreeGen extends reflect.internal.TreeGen with TreeDSL {
     mkMethodCall(ScalaRunTimeModule, meth, targs, args)
 
   def mkSysErrorCall(message: String): Tree =
-    mkMethodCall(Sys_error, List(Literal(Constant(message))))
+    mkMethodCall(Sys_error, Literal(Constant(message)) :: Nil)
 
   /** Make a synchronized block on 'monitor'. */
   def mkSynchronized(monitor: Tree, body: Tree): Tree =

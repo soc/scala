@@ -493,7 +493,7 @@ trait MethodSynthesis {
       // Derives a tree without attempting to use the original tree's symbol.
       override def derivedTree = {
         atPos(tree.pos.focus) {
-          DefDef(derivedMods, name, Nil, Nil :: Nil, tree.tpt.duplicate,
+          DefDef(derivedMods, name, Nil, NilNil, tree.tpt.duplicate,
             if (isDeferred) EmptyTree else Select(This(owner), tree.name)
           )
         }
