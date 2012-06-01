@@ -79,6 +79,8 @@ trait Scopes extends api.Scopes { self: SymbolTable =>
 
     /** is the scope empty? */
     override def isEmpty: Boolean = elems eq null
+    
+    def hasSingleMember = (elems ne null) && (elems.next eq null)
 
     /** the number of entries in this scope */
     override def size: Int = {

@@ -551,7 +551,7 @@ trait JavaParsers extends ast.parser.ParsersCommon with JavaScanners {
               if (parentToken == AT && in.token == DEFAULT) {
                 val annot =
                   atPos(pos) {
-                    New(Select(scalaDot(nme.runtime), tpnme.AnnotationDefaultATTR), List(Nil))
+                    New(Select(scalaDot(nme.runtime), tpnme.AnnotationDefaultATTR), NilNil)
                   }
                 mods1 = mods1 withAnnotations List(annot)
                 skipTo(SEMI)
@@ -841,7 +841,7 @@ trait JavaParsers extends ast.parser.ParsersCommon with JavaScanners {
       val predefs = List(
         DefDef(
           Modifiers(Flags.JAVA | Flags.STATIC), nme.values, Nil,
-          List(Nil),
+          NilNil,
           arrayOf(enumType),
           blankExpr),
         DefDef(

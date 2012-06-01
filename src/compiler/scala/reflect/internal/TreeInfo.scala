@@ -486,7 +486,7 @@ abstract class TreeInfo {
    */
   def firstDefinesClassOrObject(trees: List[Tree], name: Name): Boolean = trees match {
       case Import(_, _) :: xs               => firstDefinesClassOrObject(xs, name)
-      case Annotated(_, tree1) :: Nil       => firstDefinesClassOrObject(List(tree1), name)
+      case Annotated(_, tree1) :: Nil       => firstDefinesClassOrObject(tree1 :: Nil, name)
       case ModuleDef(_, `name`, _) :: Nil   => true
       case ClassDef(_, `name`, _, _) :: Nil => true
       case _                                => false

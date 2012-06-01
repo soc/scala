@@ -110,7 +110,7 @@ trait Implicits {
     val tvars = tpars map (TypeVar untouchable _)
     val tpSubsted = tp.subst(tpars, tvars)
 
-    val search = new ImplicitSearch(EmptyTree, functionType(List(tpSubsted), AnyClass.tpe), true, context.makeImplicit(false))
+    val search = new ImplicitSearch(EmptyTree, functionType(tpSubsted :: Nil, AnyClass.tpe), true, context.makeImplicit(false))
 
     search.allImplicitsPoly(tvars)
   }
@@ -218,7 +218,7 @@ trait Implicits {
    *  searches.
    */
   def memberWildcardType(name: Name, tp: Type) = {
-    val result = refinedType(List(WildcardType), NoSymbol)
+    val result = refinedType(WildcardType :: Nil, NoSymbol)
     name match {
       case x: TermName => result.typeSymbol.newMethod(x) setInfoAndEnter tp
       case x: TypeName => result.typeSymbol.newAbstractType(x) setInfoAndEnter tp
@@ -232,7 +232,7 @@ trait Implicits {
     private val hasMemberCache = perRunCaches.newMap[Name, Type]()
     def apply(name: Name): Type = hasMemberCache.getOrElseUpdate(name, memberWildcardType(name, WildcardType))
     def unapply(pt: Type): Option[Name] = pt match {
-      case RefinedType(List(WildcardType), Scope(sym)) if sym.tpe == WildcardType => Some(sym.name)
+      case RefinedType(WildcardType :: Nil, Scope(sym)) if sym.tpe == WildcardType => Some(sym.name)
       case _ => None
     }
   }
@@ -248,15 +248,11 @@ trait Implicits {
       memberWildcardType(name, mtpe)
     }
     def unapply(pt: Type): Option[(Name, List[Type], Type)] = pt match {
-      case RefinedType(List(WildcardType), decls) =>
-        decls.toList match {
-          case List(sym) =>
-            sym.tpe match {
-              case MethodType(params, restpe)
-              if (params forall (_.tpe.isInstanceOf[BoundedWildcardType])) =>
-                Some((sym.name, params map (_.tpe.bounds.lo), restpe))
-              case _ => None
-            }
+      case RefinedType(WildcardType :: Nil, decls) if decls.hasSingleMember =>
+        val sym = decls.toList.head
+        sym.tpe match {
+          case MethodType(params, restpe) if params forall (_.tpe.isInstanceOf[BoundedWildcardType]) =>
+            Some((sym.name, params map (_.tpe.bounds.lo), restpe))
           case _ => None
         }
       case _ => None
@@ -624,7 +620,7 @@ trait Implicits {
               printTyping(ptLine("" + info.sym, "tvars" -> tvars, "tvars.constr" -> tvars.map(_.constr)))
 
             val targs = solvedTypes(tvars, undetParams, undetParams map varianceInType(pt),
-                                    false, lubDepth(List(itree2.tpe, pt)))
+                                    false, lubDepth(itree2.tpe :: pt :: Nil))
 
             // #2421: check that we correctly instantiated type parameters outside of the implicit tree:
             checkBounds(itree2, NoPrefix, NoSymbol, undetParams, targs, "inferred ")
@@ -1186,7 +1182,7 @@ trait Implicits {
       )
       // todo. migrate hardcoded materialization in Implicits to corresponding implicit macros
       var materializer = atPos(pos.focus)(
-        gen.mkMethodCall(TagMaterializers(tagClass), List(tp), List(prefix))
+        gen.mkMethodCall(TagMaterializers(tagClass), tp :: Nil, prefix :: Nil)
       )
       if (settings.XlogImplicits.value) println("materializing requested %s.%s[%s] using %s".format(pre, tagClass.name, tp, materializer))
       if (context.macrosEnabled) success(materializer)
@@ -1200,8 +1196,8 @@ trait Implicits {
           gen.mkMethodCall(
             ClassManifestModule,
             newTermName("arrayType"),
-            List(tp),
-            List(inferImplicit(tree, appliedType(ClassManifestClass, tp), true, false, context).tree)
+            tp :: Nil,
+            inferImplicit(tree, appliedType(ClassManifestClass, tp), true, false, context).tree :: Nil
           )
         case TypeRef(_, sym, _) if isPrimitiveValueClass(sym) || isPhantomClass(sym) || sym == ObjectClass =>
           Select(gen.mkAttributedRef(ClassManifestModule), sym.name.toString)
@@ -1216,8 +1212,8 @@ trait Implicits {
           gen.mkMethodCall(
             ClassManifestModule,
             newTermName("classType"),
-            List(tp),
-            List(arg)
+            tp :: Nil,
+            arg :: Nil
           )
         case _ =>
           EmptyTree
@@ -1230,7 +1226,7 @@ trait Implicits {
       val tagInScope = context.withMacrosDisabled(resolveArrayTag(tp, pos))
       val tree = (
         if (tagInScope.isEmpty) mot(tp)
-        else gen.mkMethodCall(ReflectPackage, nme.arrayTagToClassManifest, List(tp), List(tagInScope))
+        else gen.mkMethodCall(ReflectPackage, nme.arrayTagToClassManifest, tp :: Nil, tagInScope :: Nil)
       )
       tree match {
         case EmptyTree  => SearchFailure
@@ -1315,7 +1311,7 @@ trait Implicits {
         // any previous errors should not affect us now
         context.flushBuffer()
         val res = typedImplicit(ii, false)
-        if (res.tree ne EmptyTree) List((res, tvars map (_.constr)))
+        if (res.tree ne EmptyTree) ((res, tvars map (_.constr))) :: Nil
         else Nil
       }
     }

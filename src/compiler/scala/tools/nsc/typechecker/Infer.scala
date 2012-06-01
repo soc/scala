@@ -1177,28 +1177,18 @@ trait Infer {
     // the changes are rolled back by restoreTypeBounds, but might be unintentially observed in the mean time
     def instantiateTypeVar(tvar: TypeVar) {
       val tparam = tvar.origin.typeSymbol
-      if (false &&
-          tvar.constr.inst != NoType &&
-          isFullyDefined(tvar.constr.inst) &&
-          (tparam.info.bounds containsType tvar.constr.inst)) {
-        context.nextEnclosing(_.tree.isInstanceOf[CaseDef]).pushTypeBounds(tparam)
-        tparam setInfo tvar.constr.inst
-        tparam resetFlag DEFERRED
-        debuglog("new alias of " + tparam + " = " + tparam.info)
-      } else {
-        val (lo, hi) = instBounds(tvar)
-        if (lo <:< hi) {
-          if (!((lo <:< tparam.info.bounds.lo) && (tparam.info.bounds.hi <:< hi)) // bounds were improved
-             && tparam != lo.typeSymbolDirect && tparam != hi.typeSymbolDirect) { // don't create illegal cycles
-            context.nextEnclosing(_.tree.isInstanceOf[CaseDef]).pushTypeBounds(tparam)
-            tparam setInfo TypeBounds(lo, hi)
-            debuglog("new bounds of " + tparam + " = " + tparam.info)
-          } else {
-            debuglog("redundant: "+tparam+" "+tparam.info+"/"+lo+" "+hi)
-          }
+      val (lo, hi) = instBounds(tvar)
+      if (lo <:< hi) {
+        if (!((lo <:< tparam.info.bounds.lo) && (tparam.info.bounds.hi <:< hi)) // bounds were improved
+           && tparam != lo.typeSymbolDirect && tparam != hi.typeSymbolDirect) { // don't create illegal cycles
+          context.nextEnclosing(_.tree.isInstanceOf[CaseDef]).pushTypeBounds(tparam)
+          tparam setInfo TypeBounds(lo, hi)
+          debuglog("new bounds of " + tparam + " = " + tparam.info)
         } else {
-          debuglog("inconsistent: "+tparam+" "+lo+" "+hi)
+          debuglog("redundant: "+tparam+" "+tparam.info+"/"+lo+" "+hi)
         }
+      } else {
+        debuglog("inconsistent: "+tparam+" "+lo+" "+hi)
       }
     }
 

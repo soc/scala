@@ -1204,7 +1204,7 @@ trait Typers extends Modes with Adaptations with Taggings {
         case SilentResultValue(t) => t
         case _ =>
           context.undetparams = savedUndetparams
-          val valueDiscard = atPos(tree.pos)(Block(List(instantiate(tree, mode, WildcardType)), Literal(Constant())))
+          val valueDiscard = atPos(tree.pos)(Block(instantiate(tree, mode, WildcardType) :: Nil, Literal(Constant())))
           typed(valueDiscard, mode, UnitClass.tpe)
       }
     }
@@ -1244,7 +1244,7 @@ trait Typers extends Modes with Adaptations with Taggings {
                 "applied implicit conversion from %s to %s = %s".format(
                   qual.tpe, searchTemplate, coercion.symbol.defString))
 
-            typedQualifier(atPos(qual.pos)(new ApplyImplicitView(coercion, List(qual))))
+            typedQualifier(atPos(qual.pos)(new ApplyImplicitView(coercion, qual :: Nil)))
         }
       }
       else qual
@@ -1352,7 +1352,7 @@ trait Typers extends Modes with Adaptations with Taggings {
     }
 
     def parentTypes(templ: Template): List[Tree] =
-      if (templ.parents.isEmpty) List(atPos(templ.pos)(TypeTree(AnyRefClass.tpe)))
+      if (templ.parents.isEmpty) atPos(templ.pos)(TypeTree(AnyRefClass.tpe)) :: Nil
       else try {
         val clazz = context.owner
         // Normalize supertype and mixins so that supertype is always a class, not a trait.
@@ -1468,7 +1468,7 @@ trait Typers extends Modes with Adaptations with Taggings {
           log("Type error calculating parents in template " + templ)
           log("Error: " + ex)
           ParentTypesError(templ, ex)
-          List(TypeTree(AnyRefClass.tpe))
+          TypeTree(AnyRefClass.tpe) :: Nil
       }
 
     /** <p>Check that</p>
@@ -1545,7 +1545,7 @@ trait Typers extends Modes with Adaptations with Taggings {
       for (tparam <- clazz.typeParams) {
         if (classinfo.expansiveRefs(tparam) contains tparam) {
           val newinfo = ClassInfoType(
-            classinfo.parents map (_.instantiateTypeParams(List(tparam), List(AnyRefClass.tpe))),
+            classinfo.parents map (_.instantiateTypeParams(tparam :: Nil, AnyRefClass.tpe :: Nil)),
             classinfo.decls,
             clazz)
           clazz.setInfo {
@@ -1621,7 +1621,7 @@ trait Typers extends Modes with Adaptations with Taggings {
             if (noSerializable) Nil
             else {
               clazz.makeSerializable()
-              List(TypeTree(SerializableClass.tpe) setPos clazz.pos.focus)
+              (TypeTree(SerializableClass.tpe) setPos clazz.pos.focus) :: Nil
             }
           )
         })
@@ -2215,7 +2215,7 @@ trait Typers extends Modes with Adaptations with Taggings {
 
       private val anonClass = context.owner.newAnonymousFunctionClass(tree.pos)
 
-      anonClass addAnnotation AnnotationInfo(SerialVersionUIDAttr.tpe, List(Literal(Constant(0))), Nil)
+      anonClass addAnnotation AnnotationInfo(SerialVersionUIDAttr.tpe, Literal(Constant(0)) :: Nil, Nil)
 
       def deriveFormals =
         if (targs.isEmpty) Nil
@@ -2258,7 +2258,7 @@ trait Typers extends Modes with Adaptations with Taggings {
 
           val methFormals = paramSyms map (_.tpe)
           val parents = (
-            if (isPartial) parentsPartial(List(methFormals.head, resTp))
+            if (isPartial) parentsPartial(methFormals.head :: resTp :: Nil)
             else addSerializable(abstractFunctionType(methFormals, resTp))
           )
           anonClass setInfo ClassInfoType(parents, newScope, anonClass)
@@ -2278,16 +2278,16 @@ trait Typers extends Modes with Adaptations with Taggings {
         // create the parameter that corresponds to the function's parameter
         val List(argTp)       = deriveFormals
         val A1                = methodSym newTypeParameter(newTypeName("A1")) setInfo TypeBounds.upper(argTp)
-        val paramSyms@List(x) = mkParams(methodSym, List(A1.tpe))
+        val paramSyms@List(x) = mkParams(methodSym, A1.tpe :: Nil)
         val selector          = mkSel(paramSyms)
 
         if (selector eq EmptyTree) EmptyTree
         else {
           // applyOrElse's default parameter:
           val B1        = methodSym newTypeParameter(newTypeName("B1")) setInfo TypeBounds.empty //lower(resTp)
-          val default   = methodSym newValueParameter(newTermName("default"), tree.pos.focus, SYNTHETIC) setInfo functionType(List(A1.tpe), B1.tpe)
+          val default   = methodSym newValueParameter(newTermName("default"), tree.pos.focus, SYNTHETIC) setInfo functionType(A1.tpe :: Nil, B1.tpe)
 
-          val paramSyms = List(x, default)
+          val paramSyms = x :: default :: Nil
           methodSym setInfoAndEnter polyType(List(A1, B1), MethodType(paramSyms, B1.tpe))
 
           val methodBodyTyper = newTyper(context.makeNewScope(context.tree, methodSym)) // should use the DefDef for the context's tree, but it doesn't exist yet (we need the typer we're creating to create it)
@@ -2332,11 +2332,11 @@ trait Typers extends Modes with Adaptations with Taggings {
         // TODO: figure out the details (T @cps[U] is not a subtype of Any, but then why does it work for the apply method?)
         if (targs forall (_ <:< AnyClass.tpe)) List(applyOrElseMethodDef, isDefinedAtMethod)
         else List(applyMethod, isDefinedAtMethod)
-      } else List(applyMethod)
+      } else applyMethod :: Nil
 
       def translated =
         if (members.head eq EmptyTree) setError(tree)
-        else typed(atPos(tree.pos)(Block(List(ClassDef(anonClass, NoMods, List(Nil), List(Nil), members, tree.pos.focus)), atPos(tree.pos.focus)(New(anonClass.tpe)))), mode, pt)
+        else typed(atPos(tree.pos)(Block(List(ClassDef(anonClass, NoMods, NilNil, NilNil, members, tree.pos.focus)), atPos(tree.pos.focus)(New(anonClass.tpe)))), mode, pt)
     }
 
     // Function(params, Match(sel, cases)) ==> new <Partial>Function { def apply<OrElse>(params) = `translateMatch('sel match { cases }')` }
@@ -3684,7 +3684,7 @@ trait Typers extends Modes with Adaptations with Taggings {
           treeInfo.methPart(lhs1) match {
             case Select(qual, name) =>
               val sel = Select(qual, nme.getterToSetter(name.toTermName)) setPos lhs.pos
-              val app = Apply(sel, List(rhs)) setPos tree.pos
+              val app = Apply(sel, rhs :: Nil) setPos tree.pos
               return typed(app, mode, pt)
 
             case _ =>
@@ -3699,7 +3699,7 @@ trait Typers extends Modes with Adaptations with Taggings {
         }
         else if(dyna.isDynamicallyUpdatable(lhs1)) {
           val rhs1 = typed(rhs, EXPRmode | BYVALmode, WildcardType)
-          typed1(Apply(lhs1, List(rhs1)), mode, pt)
+          typed1(Apply(lhs1, rhs1 :: Nil), mode, pt)
         }
         else fail()
       }
@@ -3806,7 +3806,7 @@ trait Typers extends Modes with Adaptations with Taggings {
               val sym1 = if (sym.owner.isClass && sym.getter(sym.owner) != NoSymbol) sym.getter(sym.owner)
                 else sym.lazyAccessorOrSelf
               val pre = if (sym1.owner.isClass) sym1.owner.thisType else NoPrefix
-              intersectionType(List(tp, singleType(pre, sym1)))
+              intersectionType(tp :: singleType(pre, sym1) :: Nil)
             case _ => tp
           }}
 
@@ -4156,12 +4156,14 @@ trait Typers extends Modes with Adaptations with Taggings {
               (stabilize(treeAndPre._1, treeAndPre._2, mode, pt), None)
           }
 
-          def isPotentialNullDeference() = {
+          def isPotentialNullDeference() = (
             !isPastTyper &&
             !sym.isConstructor &&
-            !(qual.tpe <:< NotNullClass.tpe) && !qual.tpe.isNotNull &&
-            !(List(Any_isInstanceOf, Any_asInstanceOf) contains result.symbol)  // null.is/as is not a dereference
-          }
+            !(qual.tpe <:< NotNullClass.tpe) && 
+            !qual.tpe.isNotNull &&
+            !(result.symbol == Any_isInstanceOf) &&
+            !(result.symbol == Any_asInstanceOf)  // null.is/as is not a dereference
+          )
           // unit is null here sometimes; how are we to know when unit might be null? (See bug #2467.)
           if (settings.warnSelectNullable.value && isPotentialNullDeference && unit != null)
             unit.warning(tree.pos, "potential null pointer dereference: "+tree)
@@ -4587,7 +4589,7 @@ trait Typers extends Modes with Adaptations with Taggings {
             if (isPrimitiveValueClass(pt.typeSymbol) || !isFullyDefined(pt)) arrayType(pt)
             else {
               val tparam = context.owner freshExistential "" setInfo TypeBounds.upper(pt)
-              newExistentialType(List(tparam), arrayType(tparam.tpe))
+              newExistentialType(tparam :: Nil, arrayType(tparam.tpe))
             }
 
           val (expr1, baseClass) = expr.tpe.typeSymbol match {
@@ -4657,7 +4659,7 @@ trait Typers extends Modes with Adaptations with Taggings {
               // convert new Array^N[T](len) for N > 1 to evidence[ClassTag[Array[...Array[T]...]]].newArray(len), where Array HK gets applied (N-1) times
               // [Eugene] no more MaxArrayDims. ClassTags are flexible enough to allow creation of arrays of arbitrary dimensionality (w.r.t JVM restrictions)
               val Some((level, componentType)) = erasure.GenericArray.unapply(tpt.tpe)
-              val tagType = List.iterate(componentType, level)(tpe => appliedType(ArrayClass.asType, List(tpe))).last
+              val tagType = List.iterate(componentType, level)(tpe => appliedType(ArrayClass.asType, tpe :: Nil)).last
               val newArrayApp = atPos(tree.pos) {
                 val tag = resolveArrayTag(tagType, tree.pos)
                 if (tag.isEmpty) MissingArrayTagError(tree, tagType)

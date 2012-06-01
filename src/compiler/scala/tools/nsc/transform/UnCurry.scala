@@ -84,7 +84,7 @@ abstract class UnCurry extends InfoTransform
     }
 
     private lazy val serialVersionUIDAnnotation =
-      AnnotationInfo(SerialVersionUIDAttr.tpe, List(Literal(Constant(0))), Nil)
+      AnnotationInfo(SerialVersionUIDAttr.tpe, Literal(Constant(0)) :: Nil, Nil)
 
     // I don't have a clue why I'm catching TypeErrors here, but it's better
     // than spewing stack traces at end users for internal errors. Examples
@@ -167,7 +167,7 @@ abstract class UnCurry extends InfoTransform
       localTyper typed {
         val extpe   = nonLocalReturnExceptionType(meth.tpe.finalResultType)
         val ex      = meth.newValue(nme.ex, body.pos) setInfo extpe
-        val pat     = gen.mkBindForCase(ex, NonLocalReturnControlClass, List(meth.tpe.finalResultType))
+        val pat     = gen.mkBindForCase(ex, NonLocalReturnControlClass, meth.tpe.finalResultType :: Nil)
         val rhs = (
           IF   ((ex DOT nme.key)() OBJ_EQ Ident(key))
           THEN ((ex DOT nme.value)())
@@ -176,7 +176,7 @@ abstract class UnCurry extends InfoTransform
         val keyDef   = ValDef(key, New(ObjectClass.tpe))
         val tryCatch = Try(body, pat -> rhs)
 
-        Block(List(keyDef), tryCatch)
+        Block(keyDef :: Nil, tryCatch)
       }
     }
 
@@ -256,7 +256,7 @@ abstract class UnCurry extends InfoTransform
             fun.body changeOwner (fun.symbol     -> methSym)
 
             val body    = localTyper.typedPos(fun.pos)(fun.body)
-            val methDef = DefDef(methSym, List(fun.vparams), body)
+            val methDef = DefDef(methSym, fun.vparams :: Nil, body)
 
             // Have to repack the type to avoid mismatches when existentials
             // appear in the result - see SI-4869.
@@ -266,8 +266,9 @@ abstract class UnCurry extends InfoTransform
 
           localTyper.typedPos(fun.pos) {
             Block(
-              List(ClassDef(anonClass, NoMods, List(Nil), List(Nil), List(applyMethodDef), fun.pos)),
-              Typed(New(anonClass.tpe), TypeTree(fun.tpe)))
+              ClassDef(anonClass, NoMods, NilNil, NilNil, applyMethodDef :: Nil, fun.pos) :: Nil,
+              Typed(New(anonClass.tpe), TypeTree(fun.tpe))
+            )
           }
 
       }
@@ -317,11 +318,11 @@ abstract class UnCurry extends InfoTransform
         val List(argtpe)            = formals
         val A1                      = methSym newTypeParameter(newTypeName("A1")) setInfo TypeBounds.upper(argtpe)
         val B1                      = methSym newTypeParameter(newTypeName("B1")) setInfo TypeBounds.lower(restpe)
-        val methFormals             = List(A1.tpe, functionType(List(A1.tpe), B1.tpe))
+        val methFormals             = List(A1.tpe, functionType(A1.tpe :: Nil, B1.tpe))
         val params@List(x, default) = methSym newSyntheticValueParams methFormals
-        methSym setInfoAndEnter polyType(List(A1, B1), MethodType(params, B1.tpe))
+        methSym setInfoAndEnter polyType(A1 :: B1 :: Nil, MethodType(params, B1.tpe))
 
-        val substParam = new TreeSymSubstituter(fun.vparams map (_.symbol), List(x))
+        val substParam = new TreeSymSubstituter(fun.vparams map (_.symbol), x :: Nil)
         val body = localTyper.typedPos(fun.pos) { import CODE._
           def defaultAction(scrut: Tree) = REF(default) APPLY (REF(x))
 
@@ -369,8 +370,9 @@ abstract class UnCurry extends InfoTransform
 
       localTyper.typedPos(fun.pos) {
         Block(
-          List(ClassDef(anonClass, NoMods, List(Nil), List(Nil), List(applyOrElseMethodDef, isDefinedAtMethodDef), fun.pos)),
-          Typed(New(anonClass.tpe), TypeTree(fun.tpe)))
+          ClassDef(anonClass, NoMods, NilNil, NilNil, applyOrElseMethodDef :: isDefinedAtMethodDef :: Nil, fun.pos) :: Nil,
+          Typed(New(anonClass.tpe), TypeTree(fun.tpe))
+        )
       }
     }
 
@@ -414,7 +416,7 @@ abstract class UnCurry extends InfoTransform
           }
           afterUncurry {
             localTyper.typedPos(pos) {
-              gen.mkMethodCall(tree, toArraySym, Nil, List(traversableArrayTag(tree.tpe)))
+              gen.mkMethodCall(tree, toArraySym, Nil, traversableArrayTag(tree.tpe) :: Nil)
             }
           }
         }
@@ -440,7 +442,7 @@ abstract class UnCurry extends InfoTransform
           if (isJava && !isReferenceArray(suffix.tpe) && isArrayOfSymbol(fun.tpe.params.last.tpe, ObjectClass)) {
             // The array isn't statically known to be a reference array, so call ScalaRuntime.toObjectArray.
             suffix = localTyper.typedPos(pos) {
-              gen.mkRuntimeCall(nme.toObjectArray, List(suffix))
+              gen.mkRuntimeCall(nme.toObjectArray, suffix :: Nil)
             }
           }
         }
@@ -755,7 +757,7 @@ abstract class UnCurry extends InfoTransform
           case (null, argsym) => Ident(argsym)
           case (l, _)         => l
         }
-        val end = if (forwsym.isConstructor) List(UNIT) else Nil
+        val end = if (forwsym.isConstructor) UNIT :: Nil else Nil
 
         DEF(forwsym) === BLOCK(
           Apply(gen.mkAttributedRef(flatdd.symbol), seqargs) :: end : _*

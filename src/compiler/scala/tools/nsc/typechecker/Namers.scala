@@ -692,7 +692,7 @@ trait Namers extends MethodSynthesis {
     def accessorTypeCompleter(tree: ValDef, isSetter: Boolean = false) = mkTypeCompleter(tree) { sym =>
       validate(sym setInfo {
         if (isSetter)
-          MethodType(List(sym.newSyntheticValueParam(typeSig(tree))), UnitClass.tpe)
+          MethodType(sym.newSyntheticValueParam(typeSig(tree)) :: Nil, UnitClass.tpe)
         else
           NullaryMethodType(typeSig(tree))
       })
@@ -702,7 +702,7 @@ trait Namers extends MethodSynthesis {
       val selftpe = typer.typedType(tree).tpe
       sym setInfo {
         if (selftpe.typeSymbol isNonBottomSubClass sym.owner) selftpe
-        else intersectionType(List(sym.owner.tpe, selftpe))
+        else intersectionType(sym.owner.tpe :: selftpe :: Nil)
       }
     }
 
@@ -970,7 +970,7 @@ trait Namers extends MethodSynthesis {
       // Add a () parameter section if this overrides some method with () parameters.
       if (clazz.isClass && vparamss.isEmpty && overriddenSymbol.alternatives.exists(
         _.info.isInstanceOf[MethodType])) {
-        vparamSymss = List(Nil)
+        vparamSymss = NilNil
       }
       mforeach(vparamss) { vparam =>
         if (vparam.tpt.isEmpty) {
@@ -1025,7 +1025,7 @@ trait Namers extends MethodSynthesis {
       var baseParamss = (vparamss, overridden.tpe.paramss) match {
         // match empty and missing parameter list
         case (Nil, List(Nil)) => Nil
-        case (List(Nil), Nil) => List(Nil)
+        case (List(Nil), Nil) => NilNil
         case (_, paramss)     => paramss
       }
       assert(
@@ -1320,7 +1320,7 @@ trait Namers extends MethodSynthesis {
     private object RestrictJavaArraysMap extends TypeMap {
       def apply(tp: Type): Type = tp match {
         case ArrayOf(elem) if elem.typeSymbol.isAbstractType && !(elem <:< ObjectClass.tpe) =>
-          arrayType(intersectionType(List(elem, ObjectClass.tpe)))
+          arrayType(intersectionType(elem :: ObjectClass.tpe :: Nil))
         case _ =>
           mapOver(tp)
       }

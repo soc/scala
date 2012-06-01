@@ -52,7 +52,7 @@ trait Unapplies extends ast.TreeDSL
 //          else List(prod)
         val targs = getProductArgs(prod)
 
-        if (targs.isEmpty || targs.tail.isEmpty) List(prod) // special n == 0 ||  n == 1
+        if (targs.isEmpty || targs.tail.isEmpty) prod :: Nil // special n == 0 ||  n == 1
         else targs  // n > 1
       case _                        =>
         throw new TypeError("result type "+tp+" of unapply not in {Boolean, Option[_], Some[_]}")
@@ -143,23 +143,23 @@ trait Unapplies extends ast.TreeDSL
     def primaries      = constrParamss(cdef).head take MaxFunctionArity map (_.tpt)
     def inheritFromFun = !cdef.mods.hasAbstractFlag && cdef.tparams.isEmpty && constrParamss(cdef).length == 1
     def createFun      = gen.scalaFunctionConstr(primaries, toIdent(cdef), abstractFun = true)
-    def parents        = if (inheritFromFun) List(createFun) else Nil
+    def parents        = if (inheritFromFun) createFun :: Nil else Nil
     def toString       = DefDef(
       Modifiers(OVERRIDE | FINAL),
       nme.toString_,
       Nil,
-      List(Nil),
+      NilNil,
       TypeTree(),
       Literal(Constant(cdef.name.decode)))
 
-    companionModuleDef(cdef, parents, List(toString))
+    companionModuleDef(cdef, parents, toString :: Nil)
   }
 
   def companionModuleDef(cdef: ClassDef, parents: List[Tree] = Nil, body: List[Tree] = Nil): ModuleDef = atPos(cdef.pos.focus) {
     ModuleDef(
       Modifiers(cdef.mods.flags & AccessFlags | SYNTHETIC, cdef.mods.privateWithin),
       cdef.name.toTermName,
-      Template(parents, emptyValDef, NoMods, Nil, List(Nil), body, cdef.impl.pos.focus))
+      Template(parents, emptyValDef, NoMods, Nil, NilNil, body, cdef.impl.pos.focus))
   }
 
   private val caseMods = Modifiers(SYNTHETIC | CASE)
@@ -188,12 +188,12 @@ trait Unapplies extends ast.TreeDSL
       case xs :: _ if xs.nonEmpty && isRepeatedParamType(xs.last.tpt) => nme.unapplySeq
       case _                                                          => nme.unapply
     }
-    val cparams   = List(ValDef(Modifiers(PARAM | SYNTHETIC), unapplyParamName, classType(cdef, tparams), EmptyTree))
+    val cparams   = ValDef(Modifiers(PARAM | SYNTHETIC), unapplyParamName, classType(cdef, tparams), EmptyTree) :: Nil
     val ifNull    = if (constrParamss(cdef).head.isEmpty) FALSE else REF(NoneModule)
     val body      = nullSafe({ case Ident(x) => caseClassUnapplyReturnValue(x, cdef.symbol) }, ifNull)(Ident(unapplyParamName))
 
     atPos(cdef.pos.focus)(
-      DefDef(caseMods, method, tparams, List(cparams), TypeTree(), body)
+      DefDef(caseMods, method, tparams, cparams :: Nil, TypeTree(), body)
     )
   }
 

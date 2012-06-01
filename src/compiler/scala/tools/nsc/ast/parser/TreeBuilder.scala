@@ -122,9 +122,9 @@ abstract class TreeBuilder {
     new GetVarTraverser apply tree
 
   def byNameApplication(tpe: Tree): Tree =
-    AppliedTypeTree(rootScalaDot(tpnme.BYNAME_PARAM_CLASS_NAME), List(tpe))
+    AppliedTypeTree(rootScalaDot(tpnme.BYNAME_PARAM_CLASS_NAME), tpe :: Nil)
   def repeatedApplication(tpe: Tree): Tree =
-    AppliedTypeTree(rootScalaDot(tpnme.REPEATED_PARAM_CLASS_NAME), List(tpe))
+    AppliedTypeTree(rootScalaDot(tpnme.REPEATED_PARAM_CLASS_NAME), tpe :: Nil)
 
   def makeImportSelector(name: Name, nameOffset: Int): ImportSelector =
     ImportSelector(name, nameOffset, name, nameOffset)
@@ -135,9 +135,9 @@ abstract class TreeBuilder {
   }
 
   def makeTupleTerm(trees: List[Tree], flattenUnary: Boolean): Tree = trees match {
-    case Nil => Literal(Constant())
+    case Nil                        => Literal(Constant())
     case List(tree) if flattenUnary => tree
-    case _ => makeTuple(trees, false)
+    case _                          => makeTuple(trees, false)
   }
 
   def makeTupleType(trees: List[Tree], flattenUnary: Boolean): Tree = trees match {
@@ -183,7 +183,7 @@ abstract class TreeBuilder {
       } else args
     val arguments = right match {
       case Parens(args) => mkNamed(args)
-      case _ => List(right)
+      case _ => right :: Nil
     }
     if (isExpr) {
       if (treeInfo.isLeftAssoc(op)) {
@@ -191,8 +191,9 @@ abstract class TreeBuilder {
       } else {
         val x = freshTermName()
         Block(
-          List(ValDef(Modifiers(SYNTHETIC), x, TypeTree(), stripParens(left))),
-          Apply(atPos(opPos union right.pos) { Select(stripParens(right), op.encode) }, List(Ident(x))))
+          ValDef(Modifiers(SYNTHETIC), x, TypeTree(), stripParens(left)) :: Nil,
+          Apply(atPos(opPos union right.pos) { Select(stripParens(right), op.encode) }, Ident(x) :: Nil)
+        )
       }
     } else {
       Apply(Ident(op.encode), stripParens(left) :: arguments)
@@ -206,7 +207,7 @@ abstract class TreeBuilder {
   def makeNew(parents: List[Tree], self: ValDef, stats: List[Tree], argss: List[List[Tree]],
               npos: Position, cpos: Position): Tree =
     if (parents.isEmpty)
-      makeNew(List(scalaAnyRefConstr), self, stats, argss, npos, cpos)
+      makeNew(scalaAnyRefConstr :: Nil, self, stats, argss, npos, cpos)
     else if (parents.tail.isEmpty && stats.isEmpty)
       atPos(npos union cpos) { New(parents.head, argss) }
     else {
@@ -217,12 +218,12 @@ abstract class TreeBuilder {
             atPos(cpos) {
               ClassDef(
                 Modifiers(FINAL), x, Nil,
-                Template(parents, self, NoMods, List(Nil), argss, stats, cpos.focus))
+                Template(parents, self, NoMods, NilNil, argss, stats, cpos.focus))
             }),
           atPos(npos) {
             New(
               Ident(x) setPos npos.focus,
-              List(Nil))
+              NilNil)
           }
         )
       }
@@ -231,7 +232,7 @@ abstract class TreeBuilder {
   /** Create a tree representing an assignment <lhs = rhs> */
   def makeAssign(lhs: Tree, rhs: Tree): Tree = lhs match {
     case Apply(fn, args) =>
-      Apply(atPos(fn.pos) { Select(fn, nme.update) }, args ::: List(rhs))
+      Apply(atPos(fn.pos) { Select(fn, nme.update) }, args :+ rhs)
     case _ =>
       Assign(lhs, rhs)
   }
@@ -244,14 +245,14 @@ abstract class TreeBuilder {
   /** Create tree representing a while loop */
   def makeWhile(lname: TermName, cond: Tree, body: Tree): Tree = {
     val continu = atPos(o2p(body.pos.endOrPoint)) { Apply(Ident(lname), Nil) }
-    val rhs = If(cond, Block(List(body), continu), Literal(Constant()))
+    val rhs = If(cond, Block(body :: Nil, continu), Literal(Constant()))
     LabelDef(lname, Nil, rhs)
   }
 
   /** Create tree representing a do-while loop */
   def makeDoWhile(lname: TermName, body: Tree, cond: Tree): Tree = {
     val continu = Apply(Ident(lname), Nil)
-    val rhs = Block(List(body), If(cond, continu, Literal(Constant())))
+    val rhs = Block(body :: Nil, If(cond, continu, Literal(Constant())))
     LabelDef(lname, Nil, rhs)
   }
 
@@ -360,7 +361,7 @@ abstract class TreeBuilder {
             body) setPos splitpos
         case None =>
           atPos(splitpos) {
-            makeVisitor(List(CaseDef(pat, EmptyTree, body)), false)
+            makeVisitor(CaseDef(pat, EmptyTree, body) :: Nil, false)
           }
       }
     }
@@ -368,7 +369,7 @@ abstract class TreeBuilder {
     /** Make an application  qual.meth(pat => body) positioned at `pos`.
      */
     def makeCombination(pos: Position, meth: TermName, qual: Tree, pat: Tree, body: Tree): Tree =
-      Apply(Select(qual, meth) setPos qual.pos, List(makeClosure(pos, pat, body))) setPos pos
+      Apply(Select(qual, meth) setPos qual.pos, makeClosure(pos, pat, body) :: Nil) setPos pos
 
     /** If `pat` is not yet a `Bind` wrap it in one with a fresh name
      */
@@ -415,7 +416,7 @@ abstract class TreeBuilder {
         val pdefs = (defpats, rhss).zipped flatMap makePatDef
         val ids = (defpat1 :: defpats) map makeValue
         val rhs1 = makeForYield(
-          List(ValFrom(pos, defpat1, rhs)),
+          ValFrom(pos, defpat1, rhs) :: Nil,
           Block(pdefs, atPos(wrappingPos(ids)) { makeTupleTerm(ids, true) }) setPos wrappingPos(pdefs))
         val allpats = (pat :: pats) map (_.duplicate)
         val vfrom1 = ValFrom(r2p(pos.startOrPoint, pos.point, rhs1.pos.endOrPoint), atPos(wrappingPos(allpats)) { makeTuple(allpats, false) } , rhs1)
@@ -442,16 +443,16 @@ abstract class TreeBuilder {
       case g :: Nil => g
       case ValFrom(pos1, pat1, rhs1) :: gs2 =>
         val ValFrom(pos2, pat2, rhs2) = combine(gs2)
-        ValFrom(pos1, makeTuple(List(pat1, pat2), false), Apply(Select(rhs1, nme.zip), List(rhs2)))
+        ValFrom(pos1, makeTuple(pat1 :: pat2 :: Nil, false), Apply(Select(rhs1, nme.zip), rhs2 :: Nil))
     }
-    makeForYield(List(combine(gs)), body)
+    makeForYield(combine(gs) :: Nil, body)
   }
 
   /** Create tree for a pattern alternative */
   def makeAlternative(ts: List[Tree]): Tree = {
     def alternatives(t: Tree): List[Tree] = t match {
       case Alternative(ts)  => ts
-      case _                => List(t)
+      case _                => t :: Nil
     }
     Alternative(ts flatMap alternatives)
   }
@@ -465,7 +466,7 @@ abstract class TreeBuilder {
     val x   = freshTermName(prefix)
     val id  = Ident(x)
     val sel = if (checkExhaustive) id else gen.mkUnchecked(id)
-    Function(List(makeSyntheticParam(x)), Match(sel, cases))
+    Function(makeSyntheticParam(x) :: Nil, Match(sel, cases))
   }
 
   /** Create tree for case definition <case pat if guard => rhs> */
@@ -484,10 +485,10 @@ abstract class TreeBuilder {
     val catchDef = ValDef(NoMods, freshTermName("catchExpr"), TypeTree(), catchExpr)
     val catchFn  = Ident(catchDef.name)
     val body     = atPos(catchExpr.pos.makeTransparent)(Block(
-      List(catchDef),
+      catchDef :: Nil,
       If(
-        Apply(Select(catchFn, nme.isDefinedAt), List(Ident(binder))),
-        Apply(Select(catchFn, nme.apply), List(Ident(binder))),
+        Apply(Select(catchFn, nme.isDefinedAt), Ident(binder) :: Nil),
+        Apply(Select(catchFn, nme.apply), Ident(binder) :: Nil),
         Throw(Ident(binder))
       )
     ))
@@ -566,7 +567,7 @@ abstract class TreeBuilder {
 
   /** Create a tree representing the function type (argtpes) => restpe */
   def makeFunctionTypeTree(argtpes: List[Tree], restpe: Tree): Tree =
-    AppliedTypeTree(rootScalaDot(newTypeName("Function" + argtpes.length)), argtpes ::: List(restpe))
+    AppliedTypeTree(rootScalaDot(newTypeName("Function" + argtpes.length)), argtpes :+ restpe)
 
   /** Append implicit parameter section if `contextBounds` nonempty */
   def addEvidenceParams(owner: Name, vparamss: List[List[ValDef]], contextBounds: List[Tree]): List[List[ValDef]] = {
@@ -578,9 +579,9 @@ abstract class TreeBuilder {
 
       val vparamssLast = if(vparamss.nonEmpty) vparamss.last else Nil
       if(vparamssLast.nonEmpty && vparamssLast.head.mods.hasFlag(IMPLICIT))
-        vparamss.init ::: List(evidenceParams ::: vparamssLast)
+        vparamss.init :+ (evidenceParams ::: vparamssLast)
       else
-        vparamss ::: List(evidenceParams)
+        vparamss :+ evidenceParams
     }
   }
 }
