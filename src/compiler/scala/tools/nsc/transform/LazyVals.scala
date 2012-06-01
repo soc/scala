@@ -74,9 +74,9 @@ abstract class LazyVals extends Transform with TypingTransformers with ast.TreeD
           val Block(stats, expr) = block1
           val stats1 = stats.flatMap(_ match {
             case Block(List(d1@DefDef(_, n1, _, _, _, _)), d2@DefDef(_, n2, _, _, _, _)) if (nme.newLazyValSlowComputeName(n2) == n1) =>
-              List(d1, d2)
+              d1 :: d2 :: Nil
             case stat =>
-              List(stat)
+              stat :: Nil
           })
           treeCopy.Block(block1, stats1, expr)
           
@@ -256,7 +256,7 @@ abstract class LazyVals extends Transform with TypingTransformers with ast.TreeD
       }
 
       val cond = (bitmapRef GEN_& (mask, bitmapKind)) GEN_== (ZERO, bitmapKind)
-      val lazyDefs = mkFastPathBody(methOrClass.enclClass, lazyVal, cond, List(block), Nil, res)
+      val lazyDefs = mkFastPathBody(methOrClass.enclClass, lazyVal, cond, block :: Nil, Nil, res)
       (atPos(tree.pos)(localTyper.typed {lazyDefs._1 }), atPos(tree.pos)(localTyper.typed {lazyDefs._2 }))
     }
 

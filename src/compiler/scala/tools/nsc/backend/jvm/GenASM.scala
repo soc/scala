@@ -331,7 +331,7 @@ abstract class GenASM extends SubComponent with BytecodeWriters {
   private def superClasses(s: Symbol): List[Symbol] = {
     assert(!s.isInterface)
     s.superClass match {
-      case NoSymbol => List(s)
+      case NoSymbol => s :: Nil
       case sc       => s :: superClasses(sc)
     }
   }
@@ -360,7 +360,7 @@ abstract class GenASM extends SubComponent with BytecodeWriters {
 
     val res = Pair(a.isInterface, b.isInterface) match {
       case (true, true) =>
-        global.lub(List(a.tpe, b.tpe)).typeSymbol // TODO assert == firstCommonSuffix of resp. parents
+        global.lub(a.tpe :: b.tpe :: Nil).typeSymbol // TODO assert == firstCommonSuffix of resp. parents
       case (true, false) =>
         if(b isSubClass a) a else ObjectClass
       case (false, true) =>
@@ -684,7 +684,7 @@ abstract class GenASM extends SubComponent with BytecodeWriters {
         case Some(pickle) if !nme.isModuleName(newTermName(jclassName)) =>
           val scalaAnnot = {
             val sigBytes = ScalaSigBytes(pickle.bytes.take(pickle.writeIndex))
-            AnnotationInfo(sigBytes.sigAnnot, Nil, List((nme.bytes, sigBytes)))
+            AnnotationInfo(sigBytes.sigAnnot, Nil, ((nme.bytes, sigBytes)) :: Nil)
           }
           pickledBytes += pickle.writeIndex
           currentRun.symData -= sym
@@ -1542,7 +1542,7 @@ abstract class GenASM extends SubComponent with BytecodeWriters {
               new Local(method.symbol.newVariable(nme.FAKE_LOCAL_THIS),
                         toTypeKind(outerField.tpe),
                         false)
-            m.locals = m.locals ::: List(_this)
+            m.locals = m.locals :+ _this
             computeLocalVarsIndex(m) // since we added a new local, we need to recompute indexes
             jmethod.visitVarInsn(asm.Opcodes.ALOAD, 0)
             jmethod.visitFieldInsn(asm.Opcodes.GETFIELD,
@@ -2119,7 +2119,7 @@ abstract class GenASM extends SubComponent with BytecodeWriters {
 
           private def fuse(ranges: List[Interval], added: Interval): List[Interval] = {
             assert(added.repOK, added)
-            if(ranges.isEmpty) { return List(added) }
+            if(ranges.isEmpty) { return added :: Nil }
             // precond: ranges is sorted by increasing start
             var fused: List[Interval] = Nil
             var done = false
@@ -2136,7 +2136,7 @@ abstract class GenASM extends SubComponent with BytecodeWriters {
                 done = true
               }
             }
-            if(!done) { fused = fused ::: List(added) }
+            if(!done) { fused = fused :+ added }
             assert(repOK(fused), fused)
 
             fused
@@ -2940,7 +2940,7 @@ abstract class GenASM extends SubComponent with BytecodeWriters {
       }
     }
 
-    private def directSuccStar(b: BasicBlock): List[BasicBlock] = { directSuccStar(List(b)) }
+    private def directSuccStar(b: BasicBlock): List[BasicBlock] = { directSuccStar(b :: Nil) }
 
     /** Transitive closure of successors potentially reachable due to normal (non-exceptional) control flow.
        Those BBs in the argument are also included in the result */

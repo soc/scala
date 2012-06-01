@@ -273,7 +273,7 @@ abstract class Constructors extends Transform with ast.TreeDSL {
         sym setFlag MUTABLE
         val setr = addAccessor(
           sym, nme.getterToSetter(nme.getterName(sym.name)), setterFlags(sym.flags))
-        setr setInfo MethodType(setr.newSyntheticValueParams(List(sym.tpe)), UnitClass.tpe)
+        setr setInfo MethodType(setr.newSyntheticValueParams(sym.tpe :: Nil), UnitClass.tpe)
         defBuf += localTyper.typed {
           //util.trace("adding setter def for "+setr) {
           atPos(sym.pos) {
@@ -310,7 +310,7 @@ abstract class Constructors extends Transform with ast.TreeDSL {
         localTyper.typed {
           atPos(impl.pos) {
             val closureClass   = clazz.newClass(nme.delayedInitArg.toTypeName, impl.pos, SYNTHETIC | FINAL)
-            val closureParents = List(AbstractFunctionClass(0).tpe)
+            val closureParents = AbstractFunctionClass(0).tpe :: Nil
 
             closureClass setInfoAndEnter new ClassInfoType(closureParents, newScope, closureClass)
 
@@ -353,7 +353,7 @@ abstract class Constructors extends Transform with ast.TreeDSL {
                         if (setter != NoSymbol)
                           applyMethodTyper.typed {
                             atPos(tree.pos) {
-                              Apply(Select(qual, setter), List(rhs))
+                              Apply(Select(qual, setter), rhs :: Nil)
                             }
                           }
                         else tree
@@ -368,21 +368,21 @@ abstract class Constructors extends Transform with ast.TreeDSL {
 
             val applyMethodDef = DefDef(
               sym = applyMethod,
-              vparamss = List(Nil),
+              vparamss = Nil :: Nil,
               rhs = Block(applyMethodStats, gen.mkAttributedRef(BoxedUnit_UNIT)))
 
             ClassDef(
               sym = closureClass,
               constrMods = Modifiers(0),
-              vparamss = List(List(outerFieldDef)),
-              argss = List(Nil),
-              body = List(applyMethodDef),
+              vparamss = (outerFieldDef :: Nil) :: Nil,
+              argss = Nil :: Nil,
+              body = applyMethodDef :: Nil,
               superPos = impl.pos)
           }
         }
 
       def delayedInitCall(closure: Tree) = localTyper.typedPos(impl.pos) {
-        gen.mkMethodCall(This(clazz), delayedInitMethod, Nil, List(New(closure.symbol.tpe, This(clazz))))
+        gen.mkMethodCall(This(clazz), delayedInitMethod, Nil, New(closure.symbol.tpe, This(clazz)) :: Nil)
       }
 
       /** Return a pair consisting of (all statements up to and including superclass and trait constr calls, rest) */
@@ -408,7 +408,7 @@ abstract class Constructors extends Transform with ast.TreeDSL {
       if (needsDelayedInit) {
         val dicl = new ConstructorTransformer(unit) transform delayedInitClosure(remainingConstrStats)
         defBuf += dicl
-        remainingConstrStats = List(delayedInitCall(dicl))
+        remainingConstrStats = delayedInitCall(dicl) :: Nil
       }
 
       // Assemble final constructor

@@ -27,7 +27,7 @@ abstract class TreeGen extends reflect.internal.TreeGen with TreeDSL {
 
     if (!global.phase.erasedTypes && settings.warnSelectNullable.value &&
         tpe <:< NotNullClass.tpe && !tpe.isNotNull)
-      mkRuntimeCall(nme.checkInitialized, List(tree))
+      mkRuntimeCall(nme.checkInitialized, tree :: Nil)
     else
       tree
   }
@@ -43,12 +43,10 @@ abstract class TreeGen extends reflect.internal.TreeGen with TreeDSL {
           setFlag SYNTHETIC
           setInfo analyzer.ImportType(qual)
     )
-    val importTree = (
-      Import(qual, List(ImportSelector(nme.WILDCARD, -1, null, -1)))
+    ( Import(qual, ImportSelector(nme.WILDCARD, -1, null, -1) :: Nil)
         setSymbol importSym
-          setType NoType
+        setType NoType
     )
-    importTree
   }
 
   // wrap the given expression in a SoftReference so it can be gc-ed
@@ -58,7 +56,7 @@ abstract class TreeGen extends reflect.internal.TreeGen with TreeDSL {
   def mkUnchecked(expr: Tree): Tree = atPos(expr.pos) {
     // This can't be "Annotated(New(UncheckedClass), expr)" because annotations
     // are very picky about things and it crashes the compiler with "unexpected new".
-    Annotated(New(scalaDot(UncheckedClass.name), List(Nil)), expr)
+    Annotated(New(scalaDot(UncheckedClass.name), Nil :: Nil), expr)
   }
   // if it's a Match, mark the selector unchecked; otherwise nothing.
   def mkUncheckedMatch(tree: Tree) = tree match {
@@ -89,7 +87,7 @@ abstract class TreeGen extends reflect.internal.TreeGen with TreeDSL {
         caseMatch(matchExpr, selector, cases, identity)
       // old-style match or virtpatmat switch
       case Block((vd: ValDef) :: Nil, orig@Match(selector, cases)) => // println("block match: "+ (selector, cases, vd) + "for:\n"+ matchExpr )
-        caseMatch(matchExpr, selector, cases, m => copyBlock(matchExpr, List(vd), m))
+        caseMatch(matchExpr, selector, cases, m => copyBlock(matchExpr, vd :: Nil, m))
       // virtpatmat
       case Apply(Apply(TypeApply(Select(tgt, nme.runOrElse), targs), List(scrut)), List(matcher)) => // println("virt match: "+ (tgt, targs, scrut, matcher) + "for:\n"+ matchExpr )
         caseVirtualizedMatch(matchExpr, tgt, targs, scrut, matcher)
@@ -177,7 +175,7 @@ abstract class TreeGen extends reflect.internal.TreeGen with TreeDSL {
 
   /** Make a synchronized block on 'monitor'. */
   def mkSynchronized(monitor: Tree, body: Tree): Tree =
-    Apply(Select(monitor, Object_synchronized), List(body))
+    Apply(Select(monitor, Object_synchronized), body :: Nil)
 
   def mkAppliedTypeForCase(clazz: Symbol): Tree = {
     val numParams = clazz.typeParams.size
@@ -219,8 +217,8 @@ abstract class TreeGen extends reflect.internal.TreeGen with TreeDSL {
     mkMethodCall(
       PredefModule,
       wrapArrayMethodName(elemtp),
-      if (isPrimitiveValueType(elemtp)) Nil else List(elemtp),
-      List(tree)
+      if (isPrimitiveValueType(elemtp)) Nil else elemtp :: Nil,
+      tree :: Nil
     )
   }
 
@@ -245,7 +243,7 @@ abstract class TreeGen extends reflect.internal.TreeGen with TreeDSL {
    */
   def mkCastArray(tree: Tree, elemtp: Type, pt: Type) =
     if (elemtp.typeSymbol == AnyClass && isPrimitiveValueType(tree.tpe.typeArgs.head))
-      mkCast(mkRuntimeCall(nme.toObjectArray, List(tree)), pt)
+      mkCast(mkRuntimeCall(nme.toObjectArray, tree :: Nil), pt)
     else
       mkCast(tree, pt)
 
@@ -304,8 +302,8 @@ abstract class TreeGen extends reflect.internal.TreeGen with TreeDSL {
     else {
       val (valDef, identFn) = mkPackedValDef(expr, owner, unit.freshTermName("ev$"))
       val containing = within(identFn)
-      ensureNonOverlapping(containing, List(expr))
-      Block(List(valDef), containing) setPos (containing.pos union expr.pos)
+      ensureNonOverlapping(containing, expr :: Nil)
+      Block(valDef :: Nil, containing) setPos (containing.pos union expr.pos)
     }
   }
 

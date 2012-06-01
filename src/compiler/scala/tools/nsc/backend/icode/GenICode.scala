@@ -940,7 +940,7 @@ abstract class GenICode extends SubComponent  {
             caseCtx.bb.closeWith(JUMP(afterCtx.bb) setPos caze.pos)
           }
           ctx1.bb.emitOnly(
-            SWITCH(tags.reverse map (x => List(x)), (default :: targets).reverse) setPos tree.pos
+            SWITCH(tags.reverse map (_ :: Nil), (default :: targets).reverse) setPos tree.pos
           )
           afterCtx
 
@@ -1231,9 +1231,9 @@ abstract class GenICode extends SubComponent  {
             scalaPrimitives.getPrimitive(fun.symbol) == scalaPrimitives.CONCAT)
           liftStringConcat(larg) ::: rarg
         else
-          List(tree)
+          tree :: Nil
       case _ =>
-        List(tree)
+        tree :: Nil
     }
 
     /** Some useful equality helpers.

@@ -86,9 +86,9 @@ abstract class ExtensionMethods extends Transform with TypingTransformers {
       def transform(clonedType: Type): Type = clonedType match {
         case MethodType(params, restpe) =>
           // I assume it was a bug that this was dropping params... [Martin]: No, it wasn't; it's curried.
-          MethodType(List(thisParam), clonedType)
+          MethodType(thisParam :: Nil, clonedType)
         case NullaryMethodType(restpe) =>
-          MethodType(List(thisParam), restpe)
+          MethodType(thisParam :: Nil, restpe)
       }
       val GenPolyType(tparams, restpe) = origInfo cloneInfo extensionMeth
       GenPolyType(tparams ::: newTypeParams, transform(restpe) substSym (clazz.typeParams, newTypeParams))
@@ -134,7 +134,7 @@ abstract class ExtensionMethods extends Transform with TypingTransformers {
           extensionDefs(companion) += atPos(tree.pos) { DefDef(extensionMeth, extensionBody) }
           val extensionCallPrefix = Apply(
               gen.mkTypeApply(gen.mkAttributedRef(companion), extensionMeth, origTpeParams map (_.tpe)),
-              List(This(currentOwner)))
+              This(currentOwner) :: Nil)
           val extensionCall = atOwner(origMeth) {
             localTyper.typedPos(rhs.pos) {
               (extensionCallPrefix /: vparamss) {

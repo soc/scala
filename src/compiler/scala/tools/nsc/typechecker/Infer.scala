@@ -50,12 +50,12 @@ trait Infer {
 
   def actualTypes(actuals: List[Type], nformals: Int): List[Type] =
     if (nformals == 1 && !hasLength(actuals, 1))
-      List(if (actuals.isEmpty) UnitClass.tpe else tupleType(actuals))
+      (if (actuals.isEmpty) UnitClass.tpe else tupleType(actuals)) :: Nil
     else actuals
 
   def actualArgs(pos: Position, actuals: List[Tree], nformals: Int): List[Tree] = {
     val inRange = nformals == 1 && !hasLength(actuals, 1) && actuals.lengthCompare(MaxTupleArity) <= 0
-    if (inRange && !phase.erasedTypes) List(atPos(pos)(gen.mkTuple(actuals)))
+    if (inRange && !phase.erasedTypes) atPos(pos)(gen.mkTuple(actuals)) :: Nil
     else actuals
   }
 
@@ -391,7 +391,7 @@ trait Infer {
           }
           //println("try to solve "+tvars+" "+tparams)
           (solvedTypes(tvars, tparams, tparams map varianceInType(varianceType),
-                      false, lubDepth(List(restpe, pt))), tvars)
+                      false, lubDepth(restpe :: pt :: Nil)), tvars)
         } catch {
           case ex: NoInstance => (null, null)
         }
@@ -1104,7 +1104,7 @@ trait Infer {
             // debuglog("TVARS "+ (tvars map (_.constr)))
             // look at the argument types of the primary constructor corresponding to the pattern
             val variances  = undetparams map varianceInType(ctorTp.paramTypes.headOption getOrElse ctorTp)
-            val targs      = solvedTypes(tvars, undetparams, variances, true, lubDepth(List(resTp, pt)))
+            val targs      = solvedTypes(tvars, undetparams, variances, true, lubDepth(resTp :: pt :: Nil))
             // checkBounds(tree, NoPrefix, NoSymbol, undetparams, targs, "inferred ")
             // no checkBounds here. If we enable it, test bug602 fails.
             // TODO: reinstate checkBounds, return params that fail to meet their bounds to undetparams
@@ -1159,7 +1159,7 @@ trait Infer {
       val tparam = tvar.origin.typeSymbol
       val instType = toOrigin(tvar.constr.inst)
       val (loBounds, hiBounds) =
-        if (instType != NoType && isFullyDefined(instType)) (List(instType), List(instType))
+        if (instType != NoType && isFullyDefined(instType)) (instType :: Nil, instType :: Nil)
         else (tvar.constr.loBounds, tvar.constr.hiBounds)
       val lo = lub(tparam.info.bounds.lo :: loBounds map toOrigin)
       val hi = glb(tparam.info.bounds.hi :: hiBounds map toOrigin)
@@ -1315,7 +1315,7 @@ trait Infer {
           case _ =>
             tp2
         }
-        intersectionType(List(tp1, reduced2))
+        intersectionType(tp1 :: reduced2 :: Nil)
       }
     }
 
@@ -1529,7 +1529,7 @@ trait Infer {
         // for functional values, the `apply` method might be overloaded
         val mtypes = followApply(alt.tpe) match {
           case OverloadedType(_, alts) => alts map (_.tpe)
-          case t                       => List(t)
+          case t                       => t :: Nil
         }
         // Drop those that use a default; keep those that use vararg/tupling conversion.
         mtypes exists (t =>

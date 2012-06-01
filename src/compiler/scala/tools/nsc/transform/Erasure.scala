@@ -339,7 +339,7 @@ abstract class Erasure extends AddInterfaces
   /** An extractor object for unboxed expressions (maybe subsumed by posterasure?) */
   object Unboxed {
     def unapply(tree: Tree): Option[Tree] = tree match {
-      case Apply(fn, List(arg)) if isUnbox(fn.symbol) && safeToRemoveUnbox(arg.tpe.typeSymbol) =>
+      case Apply(fn, arg :: Nil) if isUnbox(fn.symbol) && safeToRemoveUnbox(arg.tpe.typeSymbol) =>
         Some(arg)
       case Apply(
         TypeApply(
@@ -348,7 +348,7 @@ abstract class Erasure extends AddInterfaces
               sel @ Select(arg, acc),
               Nil),
             asinstanceof),
-          List(tpt)),
+          tpt :: Nil),
         Nil)
       if cast.symbol == Object_asInstanceOf &&
         tpt.tpe.typeSymbol.isDerivedValueClass &&
@@ -382,7 +382,7 @@ abstract class Erasure extends AddInterfaces
 
     val opc = beforeExplicitOuter {
       new overridingPairs.Cursor(owner) {
-        override def parents              = List(owner.info.firstParent)
+        override def parents              = owner.info.firstParent :: Nil
         override def exclude(sym: Symbol) = !sym.isMethod || sym.isPrivate || super.exclude(sym)
       }
     }
@@ -590,7 +590,7 @@ abstract class Erasure extends AddInterfaces
       } else if (tree.tpe != null && tree.tpe.typeSymbol == ArrayClass && pt.typeSymbol == ArrayClass) {
         // See SI-2386 for one example of when this might be necessary.
         val needsExtraCast = isPrimitiveValueType(tree.tpe.typeArgs.head) && !isPrimitiveValueType(pt.typeArgs.head)
-        val tree1 = if (needsExtraCast) gen.mkRuntimeCall(nme.toObjectArray, List(tree)) else tree
+        val tree1 = if (needsExtraCast) gen.mkRuntimeCall(nme.toObjectArray, tree :: Nil) else tree
         gen.mkAttributedCast(tree1, pt)
       } else gen.mkAttributedCast(tree, pt)
     }
@@ -906,7 +906,7 @@ abstract class Erasure extends AddInterfaces
                   unboundedGenericArrayLevel(arg.tpe) > 0) =>
           val level = unboundedGenericArrayLevel(arg.tpe)
           def isArrayTest(arg: Tree) =
-            gen.mkRuntimeCall(nme.isArray, List(arg, Literal(Constant(level))))
+            gen.mkRuntimeCall(nme.isArray, arg :: Literal(Constant(level)) :: Nil)
 
           global.typer.typedPos(tree.pos) {
             if (level == 1) isArrayTest(qual)
@@ -915,7 +915,7 @@ abstract class Erasure extends AddInterfaces
                 gen.mkMethodCall(
                   qual1(),
                   fun.symbol,
-                  List(specialErasure(fun.symbol)(arg.tpe)),
+                  specialErasure(fun.symbol)(arg.tpe) :: Nil,
                   Nil
                 ),
                 isArrayTest(qual1())
@@ -963,7 +963,7 @@ abstract class Erasure extends AddInterfaces
               case s @ (ShortClass | ByteClass | CharClass) => numericConversion(qual, s)
               case BooleanClass                             => If(qual, LIT(true.##), LIT(false.##))
               case _                                        =>
-                global.typer.typed(gen.mkRuntimeCall(nme.hash_, List(qual)))
+                global.typer.typed(gen.mkRuntimeCall(nme.hash_, qual :: Nil))
             }
           }
           // Rewrite 5.getClass to ScalaRunTime.anyValClass(5)
@@ -972,7 +972,7 @@ abstract class Erasure extends AddInterfaces
           else
             tree
 
-        case Apply(Select(New(tpt), nme.CONSTRUCTOR), List(arg)) if (tpt.tpe.typeSymbol.isDerivedValueClass) =>
+        case Apply(Select(New(tpt), nme.CONSTRUCTOR), arg :: Nil) if (tpt.tpe.typeSymbol.isDerivedValueClass) =>
           InjectDerivedValue(arg) setSymbol tpt.tpe.typeSymbol
         case Apply(fn, args) =>
           def qualifier = fn match {
@@ -981,7 +981,7 @@ abstract class Erasure extends AddInterfaces
           }
           if (fn.symbol == Any_asInstanceOf)
             (fn: @unchecked) match {
-              case TypeApply(Select(qual, _), List(targ)) =>
+              case TypeApply(Select(qual, _), targ :: Nil) =>
                 if (qual.tpe <:< targ.tpe)
                   atPos(tree.pos) { Typed(qual, TypeTree(targ.tpe)) }
                 else if (isNumericValueClass(qual.tpe.typeSymbol) && isNumericValueClass(targ.tpe.typeSymbol))
@@ -1006,7 +1006,7 @@ abstract class Erasure extends AddInterfaces
                   case SingleType(_, _) | ThisType(_) | SuperType(_, _) =>
                     val cmpOp = if (targ.tpe <:< AnyValClass.tpe) Any_equals else Object_eq
                     atPos(tree.pos) {
-                      Apply(Select(qual, cmpOp), List(gen.mkAttributedQualifier(targ.tpe)))
+                      Apply(Select(qual, cmpOp), gen.mkAttributedQualifier(targ.tpe) :: Nil)
                     }
                   case RefinedType(parents, decls) if (parents.length >= 2) =>
                     // Optimization: don't generate isInstanceOf tests if the static type

@@ -154,8 +154,10 @@ abstract class SymbolLoaders {
         sym setInfo tpe
     }
     private def initRoot(root: Symbol) {
-      if (root.rawInfo == this)
-        List(root, root.moduleClass) foreach markAbsent
+      if (root.rawInfo == this) {
+        markAbsent(root)
+        markAbsent(root.moduleClass)
+      }
       else if (root.isClass && !root.isModuleClass)
         root.rawInfo.load(root)
     }

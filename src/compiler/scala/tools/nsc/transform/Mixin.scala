@@ -218,7 +218,7 @@ abstract class Mixin extends InfoTransform with ast.TreeDSL {
         val newFlags   = field.flags & ~PrivateLocal | ACCESSOR | lateDEFERRED
         val setter     = clazz.newMethod(setterName, field.pos, newFlags)
         // TODO preserve pre-erasure info?
-        setter setInfo MethodType(setter.newSyntheticValueParams(List(field.info)), UnitClass.tpe)
+        setter setInfo MethodType(setter.newSyntheticValueParams(field.info :: Nil), UnitClass.tpe)
         if (needsExpandedSetterName(field))
           setter.name = nme.expandedSetterName(setter.name, clazz)
 
@@ -536,7 +536,7 @@ abstract class Mixin extends InfoTransform with ast.TreeDSL {
               sym setFlag notOVERRIDE
               self = sym.newValueParameter(nme.SELF, sym.pos) setInfo toInterface(currentOwner.typeOfThis)
               val selfdef = ValDef(self) setType NoType
-              copyDefDef(tree)(vparamss = List(selfdef :: vparams))
+              copyDefDef(tree)(vparamss = (selfdef :: vparams) :: Nil)
             }
             else EmptyTree
           }
@@ -546,7 +546,7 @@ abstract class Mixin extends InfoTransform with ast.TreeDSL {
             }
             tree
           }
-        case Apply(tapp @ TypeApply(fn, List(arg)), Nil) =>
+        case Apply(tapp @ TypeApply(fn, arg :: Nil), Nil) =>
           if (arg.tpe.typeSymbol.isImplClass) {
             val ifacetpe = toInterface(arg.tpe)
             arg.tpe = ifacetpe
@@ -865,8 +865,8 @@ abstract class Mixin extends InfoTransform with ast.TreeDSL {
         rhs match {
           case Block(List(assign), returnTree) =>
             val Assign(moduleVarRef, _) = assign
-            val cond                    = Apply(Select(moduleVarRef, nme.eq), List(NULL))
-            mkFastPathBody(clazz, moduleSym, cond, List(assign), List(NULL), returnTree, attrThis, args)
+            val cond                    = Apply(Select(moduleVarRef, nme.eq), NULL :: Nil)
+            mkFastPathBody(clazz, moduleSym, cond, assign :: Nil, NULL :: Nil, returnTree, attrThis, args)
           case _ =>
             assert(false, "Invalid getter " + rhs + " for module in class " + clazz)
             EmptyTree
@@ -901,7 +901,7 @@ abstract class Mixin extends InfoTransform with ast.TreeDSL {
           if (sym.isLazy && !isEmpty && !clazz.isImplClass) {
             assert(fieldOffset contains sym, sym)
             deriveDefDef(stat) {
-              case t if isUnit => mkLazyDef(clazz, sym, List(t), UNIT, fieldOffset(sym))
+              case t if isUnit => mkLazyDef(clazz, sym, t :: Nil, UNIT, fieldOffset(sym))
 
               case Block(stats, res) =>
                 mkLazyDef(clazz, sym, stats, Select(This(clazz), res.symbol), fieldOffset(sym))
@@ -963,8 +963,8 @@ abstract class Mixin extends InfoTransform with ast.TreeDSL {
             stats flatMap {
               case stat @ Assign(lhs @ Select(This(_), _), rhs) => stat :: checkedGetter(lhs)
               // remove initialization for default values
-              case Apply(lhs @ Select(Ident(self), _), List(EmptyTree)) if lhs.symbol.isSetter => Nil
-              case stat => List(stat)
+              case Apply(lhs @ Select(Ident(self), _), EmptyTree :: Nil) if lhs.symbol.isSetter => Nil
+              case stat => stat :: Nil
             },
             exprOwner
           )
@@ -1016,7 +1016,7 @@ abstract class Mixin extends InfoTransform with ast.TreeDSL {
             val init      = if (isUnit) initCall else atPos(sym.pos)(Assign(selection, initCall))
             val returns   = if (isUnit) UNIT else selection
 
-            mkLazyDef(clazz, sym, List(init), returns, fieldOffset(sym))
+            mkLazyDef(clazz, sym, init :: Nil, returns, fieldOffset(sym))
           }
           else sym.getter(sym.owner).tpe.resultType.typeSymbol match {
             case UnitClass  => UNIT

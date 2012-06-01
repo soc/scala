@@ -504,7 +504,7 @@ abstract class ClassfileParser {
         in.nextChar              // skip superclass
         val ifaces = in.nextChar
         in.bp += ifaces * 2     // .. and iface count interfaces
-        List(definitions.AnyRefClass.tpe) // dummy superclass, will be replaced by pickled information
+        definitions.AnyRefClass.tpe :: Nil // dummy superclass, will be replaced by pickled information
       }
       else raiseLoaderLevel {
         val superType = if (isAnnotation) { in.nextChar; definitions.AnnotationClass.tpe }

@@ -40,7 +40,7 @@ abstract class TypeFlowAnalysis {
 
     val top                   = new TypeStack
     val bottom                = new TypeStack
-    val exceptionHandlerStack = new TypeStack(List(REFERENCE(AnyRefClass)))
+    val exceptionHandlerStack = new TypeStack(REFERENCE(AnyRefClass) :: Nil)
 
     def lub2(exceptional: Boolean)(s1: TypeStack, s2: TypeStack) = {
       if (s1 eq bottom) s2
@@ -358,7 +358,7 @@ abstract class TypeFlowAnalysis {
 
       def push(t: InferredType) {
         depth += 1
-        types = types ::: List(t)
+        types = types :+ t
       }
 
       def push(k: TypeKind) { push(Const(k)) }

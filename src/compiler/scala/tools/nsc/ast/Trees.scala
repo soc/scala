@@ -109,7 +109,7 @@ trait Trees extends reflect.internal.Trees { self: Global =>
         val superCall = (superRef /: argss) (Apply)
         List(
           atPos(wrappingPos(superPos, lvdefs ::: argss.flatten)) (
-            DefDef(constrMods, nme.CONSTRUCTOR, Nil, vparamss1, TypeTree(), Block(lvdefs ::: List(superCall), Literal(Constant())))))
+            DefDef(constrMods, nme.CONSTRUCTOR, Nil, vparamss1, TypeTree(), Block(lvdefs :+ superCall, Literal(Constant())))))
       }
     }
     constrs foreach (ensureNonOverlapping(_, parents ::: gvdefs))

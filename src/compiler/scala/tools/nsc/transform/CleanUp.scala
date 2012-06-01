@@ -140,7 +140,7 @@ abstract class CleanUp extends Transform with ast.TreeDSL {
 
         def addStaticMethodToClass(forBody: (Symbol, Symbol) => Tree): Symbol = {
           val methSym = currentClass.newMethod(mkTerm(nme.reflMethodName), ad.pos, STATIC | SYNTHETIC)
-          val params  = methSym.newSyntheticValueParams(List(ClassClass.tpe))
+          val params  = methSym.newSyntheticValueParams(ClassClass.tpe :: Nil)
           methSym setInfoAndEnter MethodType(params, MethodClass.tpe)
 
           val methDef = typedPos(DefDef(methSym, forBody(methSym, params.head)))

@@ -457,7 +457,7 @@ abstract class RefChecks extends InfoTransform with reflect.internal.transform.R
 
             // check overriding (abstract type --> abstract type or abstract type --> concrete type member (a type alias))
             // making an abstract type member concrete is like passing a type argument
-            val kindErrors = typer.infer.checkKindBounds(List(other), List(memberTp), self, member.owner) // (1.7.2)
+            val kindErrors = typer.infer.checkKindBounds(other :: Nil, memberTp :: Nil, self, member.owner) // (1.7.2)
 
             if(!kindErrors.isEmpty)
               unit.error(member.pos,
@@ -469,7 +469,7 @@ abstract class RefChecks extends InfoTransform with reflect.internal.transform.R
             // this overlaps somewhat with validateVariance
             if(member.isAliasType) {
               // println("checkKindBounds" + ((List(member), List(memberTp.normalize), self, member.owner)))
-              val kindErrors = typer.infer.checkKindBounds(List(member), List(memberTp.normalize), self, member.owner)
+              val kindErrors = typer.infer.checkKindBounds(member :: Nil, memberTp.normalize :: Nil, self, member.owner)
 
               if(!kindErrors.isEmpty)
                 unit.error(member.pos,
@@ -530,8 +530,10 @@ abstract class RefChecks extends InfoTransform with reflect.internal.transform.R
             else clazz + " needs to be abstract"
           ) + ", since"
 
-          if (abstractErrors.isEmpty) abstractErrors ++= List(prelude, msg)
-          else abstractErrors += msg
+          if (abstractErrors.isEmpty)
+            abstractErrors += prelude
+
+          abstractErrors += msg
         }
 
         def javaErasedOverridingSym(sym: Symbol): Symbol =
@@ -1051,8 +1053,8 @@ abstract class RefChecks extends InfoTransform with reflect.internal.transform.R
         }
         val actual   = underlyingClass(args.head.tpe)
         val receiver = underlyingClass(qual.tpe)
-        def onTrees[T](f: List[Tree] => T) = f(List(qual, args.head))
-        def onSyms[T](f: List[Symbol] => T) = f(List(receiver, actual))
+        def onTrees[T](f: List[Tree] => T) = f(qual :: args.head :: Nil)
+        def onSyms[T](f: List[Symbol] => T) = f(receiver :: actual :: Nil)
 
         // @MAT normalize for consistency in error message, otherwise only part is normalized due to use of `typeSymbol`
         def typesString = normalizeAll(qual.tpe.widen)+" and "+normalizeAll(args.head.tpe.widen)
@@ -1150,7 +1152,7 @@ abstract class RefChecks extends InfoTransform with reflect.internal.transform.R
         if (isWarnable && nullCount == 0 && !(isSpecial(receiver) && isSpecial(actual))) {
           // better to have lubbed and lost
           def warnIfLubless(): Unit = {
-            val common = global.lub(List(actual.tpe, receiver.tpe))
+            val common = global.lub(actual.tpe :: receiver.tpe :: Nil)
             if (ObjectClass.tpe <:< common)
               unrelatedTypes()
           }
@@ -1249,7 +1251,7 @@ abstract class RefChecks extends InfoTransform with reflect.internal.transform.R
         if (!sym.isStatic)
           createInnerModuleAccessor(findOrCreateModuleVar)
         else if (sym.isOverridingSymbol)
-          List(createStaticModuleAccessor())
+          createStaticModuleAccessor() :: Nil
         else
           Nil
       })
@@ -1276,11 +1278,8 @@ abstract class RefChecks extends InfoTransform with reflect.internal.transform.R
       val lazyDef = atPos(tree.pos)(DefDef(lazySym, body.changeOwner(vsym -> lazySym)))
       debuglog("Created lazy accessor: " + lazyDef)
 
-      if (hasUnitType) List(typed(lazyDef))
-      else List(
-        typed(ValDef(vsym)),
-        afterRefchecks(typed(lazyDef))
-      )
+      if (hasUnitType) typed(lazyDef) :: Nil
+      else typed(ValDef(vsym)) :: afterRefchecks(typed(lazyDef)) :: Nil
     }
 
     def transformStat(tree: Tree, index: Int): List[Tree] = tree match {
@@ -1292,7 +1291,7 @@ abstract class RefChecks extends InfoTransform with reflect.internal.transform.R
           debuglog("refsym = " + currentLevel.refsym)
           unit.error(currentLevel.refpos, "forward reference not allowed from self constructor invocation")
         }
-        List(t)
+        t :: Nil
       case ModuleDef(_, _, _) => eliminateModuleDefs(tree)
       case ValDef(_, _, _, _) =>
         val tree1 @ ValDef(_, _, _, rhs) = transform(tree) // important to do before forward reference check
@@ -1304,11 +1303,11 @@ abstract class RefChecks extends InfoTransform with reflect.internal.transform.R
             debuglog("refsym = " + currentLevel.refsym)
             unit.error(currentLevel.refpos, "forward reference extends over definition of " + lazySym)
           }
-          List(tree1)
+          tree1 :: Nil
         }
       case Import(_, _)                                        => Nil
       case DefDef(mods, _, _, _, _, _) if (mods hasFlag MACRO) => Nil
-      case _                                                   => List(transform(tree))
+      case _                                                   => transform(tree) :: Nil
     }
 
     /* Check whether argument types conform to bounds of type parameters */

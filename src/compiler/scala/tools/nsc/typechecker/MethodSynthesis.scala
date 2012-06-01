@@ -154,7 +154,7 @@ trait MethodSynthesis {
       createMethod(original)(m => gen.mkMethodCall(newMethod, transformArgs(m.paramss.head map Ident)))
 
     def createSwitchMethod(name: Name, range: Seq[Int], returnType: Type)(f: Int => Tree) = {
-      createMethod(name, List(IntClass.tpe), returnType) { m =>
+      createMethod(name, IntClass.tpe :: Nil, returnType) { m =>
         val arg0    = Ident(m.firstParam)
         val default = DEFAULT ==> THROW(IndexOutOfBoundsExceptionClass, arg0)
         val cases   = range.map(num => CASE(LIT(num)) ==> f(num)).toList :+ default
@@ -239,21 +239,21 @@ trait MethodSynthesis {
             context.unit.synthetics -= meth
             meth setAnnotations deriveAnnotations(annotations, MethodTargetClass, false)
             cd.symbol setAnnotations deriveAnnotations(annotations, ClassTargetClass, true)
-            List(cd, mdef)
+            cd :: mdef :: Nil
           case _ =>
             // Shouldn't happen, but let's give ourselves a reasonable error when it does
             abort("No synthetics for " + meth + ": synthetics contains " + context.unit.synthetics.keys.mkString(", "))
         }
       case _ =>
-        List(stat)
+        stat :: Nil
       }
 
     def standardAccessors(vd: ValDef): List[DerivedFromValDef] = (
-      if (vd.mods.isMutable && !vd.mods.isLazy) List(Getter(vd), Setter(vd))
-      else List(Getter(vd))
+      if (vd.mods.isMutable && !vd.mods.isLazy) Getter(vd) :: Setter(vd) :: Nil
+      else Getter(vd) :: Nil
     )
     def beanAccessors(vd: ValDef): List[DerivedFromValDef] = {
-      val setter = if (vd.mods.isMutable) List(BeanSetter(vd)) else Nil
+      val setter = if (vd.mods.isMutable) BeanSetter(vd) :: Nil else Nil
       if (vd.symbol hasAnnotation BeanPropertyAttr)
         BeanGetter(vd) :: setter
       else if (vd.symbol hasAnnotation BooleanBeanPropertyAttr)
@@ -261,7 +261,7 @@ trait MethodSynthesis {
       else Nil
     }
     def allValDefDerived(vd: ValDef) = {
-      val field = if (vd.mods.isDeferred) Nil else List(Field(vd))
+      val field = if (vd.mods.isDeferred) Nil else Field(vd) :: Nil
       field ::: standardAccessors(vd) ::: beanAccessors(vd)
     }
 
@@ -493,7 +493,7 @@ trait MethodSynthesis {
       // Derives a tree without attempting to use the original tree's symbol.
       override def derivedTree = {
         atPos(tree.pos.focus) {
-          DefDef(derivedMods, name, Nil, List(Nil), tree.tpt.duplicate,
+          DefDef(derivedMods, name, Nil, Nil :: Nil, tree.tpt.duplicate,
             if (isDeferred) EmptyTree else Select(This(owner), tree.name)
           )
         }
@@ -518,7 +518,7 @@ trait MethodSynthesis {
           else new BooleanBeanGetter(tree) with NoSymbolBeanGetter
         )
         getter :: {
-          if (mods.isMutable) List(BeanSetter(tree)) else Nil
+          if (mods.isMutable) BeanSetter(tree) :: Nil else Nil
         }
       }
       else Nil

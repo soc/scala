@@ -386,13 +386,13 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
      *  Calling this method multiple times will re-use the same parameter names.
      */
     final def newSyntheticValueParams(argtypes: List[Type]): List[TermSymbol] =
-      newSyntheticValueParamss(List(argtypes)).head
+      newSyntheticValueParamss(argtypes :: Nil).head
 
     /** Synthetic value parameter when parameter symbol is not available.
      *  Calling this method multiple times will re-use the same parameter name.
      */
     final def newSyntheticValueParam(argtype: Type): Symbol =
-      newSyntheticValueParams(List(argtype)).head
+      newSyntheticValueParams(argtype :: Nil).head
 
     /** Type skolems are type parameters ''seen from the inside''
      *  Assuming a polymorphic method m[T], its type is a PolyType which has a TypeParameter

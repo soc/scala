@@ -242,7 +242,7 @@ abstract class SuperAccessors extends transform.Transform with transform.TypingT
               ensureAccessor(sel)
             }
             else
-              mayNeedProtectedAccessor(sel, List(EmptyTree), false)
+              mayNeedProtectedAccessor(sel, EmptyTree :: Nil, false)
           }
 
         case sel @ Select(Super(_, mix), name) =>
@@ -262,7 +262,7 @@ abstract class SuperAccessors extends transform.Transform with transform.TypingT
           mayNeedProtectedAccessor(sel, args, true)
 
         case sel @ Select(qual, name) =>
-          mayNeedProtectedAccessor(sel, List(EmptyTree), true)
+          mayNeedProtectedAccessor(sel, EmptyTree :: Nil, true)
 
         case Assign(lhs @ Select(qual, name), rhs) =>
           if (lhs.symbol.isVariable &&
@@ -271,7 +271,7 @@ abstract class SuperAccessors extends transform.Transform with transform.TypingT
             debuglog("Adding protected setter for " + tree)
             val setter = makeSetter(lhs);
             debuglog("Replaced " + tree + " with " + setter);
-            transform(localTyper.typed(Apply(setter, List(qual, rhs))))
+            transform(localTyper.typed(Apply(setter, qual :: rhs :: Nil)))
           } else
             super.transform(tree)
 
@@ -329,11 +329,10 @@ abstract class SuperAccessors extends transform.Transform with transform.TypingT
       val accType = (protAcc: Symbol) => memberType match {
         case PolyType(tparams, restpe) =>
           // luc: question to author: should the tparams symbols not be cloned and get a new owner (protAcc)?
-          PolyType(tparams, MethodType(List(protAcc.newSyntheticValueParam(objType)),
+          PolyType(tparams, MethodType(protAcc.newSyntheticValueParam(objType) :: Nil,
                                        restpe.cloneInfo(protAcc).asSeenFrom(qual.tpe, sym.owner)))
         case _ =>
-          MethodType(List(protAcc.newSyntheticValueParam(objType)),
-                     memberType.cloneInfo(protAcc).asSeenFrom(qual.tpe, sym.owner))
+          MethodType(protAcc.newSyntheticValueParam(objType) :: Nil, memberType.cloneInfo(protAcc).asSeenFrom(qual.tpe, sym.owner))
       }
 
       val protAcc = clazz.info.decl(accName).suchThat(s => s == NoSymbol || s.tpe =:= accType(s)) orElse {
@@ -400,7 +399,7 @@ abstract class SuperAccessors extends transform.Transform with transform.TypingT
       val accName = nme.protSetterName(field.originalName)
       val protectedAccessor = clazz.info decl accName orElse {
         val protAcc      = clazz.newMethod(accName, field.pos)
-        val paramTypes   = List(clazz.typeOfThis, field.tpe)
+        val paramTypes   = clazz.typeOfThis :: field.tpe :: Nil
         val params       = protAcc newSyntheticValueParams paramTypes
         val accessorType = MethodType(params, UnitClass.tpe)
 

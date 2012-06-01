@@ -107,7 +107,7 @@ trait Trees { self: Universe =>
     def attachments: List[Any] = rawatt match {
       case NoPosition                      => Nil
       case NontrivialAttachment(pos, atts) => pos :: atts.toList
-      case x                               => List(x)
+      case x                               => x :: Nil
     }
     // Writing "Any" repeatedly to work within this structure
     // is making my skin crawl.
@@ -276,7 +276,7 @@ trait Trees { self: Universe =>
     def children: List[Tree] = {
       def subtrees(x: Any): List[Tree] = x match {
         case EmptyTree   => Nil
-        case t: Tree     => List(t)
+        case t: Tree     => t :: Nil
         case xs: List[_] => xs flatMap subtrees
         case _           => Nil
       }

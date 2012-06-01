@@ -651,7 +651,7 @@ abstract class UnCurry extends InfoTransform
 
         case dd @ DefDef(_, _, _, vparamss0, _, rhs0) =>
           val flatdd = copyDefDef(dd)(
-            vparamss = List(vparamss0.flatten),
+            vparamss = vparamss0.flatten :: Nil,
             rhs = nonLocalReturnKeys get dd.symbol match {
               case Some(k) => atPos(rhs0.pos)(nonLocalReturnTry(rhs0, k, dd.symbol))
               case None    => rhs0

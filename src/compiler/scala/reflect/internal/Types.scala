@@ -445,7 +445,7 @@ trait Types extends api.Types { self: SymbolTable =>
       if (phase.erasedTypes) this
       else {
         val cowner = commonOwner(this)
-        refinedType(List(this), cowner, EmptyScope, cowner.pos).narrow
+        refinedType(this :: Nil, cowner, EmptyScope, cowner.pos).narrow
       }
 
     /** For a TypeBounds type, itself;
@@ -984,7 +984,7 @@ trait Types extends api.Types { self: SymbolTable =>
         if (!e.sym.hasFlag(excludedFlags)) {
           if (sym == NoSymbol) sym = e.sym
           else {
-            if (alts.isEmpty) alts = List(sym)
+            if (alts.isEmpty) alts = sym :: Nil
             alts = e.sym :: alts
           }
         }
@@ -1552,7 +1552,7 @@ trait Types extends api.Types { self: SymbolTable =>
 
   protected def defineBaseClassesOfCompoundType(tpe: CompoundType) = {
     def computeBaseClasses: List[Symbol] =
-      if (tpe.parents.isEmpty) List(tpe.typeSymbol)
+      if (tpe.parents.isEmpty) tpe.typeSymbol :: Nil
       else {
         //Console.println("computing base classes of " + typeSymbol + " at phase " + phase);//DEBUG
         // optimized, since this seems to be performance critical
@@ -1620,7 +1620,10 @@ trait Types extends api.Types { self: SymbolTable =>
     private var normalized: Type = _
     private def normalizeImpl = {
       // TODO see comments around def intersectionType and def merge
-      def flatten(tps: List[Type]): List[Type] = tps flatMap { case RefinedType(parents, ds) if ds.isEmpty => flatten(parents) case tp => List(tp) }
+      def flatten(tps: List[Type]): List[Type] = tps flatMap {
+        case RefinedType(parents, ds) if ds.isEmpty => flatten(parents)
+        case tp                                     => tp :: Nil
+      }
       val flattened = flatten(parents).distinct
       if (decls.isEmpty && flattened.tail.isEmpty) {
         flattened.head
@@ -2388,7 +2391,7 @@ trait Types extends api.Types { self: SymbolTable =>
       if (!isValidForBaseClasses(period)) {
         tpe.parentsCache = tpe.thisInfo.parents map tpe.transform
       } else if (tpe.parentsCache == null) { // seems this can happen if things are corrupted enough, see #2641
-        tpe.parentsCache = List(AnyClass.tpe)
+        tpe.parentsCache = AnyClass.tpe :: Nil
       }
     }
   }
@@ -2706,7 +2709,7 @@ trait Types extends api.Types { self: SymbolTable =>
 
   object HasTypeMember {
     def apply(name: TypeName, tp: Type): Type = {
-      val bound = refinedType(List(WildcardType), NoSymbol)
+      val bound = refinedType(WildcardType :: Nil, NoSymbol)
       val bsym = bound.typeSymbol.newAliasType(name)
       bsym setInfo tp
       bound.decls enter bsym
@@ -3023,7 +3026,7 @@ trait Types extends api.Types { self: SymbolTable =>
         // The alias/widen variations are often no-ops.
         val tpes = (
           if (isLowerBound) List(tpe, tpe.widen, tpe.dealias, tpe.widen.dealias).distinct
-          else List(tpe)
+          else tpe :: Nil
         )
         tpes exists { tp =>
           val lhs = if (isLowerBound) tp.typeArgs else typeArgs
@@ -3601,7 +3604,7 @@ trait Types extends api.Types { self: SymbolTable =>
           AnyClass.tpe
         case tp1 @ RefinedType(parents, decls) =>
           var parents1 = parents filter (_.typeSymbol != SingletonClass)
-          if (parents1.isEmpty) parents1 = List(AnyClass.tpe)
+          if (parents1.isEmpty) parents1 = AnyClass.tpe :: Nil
           if (parents1.tail.isEmpty && decls.isEmpty) mapOver(parents1.head)
           else mapOver(copyRefinedType(tp1, parents1, decls))
         case tp1 =>
@@ -3724,7 +3727,7 @@ trait Types extends api.Types { self: SymbolTable =>
    */
   class TypeConstraint(lo0: List[Type], hi0: List[Type], numlo0: Type, numhi0: Type, avoidWidening0: Boolean = false) {
     def this(lo0: List[Type], hi0: List[Type]) = this(lo0, hi0, NoType, NoType)
-    def this(bounds: TypeBounds) = this(List(bounds.lo), List(bounds.hi))
+    def this(bounds: TypeBounds) = this(bounds.lo :: Nil, bounds.hi :: Nil)
     def this() = this(Nil, Nil)
 
     /*  Syncnote: Type constraints are assumed to be used from only one
@@ -5726,7 +5729,7 @@ trait Types extends api.Types { self: SymbolTable =>
             val memberTp1 = tp1.memberType(sym1)
             // println("kinds conform? "+(memberTp1, tp1, sym2, kindsConform(List(sym2), List(memberTp1), tp2, sym2.owner)))
             info2.bounds.containsType(memberTp1) &&
-            kindsConform(List(sym2), List(memberTp1), tp1, sym1.owner)
+            kindsConform(sym2 :: Nil, memberTp1 :: Nil, tp1, sym1.owner)
         }
       || sym2.isAliasType && tp2.memberType(sym2).substThis(tp2.typeSymbol, tp1) =:= tp1.memberType(sym1) //@MAT ok
     )
@@ -6423,7 +6426,7 @@ trait Types extends api.Types { self: SymbolTable =>
         val glbOwner = commonOwner(ts)
         def refinedToParents(t: Type): List[Type] = t match {
           case RefinedType(ps, _) => ps flatMap refinedToParents
-          case _ => List(t)
+          case _ => t :: Nil
         }
         def refinedToDecls(t: Type): List[Scope] = t match {
           case RefinedType(ps, decls) =>
@@ -6545,9 +6548,9 @@ trait Types extends api.Types { self: SymbolTable =>
             None  // something is wrong: an array without a type arg.
           } else {
             val args = argss map (_.head)
-            if (args.tail forall (_ =:= args.head)) Some(typeRef(pre, sym, List(args.head)))
+            if (args.tail forall (_ =:= args.head)) Some(typeRef(pre, sym, args.head :: Nil))
             else if (args exists (arg => isPrimitiveValueClass(arg.typeSymbol))) Some(ObjectClass.tpe)
-            else Some(typeRef(pre, sym, List(lub(args))))
+            else Some(typeRef(pre, sym, lub(args) :: Nil))
           }
         }
         else {
