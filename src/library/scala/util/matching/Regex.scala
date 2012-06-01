@@ -212,7 +212,7 @@ class Regex(regex: String, groupNames: String*) extends Serializable {
    */
   def findAllMatchIn(source: java.lang.CharSequence): Iterator[Match] = {
     val matchIterator = findAllIn(source)
-    new Iterator[Match] {
+    new collection.AbstractIterator[Match] {
       def hasNext = matchIterator.hasNext
       def next: Match = {
         matchIterator.next;

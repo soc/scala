@@ -41,7 +41,7 @@ trait Scopes extends api.Scopes { self: SymbolTable =>
    *  This is necessary because when run from reflection every scope needs to have a
    *  SynchronizedScope as mixin.
    */
-  class Scope protected[Scopes] (initElems: ScopeEntry = null) extends Iterable[Symbol] {
+  class Scope protected[Scopes] (initElems: ScopeEntry = null) extends collection.AbstractIterable[Symbol] {
 
     protected[Scopes] def this(base: Scope) = {
       this(base.elems)

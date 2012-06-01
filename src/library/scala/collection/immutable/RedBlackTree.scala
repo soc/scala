@@ -408,7 +408,7 @@ object RedBlackTree {
     def unapply[A, B](t: BlackTree[A, B]) = Some((t.key, t.value, t.left, t.right))
   }
 
-  private[this] abstract class TreeIterator[A, B, R](tree: Tree[A, B]) extends Iterator[R] {
+  private[this] abstract class TreeIterator[A, B, R](tree: Tree[A, B]) extends collection.AbstractIterator[R] {
     protected[this] def nextResult(tree: Tree[A, B]): R
 
     override def hasNext: Boolean = next ne null

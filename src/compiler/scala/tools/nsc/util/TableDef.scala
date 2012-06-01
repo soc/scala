@@ -2,6 +2,7 @@ package scala.tools.nsc
 package util
 
 import TableDef._
+import scala.collection.{ mutable, immutable, generic }
 
 /** A class for representing tabular data in a way that preserves
  *  its inner beauty.  See Exceptional for an example usage.
@@ -38,7 +39,7 @@ class TableDef[T](_cols: Column[T]*) {
   def colApply(el: T) = colFunctions map (f => f(el))
   def retThis(body: => Unit): this.type = { body ; this }
 
-  class Table(val rows: Seq[T]) extends Seq[T] {
+  class Table(val rows: Seq[T]) extends collection.AbstractSeq[T] {
     def iterator          = rows.iterator
     def apply(index: Int) = rows(index)
     def length            = rows.length

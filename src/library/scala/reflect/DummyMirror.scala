@@ -167,7 +167,7 @@ class DummyMirror(cl: ClassLoader) extends api.Mirror {
 
   // Members declared in scala.reflect.api.Scopes
   type Scope = DummyScope.type
-  object DummyScope extends Iterable[Symbol] {
+  object DummyScope extends collection.AbstractIterable[Symbol] {
     def iterator: Iterator[Symbol] = notSupported()
   }
   def newScope: Scope = DummyScope

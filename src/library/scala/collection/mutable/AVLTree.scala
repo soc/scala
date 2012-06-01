@@ -204,7 +204,7 @@ private case class Node[A](val data: A, val left: AVLTree[A], val right: AVLTree
   }
 }
 
-private class AVLIterator[A](root: Node[A]) extends Iterator[A] {
+private class AVLIterator[A](root: Node[A]) extends collection.AbstractIterator[A] {
   val stack = mutable.ArrayStack[Node[A]](root)
   diveLeft()
 
