@@ -146,7 +146,7 @@ class ScalaTool extends ScalaMatchingTask {
     }
   }
 
-  /** Sets flags to be passed to the Java interpreter. */
+  /** Sets flags to be passed to the java. */
   def setJavaflags(input: String) =
     javaFlags = input.trim
 

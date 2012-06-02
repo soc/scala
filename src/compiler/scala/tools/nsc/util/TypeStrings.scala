@@ -4,7 +4,7 @@
  */
 
 package scala.tools.nsc
-package interpreter
+package util
 
 import java.lang.{ reflect => r }
 import r.TypeVariable
@@ -155,6 +155,8 @@ trait StructuredTypeStrings extends DestructureTypes {
  *  "definition" is when you want strings like
  */
 trait TypeStrings {
+  private type JClass = java.lang.Class[_]
+  
   private val ObjectClass = classOf[java.lang.Object]
   private val primitives = Set[String]("byte", "char", "short", "int", "long", "float", "double", "boolean", "void")
   private val primitiveMap = primitives.toList map { x =>

@@ -3,12 +3,11 @@
  * @author  Paul Phillips
  */
 
-package scala.tools.nsc
-package interpreter
+package scala.runtime
 
 class RichClass[T](val clazz: Class[T]) {
   def toTag: ClassTag[T] = ClassTag[T](clazz)
-  def toTypeString: String = TypeStrings.fromClazz(clazz)
+  // def toTypeString: String = TypeStrings.fromClazz(clazz)
 
   // Sadly isAnonymousClass does not return true for scala anonymous
   // classes because our naming scheme is not doing well against the
@@ -21,14 +20,14 @@ class RichClass[T](val clazz: Class[T]) {
   /** It's not easy... to be... me... */
   def supermans: List[ClassTag[_]] = supers map (_.toTag)
   def superNames: List[String]    = supers map (_.getName)
-  def interfaces: List[JClass]    = supers filter (_.isInterface)
+  def interfaces: List[Class[_]]    = supers filter (_.isInterface)
 
   def hasAncestorName(f: String => Boolean) = superNames exists f
-  def hasAncestor(f: JClass => Boolean) = supers exists f
+  def hasAncestor(f: Class[_] => Boolean) = supers exists f
   def hasAncestorInPackage(pkg: String) = hasAncestorName(_ startsWith (pkg + "."))
 
-  def supers: List[JClass] = {
-    def loop(x: JClass): List[JClass] = x.getSuperclass match {
+  def supers: List[Class[_]] = {
+    def loop(x: Class[_]): List[Class[_]] = x.getSuperclass match {
       case null   => List(x)
       case sc     => x :: (x.getInterfaces.toList flatMap loop) ++ loop(sc)
     }

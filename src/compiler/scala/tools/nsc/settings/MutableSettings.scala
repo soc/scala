@@ -196,7 +196,7 @@ class MutableSettings(val errorFn: String => Unit)
     getClasspath("boot", loader) foreach { bootclasspath append _ }
   }
 
-  /** The parent loader to use for the interpreter.*/
+  /** The parent loader to use for the repl.*/
   private[nsc] var explicitParentLoader: Option[ClassLoader] = None
 
   /** Retrieves the contents of resource "${id}.class.path" from `loader`

@@ -1,6 +1,7 @@
 package scala.tools.nsc
 
-import util.ScalaClassLoader
+import scala.tools.nsc.util.ScalaClassLoader
+import scala.reflect.internal.AbstractFileClassLoader
 
 trait ToolBoxes { self: Global =>
 
@@ -61,7 +62,6 @@ trait ToolBoxes { self: Global =>
 
         // [Eugene] a heuristic to detect REPL
         if (self.settings.exposeEmptyPackage.value) {
-          import scala.tools.nsc.interpreter._
           val virtualDirectory = self.settings.outputDirs.getSingleOutput.get
           loader = new AbstractFileClassLoader(virtualDirectory, loader) {}
         }

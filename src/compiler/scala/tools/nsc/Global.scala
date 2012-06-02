@@ -1013,7 +1013,7 @@ class Global(var currentSettings: Settings, var reporter: Reporter) extends Symb
 
   object typeDeconstruct extends {
     val global: Global.this.type = Global.this
-  } with interpreter.StructuredTypeStrings
+  } with util.StructuredTypeStrings
 
   /** There are common error conditions where when the exception hits
    *  here, currentRun.currentUnit is null.  This robs us of the knowledge

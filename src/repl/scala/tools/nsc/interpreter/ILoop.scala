@@ -46,9 +46,6 @@ class ILoop(in0: Option[BufferedReader], protected val out: JPrintWriter)
   var settings: Settings = _
   var intp: IMain = _
 
-  @deprecated("Use `intp` instead.", "2.9.0") def interpreter = intp
-  @deprecated("Use `intp` instead.", "2.9.0") def interpreter_= (i: Interpreter): Unit = intp = i
-
   /** Having inherited the difficult "var-ness" of the repl instance,
    *  I'm trying to work around it by moving operations into a class from
    *  which it will appear a stable prefix.

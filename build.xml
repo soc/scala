@@ -626,7 +626,60 @@ QUICK BUILD (QUICK)
     <stopwatch name="quick.comp.timer" action="total"/>
   </target>
 
-  <target name="quick.pre-bin" depends="quick.comp">
+  <target name="quick.pre-repl" depends="quick.comp">
+    <uptodate property="quick.repl.available" targetfile="${build-quick.dir}/repl.complete">
+      <srcfiles dir="${src.dir}">
+        <include name="repl/**"/>
+      </srcfiles>
+    </uptodate>
+  </target>
+
+  <target name="quick.repl" depends="quick.pre-repl" unless="quick.repl.available">
+    <stopwatch name="quick.repl.timer"/>
+    <mkdir dir="${build-quick.dir}/classes/repl"/>
+    <javac
+      srcdir="${src.dir}/repl"
+      destdir="${build-quick.dir}/classes/repl"
+      classpath="${build-quick.dir}/classes/repl"
+      includes="**/*.java"
+      target="1.6" source="1.6">
+      <compilerarg line="${javac.args} -XDignore.symbol.file"/>
+    </javac>
+    <scalacfork
+      destdir="${build-quick.dir}/classes/repl"
+      compilerpathref="locker.classpath"
+      srcpath="${src.dir}/repl"
+      params="${scalac.args.quick}"
+      srcdir="${src.dir}/repl"
+      jvmargs="${scalacfork.jvmargs}">
+      <include name="**/*.scala"/>
+      <compilationpath>
+        <pathelement location="${build-quick.dir}/classes/library"/>
+        <pathelement location="${build-quick.dir}/classes/compiler"/>
+        <path refid="aux.libs"/>
+        <path refid="asm.classpath"/>
+        <pathelement location="${jline.jar}"/>
+      </compilationpath>
+    </scalacfork>
+    <propertyfile file="${build-quick.dir}/classes/repl/repl.properties">
+      <entry key="version.number" value="${version.number}"/>
+      <entry key="maven.version.number" value="${maven.version.number}"/>
+      <entry key="osgi.version.number" value="${osgi.version.number}"/>
+      <entry key="copyright.string" value="${copyright.string}"/>
+    </propertyfile>
+    <copy todir="${build-quick.dir}/classes/repl">
+      <fileset dir="${src.dir}/repl">
+        <include name="**/*.tmpl"/>
+        <include name="**/*.xml"/>
+        <include name="**/*.js"/>
+        <include name="**/*.css"/>
+      </fileset>
+    </copy>
+    <touch file="${build-quick.dir}/repl.complete" verbose="no"/>
+    <stopwatch name="quick.lib.timer" action="total"/>
+  </target>
+
+  <target name="quick.pre-bin" depends="quick.repl">
     <condition property="quick.bin.available">
       <isset property="quick.comp.available"/>
     </condition>
@@ -715,7 +768,7 @@ PACKED QUICK BUILD (PACK)
       <!-- filemode / dirmode: see trac ticket #1294 -->
       <zipfileset dirmode="755" filemode="644" src="${fjbg.jar}"/>
     </jar>
-    <copy file="${jline.jar}" toDir="${build-pack.dir}/lib"/>
+    <!-- <copy file="${jline.jar}" toDir="${build-pack.dir}/lib"/> -->
     <copy todir="${build-pack.dir}/lib">
       <fileset dir="${lib-extra.dir}">
         <include name="**/*.jar"/>
@@ -723,7 +776,27 @@ PACKED QUICK BUILD (PACK)
     </copy>
   </target>
 
-  <target name="pack.pre-bin" depends="pack.comp">
+  <target name="pack.pre-repl" depends="pack.comp">
+    <uptodate
+      property="pack.repl.available"
+      targetfile="${build-pack.dir}/lib/scala-repl.jar"
+      srcfile="${build-quick.dir}/repl.complete"/>
+  </target>
+
+  <target name="pack.repl" depends="pack.pre-repl" unless="pack.repl.available">
+    <mkdir dir="${build-pack.dir}/META-INF"/>
+    <copy file="META-INF/MANIFEST.MF" toDir="${build-pack.dir}/META-INF"/>
+    <manifest file="${build-pack.dir}/META-INF/MANIFEST.MF" mode="update">
+      <attribute name="Bundle-Version" value="${version.number}"/>
+    </manifest>
+    <mkdir dir="${build-pack.dir}/lib"/>
+    <jar destfile="${build-pack.dir}/lib/scala-repl.jar" manifest="${build-pack.dir}/META-INF/MANIFEST.MF">
+      <fileset dir="${build-quick.dir}/classes/repl"/>
+    </jar>
+    <copy file="${jline.jar}" toDir="${build-pack.dir}/lib"/>
+  </target>
+
+  <target name="pack.pre-bin" depends="pack.repl">
     <uptodate
       property="pack.bin.available"
       srcfile="${build-pack.dir}/lib/scala-compiler.jar"

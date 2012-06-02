@@ -2,11 +2,11 @@
  * Copyright 2005-2011 LAMP/EPFL
  */
 
-package scala.tools.nsc
-package interpreter
+package scala.reflect
+package internal
 
 import scala.tools.nsc.io.{ File, AbstractFile }
-import util.ScalaClassLoader
+import scala.tools.nsc.util.ScalaClassLoader
 import java.net.URL
 import scala.collection.{ mutable, immutable }
 
@@ -63,7 +63,7 @@ class AbstractFileClassLoader(root: AbstractFile, parent: ClassLoader)
     case null => super.classBytes(name)
     case file => file.toByteArray
   }
-  override def findClass(name: String): JClass = {
+  override def findClass(name: String): Class[_] = {
     val bytes = classBytes(name)
     if (bytes.length == 0)
       throw new ClassNotFoundException(name)

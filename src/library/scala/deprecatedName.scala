@@ -15,7 +15,7 @@ import annotation.meta._
  * applied as deprecated. Using that name in a named argument generates
  * a deprecation warning.
  *
- * For instance, evaluating the code below in the Scala interpreter
+ * For instance, evaluating the code below in the Scala repl
  * {{{
  *   def inc(x: Int, @deprecatedName('y) n: Int): Int = x + n
  *   inc(1, y = 2)

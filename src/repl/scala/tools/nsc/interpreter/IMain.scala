@@ -10,11 +10,10 @@ import Predef.{ println => _, _ }
 import util.{ Set => _, _ }
 import java.net.URL
 import scala.sys.BooleanProp
-import io.VirtualDirectory
-import scala.tools.nsc.io.AbstractFile
+import scala.tools.nsc.io.{ AbstractFile, VirtualDirectory }
 import reporters._
 import symtab.Flags
-import scala.reflect.internal.Names
+import scala.reflect.internal.{ Names, AbstractFileClassLoader }
 import scala.tools.util.PathResolver
 import scala.tools.nsc.util.ScalaClassLoader
 import ScalaClassLoader.URLClassLoader

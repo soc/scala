@@ -8,6 +8,7 @@ package interpreter
 
 import NamedParam._
 import language.implicitConversions
+import util.TypeStrings
 
 trait NamedParamCreator {
   protected def freshName: () => String

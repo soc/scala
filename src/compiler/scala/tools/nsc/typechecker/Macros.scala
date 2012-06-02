@@ -9,6 +9,7 @@ import scala.collection.mutable.ListBuffer
 import scala.compat.Platform.EOL
 import scala.reflect.makro.runtime.{Context => MacroContext}
 import scala.reflect.runtime.Mirror
+import scala.reflect.internal.AbstractFileClassLoader
 import util.Statistics._
 import scala.reflect.makro.util._
 
@@ -598,7 +599,6 @@ trait Macros extends Traces {
 
         // [Eugene] a heuristic to detect REPL
         if (global.settings.exposeEmptyPackage.value) {
-          import scala.tools.nsc.interpreter._
           val virtualDirectory = global.settings.outputDirs.getSingleOutput.get
           loader = new AbstractFileClassLoader(virtualDirectory, loader) {}
         }

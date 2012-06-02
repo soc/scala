@@ -335,6 +335,7 @@ object Predef extends LowPriorityImplicits {
   @inline implicit def augmentString(x: String): StringOps = new StringOps(x)
   implicit def any2stringadd(x: Any) = new runtime.StringAdd(x)
   implicit def unaugmentString(x: StringOps): String = x.repr
+  implicit def enrichClass[T](clazz: Class[T]) = new runtime.RichClass[T](clazz)
 
   implicit val StringCanBuildFrom: CanBuildFrom[String, Char, String] = new CanBuildFrom[String, Char, String] {
     def apply(from: String) = apply()
