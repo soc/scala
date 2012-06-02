@@ -150,7 +150,7 @@ INITIALISATION
   <target name="init.maven.jars" depends="init.maven.tasks">
     <artifact:dependencies pathId="dependency.classpath" filesetId="dependency.fileset">
       <dependency groupId="com.typesafe" artifactId="config" version="0.4.0"/>
-      <dependency groupId="org.improving" artifactId="jvminfo" version="0.1.1-SNAPSHOT" />
+      <dependency groupId="org.improving" artifactId="jvminfo" version="0.1.1" />
     </artifact:dependencies>
   </target>
 
@@ -561,8 +561,16 @@ QUICK BUILD (QUICK)
     <touch file="${build-quick.dir}/library.complete" verbose="no"/>
     <stopwatch name="quick.lib.timer" action="total"/>
   </target>
+  
+  <target name="quick.pre-comp" depends="quick.lib">
+    <uptodate property="quick.comp.available" targetfile="${build-quick.dir}/compiler.complete">
+      <srcfiles dir="${src.dir}">
+        <include name="compiler/**"/>
+      </srcfiles>
+    </uptodate>
+  </target>
 
-  <target name="quick.comp" depends="quick.lib" unless="quick.comp.available">
+  <target name="quick.comp" depends="quick.pre-comp" unless="quick.comp.available">
     <stopwatch name="quick.comp.timer"/>
     <mkdir dir="${build-quick.dir}/classes/compiler"/>
     <!-- TODO If we have cross dependencies, move this below scalacfork... -->
