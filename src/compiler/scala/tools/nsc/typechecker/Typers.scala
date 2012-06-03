@@ -3411,24 +3411,28 @@ trait Typers extends Modes with Adaptations with Taggings {
       )
     }
 
+    def higherKindedTypeArgs(mode: Int, args: List[Tree], tparams: List[Symbol]) = (
+      map2Conserve(args, tparams) {
+        //@M! the polytype denotes the expected kind
+        (arg, tparam) => typedHigherKindedType(arg, mode, GenPolyType(tparam.typeParams, AnyClass.tpe))
+      }
+    )
+
     // lifted out of typed1 because it's needed in typedImplicit0
     protected def typedTypeApply(tree: Tree, mode: Int, fun: Tree, args: List[Tree]): Tree = fun.tpe match {
       case OverloadedType(pre, alts) =>
         inferPolyAlternatives(fun, args map (_.tpe))
         val tparams = fun.symbol.typeParams //@M TODO: fun.symbol.info.typeParams ? (as in typedAppliedTypeTree)
-        val args1 = if (sameLength(args, tparams)) {
-          //@M: in case TypeApply we can't check the kind-arities of the type arguments,
-          // as we don't know which alternative to choose... here we do
-          map2Conserve(args, tparams) {
-            //@M! the polytype denotes the expected kind
-            (arg, tparam) => typedHigherKindedType(arg, mode, GenPolyType(tparam.typeParams, AnyClass.tpe))
-          }
-        } else // @M: there's probably something wrong when args.length != tparams.length... (triggered by bug #320)
-         // Martin, I'm using fake trees, because, if you use args or arg.map(typedType),
-         // inferPolyAlternatives loops...  -- I have no idea why :-(
-         // ...actually this was looping anyway, see bug #278.
-          return TypedApplyWrongNumberOfTpeParametersError(fun, fun)
-
+        //@M: in case TypeApply we can't check the kind-arities of the type arguments,
+        // as we don't know which alternative to choose... here we do
+        val args1 = (
+          if (sameLength(args, tparams)) higherKindedTypeArgs(mode, args, tparams)
+          // @M: there's probably something wrong when args.length != tparams.length... (triggered by bug #320)
+          // Martin, I'm using fake trees, because, if you use args or arg.map(typedType),
+          // inferPolyAlternatives loops...  -- I have no idea why :-(
+          // ...actually this was looping anyway, see bug #278.
+          else return TypedApplyWrongNumberOfTpeParametersError(fun, fun)
+        )
         typedTypeApply(tree, mode, fun, args1)
       case SingleType(_, _) =>
         typedTypeApply(tree, mode, fun setType fun.tpe.widen, args)
@@ -4427,10 +4431,7 @@ trait Typers extends Modes with Adaptations with Taggings {
               if (!tpt1.symbol.rawInfo.isComplete)
                 args mapConserve (typedHigherKindedType(_, mode))
                 // if symbol hasn't been fully loaded, can't check kind-arity
-              else map2Conserve(args, tparams) { (arg, tparam) =>
-                //@M! the polytype denotes the expected kind
-                typedHigherKindedType(arg, mode, GenPolyType(tparam.typeParams, AnyClass.tpe))
-              }
+              else higherKindedTypeArgs(mode, args, tparams)
             val argtypes = args1 map (_.tpe)
 
             foreach2(args, tparams)((arg, tparam) => arg match {
@@ -4629,19 +4630,16 @@ trait Typers extends Modes with Adaptations with Taggings {
           //context.undetparams = undets
 
           // @M maybe the well-kindedness check should be done when checking the type arguments conform to the type parameters' bounds?
-          val args1 = if (sameLength(args, tparams)) map2Conserve(args, tparams) {
-                        //@M! the polytype denotes the expected kind
-                        (arg, tparam) => typedHigherKindedType(arg, mode, GenPolyType(tparam.typeParams, AnyClass.tpe))
-                      } else {
-                      //@M  this branch is correctly hit for an overloaded polymorphic type. It also has to handle erroneous cases.
-                      // Until the right alternative for an overloaded method is known, be very liberal,
-                      // typedTypeApply will find the right alternative and then do the same check as
-                      // in the then-branch above. (see pos/tcpoly_overloaded.scala)
-                      // this assert is too strict: be tolerant for errors like trait A { def foo[m[x], g]=error(""); def x[g] = foo[g/*ERR: missing argument type*/] }
-                      //assert(fun1.symbol.info.isInstanceOf[OverloadedType] || fun1.symbol.isError) //, (fun1.symbol,fun1.symbol.info,fun1.symbol.info.getClass,args,tparams))
-                        args mapConserve (typedHigherKindedType(_, mode))
-                      }
-
+          val args1 = (
+            if (sameLength(args, tparams)) higherKindedTypeArgs(mode, args, tparams)
+            //@M  this branch is correctly hit for an overloaded polymorphic type. It also has to handle erroneous cases.
+            // Until the right alternative for an overloaded method is known, be very liberal,
+            // typedTypeApply will find the right alternative and then do the same check as
+            // in the then-branch above. (see pos/tcpoly_overloaded.scala)
+            // this assert is too strict: be tolerant for errors like trait A { def foo[m[x], g]=error(""); def x[g] = foo[g/*ERR: missing argument type*/] }
+            //assert(fun1.symbol.info.isInstanceOf[OverloadedType] || fun1.symbol.isError) //, (fun1.symbol,fun1.symbol.info,fun1.symbol.info.getClass,args,tparams))
+            else args mapConserve (typedHigherKindedType(_, mode))
+          )
           //@M TODO: context.undetparams = undets_fun ?
           typedTypeApply(tree, mode, fun1, args1)
 
