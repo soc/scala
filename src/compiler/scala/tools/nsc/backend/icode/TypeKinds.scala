@@ -7,6 +7,8 @@ package scala.tools.nsc
 package backend
 package icode
 
+import annotation.switch
+
 /* A type case
 
     case UNIT            =>
@@ -46,12 +48,28 @@ trait TypeKinds { self: ICodes =>
   private lazy val reversePrimitiveMap: Map[TypeKind, Symbol] =
     (primitiveTypeMap map (_.swap)).toMap
 
+  def typeKindsInCanonicalOrder = List(BOOL, BYTE, SHORT, CHAR, INT, LONG, FLOAT, DOUBLE, REFERENCE(AnyRefClass))
+  def numericKindsInCanonicalOrder = typeKindsInCanonicalOrder filter (_.isNumericType)
+
+  def typeKindFromCanonicalIndex(idx: Int) = (idx: @switch) match {
+    case 0 => BOOL
+    case 1 => BYTE
+    case 2 => SHORT
+    case 3 => CHAR
+    case 4 => INT
+    case 5 => LONG
+    case 6 => FLOAT
+    case 7 => DOUBLE
+    case 8 => REFERENCE(AnyRefClass)
+  }
+
   /** This class represents a type kind. Type kinds
    * represent the types that the VM know (or the ICode
    * view of what VMs know).
    */
   sealed abstract class TypeKind {
     def maxType(other: TypeKind): TypeKind
+    def canonicalIndex: Int
 
     def toType: Type = reversePrimitiveMap get this map (_.tpe) getOrElse {
       this match {
@@ -88,6 +106,14 @@ trait TypeKinds { self: ICodes =>
 
     final def isNumericType: Boolean = isIntegralType | isRealType
 
+    /** The first scala primitive opcode which converts from this type. */
+    def startOfConversionRange: Int = -1
+
+    def conversionOpcodeTo(to: TypeKind): Int = {
+      assert(startOfConversionRange > 0 && to.canonicalIndex > 0, this)
+      startOfConversionRange + to.canonicalIndex - 1
+    }
+
     /** Simple subtyping check */
     def <:<(other: TypeKind): Boolean = (this eq other) || (this match {
       case BOOL | BYTE | SHORT | CHAR => other == INT || other == LONG
@@ -107,7 +133,7 @@ trait TypeKinds { self: ICodes =>
       uncomparable(this.toString, other)
   }
 
-  sealed abstract class ValueTypeKind extends TypeKind {
+  sealed abstract class ValueTypeKind(final val canonicalIndex: Int) extends TypeKind {
     override def isValueType = true
     override def toString = {
       this.getClass.getName stripSuffix "$" dropWhile (_ != '$') drop 1
@@ -167,7 +193,7 @@ trait TypeKinds { self: ICodes =>
   }
 
   /** The unit value */
-  case object UNIT extends ValueTypeKind {
+  case object UNIT extends ValueTypeKind(-1) {
     def maxType(other: TypeKind) = other match {
       case UNIT | REFERENCE(NothingClass)   => UNIT
       case _                                => uncomparable(other)
@@ -175,7 +201,7 @@ trait TypeKinds { self: ICodes =>
   }
 
   /** A boolean value */
-  case object BOOL extends ValueTypeKind {
+  case object BOOL extends ValueTypeKind(0) {
     override def isIntSizedType = true
     def maxType(other: TypeKind) = other match {
       case BOOL | REFERENCE(NothingClass)   => BOOL
@@ -189,7 +215,8 @@ trait TypeKinds { self: ICodes =>
    */
 
   /** A 1-byte signed integer */
-  case object BYTE extends ValueTypeKind {
+  case object BYTE extends ValueTypeKind(1) {
+    override def startOfConversionRange = ScalaPrimitiveOpcodes.B2B
     override def isIntSizedType = true
     override def isIntegralType = true
     def maxType(other: TypeKind) = {
@@ -201,7 +228,8 @@ trait TypeKinds { self: ICodes =>
   }
 
   /** A 2-byte signed integer */
-  case object SHORT extends ValueTypeKind {
+  case object SHORT extends ValueTypeKind(2) {
+    override def startOfConversionRange = ScalaPrimitiveOpcodes.S2B
     override def isIntSizedType = true
     override def isIntegralType = true
     override def maxType(other: TypeKind) = other match {
@@ -213,7 +241,8 @@ trait TypeKinds { self: ICodes =>
   }
 
   /** A 2-byte UNSIGNED integer */
-  case object CHAR extends ValueTypeKind {
+  case object CHAR extends ValueTypeKind(3) {
+    override def startOfConversionRange = ScalaPrimitiveOpcodes.C2B
     override def isIntSizedType = true
     override def isIntegralType = true
     override def maxType(other: TypeKind) = other match {
@@ -225,7 +254,8 @@ trait TypeKinds { self: ICodes =>
   }
 
   /** A 4-byte signed integer */
-  case object INT extends ValueTypeKind {
+  case object INT extends ValueTypeKind(4) {
+    override def startOfConversionRange = ScalaPrimitiveOpcodes.I2B
     override def isIntSizedType = true
     override def isIntegralType = true
     override def maxType(other: TypeKind) = other match {
@@ -236,7 +266,8 @@ trait TypeKinds { self: ICodes =>
   }
 
   /** An 8-byte signed integer */
-  case object LONG extends ValueTypeKind {
+  case object LONG extends ValueTypeKind(5) {
+    override def startOfConversionRange = ScalaPrimitiveOpcodes.L2B
     override def isIntegralType = true
     override def isWideType = true
     override def maxType(other: TypeKind): TypeKind =
@@ -246,7 +277,8 @@ trait TypeKinds { self: ICodes =>
   }
 
   /** A 4-byte floating point number */
-  case object FLOAT extends ValueTypeKind {
+  case object FLOAT extends ValueTypeKind(6) {
+    override def startOfConversionRange = ScalaPrimitiveOpcodes.F2B
     override def isRealType = true
     override def maxType(other: TypeKind): TypeKind =
       if (other == DOUBLE) DOUBLE
@@ -255,7 +287,8 @@ trait TypeKinds { self: ICodes =>
   }
 
   /** An 8-byte floating point number */
-  case object DOUBLE extends ValueTypeKind {
+  case object DOUBLE extends ValueTypeKind(7) {
+    override def startOfConversionRange = ScalaPrimitiveOpcodes.D2B
     override def isRealType = true
     override def isWideType = true
     override def maxType(other: TypeKind): TypeKind =
@@ -265,6 +298,7 @@ trait TypeKinds { self: ICodes =>
 
   /** A class type. */
   final case class REFERENCE(cls: Symbol) extends TypeKind {
+    val canonicalIndex = 8
     override def toString = "REF(" + cls + ")"
     assert(cls ne null,
            "REFERENCE to null class symbol.")
@@ -299,6 +333,7 @@ trait TypeKinds { self: ICodes =>
   }
 
   final case class ARRAY(val elem: TypeKind) extends TypeKind {
+    val canonicalIndex = 8
     override def toString    = "ARRAY[" + elem + "]"
     override def isArrayType = true
     override def dimensions  = 1 + elem.dimensions
@@ -331,6 +366,7 @@ trait TypeKinds { self: ICodes =>
 
   /** A boxed value. */
   case class BOXED(kind: TypeKind) extends TypeKind {
+    val canonicalIndex = -1
     override def isBoxedType = true
 
     override def maxType(other: TypeKind) = other match {
@@ -352,6 +388,7 @@ trait TypeKinds { self: ICodes =>
   * way. For JVM it would have been a REFERENCE to 'StringBuffer'.
   */
   case object ConcatClass extends TypeKind {
+    val canonicalIndex = -1
     override def toString = "ConcatClass"
 
     /**

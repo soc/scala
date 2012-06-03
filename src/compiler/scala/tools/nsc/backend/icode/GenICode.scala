@@ -14,6 +14,7 @@ import scala.tools.nsc.symtab._
 import scala.annotation.switch
 import PartialFunction._
 import language.postfixOps
+import ScalaPrimitiveOpcodes._
 
 /** This class ...
  *
@@ -261,14 +262,14 @@ abstract class GenICode extends SubComponent  {
      *  @return     ...
      */
     private def genArrayOp(tree: Tree, ctx: Context, code: Int, expectedType: TypeKind): (Context, TypeKind) = {
+      // println("genArrayOp code = " + code)
       import scalaPrimitives._
       val Apply(Select(arrayObj, _), args) = tree
-      val k = toTypeKind(arrayObj.tpe)
-      val ARRAY(elem) = k
-      var ctx1 = genLoad(arrayObj, ctx, k)
-      val elementType = typeOfArrayOp.getOrElse(code, abort("Unknown operation on arrays: " + tree + " code: " + code))
-
-      var generatedType = expectedType
+      val k                                = toTypeKind(arrayObj.tpe)
+      val ARRAY(elem)                      = k
+      var ctx1                             = genLoad(arrayObj, ctx, k)
+      val elementType                      = typeOfArrayOp(code)
+      var generatedType                    = expectedType
 
       if (scalaPrimitives.isArrayGet(code)) {
         // load argument on stack
@@ -424,6 +425,7 @@ abstract class GenICode extends SubComponent  {
       val sym = tree.symbol
       val Apply(fun @ Select(receiver, _), args) = tree
       val code = scalaPrimitives.getPrimitive(sym, receiver.tpe)
+      println("getPrimitive(%s, %s) == %s".format(sym, receiver.tpe, code))
 
       if (scalaPrimitives.isArithmeticOp(code))
         genArithmeticOp(tree, ctx, code)
@@ -972,7 +974,7 @@ abstract class GenICode extends SubComponent  {
             assert(!from.isReferenceType && !to.isReferenceType,
               "type error: can't convert from " + from + " to " + to +" in unit " + unit.source + " at " + pos)
 
-            ctx.bb.emit(CALL_PRIMITIVE(Conversion(from, to)), pos)
+            ctx.emitConversion(from, to)
         }
       } else if (from == NothingReference) {
         ctx.bb.emit(THROW(ThrowableClass))
@@ -986,7 +988,8 @@ abstract class GenICode extends SubComponent  {
         ctx.bb.emit(CHECK_CAST(to))
       }
       else (from, to) match  {
-        case (BYTE, LONG) | (SHORT, LONG) | (CHAR, LONG) | (INT, LONG) => ctx.bb.emit(CALL_PRIMITIVE(Conversion(INT, LONG)))
+        case (BYTE, LONG) | (SHORT, LONG) | (CHAR, LONG) | (INT, LONG) =>
+          ctx.emitConversion(INT, LONG)
         case _ => ()
       }
     }
@@ -1056,7 +1059,7 @@ abstract class GenICode extends SubComponent  {
 
     def genConversion(from: TypeKind, to: TypeKind, ctx: Context, cast: Boolean) = {
       if (cast)
-        ctx.bb.emit(CALL_PRIMITIVE(Conversion(from, to)))
+        ctx.emitConversion(from, to)
       else {
         ctx.bb.emit(DROP(from))
         ctx.bb.emit(CONSTANT(Constant(from == to)))
@@ -1082,74 +1085,12 @@ abstract class GenICode extends SubComponent  {
       case ConcatClass     => abort("no zero of ConcatClass")
     }
 
-
     /** Is the given symbol a primitive operation? */
     def isPrimitive(fun: Symbol): Boolean = scalaPrimitives.isPrimitive(fun)
 
     /** Generate coercion denoted by "code"
      */
-    def genCoercion(tree: Tree, ctx: Context, code: Int) = {
-      import scalaPrimitives._
-      (code: @switch) match {
-        case B2B => ()
-        case B2C => ctx.bb.emit(CALL_PRIMITIVE(Conversion(BYTE, CHAR)), tree.pos)
-        case B2S => ctx.bb.emit(CALL_PRIMITIVE(Conversion(BYTE, SHORT)), tree.pos)
-        case B2I => ctx.bb.emit(CALL_PRIMITIVE(Conversion(BYTE, INT)), tree.pos)
-        case B2L => ctx.bb.emit(CALL_PRIMITIVE(Conversion(BYTE, LONG)), tree.pos)
-        case B2F => ctx.bb.emit(CALL_PRIMITIVE(Conversion(BYTE, FLOAT)), tree.pos)
-        case B2D => ctx.bb.emit(CALL_PRIMITIVE(Conversion(BYTE, DOUBLE)), tree.pos)
-
-        case S2B => ctx.bb.emit(CALL_PRIMITIVE(Conversion(SHORT, BYTE)), tree.pos)
-        case S2S => ()
-        case S2C => ctx.bb.emit(CALL_PRIMITIVE(Conversion(SHORT, CHAR)), tree.pos)
-        case S2I => ctx.bb.emit(CALL_PRIMITIVE(Conversion(SHORT, INT)), tree.pos)
-        case S2L => ctx.bb.emit(CALL_PRIMITIVE(Conversion(SHORT, LONG)), tree.pos)
-        case S2F => ctx.bb.emit(CALL_PRIMITIVE(Conversion(SHORT, FLOAT)), tree.pos)
-        case S2D => ctx.bb.emit(CALL_PRIMITIVE(Conversion(SHORT, DOUBLE)), tree.pos)
-
-        case C2B => ctx.bb.emit(CALL_PRIMITIVE(Conversion(CHAR, BYTE)), tree.pos)
-        case C2S => ctx.bb.emit(CALL_PRIMITIVE(Conversion(CHAR, SHORT)), tree.pos)
-        case C2C => ()
-        case C2I => ctx.bb.emit(CALL_PRIMITIVE(Conversion(CHAR, INT)), tree.pos)
-        case C2L => ctx.bb.emit(CALL_PRIMITIVE(Conversion(CHAR, LONG)), tree.pos)
-        case C2F => ctx.bb.emit(CALL_PRIMITIVE(Conversion(CHAR, FLOAT)), tree.pos)
-        case C2D => ctx.bb.emit(CALL_PRIMITIVE(Conversion(CHAR, DOUBLE)), tree.pos)
-
-        case I2B => ctx.bb.emit(CALL_PRIMITIVE(Conversion(INT, BYTE)), tree.pos)
-        case I2S => ctx.bb.emit(CALL_PRIMITIVE(Conversion(INT, SHORT)), tree.pos)
-        case I2C => ctx.bb.emit(CALL_PRIMITIVE(Conversion(INT, CHAR)), tree.pos)
-        case I2I => ()
-        case I2L => ctx.bb.emit(CALL_PRIMITIVE(Conversion(INT, LONG)), tree.pos)
-        case I2F => ctx.bb.emit(CALL_PRIMITIVE(Conversion(INT, FLOAT)), tree.pos)
-        case I2D => ctx.bb.emit(CALL_PRIMITIVE(Conversion(INT, DOUBLE)), tree.pos)
-
-        case L2B => ctx.bb.emit(CALL_PRIMITIVE(Conversion(LONG, BYTE)), tree.pos)
-        case L2S => ctx.bb.emit(CALL_PRIMITIVE(Conversion(LONG, SHORT)), tree.pos)
-        case L2C => ctx.bb.emit(CALL_PRIMITIVE(Conversion(LONG, CHAR)), tree.pos)
-        case L2I => ctx.bb.emit(CALL_PRIMITIVE(Conversion(LONG, INT)), tree.pos)
-        case L2L => ()
-        case L2F => ctx.bb.emit(CALL_PRIMITIVE(Conversion(LONG, FLOAT)), tree.pos)
-        case L2D => ctx.bb.emit(CALL_PRIMITIVE(Conversion(LONG, DOUBLE)), tree.pos)
-
-        case F2B => ctx.bb.emit(CALL_PRIMITIVE(Conversion(FLOAT, BYTE)), tree.pos)
-        case F2S => ctx.bb.emit(CALL_PRIMITIVE(Conversion(FLOAT, SHORT)), tree.pos)
-        case F2C => ctx.bb.emit(CALL_PRIMITIVE(Conversion(FLOAT, CHAR)), tree.pos)
-        case F2I => ctx.bb.emit(CALL_PRIMITIVE(Conversion(FLOAT, INT)), tree.pos)
-        case F2L => ctx.bb.emit(CALL_PRIMITIVE(Conversion(FLOAT, LONG)), tree.pos)
-        case F2F => ()
-        case F2D => ctx.bb.emit(CALL_PRIMITIVE(Conversion(FLOAT, DOUBLE)), tree.pos)
-
-        case D2B => ctx.bb.emit(CALL_PRIMITIVE(Conversion(DOUBLE, BYTE)), tree.pos)
-        case D2S => ctx.bb.emit(CALL_PRIMITIVE(Conversion(DOUBLE, SHORT)), tree.pos)
-        case D2C => ctx.bb.emit(CALL_PRIMITIVE(Conversion(DOUBLE, CHAR)), tree.pos)
-        case D2I => ctx.bb.emit(CALL_PRIMITIVE(Conversion(DOUBLE, INT)), tree.pos)
-        case D2L => ctx.bb.emit(CALL_PRIMITIVE(Conversion(DOUBLE, LONG)), tree.pos)
-        case D2F => ctx.bb.emit(CALL_PRIMITIVE(Conversion(DOUBLE, FLOAT)), tree.pos)
-        case D2D => ()
-
-        case _ => abort("Unknown coercion primitive: " + code)
-      }
-    }
+    def genCoercion(tree: Tree, ctx: Context, code: Int) = ctx emitConversion code
 
     /** The Object => String overload.
      */
@@ -1665,7 +1606,7 @@ abstract class GenICode extends SubComponent  {
      * The Context class keeps information relative to the current state
      * in code generation
      */
-    class Context {
+    class Context extends opcodes.Emitter {
       /** The current package. */
       var packg: Name = _
 
@@ -1870,6 +1811,72 @@ abstract class GenICode extends SubComponent  {
         this.method.addLocal(new Local(sym, toTypeKind(tpe), false))
       }
 
+      def emit(instr: Instruction, pos: Position): Unit = bb.emit(instr, pos)
+      def emit(instr: Instruction): Unit = bb.emit(instr)
+
+      // def genCoercion(tree: Tree, ctx: Context, code: Int) = {
+      //   import scalaPrimitives._
+      //   (code: @switch) match {
+      //     case B2B => ()
+      //     case B2C => ctx.bb.emit(CALL_PRIMITIVE(Conversion(BYTE, CHAR)), tree.pos)
+      //     case B2S => ctx.bb.emit(CALL_PRIMITIVE(Conversion(BYTE, SHORT)), tree.pos)
+      //     case B2I => ctx.bb.emit(CALL_PRIMITIVE(Conversion(BYTE, INT)), tree.pos)
+      //     case B2L => ctx.bb.emit(CALL_PRIMITIVE(Conversion(BYTE, LONG)), tree.pos)
+      //     case B2F => ctx.bb.emit(CALL_PRIMITIVE(Conversion(BYTE, FLOAT)), tree.pos)
+      //     case B2D => ctx.bb.emit(CALL_PRIMITIVE(Conversion(BYTE, DOUBLE)), tree.pos)
+      //
+      //     case S2B => ctx.bb.emit(CALL_PRIMITIVE(Conversion(SHORT, BYTE)), tree.pos)
+      //     case S2S => ()
+      //     case S2C => ctx.bb.emit(CALL_PRIMITIVE(Conversion(SHORT, CHAR)), tree.pos)
+      //     case S2I => ctx.bb.emit(CALL_PRIMITIVE(Conversion(SHORT, INT)), tree.pos)
+      //     case S2L => ctx.bb.emit(CALL_PRIMITIVE(Conversion(SHORT, LONG)), tree.pos)
+      //     case S2F => ctx.bb.emit(CALL_PRIMITIVE(Conversion(SHORT, FLOAT)), tree.pos)
+      //     case S2D => ctx.bb.emit(CALL_PRIMITIVE(Conversion(SHORT, DOUBLE)), tree.pos)
+      //
+      //     case C2B => ctx.bb.emit(CALL_PRIMITIVE(Conversion(CHAR, BYTE)), tree.pos)
+      //     case C2S => ctx.bb.emit(CALL_PRIMITIVE(Conversion(CHAR, SHORT)), tree.pos)
+      //     case C2C => ()
+      //     case C2I => ctx.bb.emit(CALL_PRIMITIVE(Conversion(CHAR, INT)), tree.pos)
+      //     case C2L => ctx.bb.emit(CALL_PRIMITIVE(Conversion(CHAR, LONG)), tree.pos)
+      //     case C2F => ctx.bb.emit(CALL_PRIMITIVE(Conversion(CHAR, FLOAT)), tree.pos)
+      //     case C2D => ctx.bb.emit(CALL_PRIMITIVE(Conversion(CHAR, DOUBLE)), tree.pos)
+      //
+      //     case I2B => ctx.bb.emit(CALL_PRIMITIVE(Conversion(INT, BYTE)), tree.pos)
+      //     case I2S => ctx.bb.emit(CALL_PRIMITIVE(Conversion(INT, SHORT)), tree.pos)
+      //     case I2C => ctx.bb.emit(CALL_PRIMITIVE(Conversion(INT, CHAR)), tree.pos)
+      //     case I2I => ()
+      //     case I2L => ctx.bb.emit(CALL_PRIMITIVE(Conversion(INT, LONG)), tree.pos)
+      //     case I2F => ctx.bb.emit(CALL_PRIMITIVE(Conversion(INT, FLOAT)), tree.pos)
+      //     case I2D => ctx.bb.emit(CALL_PRIMITIVE(Conversion(INT, DOUBLE)), tree.pos)
+      //
+      //     case L2B => ctx.bb.emit(CALL_PRIMITIVE(Conversion(LONG, BYTE)), tree.pos)
+      //     case L2S => ctx.bb.emit(CALL_PRIMITIVE(Conversion(LONG, SHORT)), tree.pos)
+      //     case L2C => ctx.bb.emit(CALL_PRIMITIVE(Conversion(LONG, CHAR)), tree.pos)
+      //     case L2I => ctx.bb.emit(CALL_PRIMITIVE(Conversion(LONG, INT)), tree.pos)
+      //     case L2L => ()
+      //     case L2F => ctx.bb.emit(CALL_PRIMITIVE(Conversion(LONG, FLOAT)), tree.pos)
+      //     case L2D => ctx.bb.emit(CALL_PRIMITIVE(Conversion(LONG, DOUBLE)), tree.pos)
+      //
+      //     case F2B => ctx.bb.emit(CALL_PRIMITIVE(Conversion(FLOAT, BYTE)), tree.pos)
+      //     case F2S => ctx.bb.emit(CALL_PRIMITIVE(Conversion(FLOAT, SHORT)), tree.pos)
+      //     case F2C => ctx.bb.emit(CALL_PRIMITIVE(Conversion(FLOAT, CHAR)), tree.pos)
+      //     case F2I => ctx.bb.emit(CALL_PRIMITIVE(Conversion(FLOAT, INT)), tree.pos)
+      //     case F2L => ctx.bb.emit(CALL_PRIMITIVE(Conversion(FLOAT, LONG)), tree.pos)
+      //     case F2F => ()
+      //     case F2D => ctx.bb.emit(CALL_PRIMITIVE(Conversion(FLOAT, DOUBLE)), tree.pos)
+      //
+      //     case D2B => ctx.bb.emit(CALL_PRIMITIVE(Conversion(DOUBLE, BYTE)), tree.pos)
+      //     case D2S => ctx.bb.emit(CALL_PRIMITIVE(Conversion(DOUBLE, SHORT)), tree.pos)
+      //     case D2C => ctx.bb.emit(CALL_PRIMITIVE(Conversion(DOUBLE, CHAR)), tree.pos)
+      //     case D2I => ctx.bb.emit(CALL_PRIMITIVE(Conversion(DOUBLE, INT)), tree.pos)
+      //     case D2L => ctx.bb.emit(CALL_PRIMITIVE(Conversion(DOUBLE, LONG)), tree.pos)
+      //     case D2F => ctx.bb.emit(CALL_PRIMITIVE(Conversion(DOUBLE, FLOAT)), tree.pos)
+      //     case D2D => ()
+      //
+      //     case _ => abort("Unknown coercion primitive: " + code)
+      //   }
+      // }
+      //
 
       /**
        * Generate exception handlers for the body. Body is evaluated
@@ -1908,19 +1915,23 @@ abstract class GenICode extends SubComponent  {
           tmp = this.makeLocal(tree.pos, tree.tpe, "tmp")
         }
 
-        def emitFinalizer(ctx: Context): Context = if (!finalizer.isEmpty) {
-          val ctx1 = finalizerCtx.dup.newBlock
-          ctx.bb.closeWith(JUMP(ctx1.bb))
+        def guardingResult[T](oldCtx: Context)(body: => Context): Context = {
+          oldCtx.bb emit STORE_LOCAL(tmp)
+          val newCtx = body
+          newCtx.bb emit LOAD_LOCAL(tmp)
+          newCtx
+        }
 
-          if (guardResult) {
-            ctx1.bb.emit(STORE_LOCAL(tmp))
-            val ctx2 = genLoad(duplicateFinalizer(boundLabels, ctx1, finalizer), ctx1, UNIT)
-            ctx2.bb.emit(LOAD_LOCAL(tmp))
-            ctx2
-          } else
-            genLoad(duplicateFinalizer(boundLabels, ctx1, finalizer), ctx1, UNIT)
-        } else ctx
+        def emitFinalizer(ctx: Context): Context = (
+          if (finalizer.isEmpty) ctx else {
+            val ctx1 = finalizerCtx.dup.newBlock
+            ctx.bb closeWith JUMP(ctx1.bb)
+            def load = genLoad(duplicateFinalizer(boundLabels, ctx1, finalizer), ctx1, UNIT)
 
+            if (guardResult) guardingResult(ctx1)(load)
+            else load
+          }
+        )
 
         val finalizerExh = if (finalizer != EmptyTree) Some({
           val exh = outerCtx.newExceptionHandler(NoSymbol, toTypeKind(finalizer.tpe), finalizer.pos) // finalizer covers exception handlers

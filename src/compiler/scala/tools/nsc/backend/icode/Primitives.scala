@@ -3,19 +3,42 @@
  * @author  Martin Odersky
  */
 
-
 package scala.tools.nsc
 package backend
-package icode;
+package icode
 
-import java.io.PrintWriter;
+import java.io.PrintWriter
+import scala.reflect.internal.{ ClassfileConstants => JVM }
+import annotation.switch
+import scala.tools.nsc.backend.ScalaPrimitiveOpcodes.{ B2B, D2D }
 
 trait Primitives { self: ICodes =>
-
   /** This class represents a primitive operation. */
   class Primitive {
   }
 
+  private object primitiveCache {
+    /** There are 7x7 = 49 opcodes in the scala opcode set for
+     *  converting between primitives, ranging from B2B to D2D.
+     *  The array is larger because they're not consecutive.
+     */
+    val conversions: Array[Conversion] = {
+      val arr  = new Array[Conversion](D2D - B2B + 1)
+      for ((from, idx1) <- numericKindsInCanonicalOrder.zipWithIndex ; (to, idx2) <- numericKindsInCanonicalOrder.zipWithIndex) {
+        val idx = (idx1 * 10) + idx2
+        arr(idx) = Conversion(from, to)
+      }
+      arr
+    }
+  }
+  def conversionInstruction(code: Int): Conversion = (
+    if (B2B <= code && code <= D2D) {
+      val res = primitiveCache.conversions(code - B2B)
+      assert(res != null, code)
+      res
+    }
+    else sys.error("Unknown conversion code: " + code)
+  )
 
   // type : (type) => type
   // range: type <- { BOOL, Ix, Ux, Rx }
@@ -51,7 +74,7 @@ trait Primitives { self: ICodes =>
   // type : (src) => dst
   // range: src,dst <- { Ix, Ux, Rx }
   // jvm  : i2{l, f, d}, l2{i, f, d}, f2{i, l, d}, d2{i, l, f}, i2{b, c, s}
-  case class Conversion(src: TypeKind, dst: TypeKind) extends Primitive;
+  case class Conversion private[Primitives] (src: TypeKind, dst: TypeKind) extends Primitive;
 
   // type : (Array[REF]) => I4
   // range: type <- { BOOL, Ix, Ux, Rx, REF }

@@ -38,7 +38,7 @@ trait FrontEnds {
   }
 
   def interactive(): Unit = mirror.reporter match {
-    case reporter: tools.nsc.reporters.AbstractReporter => reporter.displayPrompt()
+    case reporter: scala.tools.nsc.reporters.AbstractReporter => reporter.displayPrompt()
     case _ => ()
   }
 }

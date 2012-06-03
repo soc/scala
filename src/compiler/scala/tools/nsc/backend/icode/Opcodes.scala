@@ -3,14 +3,13 @@
  * @author  Martin Odersky
  */
 
-
-
 package scala.tools.nsc
 package backend
 package icode
 
 import scala.tools.nsc.ast._
 import scala.tools.nsc.util.{Position,NoPosition}
+import scala.tools.nsc.backend.ScalaPrimitiveOpcodes.{ isNoOpCoercion }
 
 /*
   A pattern match
@@ -99,6 +98,25 @@ trait Opcodes { self: ICodes =>
   }
 
   object opcodes {
+    abstract class Emitter {
+      def emit(instr: Instruction): Unit
+      def emit(instr: Instruction, pos: Position): Unit
+
+      def emitValue(x: Any)                                = emitConstant(Constant(x))
+      def emitConstant(x: Constant)                        = emit(CONSTANT(x))
+      def emitPrimitive(x: Primitive)                      = emit(CALL_PRIMITIVE(x))
+      def emitLoadArrayItem(kind: TypeKind)                = emit(LOAD_ARRAY_ITEM(kind))
+      def emitStoreArrayItem(kind: TypeKind)               = emit(STORE_ARRAY_ITEM(kind))
+      def emitReturn(kind: TypeKind)                       = emit(RETURN(kind))
+      def emitArithmetic(op: ArithmeticOp, kind: TypeKind) = emitPrimitive(Arithmetic(op, kind))
+      def emitNegation(kind: TypeKind)                     = emitPrimitive(Negation(kind))
+      def emitShift(op: ShiftOp, kind: TypeKind)           = emitPrimitive(Shift(op, kind))
+      def emitLogical(op: LogicalOp, kind: TypeKind)       = emitPrimitive(Logical(op, kind))
+      def emitComparison(op: ComparisonOp, kind: TypeKind) = emitPrimitive(Comparison(op, kind))
+
+      def emitConversion(opcode: Int): Unit                  = if (!isNoOpCoercion(opcode)) emitPrimitive(conversionInstruction(opcode))
+      def emitConversion(from: TypeKind, to: TypeKind): Unit = emitConversion(from conversionOpcodeTo to)
+    }
 
     def mayThrow(i: Instruction): Boolean = i match {
       case LOAD_LOCAL(_) | STORE_LOCAL(_) | CONSTANT(_) | THIS(_) | CZJUMP(_, _, _, _)

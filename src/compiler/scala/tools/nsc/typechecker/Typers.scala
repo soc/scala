@@ -3833,11 +3833,7 @@ trait Typers extends Modes with Adaptations with Taggings {
       }
 
       def typedEta(expr1: Tree): Tree = expr1.tpe match {
-        case TypeRef(_, ByNameParamClass, _) =>
-          val expr2 = Function(Nil, expr1) setPos expr1.pos
-          new ChangeOwnerTraverser(context.owner, expr2.symbol).traverse(expr2)
-          typed1(expr2, mode, pt)
-        case NullaryMethodType(restpe) =>
+        case TypeRef(_, ByNameParamClass, _) | NullaryMethodType(_) =>
           val expr2 = Function(Nil, expr1) setPos expr1.pos
           new ChangeOwnerTraverser(context.owner, expr2.symbol).traverse(expr2)
           typed1(expr2, mode, pt)

@@ -10,8 +10,9 @@ package classfile
 import scala.collection.{ mutable, immutable }
 import mutable.ListBuffer
 import backend.icode._
-import classfile.{ ClassfileConstants => JVM }
-import ClassfileConstants._
+import scala.reflect.internal.{ ClassfileConstants => JVM }
+import backend.ScalaPrimitiveOpcodes.scalaConversionOpcodeForJvmOpcode
+import JVM._
 import scala.reflect.internal.Flags._
 import annotation.switch
 
@@ -205,18 +206,6 @@ abstract class ICodeReader extends ClassfileParser {
     import opcodes._
     import code._
 
-    def emitConstant(x: Constant)                        = code emit CONSTANT(x)
-    def emitValue(x: Any)                                = emitConstant(Constant(x))
-    def emitPrimitive(x: Primitive)                      = code.emit(CALL_PRIMITIVE(x))
-    def emitArithmetic(op: ArithmeticOp, kind: TypeKind) = emitPrimitive(Arithmetic(op, kind))
-    def emitConversion(from: TypeKind, to: TypeKind)     = emitPrimitive(Conversion(from, to))
-    def emitNegation(kind: TypeKind)                     = emitPrimitive(Negation(kind))
-    def emitShift(op: ShiftOp, kind: TypeKind)           = emitPrimitive(Shift(op, kind))
-    def emitLogical(op: LogicalOp, kind: TypeKind)       = emitPrimitive(Logical(op, kind))
-    def emitComparison(op: ComparisonOp, kind: TypeKind) = emitPrimitive(Comparison(op, kind))
-    def emitLoadLocal(idx: Int, kind: TypeKind)          = code.emit(LOAD_LOCAL(code.getLocal(idx, kind)))
-    def emitStoreLocal(idx: Int, kind: TypeKind)         = code.emit(STORE_LOCAL(code.getLocal(idx, kind)))
-
     def parseInstruction() {
       var size = 1 // instruction size
 
@@ -244,7 +233,11 @@ abstract class ICodeReader extends ClassfileParser {
       )
 
       val instr = toUnsignedByte(in.nextByte)
-      (instr: @switch) match {
+
+      val convertOp = scalaConversionOpcodeForJvmOpcode(instr)
+      if (convertOp >= 0)
+        emitConversion(convertOp)
+      else (instr: @switch) match {
         case JVM.nop => parseInstruction
         case JVM.aconst_null => emitValue(null)
         case JVM.iconst_m1   => emitValue(-1)
@@ -304,14 +297,14 @@ abstract class ICodeReader extends ClassfileParser {
         case JVM.aload_2     => emitLoadLocal(2, ObjectReference)
         case JVM.aload_3     => emitLoadLocal(3, ObjectReference)
 
-        case JVM.iaload      => code.emit(LOAD_ARRAY_ITEM(INT))
-        case JVM.laload      => code.emit(LOAD_ARRAY_ITEM(LONG))
-        case JVM.faload      => code.emit(LOAD_ARRAY_ITEM(FLOAT))
-        case JVM.daload      => code.emit(LOAD_ARRAY_ITEM(DOUBLE))
-        case JVM.aaload      => code.emit(LOAD_ARRAY_ITEM(ObjectReference))
-        case JVM.baload      => code.emit(LOAD_ARRAY_ITEM(BYTE))
-        case JVM.caload      => code.emit(LOAD_ARRAY_ITEM(CHAR))
-        case JVM.saload      => code.emit(LOAD_ARRAY_ITEM(SHORT))
+        case JVM.iaload      => emitLoadArrayItem(INT)
+        case JVM.laload      => emitLoadArrayItem(LONG)
+        case JVM.faload      => emitLoadArrayItem(FLOAT)
+        case JVM.daload      => emitLoadArrayItem(DOUBLE)
+        case JVM.aaload      => emitLoadArrayItem(ObjectReference)
+        case JVM.baload      => emitLoadArrayItem(BYTE)
+        case JVM.caload      => emitLoadArrayItem(CHAR)
+        case JVM.saload      => emitLoadArrayItem(SHORT)
 
         case JVM.istore      => emitStoreLocal(in.nextByte, INT);    size += 1
         case JVM.lstore      => emitStoreLocal(in.nextByte, LONG);   size += 1
@@ -342,14 +335,14 @@ abstract class ICodeReader extends ClassfileParser {
         case JVM.astore_1    => emitStoreLocal(1, ObjectReference)
         case JVM.astore_2    => emitStoreLocal(2, ObjectReference)
         case JVM.astore_3    => emitStoreLocal(3, ObjectReference)
-        case JVM.iastore     => code.emit(STORE_ARRAY_ITEM(INT))
-        case JVM.lastore     => code.emit(STORE_ARRAY_ITEM(LONG))
-        case JVM.fastore     => code.emit(STORE_ARRAY_ITEM(FLOAT))
-        case JVM.dastore     => code.emit(STORE_ARRAY_ITEM(DOUBLE))
-        case JVM.aastore     => code.emit(STORE_ARRAY_ITEM(ObjectReference))
-        case JVM.bastore     => code.emit(STORE_ARRAY_ITEM(BYTE))
-        case JVM.castore     => code.emit(STORE_ARRAY_ITEM(CHAR))
-        case JVM.sastore     => code.emit(STORE_ARRAY_ITEM(SHORT))
+        case JVM.iastore     => emitStoreArrayItem(INT)
+        case JVM.lastore     => emitStoreArrayItem(LONG)
+        case JVM.fastore     => emitStoreArrayItem(FLOAT)
+        case JVM.dastore     => emitStoreArrayItem(DOUBLE)
+        case JVM.aastore     => emitStoreArrayItem(ObjectReference)
+        case JVM.bastore     => emitStoreArrayItem(BYTE)
+        case JVM.castore     => emitStoreArrayItem(CHAR)
+        case JVM.sastore     => emitStoreArrayItem(SHORT)
 
         case JVM.pop         => code.emit(DROP(INT))   // any 1-word type would do
         case JVM.pop2        => code.emit(DROP(LONG))  // any 2-word type would do
@@ -406,22 +399,6 @@ abstract class ICodeReader extends ClassfileParser {
           emitValue(in.nextByte)
           emitArithmetic(ADD, INT)
           emitStoreLocal(idx, INT)
-
-        case JVM.i2l         => emitConversion(INT, LONG)
-        case JVM.i2f         => emitConversion(INT, FLOAT)
-        case JVM.i2d         => emitConversion(INT, DOUBLE)
-        case JVM.l2i         => emitConversion(LONG, INT)
-        case JVM.l2f         => emitConversion(LONG, FLOAT)
-        case JVM.l2d         => emitConversion(LONG, DOUBLE)
-        case JVM.f2i         => emitConversion(FLOAT, INT)
-        case JVM.f2l         => emitConversion(FLOAT, LONG)
-        case JVM.f2d         => emitConversion(FLOAT, DOUBLE)
-        case JVM.d2i         => emitConversion(DOUBLE, INT)
-        case JVM.d2l         => emitConversion(DOUBLE, LONG)
-        case JVM.d2f         => emitConversion(DOUBLE, FLOAT)
-        case JVM.i2b         => emitConversion(INT, BYTE)
-        case JVM.i2c         => emitConversion(INT, CHAR)
-        case JVM.i2s         => emitConversion(INT, SHORT)
 
         case JVM.lcmp        => emitComparison(CMP, LONG)
         case JVM.fcmpl       => emitComparison(CMPL, FLOAT)
@@ -486,12 +463,12 @@ abstract class ICodeReader extends ClassfileParser {
           targets = default :: targets
           code.emit(LSWITCH(tags.reverse, targets.reverse))
 
-        case JVM.ireturn     => code.emit(RETURN(INT))
-        case JVM.lreturn     => code.emit(RETURN(LONG))
-        case JVM.freturn     => code.emit(RETURN(FLOAT))
-        case JVM.dreturn     => code.emit(RETURN(DOUBLE))
-        case JVM.areturn     => code.emit(RETURN(ObjectReference))
-        case JVM.return_     => code.emit(RETURN(UNIT))
+        case JVM.ireturn     => emitReturn(INT)
+        case JVM.lreturn     => emitReturn(LONG)
+        case JVM.freturn     => emitReturn(FLOAT)
+        case JVM.dreturn     => emitReturn(DOUBLE)
+        case JVM.areturn     => emitReturn(ObjectReference)
+        case JVM.return_     => emitReturn(UNIT)
 
         case JVM.getstatic    =>
           val field = pool.getMemberSymbol(in.nextChar, true); size += 2
@@ -659,7 +636,7 @@ abstract class ICodeReader extends ClassfileParser {
     else if ((flags & JAVA_ACC_STATIC) != 0) staticCode
     else instanceCode
 
-  class LinearCode {
+  class LinearCode extends opcodes.Emitter {
     val instrs     = ListBuffer[(Int, Instruction)]()
     val jmpTargets = perRunCaches.newSet[Int]()
     val locals     = perRunCaches.newMap[Int, List[(Local, TypeKind)]]()
@@ -667,6 +644,7 @@ abstract class ICodeReader extends ClassfileParser {
     var containsDUPX = false
     var containsNEW  = false
 
+    def emit(i: Instruction, pos: Position) { emit(i) }
     def emit(i: Instruction) {
       instrs += ((pc, i))
       if (i.isInstanceOf[DupX])
@@ -674,6 +652,8 @@ abstract class ICodeReader extends ClassfileParser {
       if (i.isInstanceOf[opcodes.NEW])
         containsNEW = true
     }
+    def emitLoadLocal(idx: Int, kind: TypeKind)  = emit(opcodes.LOAD_LOCAL(getLocal(idx, kind)))
+    def emitStoreLocal(idx: Int, kind: TypeKind) = emit(opcodes.STORE_LOCAL(getLocal(idx, kind)))
 
     /** Break this linear code in basic block representation
      *  As a side effect, it sets the `code` field of the current

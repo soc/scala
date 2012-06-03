@@ -8,6 +8,9 @@ package typechecker
 
 import util.Statistics._
 
+import scala.collection.{ mutable, immutable }
+import scala.reflect.NameTransformer.decode
+
 /** The main attribution phase.
  */
 trait Analyzer extends AnyRef
@@ -29,6 +32,26 @@ trait Analyzer extends AnyRef
   val global : Global
   import global._
 
+  private val allTrees = mutable.ListBuffer[Tree]()
+  private def dumpTrees = scala.sys.props contains "scalac.dump.trees"
+  if (dumpTrees) {
+    scala.sys addShutdownHook {
+      (allTrees.toList map { t =>
+        try decode("" + t).replaceAll("\\s+", " ")
+        catch { case e => "" + e }
+      }).sorted foreach println
+    }
+  }
+  object TreeTracker extends Traverser {
+    override def traverse(t: Tree) {
+      t match {
+        case CaseDef(pat, guard, body) => traverse(guard) ; traverse(body)  // skip patterns
+        case x: GenericApply           => allTrees += x
+        case _                         => super.traverse(t)
+      }
+    }
+  }
+
   object namerFactory extends SubComponent {
     val global: Analyzer.this.global.type = Analyzer.this.global
     val phaseName = "namer"
@@ -39,6 +62,9 @@ trait Analyzer extends AnyRef
       override def keepsTypeParams = false
 
       def apply(unit: CompilationUnit) {
+        if (dumpTrees)
+          TreeTracker traverse unit.body
+
         newNamer(rootContext(unit)).enterSym(unit.body)
       }
     }
@@ -70,6 +96,18 @@ trait Analyzer extends AnyRef
       }
     }
   }
+  //
+  // class WTree(val t: Tree) {
+  //   override def toString = "%-20s %s".format(t.shortClass, ("" + t) take 60)
+  //   override def hashCode = t.hashCode
+  //   override def equals(other: Any) = other match {
+  //     case that: WTree  =>
+  //       (t == that.t) || (t equalsStructure that.t) || (t.toString == that.t.toString) || (t.symbol == that.t.symbol)
+  //     case _ => false
+  //   }
+  // }
+  //
+  // private val allTrees = mutable.HashMap[WTree, Int]() withDefaultValue 0
 
   object typerFactory extends SubComponent {
     val global: Analyzer.this.global.type = Analyzer.this.global

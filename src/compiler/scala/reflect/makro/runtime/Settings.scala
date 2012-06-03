@@ -17,7 +17,7 @@ trait Settings {
     setCompilerSettings(options.split(" ").toList)
 
   def setCompilerSettings(options: List[String]): this.type = {
-    val settings = new tools.nsc.Settings(_ => ())
+    val settings = new scala.tools.nsc.Settings(_ => ())
     // [Eugene] what settings should we exclude?
     settings.copyInto(mirror.settings)
     this

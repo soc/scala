@@ -8,31 +8,10 @@ package backend
 
 import scala.tools.nsc.backend.icode._
 import scala.collection.{ mutable, immutable }
+import annotation.switch
+import scala.reflect.internal.{ ClassfileConstants => JVM }
 
-/** Scala primitive operations are represented as methods in `Any` and
- *  `AnyVal` subclasses. Here we demultiplex them by providing a mapping
- *  from their symbols to integers. Different methods exist for
- *  different value types, but with the same meaning (like plus, minus,
- *  etc.). They will all be mapped to the same int.
- *
- *  Note: The three equal methods have the following semantics:
- *  - `"=="` checks for `null`, and if non-null, calls
- *    `java.lang.Object.equals`
- *    `(class: Any; modifier: final)`. Primitive: `EQ`
- *  - `"eq"` usual reference comparison
- *    `(class: AnyRef; modifier: final)`. Primitive: `ID`
- *  - `"equals"` user-defined equality (Java semantics)
- *    `(class: Object; modifier: none)`. Primitive: `EQUALS`
- *
- * Inspired from the `scalac` compiler.
- */
-abstract class ScalaPrimitives {
-  val global: Global
-
-  import global._
-  import definitions._
-  import global.icodes._
-
+abstract class ScalaPrimitiveOpcodes {
   // Arithmetic unary operations
   final val POS = 1                            // +x
   final val NEG = 2                            // -x
@@ -134,6 +113,16 @@ abstract class ScalaPrimitives {
   final val DARRAY_SET = 157                   // RunTime.darray(x,y,z)
   final val OARRAY_SET = 158                   // RunTime.oarray(x,y,z)
 
+  /** Check whether the given operation code is an array operation. */
+  def isArrayOp(code: Int) = code match {
+    case LENGTH | APPLY | UPDATE  => true
+    case _                        => (NEW_ZARRAY <= code) && (code <= OARRAY_SET)
+  }
+  def isArrayNew(code: Int)     =                     (NEW_ZARRAY <= code && code <= NEW_OARRAY)
+  def isArrayLength(code: Int)  = (code == LENGTH) || (ZARRAY_LENGTH <= code && code <= OARRAY_LENGTH)
+  def isArrayGet(code: Int)     = (code == APPLY)  || (ZARRAY_GET <= code && code <= OARRAY_GET)
+  def isArraySet(code: Int)     = (code == UPDATE) || (ZARRAY_SET <= code && code <= OARRAY_SET)
+
   final val B2B = 200                          // RunTime.b2b(x)
   final val B2S = 201                          // RunTime.b2s(x)
   final val B2C = 202                          // RunTime.b2c(x)
@@ -189,6 +178,90 @@ abstract class ScalaPrimitives {
   final val D2L = 264                          // RunTime.d2l(x)
   final val D2F = 265                          // RunTime.d2f(x)
   final val D2D = 266                          // RunTime.d2d(x)
+
+  def isNoOpCoercion(code: Int) = code match {
+    case B2B | S2S | C2C | I2I | L2L | F2F | D2D => true
+    case _                                       => false
+  }
+  def isCoercion(code: Int) = (B2B <= code) && (code <= D2D)
+
+  def scalaConversionOpcodeForJvmOpcode(code: Int): Int = (code: @switch) match {
+    case JVM.i2l => I2L
+    case JVM.i2f => I2F
+    case JVM.i2d => I2D
+    case JVM.l2i => L2I
+    case JVM.l2f => L2F
+    case JVM.l2d => L2D
+    case JVM.f2i => F2I
+    case JVM.f2l => F2L
+    case JVM.f2d => F2D
+    case JVM.d2i => D2I
+    case JVM.d2l => D2L
+    case JVM.d2f => D2F
+    case JVM.i2b => I2B
+    case JVM.i2c => I2C
+    case JVM.i2s => I2S
+    case _       => -1
+  }
+  final val primitiveCodeOfArrayOp: Array[Int] = (
+       (ZARRAY_LENGTH to OARRAY_LENGTH)
+    ++ (ZARRAY_GET to OARRAY_GET)
+    ++ (ZARRAY_SET to OARRAY_SET)
+  ).toArray
+
+  /** Check whether the given code is a comparison operator */
+  def isComparisonOp(code: Int): Boolean = (code: @switch) match {
+    case ID | NI | EQ | NE | LT | LE | GT | GE => true
+    case _                                     => false
+  }
+  def isUniversalEqualityOp(code: Int): Boolean = (code == EQ) || (code == NE)
+  def isReferenceEqualityOp(code: Int): Boolean = (code == ID) || (code == NI)
+
+  def isArithmeticOp(code: Int): Boolean = (code: @switch) match {
+    case POS | NEG | NOT                   => true // unary
+    case ADD | SUB | MUL | DIV | MOD       => true // binary
+    case OR  | XOR | AND | LSL | LSR | ASR => true // bitwise
+    case _                                 => false
+  }
+  def isLogicalOp(code: Int): Boolean = (code: @switch) match {
+    case ZNOT | ZAND | ZOR => true
+    case _                 => false
+  }
+  def isShiftOp(code: Int): Boolean = (code: @switch) match {
+    case LSL | LSR | ASR => true
+    case _               => false
+  }
+  def isBitwiseOp(code: Int): Boolean = (code: @switch) match {
+    case OR | XOR | AND => true
+    case _              => false
+  }
+}
+
+object ScalaPrimitiveOpcodes extends ScalaPrimitiveOpcodes { }
+
+/** Scala primitive operations are represented as methods in `Any` and
+ *  `AnyVal` subclasses. Here we demultiplex them by providing a mapping
+ *  from their symbols to integers. Different methods exist for
+ *  different value types, but with the same meaning (like plus, minus,
+ *  etc.). They will all be mapped to the same int.
+ *
+ *  Note: The three equal methods have the following semantics:
+ *  - `"=="` checks for `null`, and if non-null, calls
+ *    `java.lang.Object.equals`
+ *    `(class: Any; modifier: final)`. Primitive: `EQ`
+ *  - `"eq"` usual reference comparison
+ *    `(class: AnyRef; modifier: final)`. Primitive: `ID`
+ *  - `"equals"` user-defined equality (Java semantics)
+ *    `(class: Object; modifier: none)`. Primitive: `EQUALS`
+ *
+ * Inspired from the `scalac` compiler.
+ */
+abstract class ScalaPrimitives extends ScalaPrimitiveOpcodes {
+  val global: Global
+
+  import global._
+  import definitions._
+  import global.icodes._
 
   private val primitives: mutable.Map[Symbol, Int] = new mutable.HashMap()
 
@@ -453,95 +526,24 @@ abstract class ScalaPrimitives {
         else code)
   }
 
-  def isCoercion(code: Int): Boolean = (code >= B2B) && (code <= D2D)
-
-  final val typeOfArrayOp: Map[Int, TypeKind] = Map(
-    (List(ZARRAY_LENGTH, ZARRAY_GET, ZARRAY_SET) map (_ -> BOOL)) ++
-    (List(BARRAY_LENGTH, BARRAY_GET, BARRAY_SET) map (_ -> BYTE)) ++
-    (List(SARRAY_LENGTH, SARRAY_GET, SARRAY_SET) map (_ -> SHORT)) ++
-    (List(CARRAY_LENGTH, CARRAY_GET, CARRAY_SET) map (_ -> CHAR)) ++
-    (List(IARRAY_LENGTH, IARRAY_GET, IARRAY_SET) map (_ -> INT)) ++
-    (List(LARRAY_LENGTH, LARRAY_GET, LARRAY_SET) map (_ -> LONG)) ++
-    (List(FARRAY_LENGTH, FARRAY_GET, FARRAY_SET) map (_ -> FLOAT)) ++
-    (List(DARRAY_LENGTH, DARRAY_GET, DARRAY_SET) map (_ -> DOUBLE)) ++
-    (List(OARRAY_LENGTH, OARRAY_GET, OARRAY_SET) map (_ -> REFERENCE(AnyRefClass))) : _*
-  )
-
-  /** Check whether the given operation code is an array operation. */
-  def isArrayOp(code: Int): Boolean =
-    isArrayNew(code) | isArrayLength(code) | isArrayGet(code) | isArraySet(code)
-
-  def isArrayNew(code: Int): Boolean = code match {
-    case NEW_ZARRAY | NEW_BARRAY | NEW_SARRAY | NEW_CARRAY |
-         NEW_IARRAY | NEW_LARRAY | NEW_FARRAY | NEW_DARRAY |
-         NEW_OARRAY => true
-    case _ => false
-  }
-
-  def isArrayLength(code: Int): Boolean = code match {
-    case ZARRAY_LENGTH | BARRAY_LENGTH | SARRAY_LENGTH | CARRAY_LENGTH |
-         IARRAY_LENGTH | LARRAY_LENGTH | FARRAY_LENGTH | DARRAY_LENGTH |
-         OARRAY_LENGTH | LENGTH => true
-    case _ => false
-  }
-
-  def isArrayGet(code: Int): Boolean = code match {
-    case ZARRAY_GET | BARRAY_GET | SARRAY_GET | CARRAY_GET |
-         IARRAY_GET | LARRAY_GET | FARRAY_GET | DARRAY_GET |
-         OARRAY_GET | APPLY => true
-    case _ => false
-  }
-
-  def isArraySet(code: Int): Boolean = code match {
-    case ZARRAY_SET | BARRAY_SET | SARRAY_SET | CARRAY_SET |
-         IARRAY_SET | LARRAY_SET | FARRAY_SET | DARRAY_SET |
-         OARRAY_SET | UPDATE => true;
-    case _ => false;
-  }
-
-  /** Check whether the given code is a comparison operator */
-  def isComparisonOp(code: Int): Boolean = code match {
-    case ID | NI | EQ | NE |
-         LT | LE | GT | GE => true
-
-    case _ => false
-  }
-  def isUniversalEqualityOp(code: Int): Boolean = (code == EQ) || (code == NE)
-  def isReferenceEqualityOp(code: Int): Boolean = (code == ID) || (code == NI)
-
-  def isArithmeticOp(code: Int): Boolean = code match {
-    case POS | NEG | NOT => true; // unary
-    case ADD | SUB | MUL |
-         DIV | MOD       => true; // binary
-    case OR  | XOR | AND |
-         LSL | LSR | ASR => true; // bitwise
-    case _ => false;
-  }
-
-  def isLogicalOp(code: Int): Boolean = code match {
-    case ZNOT | ZAND | ZOR => true
-    case _ => false
-  }
-
-  def isShiftOp(code: Int): Boolean = code match {
-    case LSL | LSR | ASR => true
-    case _ => false
-  }
-
-  def isBitwiseOp(code: Int): Boolean = code match {
-    case OR | XOR | AND => true
-    case _ => false
+  def typeOfArrayOp(code: Int): TypeKind = {
+    val startOfRange = (
+      if (code <= OARRAY_LENGTH) ZARRAY_LENGTH
+      else if (code <= OARRAY_GET) ZARRAY_GET
+      else ZARRAY_SET
+    )
+    typeKindFromCanonicalIndex(code - startOfRange)
   }
 
   /** If code is a coercion primitive, the result type */
-  def generatedKind(code: Int): TypeKind = code match {
-    case B2B | C2B | S2B | I2B | L2B | F2B | D2B => BYTE
-    case B2C | C2C | S2C | I2C | L2C | F2C | D2C => CHAR
-    case B2S | C2S | S2S | I2S | L2S | F2S | D2S => SHORT
-    case B2I | C2I | S2I | I2I | L2I | F2I | D2I => INT
-    case B2L | C2L | S2L | I2L | L2L | F2L | D2L => LONG
-    case B2F | C2F | S2F | I2F | L2F | F2F | D2F => FLOAT
-    case B2D | C2D | S2D | I2D | L2D | F2D | D2D => DOUBLE
+  def generatedKind(code: Int): TypeKind = ((code % 10): @switch) match {
+    case 0  => BYTE
+    case 1  => CHAR
+    case 2  => SHORT
+    case 3  => INT
+    case 4  => LONG
+    case 5  => FLOAT
+    case 6  => DOUBLE
   }
 
   def isPrimitive(sym: Symbol): Boolean = primitives contains sym
@@ -572,56 +574,13 @@ abstract class ScalaPrimitives {
       arrayParent getOrElse sys.error(fun.fullName + " : " + (tpe :: tpe.baseTypeSeq.toList).mkString(", "))
     }
 
-    code match {
-
-      case APPLY =>
-        toTypeKind(elementType) match {
-          case BOOL    => ZARRAY_GET
-          case BYTE    => BARRAY_GET
-          case SHORT   => SARRAY_GET
-          case CHAR    => CARRAY_GET
-          case INT     => IARRAY_GET
-          case LONG    => LARRAY_GET
-          case FLOAT   => FARRAY_GET
-          case DOUBLE  => DARRAY_GET
-          case REFERENCE(_) | ARRAY(_) => OARRAY_GET
-          case _ =>
-            abort("Unexpected array element type: " + elementType)
-        }
-
-      case UPDATE =>
-        toTypeKind(elementType) match {
-          case BOOL    => ZARRAY_SET
-          case BYTE    => BARRAY_SET
-          case SHORT   => SARRAY_SET
-          case CHAR    => CARRAY_SET
-          case INT     => IARRAY_SET
-          case LONG    => LARRAY_SET
-          case FLOAT   => FARRAY_SET
-          case DOUBLE  => DARRAY_SET
-          case REFERENCE(_) | ARRAY(_) => OARRAY_SET
-          case _ =>
-            abort("Unexpected array element type: " + elementType)
-        }
-
-      case LENGTH =>
-        toTypeKind(elementType) match {
-          case BOOL    => ZARRAY_LENGTH
-          case BYTE    => BARRAY_LENGTH
-          case SHORT   => SARRAY_LENGTH
-          case CHAR    => CARRAY_LENGTH
-          case INT     => IARRAY_LENGTH
-          case LONG    => LARRAY_LENGTH
-          case FLOAT   => FARRAY_LENGTH
-          case DOUBLE  => DARRAY_LENGTH
-          case REFERENCE(_) | ARRAY(_) => OARRAY_LENGTH
-          case _ =>
-            abort("Unexpected array element type: " + elementType)
-        }
-
-      case _ =>
-        code
+    val offset = code match {
+      case LENGTH => 0
+      case APPLY  => 9
+      case UPDATE => 18
+      case _      => return code
     }
-  }
 
+    primitiveCodeOfArrayOp(offset + toTypeKind(elementType).canonicalIndex)
+  }
 }

@@ -2,7 +2,7 @@ package scala.reflect.makro
 package util
 
 trait Traces {
-  def globalSettings: tools.nsc.Settings
+  def globalSettings: scala.tools.nsc.Settings
 
   // [Eugene] lots of ways to log:
   // 1) trace(...)
