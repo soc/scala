@@ -241,19 +241,33 @@ object Predef extends LowPriorityImplicits {
   }
 
   final class ArrowAssoc[A](val __leftOfArrow: A) extends AnyVal {
-    // `__leftOfArrow` must be a public val to allow inlining. The val
-    // used to be called `x`, but now goes by `__leftOfArrow`, as that
-    // reduces the chances of a user's writing `foo.__leftOfArrow` and
-    // being confused why they get an ambiguous implicit conversion
-    // error. (`foo.x` used to produce this error since both
-    // any2Ensuring and any2ArrowAssoc pimped an `x` onto everything)
-    @deprecated("Use __leftOfArrow instead", "2.10.0")
-    def x = __leftOfArrow
-
-    @inline def -> [B](y: B): Tuple2[A, B] = Tuple2(__leftOfArrow, y)
-    def →[B](y: B): Tuple2[A, B] = ->(y)
+    @inline def -> [B](y: B): (A, B)          = new Tuple2(__leftOfArrow, y)
+    @inline def -> (y: Int): (A, Int)         = new Tuple2(__leftOfArrow, y)
+    @inline def -> (y: Boolean): (A, Boolean) = new Tuple2(__leftOfArrow, y)
+    @inline def -> (y: Double): (A, Double)   = new Tuple2(__leftOfArrow, y)
   }
-  @inline implicit def any2ArrowAssoc[A](x: A): ArrowAssoc[A] = new ArrowAssoc(x)
+  final class IntArrowAssoc(val __leftOfArrow: Int) extends AnyVal {
+    @inline def -> [B](y: B): (Int, B)          = new Tuple2(__leftOfArrow, y)
+    @inline def -> (y: Int): (Int, Int)         = new Tuple2(__leftOfArrow, y)
+    @inline def -> (y: Boolean): (Int, Boolean) = new Tuple2(__leftOfArrow, y)
+    @inline def -> (y: Double): (Int, Double)   = new Tuple2(__leftOfArrow, y)
+  }
+  final class BooleanArrowAssoc(val __leftOfArrow: Boolean) extends AnyVal {
+    @inline def -> [B](y: B): (Boolean, B)          = new Tuple2(__leftOfArrow, y)
+    @inline def -> (y: Int): (Boolean, Int)         = new Tuple2(__leftOfArrow, y)
+    @inline def -> (y: Boolean): (Boolean, Boolean) = new Tuple2(__leftOfArrow, y)
+    @inline def -> (y: Double): (Boolean, Double)   = new Tuple2(__leftOfArrow, y)
+  }
+  final class DoubleArrowAssoc(val __leftOfArrow: Double) extends AnyVal {
+    @inline def -> [B](y: B): (Double, B)          = new Tuple2(__leftOfArrow, y)
+    @inline def -> (y: Int): (Double, Int)         = new Tuple2(__leftOfArrow, y)
+    @inline def -> (y: Boolean): (Double, Boolean) = new Tuple2(__leftOfArrow, y)
+    @inline def -> (y: Double): (Double, Double)   = new Tuple2(__leftOfArrow, y)
+  }
+  @inline implicit def any2ArrowAssoc[A](x: A): ArrowAssoc[A]            = new ArrowAssoc(x)
+  @inline implicit def int2ArrowAssoc(x: Int): IntArrowAssoc             = new IntArrowAssoc(x)
+  @inline implicit def boolean2ArrowAssoc(x: Boolean): BooleanArrowAssoc = new BooleanArrowAssoc(x)
+  @inline implicit def double2ArrowAssoc(x: Double): DoubleArrowAssoc    = new DoubleArrowAssoc(x)
 
   // printing and reading -----------------------------------------------
 
