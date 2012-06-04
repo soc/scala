@@ -189,7 +189,7 @@ trait TypeKinds { self: ICodes =>
       else if (b.isNullType) a
       else toTypeKind(lub0(a, b))
     }
-    else throw new CheckerException("Incompatible types: " + a + " with " + b)
+    else sys.error("Incompatible types: " + a + " with " + b)
   }
 
   /** The unit value */

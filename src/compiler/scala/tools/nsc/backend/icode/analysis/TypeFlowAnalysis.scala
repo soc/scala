@@ -46,11 +46,7 @@ abstract class TypeFlowAnalysis {
       if (s1 eq bottom) s2
       else if (s2 eq bottom) s1
       else if ((s1 eq exceptionHandlerStack) || (s2 eq exceptionHandlerStack)) sys.error("merging with exhan stack")
-      else {
-//        if (s1.length != s2.length)
-//          throw new CheckerException("Incompatible stacks: " + s1 + " and " + s2);
-        new TypeStack((s1.types, s2.types).zipped map icodes.lub)
-      }
+      else new TypeStack((s1.types, s2.types).zipped map icodes.lub)
     }
   }
 
