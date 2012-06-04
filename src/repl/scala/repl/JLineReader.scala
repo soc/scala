@@ -3,9 +3,9 @@
  * @author Stepan Koltsov
  */
 
-package scala.tools.nsc
-package interpreter
+package scala.repl
 
+import scala.tools.nsc._
 import scala.tools.jline.console.ConsoleReader
 import scala.tools.jline.console.completer._
 import session._

@@ -3,10 +3,9 @@
  * @author Paul Phillips
  */
 
-package scala.tools.nsc
-package interpreter
+package scala.repl
 
-import util.stringFromWriter
+import scala.tools.nsc.util.stringFromWriter
 
 trait Formatting {
   def prompt: String

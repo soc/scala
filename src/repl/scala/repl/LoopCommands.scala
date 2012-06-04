@@ -3,8 +3,7 @@
  * @author  Paul Phillips
  */
 
-package scala.tools.nsc
-package interpreter
+package scala.repl
 
 import collection.{ mutable, immutable }
 import mutable.ListBuffer

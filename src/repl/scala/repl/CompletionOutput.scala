@@ -3,8 +3,7 @@
  * @author Paul Phillips
  */
 
-package scala.tools.nsc
-package interpreter
+package scala.repl
 
 /** This has a lot of duplication with other methods in Symbols and Types,
  *  but repl completion utility is very sensitive to precise output.  Best

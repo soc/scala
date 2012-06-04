@@ -197,7 +197,7 @@ class MutableSettings(val errorFn: String => Unit)
   }
 
   /** The parent loader to use for the repl.*/
-  private[nsc] var explicitParentLoader: Option[ClassLoader] = None
+  private[scala] var explicitParentLoader: Option[ClassLoader] = None
 
   /** Retrieves the contents of resource "${id}.class.path" from `loader`
   * (wrapped in Some) or None if the resource does not exist.*/

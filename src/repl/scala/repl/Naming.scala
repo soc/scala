@@ -3,8 +3,7 @@
  * @author  Paul Phillips
  */
 
-package scala.tools.nsc
-package interpreter
+package scala.repl
 
 /** This is for name logic which is independent of the compiler (notice there's no Global.)
  *  That includes at least generating, metaquoting, mangling, and unmangling.

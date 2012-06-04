@@ -3,19 +3,20 @@
  * @author  Lex Spoon
  */
 
-package scala.tools.nsc
+package scala
 
+import scala.tools.nsc._
 import java.net.URL
 import scala.tools.util.PathResolver
-import io.{ File }
-import util.{ ClassPath, ScalaClassLoader }
+import scala.tools.nsc.io.{ Jar, File }
+import scala.tools.nsc.util.{ ClassPath, ScalaClassLoader }
 import Properties.{ versionString, copyrightString }
-import interpreter.{ ILoop }
+import repl.ILoop
 import GenericRunnerCommand._
 
 object JarRunner extends CommonRunner {
   def runJar(settings: GenericRunnerSettings, jarPath: String, arguments: Seq[String]): Either[Throwable, Boolean] = {
-    val jar       = new io.Jar(jarPath)
+    val jar       = new Jar(jarPath)
     val mainClass = jar.mainClass getOrElse sys.error("Cannot find main class for jar: " + jarPath)
     val jarURLs   = ClassPath expandManifestPath jarPath
     val urls      = if (jarURLs.isEmpty) File(jarPath).toURL +: settings.classpathURLs else jarURLs
@@ -33,7 +34,7 @@ object JarRunner extends CommonRunner {
   * sources for the code to run: pre-compiled code, a script file,
   * or interactive entry.
   */
-class MainGenericRunner {
+class Repl {
   def errorFn(ex: Throwable): Boolean = {
     ex.printStackTrace()
     false
@@ -78,7 +79,7 @@ class MainGenericRunner {
   }
 }
 
-object MainGenericRunner extends MainGenericRunner {
+object Repl extends Repl {
   def main(args: Array[String]) {
     if (!process(args))
       sys.exit(1)

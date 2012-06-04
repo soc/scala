@@ -3,7 +3,7 @@
  * @author Paul Phillips
  */
 
-package scala.tools.nsc
+package scala
 
 import language.implicitConversions
 
@@ -24,7 +24,10 @@ import language.implicitConversions
  *  InteractiveReader contains { history: History, completion: Completion }
  *  IMain contains { global: Global }
  */
-package object interpreter extends ReplConfig with ReplStrings {
+package object repl extends ReplConfig with ReplStrings {
+  type Global = scala.tools.nsc.Global
+  type Phase = scala.tools.nsc.Phase
+  
   type JFile          = java.io.File
   type JClass         = java.lang.Class[_]
   type JList[T]       = java.util.List[T]
@@ -37,12 +40,12 @@ package object interpreter extends ReplConfig with ReplStrings {
 
   implicit def postfixOps = language.postfixOps // make all postfix ops in this package compile without warning
 
-  private[interpreter] implicit def javaCharSeqCollectionToScala(xs: JCollection[_ <: CharSequence]): List[String] = {
+  private[repl] implicit def javaCharSeqCollectionToScala(xs: JCollection[_ <: CharSequence]): List[String] = {
     import collection.JavaConverters._
     xs.asScala.toList map ("" + _)
   }
 
-  private[nsc] implicit def enrichAnyRefWithTap[T](x: T) = new TapMaker(x)
-  private[nsc] def tracing[T](msg: String)(x: T): T = x.tapTrace(msg)
-  private[nsc] def debugging[T](msg: String)(x: T) = x.tapDebug(msg)
+  private[repl] implicit def enrichAnyRefWithTap[T](x: T) = new TapMaker(x)
+  private[repl] def tracing[T](msg: String)(x: T): T = x.tapTrace(msg)
+  private[repl] def debugging[T](msg: String)(x: T) = x.tapDebug(msg)
 }

@@ -3,11 +3,11 @@
  * @author Paul Phillips
  */
 
-package scala.tools.nsc
-package interpreter
+package scala.repl
 package session
 
-import scala.tools.nsc.io._
+import scala.tools.nsc._
+import io._
 import FileBackedHistory._
 
 /** TODO: file locking.

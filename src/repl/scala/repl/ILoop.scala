@@ -3,9 +3,9 @@
  * @author Alexander Spoon
  */
 
-package scala.tools.nsc
-package interpreter
+package scala.repl
 
+import scala.tools.nsc._
 import Predef.{ println => _, _ }
 import java.io.{ BufferedReader, FileReader }
 import java.util.concurrent.locks.ReentrantLock
@@ -14,7 +14,6 @@ import scala.util.Properties.{ jdkHome, javaVersion }
 import scala.tools.util.{ Javap }
 import scala.collection.mutable.ListBuffer
 import util.{ ClassPath, Exceptional, stringFromWriter, stringFromStream }
-import interpreter._
 import io.{ File, Directory }
 import scala.reflect.NameTransformer._
 import util.ScalaClassLoader

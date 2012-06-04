@@ -3,8 +3,8 @@
  * @author Paul Phillips
  */
 
-package scala.tools.nsc
-package interpreter
+package scala.repl
+
 import language.implicitConversions
 
 /** Files having to do with the state of a repl session:
@@ -19,5 +19,5 @@ package object session {
   type JMemoryHistory     = scala.tools.jline.console.history.MemoryHistory
   type JPersistentHistory = scala.tools.jline.console.history.PersistentHistory
 
-  private[interpreter] implicit def charSequenceFix(x: CharSequence): String = x.toString
+  private[repl] implicit def charSequenceFix(x: CharSequence): String = x.toString
 }

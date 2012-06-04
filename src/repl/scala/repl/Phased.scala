@@ -3,9 +3,9 @@
  * @author  Paul Phillips
  */
 
-package scala.tools.nsc
-package interpreter
+package scala.repl
 
+import scala.tools.nsc.NoPhase
 import scala.collection.{ mutable, immutable }
 import language.implicitConversions
 

@@ -3,9 +3,9 @@
  * @author Paul Phillips
  */
 
-package scala.tools.nsc
-package interpreter
+package scala.repl
 
+import scala.tools.nsc._
 import java.lang.reflect
 import java.util.concurrent.ConcurrentHashMap
 import util.ScalaClassLoader

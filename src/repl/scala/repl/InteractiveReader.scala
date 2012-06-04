@@ -3,15 +3,14 @@
  * @author Stepan Koltsov
  */
 
-package scala.tools.nsc
-package interpreter
+package scala.repl
 
 import java.io.IOException
 import java.nio.channels.ClosedByInterruptException
 import scala.util.control.Exception._
 import session.History
 import InteractiveReader._
-import Properties.isMac
+import scala.util.Properties.isMac
 
 /** Reads lines from an input stream */
 trait InteractiveReader {

@@ -3,8 +3,9 @@
  * @author  Paul Phillips
  */
 
-package scala.tools.nsc
-package interpreter
+package scala.repl
+
+import scala.tools.nsc._
 
 class AbstractOrMissingHandler[T](onError: String => Unit, value: T) extends PartialFunction[Throwable, T] {
   def isDefinedAt(t: Throwable) = t match {

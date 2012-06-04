@@ -3,9 +3,9 @@
  * @author  Martin Odersky
  */
 
-package scala.tools.nsc
-package interpreter
+package scala.repl
 
+import scala.tools.nsc._
 import Predef.{ println => _, _ }
 import util.{ Set => _, _ }
 import java.net.URL
@@ -76,8 +76,8 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
    */
   val virtualDirectory: VirtualDirectory            = new ReplVirtualDirectory(out) // "directory" for classfiles
   private var currentSettings: Settings             = initialSettings
-  private[nsc] var printResults                     = true      // whether to print result lines
-  private[nsc] var totalSilence                     = false     // whether to print anything
+  private[repl] var printResults                     = true      // whether to print result lines
+  private[repl] var totalSilence                     = false     // whether to print anything
   private var _initializeComplete                   = false     // compiler is initialized
   private var _isInitialized: Future[Boolean]       = null      // set up initialization future
   private var bindExceptions                        = true      // whether to bind the lastException variable
@@ -420,7 +420,7 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
     }
   }
 
-  private[nsc] def replwarn(msg: => String) {
+  private[repl] def replwarn(msg: => String) {
     if (!settings.nowarnings.value)
       printMessage(msg)
   }

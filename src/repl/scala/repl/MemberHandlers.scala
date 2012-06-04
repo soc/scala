@@ -3,8 +3,7 @@
  * @author  Martin Odersky
  */
 
-package scala.tools.nsc
-package interpreter
+package scala.repl
 
 import scala.collection.{ mutable, immutable }
 import scala.PartialFunction.cond

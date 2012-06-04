@@ -3,9 +3,9 @@
  * @author Paul Phillips
  */
 
-package scala.tools.nsc
-package interpreter
+package scala.repl
 
+import scala.tools.nsc._
 import util.Exceptional.unwrap
 import util.stackTraceString
 
@@ -27,29 +27,29 @@ trait ReplConfig {
     try Console println msg
     catch { case x: AssertionError => Console.println("Assertion error printing debugging output: " + x) }
 
-  private[nsc] def repldbgex(ex: Throwable): Unit = {
+  private[repl] def repldbgex(ex: Throwable): Unit = {
     if (isReplDebug) {
       echo("Caught/suppressing: " + ex)
       ex.printStackTrace
     }
   }
-  private[nsc] def repldbg(msg: => String)    = if (isReplDebug) echo(msg)
-  private[nsc] def repltrace(msg: => String)  = if (isReplTrace) echo(msg)
-  private[nsc] def replinfo(msg: => String)   = if (isReplInfo)  echo(msg)
+  private[repl] def repldbg(msg: => String)    = if (isReplDebug) echo(msg)
+  private[repl] def repltrace(msg: => String)  = if (isReplTrace) echo(msg)
+  private[repl] def replinfo(msg: => String)   = if (isReplInfo)  echo(msg)
 
-  private[nsc] def logAndDiscard[T](label: String, alt: => T): PartialFunction[Throwable, T] = {
+  private[repl] def logAndDiscard[T](label: String, alt: => T): PartialFunction[Throwable, T] = {
     case t =>
       repldbg(label + ": " + unwrap(t))
       repltrace(stackTraceString(unwrap(t)))
       alt
   }
-  private[nsc] def substituteAndLog[T](alt: => T)(body: => T): T =
+  private[repl] def substituteAndLog[T](alt: => T)(body: => T): T =
     substituteAndLog("" + alt, alt)(body)
-  private[nsc] def substituteAndLog[T](label: String, alt: => T)(body: => T): T = {
+  private[repl] def substituteAndLog[T](label: String, alt: => T)(body: => T): T = {
     try body
     catch logAndDiscard(label, alt)
   }
-  private[nsc] def squashAndLog(label: String)(body: => Unit): Unit =
+  private[repl] def squashAndLog(label: String)(body: => Unit): Unit =
     substituteAndLog(label, ())(body)
 
   def isReplTrace: Boolean = replProps.trace

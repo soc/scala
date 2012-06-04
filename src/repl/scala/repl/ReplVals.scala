@@ -3,10 +3,10 @@
  * @author Paul Phillips
  */
 
-package scala.tools.nsc
-package interpreter
+package scala.repl
 
 import language.implicitConversions
+import scala.tools.nsc.ast.TreeDSL
 
 /** A class which the repl utilizes to expose predefined objects.
  *  The base implementation is empty; the standard repl implementation
@@ -27,7 +27,7 @@ class StdReplVals(final val r: ILoop) extends ReplVals {
   final lazy val phased                   = power.phased
   final lazy val analyzer                 = global.analyzer
 
-  object treedsl extends { val global: intp.global.type = intp.global } with ast.TreeDSL { }
+  object treedsl extends { val global: intp.global.type = intp.global } with TreeDSL { }
 
   final lazy val typer = analyzer.newTyper(
     analyzer.rootContext(

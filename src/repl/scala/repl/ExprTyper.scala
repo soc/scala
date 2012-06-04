@@ -3,9 +3,9 @@
  * @author  Paul Phillips
  */
 
-package scala.tools.nsc
-package interpreter
+package scala.repl
 
+import scala.tools.nsc._
 import util.BatchSourceFile
 import scala.tools.nsc.ast.parser.Tokens.EOF
 

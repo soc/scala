@@ -3,8 +3,9 @@
  * @author  Lex Spoon
  */
 
-package scala.tools.nsc
-package interpreter
+package scala.repl
+
+import scala.tools.nsc._
 
 /** A command line for the interpreter.
  */

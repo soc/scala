@@ -3,8 +3,7 @@
  * @author Paul Phillips
  */
 
-package scala.tools.nsc
-package interpreter
+package scala.repl
 
 import scala.tools.jline.console.{ ConsoleReader, CursorBuffer }
 import scala.tools.jline.console.completer.CompletionHandler

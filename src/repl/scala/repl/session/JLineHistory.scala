@@ -3,8 +3,7 @@
  * @author Paul Phillips
  */
 
-package scala.tools.nsc
-package interpreter
+package scala.repl
 package session
 
 /** A straight scalification of the jline interface which mixes

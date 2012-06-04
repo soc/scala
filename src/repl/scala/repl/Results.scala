@@ -3,8 +3,7 @@
  * @author  Martin Odersky
  */
 
-package scala.tools.nsc
-package interpreter
+package scala.repl
 
 object Results {
   /** A result from the Interpreter interpreting one line of input. */

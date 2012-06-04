@@ -3,8 +3,7 @@
  * @author Stepan Koltsov
  */
 
-package scala.tools.nsc
-package interpreter
+package scala.repl
 
 import java.io.{ BufferedReader }
 import session.NoHistory
