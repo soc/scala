@@ -7,11 +7,6 @@ package scala.tools.nsc
 package backend
 package icode
 
-/** This trait ...
- *
- *  @author  Iulian Dragos
- *  @version 1.0
- */
 trait TypeStacks {
   self: ICodes =>
 
@@ -38,7 +33,7 @@ trait TypeStacks {
     /** Push a type on the type stack. UNITs are ignored. */
     def push(t: TypeKind) = {
       if (t != UNIT)
-        types = t :: types
+        types ::= t
     }
 
     def head: TypeKind = types.head
@@ -46,11 +41,7 @@ trait TypeStacks {
     /** Removes the value on top of the stack, and returns it. It assumes
      *  the stack contains at least one element.
      */
-    def pop: TypeKind = {
-      val t = types.head
-      types = types.tail
-      t
-    }
+    def pop: TypeKind = try head finally types = types.tail
 
     /** Return the topmost two values on the stack. It assumes the stack
      *  is large enough. Topmost element first.
@@ -63,11 +54,7 @@ trait TypeStacks {
     def pop3: (TypeKind, TypeKind, TypeKind) = (pop, pop, pop)
 
     /** Drop the first n elements of the stack. */
-    def pop(n: Int): List[TypeKind] = {
-      val prefix = types.take(n)
-      types = types.drop(n)
-      prefix
-    }
+    def pop(n: Int) = try types take n finally types = types drop n
 
     def apply(n: Int): TypeKind = types(n)
 
@@ -80,10 +67,7 @@ trait TypeStacks {
       (types corresponds other.types)((t1, t2) => t1 <:< t2 || t2 <:< t1)
 
     /* This method returns a String representation of the stack */
-    override def toString() =
-      if (types.isEmpty) "[]"
-      else types.mkString("[", " ", "]")
-
+    override def toString() = types.mkString("[", " ", "]")
     override def hashCode() = types.hashCode()
     override def equals(other: Any): Boolean = other match {
       case x: TypeStack => x.types == types

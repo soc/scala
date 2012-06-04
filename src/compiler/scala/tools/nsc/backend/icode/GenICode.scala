@@ -186,7 +186,7 @@ abstract class GenICode extends SubComponent  {
       ctx1.bb.emit(THROW(expr.tpe.typeSymbol), expr.pos)
       ctx1.bb.enterIgnoreMode
 
-      (ctx1, NothingReference)
+      (ctx1, REFERENCE.Nothing)
     }
 
     /**
@@ -429,7 +429,7 @@ abstract class GenICode extends SubComponent  {
       if (scalaPrimitives.isArithmeticOp(code))
         genArithmeticOp(tree, ctx, code)
       else if (code == scalaPrimitives.CONCAT)
-        (genStringConcat(tree, ctx), StringReference)
+        (genStringConcat(tree, ctx), REFERENCE.String)
       else if (code == scalaPrimitives.HASH)
         (genScalaHash(receiver, ctx), INT)
       else if (isArrayOp(code))
@@ -858,7 +858,7 @@ abstract class GenICode extends SubComponent  {
               generatedType = DOUBLE
             case (NullTag, _) =>
               ctx.bb.emit(CONSTANT(value), tree.pos);
-              generatedType = NullReference
+              generatedType = REFERENCE.Null
             case _ =>
               ctx.bb.emit(CONSTANT(value), tree.pos);
               generatedType = toTypeKind(tree.tpe)
@@ -961,7 +961,7 @@ abstract class GenICode extends SubComponent  {
     }
 
     private def adapt(from: TypeKind, to: TypeKind, ctx: Context, pos: Position): Unit = {
-      if (!(from <:< to) && !(from == NullReference && to == NothingReference)) {
+      if (!(from <:< to) && !(from == REFERENCE.Null && to == REFERENCE.Nothing)) {
         to match {
           case UNIT =>
             ctx.bb.emit(DROP(from), pos)
@@ -974,14 +974,14 @@ abstract class GenICode extends SubComponent  {
 
             ctx.emitConversion(from, to)
         }
-      } else if (from == NothingReference) {
+      } else if (from == REFERENCE.Nothing) {
         ctx.bb.emit(THROW(ThrowableClass))
         ctx.bb.enterIgnoreMode
-      } else if (from == NullReference) {
+      } else if (from == REFERENCE.Null) {
         ctx.bb.emit(DROP(from))
         ctx.bb.emit(CONSTANT(Constant(null)))
       }
-      else if (from == ThrowableReference && !(ThrowableClass.tpe <:< to.toType)) {
+      else if (from == REFERENCE.Throwable && !(ThrowableClass.tpe <:< to.toType)) {
         log("Inserted check-cast on throwable to " + to + " at " + pos)
         ctx.bb.emit(CHECK_CAST(to))
       }

@@ -85,8 +85,8 @@ trait TypeKinds { self: ICodes =>
     def isBoxedType               = false
     final def isRefOrArrayType    = isReferenceType || isArrayType
     final def isRefArrayOrBoxType = isRefOrArrayType || isBoxedType
-    final def isNothingType       = this == NothingReference
-    final def isNullType          = this == NullReference
+    final def isNothingType       = this == REFERENCE.Nothing
+    final def isNullType          = this == REFERENCE.Null
     final def isInterfaceType     = this match {
       case REFERENCE(cls) if cls.isInterface || cls.isTrait => true
       case _                                                => false
@@ -182,7 +182,7 @@ trait TypeKinds { self: ICodes =>
     if (a == b) a
     else if (a.isNothingType) b
     else if (b.isNothingType) a
-    else if (a.isBoxedType || b.isBoxedType) AnyRefReference  // we should do better
+    else if (a.isBoxedType || b.isBoxedType) REFERENCE.AnyRef  // we should do better
     else if (isIntLub) INT
     else if (a.isRefOrArrayType && b.isRefOrArrayType) {
       if (a.isNullType) b
@@ -313,7 +313,7 @@ trait TypeKinds { self: ICodes =>
      * use method 'lub'.
      */
     override def maxType(other: TypeKind) = other match {
-      case REFERENCE(_) | ARRAY(_)  => AnyRefReference
+      case REFERENCE(_) | ARRAY(_)  => REFERENCE.AnyRef
       case _                        => uncomparable("REFERENCE", other)
     }
 
@@ -324,6 +324,17 @@ trait TypeKinds { self: ICodes =>
       case _                => false
     })
     override def isReferenceType = true
+  }
+  object REFERENCE {
+    import definitions._
+
+    val AnyRef    = REFERENCE(AnyRefClass)
+    val BoxedUnit = REFERENCE(BoxedUnitClass)
+    val Nothing   = REFERENCE(NothingClass)
+    val Null      = REFERENCE(NullClass)
+    val Object    = REFERENCE(ObjectClass)
+    val String    = REFERENCE(StringClass)
+    val Throwable = REFERENCE(ThrowableClass)
   }
 
   def ArrayN(elem: TypeKind, dims: Int): ARRAY = {
@@ -351,7 +362,7 @@ trait TypeKinds { self: ICodes =>
      */
     override def maxType(other: TypeKind) = other match {
       case ARRAY(elem2) if elem == elem2  => ARRAY(elem)
-      case ARRAY(_) | REFERENCE(_)        => AnyRefReference
+      case ARRAY(_) | REFERENCE(_)        => REFERENCE.AnyRef
       case _                              => uncomparable("ARRAY", other)
     }
 
@@ -371,7 +382,7 @@ trait TypeKinds { self: ICodes =>
 
     override def maxType(other: TypeKind) = other match {
       case BOXED(`kind`)                      => this
-      case REFERENCE(_) | ARRAY(_) | BOXED(_) => AnyRefReference
+      case REFERENCE(_) | ARRAY(_) | BOXED(_) => REFERENCE.AnyRef
       case _                                  => uncomparable("BOXED", other)
     }
 
@@ -397,7 +408,7 @@ trait TypeKinds { self: ICodes =>
      * use method 'lub'.
      */
     override def maxType(other: TypeKind) = other match {
-      case REFERENCE(_) => AnyRefReference
+      case REFERENCE(_) => REFERENCE.AnyRef
       case _            => uncomparable(other)
     }
 

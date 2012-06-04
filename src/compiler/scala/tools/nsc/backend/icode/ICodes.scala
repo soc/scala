@@ -2,11 +2,6 @@
  * Copyright 2005-2011 LAMP/EPFL
  * @author  Martin Odersky
  */
-/* NSC -- new scala compiler
- * Copyright 2005-2011 LAMP/EPFL
- * @author  Martin Odersky
- */
-
 
 package scala.tools.nsc
 package backend
@@ -56,7 +51,6 @@ abstract class ICodes extends AnyRef
   private var alreadyDumping = false
 
   /** Print all classes and basic blocks. Used for debugging. */
-
   def dumpClassesAndAbort(msg: String): Nothing = {
     if (alreadyDumping) global.abort(msg)
     else alreadyDumping = true
@@ -98,17 +92,11 @@ abstract class ICodes extends AnyRef
     val global: ICodes.this.global.type = ICodes.this.global
   }
 
-  lazy val AnyRefReference: TypeKind    = REFERENCE(definitions.AnyRefClass)
-  lazy val BoxedUnitReference: TypeKind = REFERENCE(definitions.BoxedUnitClass)
-  lazy val NothingReference: TypeKind   = REFERENCE(definitions.NothingClass)
-  lazy val NullReference: TypeKind      = REFERENCE(definitions.NullClass)
-  lazy val ObjectReference: TypeKind    = REFERENCE(definitions.ObjectClass)
-  lazy val StringReference: TypeKind    = REFERENCE(definitions.StringClass)
-  lazy val ThrowableReference: TypeKind = REFERENCE(definitions.ThrowableClass)
-
   object icodeReader extends ICodeReader {
-    lazy val global: ICodes.this.global.type = ICodes.this.global
+    val global: ICodes.this.global.type = ICodes.this.global
   }
+
+  lazy val ObjectReference: TypeKind = REFERENCE(definitions.ObjectClass)
 
   /** A phase which works on icode. */
   abstract class ICodePhase(prev: Phase) extends global.GlobalPhase(prev) {
