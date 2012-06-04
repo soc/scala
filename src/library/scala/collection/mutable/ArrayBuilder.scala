@@ -46,10 +46,11 @@ object ArrayBuilder {
       case java.lang.Float.TYPE     => new ArrayBuilder.ofFloat().asInstanceOf[ArrayBuilder[T]]
       case java.lang.Double.TYPE    => new ArrayBuilder.ofDouble().asInstanceOf[ArrayBuilder[T]]
       case java.lang.Boolean.TYPE   => new ArrayBuilder.ofBoolean().asInstanceOf[ArrayBuilder[T]]
-      case java.lang.Void.TYPE      => new ArrayBuilder.ofUnit().asInstanceOf[ArrayBuilder[T]]
       case _                        => new ArrayBuilder.ofRef[T with AnyRef]()(tag.asInstanceOf[ArrayTag[T with AnyRef]]).asInstanceOf[ArrayBuilder[T]]
     }
   }
+  
+  class ofUnit extends ofRef[scala.runtime.BoxedUnit] { }
 
   /** A class for array builders for arrays of reference types.
    *
@@ -628,69 +629,5 @@ object ArrayBuilder {
     }
 
     override def toString = "ArrayBuilder.ofBoolean"
-  }
-
-  /** A class for array builders for arrays of `Unit` type. */
-  class ofUnit extends ArrayBuilder[Unit] {
-
-    private var elems: Array[Unit] = _
-    private var capacity: Int = 0
-    private var size: Int = 0
-
-    private def mkArray(size: Int): Array[Unit] = {
-      val newelems = new Array[Unit](size)
-      if (this.size > 0) Array.copy(elems, 0, newelems, 0, this.size)
-      newelems
-    }
-
-    private def resize(size: Int) {
-      elems = mkArray(size)
-      capacity = size
-    }
-
-    override def sizeHint(size: Int) {
-      if (capacity < size) resize(size)
-    }
-
-    private def ensureSize(size: Int) {
-      if (capacity < size || capacity == 0) {
-        var newsize = if (capacity == 0) 16 else capacity * 2
-        while (newsize < size) newsize *= 2
-        resize(newsize)
-      }
-    }
-
-    def +=(elem: Unit): this.type = {
-      ensureSize(size + 1)
-      elems(size) = elem
-      size += 1
-      this
-    }
-
-    override def ++=(xs: IterableOnce[Unit]): this.type = xs match {
-      case xs: WrappedArray.ofUnit =>
-        ensureSize(this.size + xs.length)
-        Array.copy(xs.array, 0, elems, this.size, xs.length)
-        size += xs.length
-        this
-      case _ =>
-        super.++=(xs)
-    }
-
-    def clear() {
-      size = 0
-    }
-
-    def result() = {
-      if (capacity != 0 && capacity == size) elems
-      else mkArray(size)
-    }
-
-    override def equals(other: Any): Boolean = other match {
-      case x: ofUnit => (size == x.size) && (elems == x.elems)
-      case _ => false
-    }
-
-    override def toString = "ArrayBuilder.ofUnit"
   }
 }

@@ -42,7 +42,7 @@ class WrappedArrayBuilder[A](tag: ArrayTag[A]) extends Builder[A, WrappedArray[A
       case java.lang.Float.TYPE     => new WrappedArray.ofFloat(new Array[Float](size)).asInstanceOf[WrappedArray[A]]
       case java.lang.Double.TYPE    => new WrappedArray.ofDouble(new Array[Double](size)).asInstanceOf[WrappedArray[A]]
       case java.lang.Boolean.TYPE   => new WrappedArray.ofBoolean(new Array[Boolean](size)).asInstanceOf[WrappedArray[A]]
-      case java.lang.Void.TYPE      => new WrappedArray.ofUnit(new Array[Unit](size)).asInstanceOf[WrappedArray[A]]
+      case java.lang.Void.TYPE      => new WrappedArray.ofRef(new Array[scala.runtime.BoxedUnit](size)).asInstanceOf[WrappedArray[A]]
       case _                        => new WrappedArray.ofRef[A with AnyRef](tag.newArray(size).asInstanceOf[Array[A with AnyRef]]).asInstanceOf[WrappedArray[A]]
     }
     if (this.size > 0) Array.copy(elems.array, 0, newelems.array, 0, this.size)

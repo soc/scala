@@ -223,11 +223,10 @@ object Ordering extends LowPriorityOrderingImplicits {
   implicit object Unit extends UnitOrdering
 
   trait BooleanOrdering extends Ordering[Boolean] {
-    def compare(x: Boolean, y: Boolean) = (x, y) match {
-      case (false, true) => -1
-      case (true, false) => 1
-      case _ => 0
-    }
+    def compare(x: Boolean, y: Boolean) = 
+      if (!x && y) -1
+      else if (x && !y) 1
+      else 0
   }
   implicit object Boolean extends BooleanOrdering
 

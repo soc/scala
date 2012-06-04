@@ -73,7 +73,6 @@ class LowPriorityImplicits {
   implicit def wrapByteArray(xs: Array[Byte]): WrappedArray[Byte] = if (xs ne null) new WrappedArray.ofByte(xs) else null
   implicit def wrapShortArray(xs: Array[Short]): WrappedArray[Short] = if (xs ne null) new WrappedArray.ofShort(xs) else null
   implicit def wrapBooleanArray(xs: Array[Boolean]): WrappedArray[Boolean] = if (xs ne null) new WrappedArray.ofBoolean(xs) else null
-  implicit def wrapUnitArray(xs: Array[Unit]): WrappedArray[Unit] = if (xs ne null) new WrappedArray.ofUnit(xs) else null
 
   implicit def wrapString(s: String): WrappedString = if (s ne null) new WrappedString(s) else null
   implicit def unwrapString(ws: WrappedString): String = if (ws ne null) ws.self else null

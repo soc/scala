@@ -12,6 +12,7 @@ package mutable
 import scala.reflect.ArrayTag
 import scala.runtime.ScalaRunTime._
 import scala.collection.generic._
+import scala.runtime.BoxedUnit
 
 /**
  *  A class representing `Array[T]`.
@@ -101,7 +102,7 @@ object WrappedArray {
     case x: Array[Byte]    => new ofByte(x)
     case x: Array[Short]   => new ofShort(x)
     case x: Array[Boolean] => new ofBoolean(x)
-    case x: Array[Unit]    => new ofUnit(x)
+    case x: Array[Unit]    => new ofRef(x.asInstanceOf[Array[BoxedUnit]])
   }).asInstanceOf[WrappedArray[T]]
 
   implicit def canBuildFrom[T](implicit m: ArrayTag[T]): CanBuildFrom[WrappedArray[_], T, WrappedArray[T]] =
@@ -175,12 +176,5 @@ object WrappedArray {
     def length: Int = array.length
     def apply(index: Int): Boolean = array(index)
     def update(index: Int, elem: Boolean) { array(index) = elem }
-  }
-
-  final class ofUnit(val array: Array[Unit]) extends WrappedArray[Unit] with Serializable {
-    def elemTag = ClassTag.Unit
-    def length: Int = array.length
-    def apply(index: Int): Unit = array(index)
-    def update(index: Int, elem: Unit) { array(index) = elem }
   }
 }

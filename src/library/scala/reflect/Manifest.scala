@@ -147,8 +147,8 @@ object Manifest {
   val Unit: AnyValManifest[Unit] = new AnyValManifest[scala.Unit]("Unit") {
     def erasure = java.lang.Void.TYPE
     override def newArray(len: Int): Array[Unit] = new Array[Unit](len)
-    override def newWrappedArray(len: Int): WrappedArray[Unit] = new WrappedArray.ofUnit(new Array[Unit](len))
-    override def newArrayBuilder(): ArrayBuilder[Unit] = new ArrayBuilder.ofUnit()
+    override def newWrappedArray(len: Int): WrappedArray[Unit] = new WrappedArray.ofRef(new Array[scala.runtime.BoxedUnit](len)).asInstanceOf[WrappedArray[Unit]]
+    override def newArrayBuilder(): ArrayBuilder[Unit] = (new ArrayBuilder.ofUnit).asInstanceOf[ArrayBuilder[Unit]]
     private def readResolve(): Any = Manifest.Unit
   }
 
