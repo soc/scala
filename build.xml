@@ -9,7 +9,7 @@ SuperSabbus for Scala core, builds the scala library and compiler. It can also p
 END-USER TARGETS
 ============================================================================ -->
 
-  <target name="build" depends="pack.done"
+  <target name="build" depends="pack.bin"
     description="Builds the Scala compiler and library. Executables are in 'build/pack/bin'."/>
 
   <target name="build-opt"
@@ -22,32 +22,10 @@ END-USER TARGETS
   <target name="clean" depends="quick.clean"
     description="Removes binaries of compiler and library. Distributions are untouched."/>
 
-  <target name="replacelocker"
-    description="Replaces the Locker compiler and library by fresh ones built from current sources.">
-    <antcall target="unlocklocker"/>
-  </target>
-
-  <target name="replacelocker-opt"
-    description="Replaces the Locker compiler and library by fresh, optimised ones built from current sources.">
-    <antcall target="replacelocker">
-      <param name="scalac.args.optimise" value="-optimise"/>
-    </antcall>
-  </target>
-
-  <target name="unlocklocker"
-    description="Unlocks Locker, allowing its compiler and library to be rebuilt">
-    <antcall target="locker.unlock"/>
-  </target>
-
   <target name="fastlocker"
     description="Buildlocker without extra fuss">
     <antcall target="locker.unlock"/>
     <antcall target="locker.done"/>
-  </target>
-
-  <target name="buildlocker"
-    description="Does the same for locker as build does for quick">
-    <antcall target="locker.unlock"/>
   </target>
 
 <!-- ===========================================================================
@@ -59,9 +37,7 @@ PROPERTIES
   <property name="build.sysclasspath" value="ignore"/>
 
   <!-- Defines the repository layout -->
-  <property name="docs.dir" value="${basedir}/docs"/>
   <property name="lib.dir" value="${basedir}/lib"/>
-  <property name="lib-ant.dir" value="${lib.dir}/ant"/>
   <property name="src.dir" value="${basedir}/src"/>
 
   <!-- For developers: any jars placed in this dir will be added to the classpath
@@ -423,7 +399,6 @@ LOCAL REFERENCE BUILD (LOCKER)
           <pathelement location="${build-locker.dir}/classes/library"/>
           <pathelement location="${build-locker.dir}/classes/compiler"/>
           <path refid="aux.libs"/>
-          <pathelement location="${jline.jar}"/>
       </classpath>
     </javac>
     <scalacfork
@@ -571,7 +546,6 @@ QUICK BUILD (QUICK)
           <pathelement location="${build-quick.dir}/classes/library"/>
           <pathelement location="${build-quick.dir}/classes/compiler"/>
           <path refid="aux.libs"/>
-          <pathelement location="${jline.jar}"/>
       </classpath>
     </javac>
     <scalacfork
@@ -664,6 +638,11 @@ QUICK BUILD (QUICK)
     <antcall target="build"/>
   </target>
 
+  <target name="rebuild" description="Remove the quick *.complete files, then build normally.">
+    <antcall target="quick.touch"/>
+    <antcall target="build"/>
+  </target>
+
   <target name="quick.touch">
     <delete><fileset dir="${build-quick.dir}" includes="*.complete"/></delete>
   </target>
@@ -692,8 +671,15 @@ PACKED QUICK BUILD (PACK)
       <fileset refid="dependency.fileset" />
       <mapper type="flatten" />
     </copy>
-    <jar destfile="${build-pack.dir}/lib/scala-library.jar">
-      <fileset dir="${build-quick.dir}/classes/library"/>
+    <jar
+      encoding="UTF-8"
+      compress="true"
+      keepcompression="true"
+      level="5"
+      index="true"
+      update="true"
+      destfile="${build-pack.dir}/lib/scala-library.jar">
+        <fileset dir="${build-quick.dir}/classes/library"/>
     </jar>
     <copy file="${forkjoin.jar}" todir="${build-pack.dir}/lib"/>
   </target>
@@ -712,8 +698,16 @@ PACKED QUICK BUILD (PACK)
       <attribute name="Bundle-Version" value="${version.number}"/>
     </manifest>
     <mkdir dir="${build-pack.dir}/lib"/>
-    <jar destfile="${build-pack.dir}/lib/scala-compiler.jar" manifest="${build-pack.dir}/META-INF/MANIFEST.MF">
-      <fileset dir="${quick-compiler.dir}"/>
+    <jar
+      encoding="UTF-8"
+      compress="true"
+      keepcompression="true"
+      level="5"
+      index="true"
+      update="true"
+      destfile="${build-pack.dir}/lib/scala-compiler.jar"
+      manifest="${build-pack.dir}/META-INF/MANIFEST.MF">
+        <fileset dir="${quick-compiler.dir}"/>
     </jar>
     <jar destfile="${build-pack.dir}/lib/scala-asm.jar" manifest="${build-pack.dir}/META-INF/MANIFEST.MF">
       <fileset dir="${build-asm.dir}/classes"/>
@@ -770,10 +764,6 @@ PACKED QUICK BUILD (PACK)
     <touch file="${build-pack.dir}/bin.complete" verbose="no"/>
   </target>
 
-  <target name="pack.done" depends="pack.bin">
-    <taskdef resource="scala/tools/ant/antlib.xml" classpathref="pack.classpath"/>
-  </target>
-
   <target name="pack.clean" depends="quick.clean">
     <delete dir="${build-pack.dir}" includeemptydirs="yes" quiet="yes" failonerror="no"/>
   </target>
@@ -784,7 +774,7 @@ TEST AND DISTRIBUTION BUNDLE (ALL)
 
   <property name="dists.dir" value="${basedir}/dists"/>
 
-  <target name="dist" depends="pack.done">
+  <target name="dist" depends="pack.bin">
     <property name="dist.name" value="scala-${version.number}"/>
     <property name="dist.dir" value="${dists.dir}/${dist.name}"/>
     <mkdir dir="${dist.dir}/lib"/>
@@ -819,7 +809,7 @@ STABLE REFERENCE (STARR)
 <!-- Does not use any properties other than ${basedir}, so that it can
      run without 'init' (when using 'replacestarrwin') -->
 
-  <target name="starr.start" depends="pack.done"/>
+  <target name="starr.start" depends="pack.bin"/>
 
   <target name="starr.copy" depends="starr.start">
     <copy todir="${basedir}/lib">
