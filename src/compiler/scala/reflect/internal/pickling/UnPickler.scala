@@ -398,23 +398,24 @@ abstract class UnPickler /*extends reflect.generic.UnPickler*/ {
       errorBadSignature("bad type tag: " + tag)
 
     /** Read a constant */
-    protected def readConstant(): Constant = {
+    protected def readConstant(): Constant = Constant(readConstantValue())
+    protected def readConstantValue(): Any = {
       val tag = readByte().toInt
       val len = readNat()
       (tag: @switch) match {
-        case LITERALunit    => Constant(())
-        case LITERALboolean => Constant(readLong(len) != 0L)
-        case LITERALbyte    => Constant(readLong(len).toByte)
-        case LITERALshort   => Constant(readLong(len).toShort)
-        case LITERALchar    => Constant(readLong(len).toChar)
-        case LITERALint     => Constant(readLong(len).toInt)
-        case LITERALlong    => Constant(readLong(len))
-        case LITERALfloat   => Constant(intBitsToFloat(readLong(len).toInt))
-        case LITERALdouble  => Constant(longBitsToDouble(readLong(len)))
-        case LITERALstring  => Constant(readNameRef().toString)
-        case LITERALnull    => Constant(null)
-        case LITERALclass   => Constant(readTypeRef())
-        case LITERALenum    => Constant(readSymbolRef())
+        case LITERALunit    => ()
+        case LITERALboolean => readLong(len) != 0L
+        case LITERALbyte    => readLong(len).toByte
+        case LITERALshort   => readLong(len).toShort
+        case LITERALchar    => readLong(len).toChar
+        case LITERALint     => readLong(len).toInt
+        case LITERALlong    => readLong(len)
+        case LITERALfloat   => intBitsToFloat(readLong(len).toInt)
+        case LITERALdouble  => longBitsToDouble(readLong(len))
+        case LITERALstring  => readNameRef().toString
+        case LITERALnull    => null
+        case LITERALclass   => readTypeRef()
+        case LITERALenum    => readSymbolRef()
         case _              => noSuchConstantTag(tag, len)
       }
     }

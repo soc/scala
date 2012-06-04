@@ -425,7 +425,6 @@ abstract class GenICode extends SubComponent  {
       val sym = tree.symbol
       val Apply(fun @ Select(receiver, _), args) = tree
       val code = scalaPrimitives.getPrimitive(sym, receiver.tpe)
-      println("getPrimitive(%s, %s) == %s".format(sym, receiver.tpe, code))
 
       if (scalaPrimitives.isArithmeticOp(code))
         genArithmeticOp(tree, ctx, code)
@@ -474,7 +473,6 @@ abstract class GenICode extends SubComponent  {
      */
     private def genLoad(tree: Tree, ctx: Context, expectedType: TypeKind): Context = {
       var generatedType = expectedType
-      debuglog("at line: " + (if (tree.pos.isDefined) tree.pos.line else tree.pos))
 
       val resCtx: Context = tree match {
         case LabelDef(name, params, rhs) =>
@@ -719,7 +717,7 @@ abstract class GenICode extends SubComponent  {
                   log("Forward jump for " + sym.fullLocationString + ": scan found label " + l)
                   l
                 case _       =>
-                  abort("Unknown label target: " + sym + " at: " + (fun.pos) + ": ctx: " + ctx)
+                  abort("Unknown label target: " + sym + ": ctx: " + ctx)
               }
             })
             // note: when one of the args to genLoadLabelArguments is a jump to a label,

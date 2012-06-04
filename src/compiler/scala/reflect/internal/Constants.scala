@@ -234,5 +234,16 @@ trait Constants extends api.Constants {
     override def hashCode: Int = value.## * 41 + 17
   }
 
-  object Constant extends ConstantExtractor
+  object Constant extends ConstantExtractor {
+    val Unit  = Constant(())
+    val True  = Constant(true)
+    val False = Constant(false)
+    val Null  = Constant(null)
+    val Int0  = Constant(0)
+    val Int1  = Constant(1)
+    val Int2  = Constant(2)
+    val Int3  = Constant(3)
+    val Int4  = Constant(4)
+    val Int5  = Constant(5)
+  }
 }

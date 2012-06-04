@@ -61,7 +61,6 @@ trait Opcodes { self: ICodes =>
    *  Each case subclass will represent a specific operation.
    */
   abstract class Instruction extends Cloneable {
-
     /** This abstract method returns the number of used elements on the stack */
     def consumed : Int = 0
 
@@ -142,12 +141,17 @@ trait Opcodes { self: ICodes =>
      * Stack: ...
      *    ->: ...:constant
      */
-    case class CONSTANT(constant: Constant) extends Instruction {
+    case class CONSTANT (constant: Constant) extends Instruction {
       override def toString = "CONSTANT(" + constant.escapedStringValue + ")"
       override def consumed = 0
       override def produced = 1
 
       override def producedTypes = toTypeKind(constant.tpe) :: Nil
+    }
+    object CONSTANT {
+      val True  = new CONSTANT(Constant.True)
+      val False = new CONSTANT(Constant.False)
+      val Null  = new CONSTANT(Constant.Null)
     }
 
     /** Loads an element of an array. The array and the index should

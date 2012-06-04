@@ -14,8 +14,7 @@ import scala.tools.nsc.backend.ScalaPrimitiveOpcodes.{ B2B, D2D }
 
 trait Primitives { self: ICodes =>
   /** This class represents a primitive operation. */
-  class Primitive {
-  }
+  sealed abstract class Primitive { }
 
   private object primitiveCache {
     /** There are 7x7 = 49 opcodes in the scala opcode set for
@@ -97,189 +96,49 @@ trait Primitives { self: ICodes =>
    */
   case object EndConcat extends Primitive
 
-  /** Pretty printer for primitives */
-  class PrimitivePrinter(out: PrintWriter) {
-
-    def print(s: String): PrimitivePrinter = {
-      out.print(s)
-      this
-    }
-
-    def print(o: AnyRef): PrimitivePrinter = print(o.toString())
-
-    def printPrimitive(prim: Primitive) = prim match {
-      case Negation(kind) =>
-        print("!")
-
-      case Test(op, kind, zero) =>
-        print(op).print(kind)
-
-      case Comparison(op, kind) =>
-        print(op).print("(").print(kind)
-
-    }
-  }
-
-  /** This class represents a comparison operation. */
-  class ComparisonOp {
-
-    /** Returns a string representation of this operation. */
-    override def toString(): String = this match {
-      case CMPL => "CMPL"
-      case CMP  => "CMP"
-      case CMPG => "CMPG"
-      case _ => throw new RuntimeException("ComparisonOp unknown case")
-    }
-  }
-
-  /** A comparison operation with -1 default for NaNs */
-  case object CMPL extends ComparisonOp
-
-  /** A comparison operation with no default for NaNs */
-  case object CMP extends ComparisonOp
-
-    /** A comparison operation with +1 default for NaNs */
-  case object CMPG extends ComparisonOp
-
+  import scala.tools.asm.{ Opcodes => ASM }
 
   /** This class represents a test operation. */
-  sealed abstract class TestOp {
-
-    /** Returns the negation of this operation. */
-    def negate(): TestOp
-
-    /** Returns a string representation of this operation. */
-    override def toString(): String
-
-    /** used only from GenASM */
-    def opcodeIF(): Int
-
-    /** used only from GenASM */
-    def opcodeIFICMP(): Int
-
+  sealed abstract class TestOp(override val toString: String, val opcodeIF: Int, val opcodeIFICMP: Int) {
+    def negate(): TestOp  // negation of this operation
   }
 
   /** An equality test */
-  case object EQ extends TestOp {
-    def negate() = NE
-    override def toString() = "EQ"
-    override def opcodeIF()     = scala.tools.asm.Opcodes.IFEQ
-    override def opcodeIFICMP() = scala.tools.asm.Opcodes.IF_ICMPEQ
-  }
+  object EQ extends TestOp("EQ", ASM.IFEQ, ASM.IF_ICMPEQ) { def negate() = NE }
+  object NE extends TestOp("NE", ASM.IFNE, ASM.IF_ICMPNE) { def negate() = EQ }
+  object LT extends TestOp("LT", ASM.IFLT, ASM.IF_ICMPLT) { def negate() = GE }
+  object GE extends TestOp("GE", ASM.IFGE, ASM.IF_ICMPGE) { def negate() = LT }
+  object LE extends TestOp("LE", ASM.IFLE, ASM.IF_ICMPLE) { def negate() = GT }
+  object GT extends TestOp("GT", ASM.IFGT, ASM.IF_ICMPGT) { def negate() = LE }
 
-  /** A non-equality test */
-  case object NE extends TestOp {
-    def negate() = EQ
-    override def toString() = "NE"
-    override def opcodeIF()     = scala.tools.asm.Opcodes.IFNE
-    override def opcodeIFICMP() = scala.tools.asm.Opcodes.IF_ICMPNE
-  }
+  /** This class represents a comparison operation. */
+  sealed class ComparisonOp(override val toString: String) { }
 
-  /** A less-than test */
-  case object LT extends TestOp {
-    def negate() = GE
-    override def toString() = "LT"
-    override def opcodeIF()     = scala.tools.asm.Opcodes.IFLT
-    override def opcodeIFICMP() = scala.tools.asm.Opcodes.IF_ICMPLT
-  }
-
-  /** A greater-than-or-equal test */
-  case object GE extends TestOp {
-    def negate() = LT
-    override def toString() = "GE"
-    override def opcodeIF()     = scala.tools.asm.Opcodes.IFGE
-    override def opcodeIFICMP() = scala.tools.asm.Opcodes.IF_ICMPGE
-  }
-
-  /** A less-than-or-equal test */
-  case object LE extends TestOp {
-    def negate() = GT
-    override def toString() = "LE"
-    override def opcodeIF()     = scala.tools.asm.Opcodes.IFLE
-    override def opcodeIFICMP() = scala.tools.asm.Opcodes.IF_ICMPLE
-  }
-
-  /** A greater-than test */
-  case object GT extends TestOp {
-    def negate() = LE
-    override def toString() = "GT"
-    override def opcodeIF()     = scala.tools.asm.Opcodes.IFGT
-    override def opcodeIFICMP() = scala.tools.asm.Opcodes.IF_ICMPGT
-  }
+  final val CMPL = new ComparisonOp("ADD")  // comparison operation with -1 default for NaNs
+  final val CMP  = new ComparisonOp("SUB")  // comparison operation with no default for NaNs
+  final val CMPG = new ComparisonOp("MUL")  // comparison operation with +1 default for NaNs
 
   /** This class represents an arithmetic operation. */
-  class ArithmeticOp {
+  sealed class ArithmeticOp(override val toString: String) { }
 
-    /** Returns a string representation of this operation. */
-    override def toString(): String = this match {
-      case ADD => "ADD"
-      case SUB => "SUB"
-      case MUL => "MUL"
-      case DIV => "DIV"
-      case REM => "REM"
-      case NOT => "NOT"
-      case _   => throw new RuntimeException("ArithmeticOp unknown case")
-    }
-  }
-
-  /** An arithmetic addition operation */
-  case object ADD extends ArithmeticOp
-
-  /** An arithmetic subtraction operation */
-  case object SUB extends ArithmeticOp
-
-  /** An arithmetic multiplication operation */
-  case object MUL extends ArithmeticOp
-
-  /** An arithmetic division operation */
-  case object DIV extends ArithmeticOp
-
-  /** An arithmetic remainder operation */
-  case object REM extends ArithmeticOp
-
-  /** Bitwise negation. */
-  case object NOT extends ArithmeticOp
+  final val ADD = new ArithmeticOp("ADD")  // arithmetic addition
+  final val SUB = new ArithmeticOp("SUB")  // arithmetic subtraction
+  final val MUL = new ArithmeticOp("MUL")  // arithmetic multiplication
+  final val DIV = new ArithmeticOp("DIV")  // arithmetic division
+  final val REM = new ArithmeticOp("REM")  // arithmetic remainder
+  final val NOT = new ArithmeticOp("NOT")  // bitwise negation
 
   /** This class represents a shift operation. */
-  class ShiftOp {
+  sealed class ShiftOp(override val toString: String) { }
 
-    /** Returns a string representation of this operation. */
-    override def toString(): String = this match {
-      case LSL =>  "LSL"
-      case ASR =>  "ASR"
-      case LSR =>  "LSR"
-      case _  => throw new RuntimeException("ShitOp unknown case")
-    }
-  }
-
-  /** A logical shift to the left */
-  case object LSL extends ShiftOp
-
-  /** An arithmetic shift to the right */
-  case object ASR extends ShiftOp
-
-  /** A logical shift to the right */
-  case object LSR extends ShiftOp
+  final val LSL = new ShiftOp("LSL")    // logical shift left
+  final val ASR = new ShiftOp("ASR")    // arithmetic shift right
+  final val LSR = new ShiftOp("LSR")    // logical shift right
 
   /** This class represents a logical operation. */
-  class LogicalOp {
+  sealed class LogicalOp(override val toString: String) { }
 
-    /** Returns a string representation of this operation. */
-    override def toString(): String = this match {
-      case AND => return "AND"
-      case OR  => return "OR"
-      case XOR => return "XOR"
-      case _  => throw new RuntimeException("LogicalOp unknown case")
-    }
-  }
-
-  /** A bitwise AND operation */
-  case object AND extends LogicalOp
-
-  /** A bitwise OR operation */
-  case object OR extends LogicalOp
-
-  /** A bitwise XOR operation */
-  case object XOR extends LogicalOp
+  final val AND = new LogicalOp("AND")  // bitwise AND
+  final val OR  = new LogicalOp("OR")   // bitwise OR
+  final val XOR = new LogicalOp("XOR")  // bitwise XOR
 }
-
