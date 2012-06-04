@@ -392,17 +392,4 @@ object Predef extends LowPriorityImplicits {
   object =:= {
      implicit def tpEquals[A]: A =:= A = singleton_=:=.asInstanceOf[A =:= A]
   }
-
-  /** A type for which there is always an implicit value.
-   *  @see [[scala.Array$]], method `fallbackCanBuildFrom`
-   */
-  class DummyImplicit
-
-  object DummyImplicit {
-
-    /** An implicit value yielding a `DummyImplicit`.
-     *   @see [[scala.Array$]], method `fallbackCanBuildFrom`
-     */
-    implicit def dummyImplicit: DummyImplicit = new DummyImplicit
-  }
 }

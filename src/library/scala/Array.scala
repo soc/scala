@@ -19,7 +19,6 @@ import scala.runtime.ScalaRunTime.{ array_apply, array_update }
  *  does not have a class tag. In that case a generic array is built.
  */
 class FallbackArrayBuilding {
-
   /** A builder factory that generates a generic array.
    *  Called instead of `Array.newBuilder` if the element type of an array
    *  does not have a class tag. Note that fallbackBuilder factory
@@ -27,7 +26,7 @@ class FallbackArrayBuilding {
    *  implicit search by `Array.canBuildFrom`). We make sure that
    *  implicit search is always successful.
    */
-  implicit def fallbackCanBuildFrom[T](implicit m: DummyImplicit): CanBuildFrom[Array[_], T, ArraySeq[T]] =
+  implicit def fallbackCanBuildFrom[T](implicit dummy: String <:< String): CanBuildFrom[Array[_], T, ArraySeq[T]] =
     new CanBuildFrom[Array[_], T, ArraySeq[T]] {
       def apply(from: Array[_]) = ArraySeq.newBuilder[T]
       def apply() = ArraySeq.newBuilder[T]
