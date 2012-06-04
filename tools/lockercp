@@ -1,10 +1,11 @@
 #!/bin/sh
 #
 
-THISDIR=$(dirname $BASH_SOURCE)
-ABS=${THISDIR}/abspath
-LIBDIR=$($ABS $THISDIR/../lib)
+thisdir=$(dirname $BASH_SOURCE)
+abs=$thisdir/abspath
+lib=$($abs $thisdir/../lib)
+build=$($abs $thisdir/../build)
 
-cp=$(${THISDIR}/cpof ${THISDIR}/../build/locker/classes)
+cp=$(${thisdir}/cpof ${build}/locker/classes):${build}/asm/classes 
 
-echo ${cp}:$LIBDIR/fjbg.jar:$LIBDIR/msil.jar:$LIBDIR/forkjoin.jar:$LIBDIR/jline.jar:$LIBDIR/asm.jar:$LIBDIR/extra/'*'
+echo ${cp}:$LIBDIR/fjbg.jar:$LIBDIR/msil.jar:$LIBDIR/forkjoin.jar:$LIBDIR/jline.jar:$LIBDIR/extra/'*'
