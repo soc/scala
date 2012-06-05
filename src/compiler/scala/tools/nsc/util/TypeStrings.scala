@@ -209,12 +209,9 @@ trait TypeStrings {
   private def tparamString(clazz: JClass): String = {
     brackets(clazz.getTypeParameters map tvarString: _*)
   }
-
-  private def tparamString[T: ClassTag] : String = {
-    // [Eugene to Paul] needs review!!
-    def typeArguments: List[rm.Type] = typeTag[T].tpe.typeArguments
-    brackets(typeArguments map (jc => tvarString(List(jc))): _*)
-  }
+  //
+  // private def tparamString[T: TypeTag] : String =
+  //   brackets(typeTag[T].tpe.typeArguments map (jc => tvarString(List(jc))): _*)
 
   /** Going for an overabundance of caution right now.  Later these types
    *  can be a lot more precise, but right now the tags have a habit of
@@ -224,10 +221,9 @@ trait TypeStrings {
    *  practice to rely on toString for correctness) generated the VALID string
    *  representation of the type.
    */
-  def fromTypedValue[T: ClassTag](x: T): String = fromTag[T]
-  def fromValue(value: Any): String            = if (value == null) "Null" else fromClazz(anyClass(value))
-  def fromClazz(clazz: JClass): String         = scalaName(clazz) + tparamString(clazz)
-  def fromTag[T: ClassTag] : String             = scalaName(typeTag[T].erasure) + tparamString[T]
+  def fromValue(value: Any): String             = if (value == null) "Null" else fromClazz(anyClass(value))
+  def fromClazz(clazz: JClass): String          = scalaName(clazz) + tparamString(clazz)
+  def fromTag[T: ClassTag] : String             = fromClazz(classTag[T].erasure)
 
   /** Reducing fully qualified noise for some common packages.
    */

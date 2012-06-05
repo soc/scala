@@ -658,9 +658,6 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
   def quietBind(p: NamedParam): IR.Result                 = beQuietDuring(bind(p))
   def bind(p: NamedParam): IR.Result                      = bind(p.name, p.tpe, p.value)
   def bind[T: ClassTag](name: String, value: T): IR.Result = bind((name, value))
-  def bindSyntheticValue(x: Any): IR.Result               = bindValue(freshInternalVarName(), x)
-  def bindValue(x: Any): IR.Result                        = bindValue(freshUserVarName(), x)
-  def bindValue(name: String, x: Any): IR.Result          = bind(name, TypeStrings.fromValue(x), x)
 
   /** Reset this interpreter, forgetting all user-specified requests. */
   def reset() {
