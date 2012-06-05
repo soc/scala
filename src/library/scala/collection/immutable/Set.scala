@@ -132,3 +132,5 @@ object Set extends ImmutableSetFactory[Set] {
   }
 }
 
+/** Explicit instantiation of the `Set` trait to reduce class file size in subclasses. */
+abstract class AbstractSet[A] extends AbstractIterable[A] with Set[A]

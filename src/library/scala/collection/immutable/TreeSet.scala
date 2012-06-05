@@ -49,7 +49,10 @@ object TreeSet extends ImmutableSortedSetFactory[TreeSet] {
  */
 @SerialVersionUID(-5685982407650748405L)
 class TreeSet[A] private (tree: RB.Tree[A, Unit])(implicit val ordering: Ordering[A])
-  extends SortedSet[A] with SortedSetLike[A, TreeSet[A]] with Serializable {
+      extends AbstractSet[A] 
+         with SortedSet[A]
+         with SortedSetLike[A, TreeSet[A]]
+         with Serializable {
 
   override def stringPrefix = "TreeSet"
 

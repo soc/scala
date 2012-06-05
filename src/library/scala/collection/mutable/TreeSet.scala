@@ -34,8 +34,13 @@ object TreeSet extends MutableSortedSetFactory[TreeSet] {
  * @author Lucien Pereira
  *
  */
-class TreeSet[A](implicit val ordering: Ordering[A]) extends SortedSet[A] with SetLike[A, TreeSet[A]]
-  with SortedSetLike[A, TreeSet[A]] with Set[A] with Serializable {
+class TreeSet[A](implicit val ordering: Ordering[A])
+    extends AbstractSet[A]
+       with SortedSet[A] 
+       with SetLike[A, TreeSet[A]]
+       with SortedSetLike[A, TreeSet[A]]
+       with Set[A]
+       with Serializable {
 
   // Projection constructor
   private def this(base: Option[TreeSet[A]], from: Option[A], until: Option[A])(implicit ordering: Ordering[A]) {

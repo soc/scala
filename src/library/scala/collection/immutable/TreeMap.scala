@@ -46,7 +46,8 @@ object TreeMap extends ImmutableSortedMapFactory[TreeMap] {
  *  @define willNotTerminateInf
  */
 class TreeMap[A, +B] private (tree: RB.Tree[A, B])(implicit val ordering: Ordering[A])
-  extends SortedMap[A, B]
+  extends AbstractMap[A, B]
+     with SortedMap[A, B]
      with SortedMapLike[A, B, TreeMap[A, B]]
      with MapLike[A, B, TreeMap[A, B]]
      with Serializable {
