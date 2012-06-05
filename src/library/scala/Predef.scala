@@ -271,9 +271,9 @@ object Predef extends LowPriorityImplicits {
 
   // printing and reading -----------------------------------------------
 
-  def print(x: Any) = Console.print(x)
-  def println() = Console.println()
-  def println(x: Any) = Console.println(x)
+  def print(x: Any)                  = Console.print(x)
+  def println()                      = Console.println()
+  def println(x: Any)                = Console.println(x)
   def printf(text: String, xs: Any*) = Console.print(text.format(xs: _*))
 
   // views --------------------------------------------------------------
