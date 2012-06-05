@@ -69,7 +69,7 @@ class JLineCompletion(val intp: IMain) extends Completion with CompletionOutput 
   }
 
   object TypeMemberCompletion {
-    def apply(tp: Type, runtimeType: Type, param: NamedParam): TypeMemberCompletion = {
+    def apply(tp: Type, runtimeType: Type, param: NamedParam[_]): TypeMemberCompletion = {
       new TypeMemberCompletion(tp) {
         var upgraded = false
         lazy val upgrade = {
@@ -177,7 +177,7 @@ class JLineCompletion(val intp: IMain) extends Completion with CompletionOutput 
         case Some((clazz, runtimeType)) =>
           val sym = intp.symbolOfTerm(id)
           if (sym.isStable) {
-            val param = new NamedParam.Untyped(id, intp valueOfTerm id getOrElse null)
+            val param = NamedParam[Any](id, intp valueOfTerm id orNull)
             Some(TypeMemberCompletion(tpe, runtimeType, param))
           }
           else default

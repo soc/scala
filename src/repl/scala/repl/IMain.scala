@@ -638,10 +638,10 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
       directlyBoundNames += newTermName(name)
     result
   }
-  def directBind(p: NamedParam): IR.Result                       = directBind(p.name, p.tpe, p.value)
+  def directBind(p: NamedParam[_]): IR.Result                       = directBind(p.name, p.tpe, p.value)
   def directBind[T: ClassTag](name: String, value: T): IR.Result = directBind((name, value))
 
-  def rebind(p: NamedParam): IR.Result = {
+  def rebind(p: NamedParam[_]): IR.Result = {
     val name     = p.name
     val oldType  = typeOfTerm(name) orElse { return IR.Error }
     val newType  = p.tpe
@@ -655,8 +655,8 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
     if (ids.isEmpty) IR.Success
     else interpret("import " + ids.mkString(", "))
 
-  def quietBind(p: NamedParam): IR.Result                 = beQuietDuring(bind(p))
-  def bind(p: NamedParam): IR.Result                      = bind(p.name, p.tpe, p.value)
+  def quietBind(p: NamedParam[_]): IR.Result               = beQuietDuring(bind(p))
+  def bind(p: NamedParam[_]): IR.Result                    = bind(p.name, p.tpe, p.value)
   def bind[T: ClassTag](name: String, value: T): IR.Result = bind((name, value))
 
   /** Reset this interpreter, forgetting all user-specified requests. */
