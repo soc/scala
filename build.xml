@@ -77,7 +77,7 @@ PROPERTIES
 
   <!-- These are NOT the flags used to run SuperSabbus, but the ones written
        into the script runners created with scala.tools.ant.ScalaTool -->
-  <property name="java.flags" value="-Xmx256M -Xms32M"/>
+  <property name="java.flags" value="-Xmx1024m -Xms64m -XX:MaxPermSize=192m"/>
   <property name="jvm.opts" value=""/>
 
   <!-- if ANT_OPTS is already set by the environment, it will be unaltered,
@@ -299,6 +299,9 @@ INITIALISATION
     <path id="pack.classpath">
       <fileset dir="${build-pack.dir}/lib" erroronmissingdir="false"/>
     </path>
+
+    <echo message="quick.classpath: ${toString:quick.classpath}" />
+
     <taskdef resource="scala/tools/ant/sabbus/antlib.xml" classpathref="starr.classpath"/>
   </target>
 
@@ -395,11 +398,7 @@ LOCAL REFERENCE BUILD (LOCKER)
       includes="**/*.java"
       target="1.6" source="1.6">
         <compilerarg line="${javac.args}"/>
-        <classpath>
-          <pathelement location="${build-locker.dir}/classes/library"/>
-          <pathelement location="${build-locker.dir}/classes/compiler"/>
-          <path refid="aux.libs"/>
-      </classpath>
+        <classpath refid="locker.classpath"/>
     </javac>
     <scalacfork
       destdir="${build-locker.dir}/classes/compiler"
@@ -429,17 +428,6 @@ LOCAL REFERENCE BUILD (LOCKER)
 
   <target name="locker.done" depends="locker.comp">
     <touch file="${build-locker.dir}/all.complete" verbose="no"/>
-    <path id="locker.classpath">
-      <pathelement location="${build-locker.dir}/classes/library"/>
-      <pathelement location="${build-locker.dir}/classes/compiler"/>
-      <path refid="aux.libs"/>
-    </path>
-    <path id="quick.classpath">
-      <pathelement location="${quick-library.dir}"/>
-      <pathelement location="${quick-compiler.dir}"/>
-      <path refid="aux.libs"/>
-      <path refid="lib.extra"/>
-    </path>
   </target>
 
   <target name="locker.clean">
@@ -507,7 +495,7 @@ QUICK BUILD (QUICK)
       srcdir="${src.dir}/library"
       jvmargs="${scalacfork.jvmargs}">
       <include name="**/*.scala"/>
-      <compilationpath refid="quick.classpath"/>
+      <compilationpath refid="locker.classpath"/>
     </scalacfork>
     <propertyfile file="${build-quick.dir}/classes/library/library.properties">
       <entry key="version.number" value="${version.number}"/>
@@ -542,11 +530,7 @@ QUICK BUILD (QUICK)
       includes="**/*.java"
       target="1.6" source="1.6">
         <compilerarg line="${javac.args}"/>
-        <classpath>
-          <pathelement location="${build-quick.dir}/classes/library"/>
-          <pathelement location="${build-quick.dir}/classes/compiler"/>
-          <path refid="aux.libs"/>
-      </classpath>
+        <classpath refid="quick.classpath"/>
     </javac>
     <scalacfork
       destdir="${quick-compiler.dir}"
@@ -587,7 +571,7 @@ QUICK BUILD (QUICK)
     <mkdir dir="${quick-repl.dir}"/>
     <scalacfork
       destdir="${quick-repl.dir}"
-      compilerpathref="locker.classpath"
+      compilerpathref="quick.classpath"
       srcpath="${src.dir}/repl"
       params="${scalac.args.quick}"
       srcdir="${src.dir}/repl"
@@ -606,21 +590,18 @@ QUICK BUILD (QUICK)
   </target>
 
   <target name="quick.bin" depends="quick.pre-bin" unless="quick.bin.available">
-    <path id="quick.bin.classpath">
-      <path refid="quick.classpath"/>
-    </path>
-    <taskdef name="quick-bin" classname="scala.tools.ant.ScalaTool" classpathref="quick.bin.classpath"/>
+    <taskdef name="quick-bin" classname="scala.tools.ant.ScalaTool" classpathref="quick.classpath"/>
     <mkdir dir="${build-quick.dir}/bin"/>
     <quick-bin
       file="${build-quick.dir}/bin/scala"
       class="scala.Repl"
       javaFlags="${java.flags}"
-      classpathref="quick.bin.classpath"/>
+      classpathref="quick.classpath"/>
     <quick-bin
       file="${build-quick.dir}/bin/scalac"
       class="scala.tools.nsc.Main"
       javaFlags="${java.flags}"
-      classpathref="quick.bin.classpath"/>
+      classpathref="quick.classpath"/>
     <chmod perm="ugo+rx" file="${build-quick.dir}/bin/scala"/>
     <chmod perm="ugo+rx" file="${build-quick.dir}/bin/scalac"/>
     <touch file="${build-quick.dir}/bin.complete" verbose="no"/>
