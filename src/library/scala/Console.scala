@@ -13,8 +13,7 @@ package scala
 import java.io.{BufferedReader, InputStream, InputStreamReader,
                 IOException, OutputStream, PrintStream, Reader}
 import java.text.MessageFormat
-import scala.util.DynamicVariable
-
+import scala.collection.{ mutable, immutable }
 
 /** Implements functionality for
  *  printing Scala values on the terminal as well as reading specific values.
@@ -72,23 +71,32 @@ object Console {
   /** ANSI invisible */
   final val INVISIBLE  = "\033[8m"
 
-  private val outVar = new DynamicVariable[PrintStream](java.lang.System.out)
-  private val errVar = new DynamicVariable[PrintStream](java.lang.System.err)
-  private val inVar = new DynamicVariable[BufferedReader](
-    new BufferedReader(new InputStreamReader(java.lang.System.in)))
+  private var globalOut: PrintStream   = java.lang.System.out
+  private var globalErr: PrintStream   = java.lang.System.err
+  private var globalIn: BufferedReader = new BufferedReader(new InputStreamReader(java.lang.System.in))
+
+  private val threadOuts = mutable.Map[Thread, PrintStream]() withDefault (_ => globalOut)
+  private val threadErrs = mutable.Map[Thread, PrintStream]() withDefault (_ => globalErr)
+  private val threadIns  = mutable.Map[Thread, BufferedReader]() withDefault (_ => globalIn)
 
   /** The default output, can be overridden by `setOut` */
-  def out = outVar.value
+  def out = threadOuts(Thread.currentThread)
   /** The default error, can be overridden by `setErr` */
-  def err = errVar.value
+  def err = threadErrs(Thread.currentThread)
   /** The default input, can be overridden by `setIn` */
-  def in = inVar.value
+  def in = threadIns(Thread.currentThread)
 
   /** Sets the default output stream.
    *
    *  @param out the new output stream.
    */
-  def setOut(out: PrintStream) { outVar.value = out }
+  def setOut(out: PrintStream) {
+    threadOuts.clear()
+    globalOut = out
+  }
+  def setOut(out: OutputStream) {
+    setOut(new PrintStream(out))
+  }
 
   /** Sets the default output stream for the duration
    *  of execution of one thunk.
@@ -103,15 +111,13 @@ object Console {
    *  @return the results of `thunk`
    *  @see `withOut[T](out:OutputStream)(thunk: => T)`
    */
-  def withOut[T](out: PrintStream)(thunk: =>T): T =
-    outVar.withValue(out)(thunk)
-
-  /** Sets the default output stream.
-   *
-   *  @param out the new output stream.
-   */
-  def setOut(out: OutputStream): Unit =
-    setOut(new PrintStream(out))
+  def withOut[T](out: PrintStream)(thunk: => T): T = {
+    val t = Thread.currentThread
+    val saved = threadOuts get t
+    threadOuts(t) = out
+    try thunk
+    finally saved foreach (threadOuts(t) = _)
+  }
 
   /** Sets the default output stream for the duration
    *  of execution of one thunk.
@@ -125,12 +131,17 @@ object Console {
   def withOut[T](out: OutputStream)(thunk: =>T): T =
     withOut(new PrintStream(out))(thunk)
 
-
   /** Sets the default error stream.
    *
    *  @param err the new error stream.
    */
-  def setErr(err: PrintStream) { errVar.value = err }
+  def setErr(err: PrintStream) {
+    threadErrs.clear()
+    globalErr = err
+  }
+  def setErr(err: OutputStream) {
+    setErr(new PrintStream(err))
+  }
 
   /** Set the default error stream for the duration
    *  of execution of one thunk.
@@ -144,35 +155,26 @@ object Console {
    *  @return the results of `thunk`
    *  @see `withErr[T](err:OutputStream)(thunk: =>T)`
    */
-  def withErr[T](err: PrintStream)(thunk: =>T): T =
-    errVar.withValue(err)(thunk)
-
-  /** Sets the default error stream.
-   *
-   *  @param err the new error stream.
-   */
-  def setErr(err: OutputStream): Unit =
-    setErr(new PrintStream(err))
-
-  /** Sets the default error stream for the duration
-   *  of execution of one thunk.
-   *
-   *  @param err the new error stream.
-   *  @param thunk the code to execute with
-   *               the new error stream active
-   *  @return the results of `thunk`
-   *  @see `withErr[T](err:PrintStream)(thunk: =>T)`
-   */
+  def withErr[T](err: PrintStream)(thunk: => T): T = {
+    val t = Thread.currentThread
+    val saved = threadErrs get t
+    threadErrs(t) = err
+    try thunk
+    finally saved foreach (threadErrs(t) = _)
+  }
   def withErr[T](err: OutputStream)(thunk: =>T): T =
     withErr(new PrintStream(err))(thunk)
-
 
   /** Sets the default input stream.
    *
    *  @param reader specifies the new input stream.
    */
   def setIn(reader: Reader) {
-    inVar.value = new BufferedReader(reader)
+    threadIns.clear()
+    globalIn = new BufferedReader(reader)
+  }
+  def setIn(in: InputStream) {
+    setIn(new InputStreamReader(in))
   }
 
   /** Sets the default input stream for the duration
@@ -192,16 +194,15 @@ object Console {
    * @return the results of `thunk`
    * @see `withIn[T](in:InputStream)(thunk: =>T)`
    */
-  def withIn[T](reader: Reader)(thunk: =>T): T =
-    inVar.withValue(new BufferedReader(reader))(thunk)
-
-  /** Sets the default input stream.
-   *
-   *  @param in the new input stream.
-   */
-  def setIn(in: InputStream) {
-    setIn(new InputStreamReader(in))
+  def withIn[T](reader: Reader)(thunk: => T): T = {
+    val t = Thread.currentThread
+    val saved = threadIns get t
+    threadIns(t) = new BufferedReader(reader)
+    try thunk
+    finally saved foreach (threadIns(t) = _)
   }
+  def withIn[T](in: InputStream)(thunk: =>T): T =
+    withIn(new InputStreamReader(in))(thunk)
 
   /** Sets the default input stream for the duration
    *  of execution of one thunk.
@@ -212,15 +213,13 @@ object Console {
    * @return the results of `thunk`
    * @see `withIn[T](reader:Reader)(thunk: =>T)`
    */
-  def withIn[T](in: InputStream)(thunk: =>T): T =
-    withIn(new InputStreamReader(in))(thunk)
 
   /** Prints an object to `out` using its `toString` method.
    *
    *  @param obj the object to print; may be null.
    */
   def print(obj: Any) {
-    out.print(if (null == obj) "null" else obj.toString())
+    out print "" + obj
   }
 
   /** Flushes the output stream. This function is required when partial
