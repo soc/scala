@@ -406,7 +406,7 @@ trait Definitions extends reflect.api.StandardDefinitions {
     lazy val IteratorClass      = requiredClass[scala.collection.Iterator[_]]
     lazy val ListClass          = requiredClass[scala.collection.immutable.List[_]]
     lazy val SeqClass           = requiredClass[scala.collection.Seq[_]]
-    lazy val StringBuilderClass = requiredClass[scala.collection.mutable.StringBuilder]
+    lazy val StringBuilderClass = requiredClass[java.lang.StringBuilder]
 
     lazy val ListModule       = requiredModule[scala.collection.immutable.List.type]
       lazy val List_apply = getMember(ListModule, nme.apply)
