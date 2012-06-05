@@ -336,7 +336,9 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
     // this is risky, but it's our only possibility to make default reflexive mirror to work with REPL
     // so far we have only used the default mirror to create a few tags for the compiler
     // so it shouldn't be in conflict with our classloader, especially since it respects its parent
-    scala.reflect.mirror.classLoader = classLoader
+
+    // grrr, causes classloader deadlocks
+    // scala.reflect.mirror.classLoader = classLoader
   }
 
   /** Given a simple repl-defined name, returns the real name of
