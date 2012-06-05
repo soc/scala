@@ -737,7 +737,10 @@ class ILoop(in0: Option[BufferedReader], protected val out: JPrintWriter)
    *  with SimpleReader.
    */
   def chooseReader(settings: Settings): InteractiveReader = {
-    try new JLineReader(new JLineCompletion(intp))
+    try {
+      if (settings.Xnojline.value) SimpleReader()
+      else new JLineReader(new JLineCompletion(intp))
+    }
     catch {
       case ex @ (_: Exception | _: NoClassDefFoundError) =>
         echo("Failed to created JLineReader: " + ex + "\nFalling back to SimpleReader.")
