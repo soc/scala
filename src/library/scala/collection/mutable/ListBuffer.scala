@@ -60,9 +60,6 @@ final class ListBuffer[A]
 
   override def /: [B](z: B)(op: (B, A) => B): B = underlying./:(z)(op)
   override def :\ [B](z: B)(op: (A, B) => B): B = underlying.:\(z)(op)
-  override def addString(b: StringBuilder): StringBuilder = underlying.addString(b)
-  override def addString(b: StringBuilder, sep: String): StringBuilder = underlying.addString(b, sep)
-  override def addString(b: StringBuilder, start: String, sep: String, end: String): StringBuilder = underlying.addString(b, start, sep, end)
   override def contains(elem: Any): Boolean = underlying contains elem
   override def containsSlice[B](that: collection.Seq[B]): Boolean = underlying containsSlice that
   override def copyToArray[B >: A](xs: Array[B]) = underlying.copyToArray(xs)
@@ -100,8 +97,6 @@ final class ListBuffer[A]
   override def lastOption: Option[A] = underlying.lastOption
   override def lengthCompare(len: Int): Int = underlying lengthCompare len
   override def mkString(sep: String): String = underlying.mkString(sep)
-  override def mkString(start: String, sep: String, end: String): String = underlying.mkString(start, sep, end)
-  override def mkString: String = underlying.mkString
   override def nonEmpty: Boolean = underlying.nonEmpty
   override def prefixLength(p: A => Boolean) = underlying prefixLength p
   override def reduceLeft[B >: A](op: (B, A) => B): B = underlying.reduceLeft(op)
@@ -114,7 +109,6 @@ final class ListBuffer[A]
   override def toArray[B >: A: ArrayTag]: Array[B] = underlying.toArray
   override def toBuffer[B >: A] = underlying.toBuffer
   override def toIndexedSeq = underlying.toIndexedSeq
-  override def toIterable: Iterable[A] = underlying.toIterable
   override def toMap[T, U](implicit ev: A <:< (T, U)): immutable.Map[T, U] = underlying.toMap(ev)
   override def toSeq: collection.Seq[A] = underlying.toSeq
   override def toSet[B >: A]: immutable.Set[B] = underlying.toSet

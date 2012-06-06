@@ -191,17 +191,6 @@ trait BitSetLike[+This <: BitSetLike[This] with SortedSet[Int]] extends SortedSe
   def subsetOf(other: BitSet): Boolean =
     (0 until nwords) forall (idx => (this.word(idx) & ~ other.word(idx)) == 0L)
 
-  override def addString(sb: StringBuilder, start: String, sep: String, end: String) = {
-    sb append start
-    var pre = ""
-    for (i <- 0 until nwords * WordLength)
-      if (contains(i)) {
-        sb append pre append i
-        pre = sep
-      }
-    sb append end
-  }
-
   override def stringPrefix = "BitSet"
 }
 

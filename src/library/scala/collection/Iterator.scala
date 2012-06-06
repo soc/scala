@@ -537,57 +537,6 @@ trait Iterator[+A] extends IterableOnce[A] {
     (l, r)
   }
 
-  /** Splits this Iterator into a prefix/suffix pair according to a predicate.
-   *
-   *  @param p the test predicate
-   *  @return  a pair of Iterators consisting of the longest prefix of this
-   *           whose elements all satisfy `p`, and the rest of the Iterator.
-   *  @note    Reuse: $consumesOneAndProducesTwoIterators
-   */
-  def span(p: A => Boolean): (Iterator[A], Iterator[A]) = {
-    val self = buffered
-
-    /**
-     * Giving a name to following iterator (as opposed to trailing) because
-     * anonymous class is represented as a structural type that trailing
-     * iterator is referring (the finish() method) and thus triggering
-     * handling of structural calls. It's not what's intended here.
-     */
-    class Leading extends AbstractIterator[A] {
-      private var isDone = false
-      val lookahead = mutable.ListBuffer[A]()
-      def advance() = {
-        self.hasNext && p(self.head) && {
-          lookahead += self.next
-          true
-        }
-      }
-      def finish() = {
-        while (advance()) ()
-        isDone = true
-      }
-      def hasNext = lookahead.nonEmpty || advance()
-      def next() = {
-        if (lookahead.isEmpty)
-          advance()
-
-        lookahead.remove(0)
-      }
-    }
-    val leading = new Leading
-    val trailing = new AbstractIterator[A] {
-      private lazy val it = {
-        leading.finish()
-        self
-      }
-      def hasNext = it.hasNext
-      def next() = it.next()
-      override def toString = "unknown-if-empty iterator"
-    }
-
-    (leading, trailing)
-  }
-
   /** Skips longest sequence of elements of this iterator which satisfy given
    *  predicate `p`, and returns an iterator of the remaining elements.
    *
@@ -627,29 +576,6 @@ trait Iterator[+A] extends IterableOnce[A] {
     def next = (self.next, that.next)
   }
 
-  /** Appends an element value to this iterator until a given target length is reached.
-   *
-   *  @param   len   the target length
-   *  @param   elem  the padding value
-   *  @return a new iterator consisting of producing all values of this iterator,
-   *          followed by the minimal number of occurrences of `elem` so
-   *          that the number of produced values is at least `len`.
-   *  @note    Reuse: $consumesAndProducesIterator
-   *
-   *  @usecase def padTo(len: Int, elem: A): Iterator[A]
-   *    @inheritdoc
-   */
-  def padTo[A1 >: A](len: Int, elem: A1): Iterator[A1] = new AbstractIterator[A1] {
-    private var count = 0
-    def hasNext = self.hasNext || count < len
-    def next = {
-      count += 1
-      if (self.hasNext) self.next
-      else if (count <= len) elem
-      else empty.next
-    }
-  }
-
   /** Creates an iterator that pairs each element produced by this iterator
    *  with its index, counting from 0.
    *
@@ -665,41 +591,6 @@ trait Iterator[+A] extends IterableOnce[A] {
       idx += 1
       ret
     }
-  }
-
-  /** Creates an iterator formed from this iterator and another iterator
-   *  by combining corresponding elements in pairs.
-   *  If one of the two iterators is shorter than the other,
-   *  placeholder elements are used to extend the shorter iterator to the length of the longer.
-   *
-   *  @param that     iterator `that` may have a different length
-   *                  as the self iterator.
-   *  @param thisElem element `thisElem` is used to fill up the
-   *                  resulting iterator if the self iterator is shorter than
-   *                  `that`
-   *  @param thatElem element `thatElem` is used to fill up the
-   *                  resulting iterator if `that` is shorter than
-   *                  the self iterator
-   *  @return         a new iterator containing pairs consisting of
-   *                  corresponding values of this iterator and `that`. The length
-   *                  of the returned iterator is the maximum of the lengths of this iterator and `that`.
-   *                  If this iterator is shorter than `that`, `thisElem` values are used to pad the result.
-   *                  If `that` is shorter than this iterator, `thatElem` values are used to pad the result.
-   *  @note           Reuse: $consumesTwoAndProducesOneIterator
-   *
-   *  @usecase def zipAll[B](that: Iterator[B], thisElem: A, thatElem: B): Iterator[(A, B)]
-   *    @inheritdoc
-   */
-  def zipAll[B, A1 >: A, B1 >: B](that: Iterator[B], thisElem: A1, thatElem: B1): Iterator[(A1, B1)] = new AbstractIterator[(A1, B1)] {
-    def hasNext = self.hasNext || that.hasNext
-    def next(): (A1, B1) =
-      if (self.hasNext) {
-        if (that.hasNext) (self.next(), that.next())
-        else (self.next(), thatElem)
-      } else {
-        if (that.hasNext) (thisElem, that.next())
-        else empty.next()
-      }
   }
 
   /** Applies a function `f` to all values produced by this iterator.
@@ -1104,7 +995,6 @@ trait Iterator[+A] extends IterableOnce[A] {
     !hasNext && !that.hasNext
   }
 
-  def toIterable: Iterable[A] = toList
   def toIterator: Iterator[A] = self
 
   /** Converts this iterator to a string.

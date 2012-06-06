@@ -128,7 +128,7 @@ trait BufferLike[A, +This <: BufferLike[A, This] with Buffer[A]]
    *  @param xs  the IterableOnce containing the elements to prepend.
    *  @return the buffer itself.
    */
-  def ++=:(xs: IterableOnce[A]): this.type = { insertAll(0, xs.toIterable); this }
+  def ++=:(xs: IterableOnce[A]): this.type = { insertAll(0, xs.toSeq); this }
 
   /** Appends the given elements to this buffer.
    *

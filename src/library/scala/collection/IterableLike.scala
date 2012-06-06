@@ -565,23 +565,8 @@ trait IterableLike[+A, +Repr]
       }
     }
   }
-  // override /*IterableLike*/ def copyToArray[B >: A](xs: Array[B], start: Int, len: Int) {
-  //   var i = start
-  //   val end = (start + len) min xs.length
-  //   val it = iterator
-  //   while (i < end && it.hasNext) {
-  //     xs(i) = it.next
-  //     i += 1
-  //   }
-  // }
 
-  def toIterable: Iterable[A] = thisCollection
   def toIterator: Iterator[A] = iterator  // toSeq.iterator
-  // 
-  // override /*IterableLike*/ def toIterable: Iterable[A] =
-  //   thisCollection
-  // override /*IterableLike*/ def toIterator: Iterator[A] =
-  //   iterator
 
   /** Converts this $coll to a string.
    *
@@ -793,38 +778,7 @@ trait IterableLike[+A, +Repr]
   //  *
   //  */
   // def zipWithIndex[A1 >: A, That](implicit bf: CBF[Repr, (A1, Int), That]): That
-  //
-  // /** Returns a $coll formed from this $coll and another iterable collection
-  //  *  by combining corresponding elements in pairs.
-  //  *  If one of the two collections is shorter than the other,
-  //  *  placeholder elements are used to extend the shorter collection to the length of the longer.
-  //  *
-  //  *  @param that     the iterable providing the second half of each result pair
-  //  *  @param thisElem the element to be used to fill up the result if this $coll is shorter than `that`.
-  //  *  @param thatElem the element to be used to fill up the result if `that` is shorter than this $coll.
-  //  *  @return        a new collection of type `That` containing pairs consisting of
-  //  *                 corresponding elements of this $coll and `that`. The length
-  //  *                 of the returned collection is the maximum of the lengths of this $coll and `that`.
-  //  *                 If this $coll is shorter than `that`, `thisElem` values are used to pad the result.
-  //  *                 If `that` is shorter than this $coll, `thatElem` values are used to pad the result.
-  //  *
-  //  *  @usecase def zipAll[B](that: Iterable[B], thisElem: A, thatElem: B): $Coll[(A, B)]
-  //  *    @inheritdoc
-  //  *
-  //  *    $orderDependent
-  //  *
-  //  *    @param   that  The iterable providing the second half of each result pair
-  //  *    @param thisElem the element to be used to fill up the result if this $coll is shorter than `that`.
-  //  *    @param thatElem the element to be used to fill up the result if `that` is shorter than this $coll.
-  //  *    @tparam  B     the type of the second half of the returned pairs
-  //  *    @return        a new $coll containing pairs consisting of
-  //  *                   corresponding elements of this $coll and `that`. The length
-  //  *                   of the returned collection is the maximum of the lengths of this $coll and `that`.
-  //  *                   If this $coll is shorter than `that`, `thisElem` values are used to pad the result.
-  //  *                   If `that` is shorter than this $coll, `thatElem` values are used to pad the result.
-  //  */
-  // def zipAll[B, A1 >: A, That](that: Iterable[B], thisElem: A1, thatElem: B)(implicit bf: CBF[Repr, (A1, B), That]): That
-  // 
+
   // override protected[this] def thisCollection: Iterable[A] = this.asInstanceOf[Iterable[A]]
   // override protected[this] def toCollection(repr: Repr): Iterable[A] = repr.asInstanceOf[Iterable[A]]
 
@@ -1019,19 +973,6 @@ trait IterableLike[+A, +Repr]
     val those = that.iterator
     while (these.hasNext && those.hasNext)
       b += ((these.next, those.next))
-    b.result
-  }
-
-  def zipAll[B, A1 >: A, That](that: Iterable[B], thisElem: A1, thatElem: B)(implicit bf: CanBuildFrom[Repr, (A1, B), That]): That = {
-    val b = bf(repr)
-    val these = this.iterator
-    val those = that.iterator
-    while (these.hasNext && those.hasNext)
-      b += ((these.next, those.next))
-    while (these.hasNext)
-      b += ((these.next, thatElem))
-    while (those.hasNext)
-      b += ((thisElem, those.next))
     b.result
   }
 

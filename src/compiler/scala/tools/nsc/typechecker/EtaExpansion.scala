@@ -88,9 +88,9 @@ trait EtaExpansion { self: Analyzer =>
           defs ++= stats
           liftoutPrefix(fun)
         case Apply(fn, args) =>
-          val byName = fn.tpe.params.map(p => definitions.isByNameParamType(p.tpe))
-          // zipAll: with repeated params, there might be more args than params
-          val newArgs = args.zipAll(byName, EmptyTree, false) map { case (arg, byN) => liftout(arg, byN) }
+          val byName = fn.tpe.params.map((p: Symbol) => definitions.isByNameParamType(p.tpe)).toIndexedSeq
+          // with repeated params, there might be more args than params
+          val newArgs = mapWithIndex(args)((arg, i) => liftout(arg, if (i < byName.length) byName(i) else false))
           treeCopy.Apply(tree, liftoutPrefix(fn), newArgs) setType null
         case TypeApply(fn, args) =>
           treeCopy.TypeApply(tree, liftoutPrefix(fn), args) setType null
@@ -107,7 +107,7 @@ trait EtaExpansion { self: Analyzer =>
      */
     def expand(tree: Tree, tpe: Type): Tree = tpe match {
       case mt @ MethodType(paramSyms, restpe) if !mt.isImplicit =>
-        val params = paramSyms map (sym =>
+        val params = paramSyms map ((sym: Symbol) =>
           ValDef(Modifiers(SYNTHETIC | PARAM),
                  sym.name.toTermName, TypeTree(sym.tpe) , EmptyTree))
         atPos(tree.pos.makeTransparent) {

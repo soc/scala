@@ -251,8 +251,6 @@ extends collection.AbstractSeq[Int]
     else (numRangeElements.toLong * (head + last) / 2).toInt
   }
 
-  override def toIterable = this
-
   override def toSeq = this
 
   override def equals(other: Any) = other match {

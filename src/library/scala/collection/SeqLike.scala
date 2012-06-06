@@ -381,25 +381,6 @@ trait SeqLike[+A, +Repr] extends Any with IterableLike[A, Repr] {
   //  */
   // def :+[B >: A, That](elem: B)(implicit bf: CanBuildFrom[Repr, B, That]): That
   //
-  // /** A copy of this $coll with an element value appended until a given target length is reached.
-  //  *
-  //  *  @param   len   the target length
-  //  *  @param   elem  the padding value
-  //  *  @tparam B      the element type of the returned $coll.
-  //  *  @tparam That   $thatinfo
-  //  *  @param bf      $bfinfo
-  //  *  @return a new collection of type `That` consisting of
-  //  *          all elements of this $coll followed by the minimal number of occurrences of `elem` so
-  //  *          that the resulting collection has a length of at least `len`.
-  //  *  @usecase def padTo(len: Int, elem: A): $Coll[A]
-  //  *    @inheritdoc
-  //  *
-  //  *    @return a new $coll consisting of
-  //  *            all elements of this $coll followed by the minimal number of occurrences of `elem` so
-  //  *            that the resulting $coll has a length of at least `len`.
-  //  */
-  // def padTo[B >: A, That](len: Int, elem: B)(implicit bf: CanBuildFrom[Repr, B, That]): That
-  //
   // /** Tests whether every element of this $coll relates to the
   //  *  corresponding element of another sequence by satisfying a test predicate.
   //  *
@@ -804,18 +785,6 @@ trait SeqLike[+A, +Repr] extends Any with IterableLike[A, Repr] {
     val b = bf(repr)
     b ++= thisCollection
     b += elem
-    b.result
-  }
-
-  def padTo[B >: A, That](len: Int, elem: B)(implicit bf: CanBuildFrom[Repr, B, That]): That = {
-    val b = bf(repr)
-    b.sizeHint(length max len)
-    var diff = len - length
-    b ++= thisCollection
-    while (diff > 0) {
-      b += elem
-      diff -= 1
-    }
     b.result
   }
 

@@ -5981,7 +5981,7 @@ trait Types extends api.Types { self: SymbolTable =>
 
     val sorted       = btsMap.toList.sortWith((x, y) => x._1.typeSymbol isLess y._1.typeSymbol)
     val maxSeqLength = sorted map (_._2.size) max
-    val padded       = sorted map (_._2.padTo(maxSeqLength, NoType))
+    val padded       = sorted map { case (_, xs) => xs ++ (1 to maxSeqLength - xs.size map (_ => NoType)) }
     val transposed   = padded.transpose
 
     val columns: List[Column[List[Type]]] = mapWithIndex(sorted) {
