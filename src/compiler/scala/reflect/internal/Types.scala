@@ -6282,6 +6282,9 @@ trait Types extends api.Types { self: SymbolTable =>
     case List() => NothingClass.tpe
     case List(t) => t
     case _ =>
+      if (ts exists (_.typeParams.nonEmpty))
+        println("lubbing mismatch: " + ts)
+
       try {
         val res = lub(ts, lubDepth(ts))
         val arities = ts map (_.typeParams.size) distinct;
