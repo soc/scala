@@ -6013,21 +6013,16 @@ trait Types extends api.Types { self: SymbolTable =>
     println("** Depth is " + depth + "\n" + formatted)
   }
 
-  /** From a list of types, find any which take type parameters
-   *  where the type parameter bounds contain references to other
-   *  any types in the list (including itself.)
+  /** From the symbol of a type constructor, find any type
+   *  parameters whose bounds refer to any other of the type
+   *  parameters (including itself.)
    *
    *  @return List of symbol pairs holding the recursive type
-   *    parameter and the parameter which references it.
+   *    parameter and the parameter to which it refers.
    */
-  def findRecursiveBounds(ts: List[Type]): List[(Symbol, Symbol)] = {
-    if (ts.isEmpty) Nil
-    else {
-      val sym = ts.head.typeSymbol
-      require(ts.tail forall (_.typeSymbol == sym), ts)
-      for (p <- sym.typeParams ; in <- sym.typeParams ; if in.info.bounds contains p) yield
-        p -> in
-    }
+  def findRecursiveBounds(tcon: Symbol): List[(Symbol, Symbol)] = {
+    for (p <- tcon.typeParams ; in <- tcon.typeParams ; if in.info.bounds contains p) yield
+      p -> in
   }
   
   /** If you call .tpe on a type constructor, it creates an applied type with
@@ -6072,37 +6067,42 @@ trait Types extends api.Types { self: SymbolTable =>
         // ts0 is the 1-dimensional frontier of symbols cutting through 2-dimensional tsBts.
         // Invariant: all symbols "under" (closer to the first row) the frontier
         // are smaller (according to _.isLess) than the ones "on and beyond" the frontier
-        val ts0     = tsBts map (_.head)
+        val ts0             = elimSub(tsBts map (_.head), depth)
+        val distinctSymbols = ts0 map (_.typeSymbol) distinct
 
         // Is the frontier made up of types with the same symbol?
-        val isUniformFrontier = (ts0: @unchecked) match {
-          case t :: ts  => ts forall (_.typeSymbol == t.typeSymbol)
+        val commonSymbol = distinctSymbols match {
+          case x :: Nil => x
+          case _        => NoSymbol
         }
-
         // Produce a single type for this frontier by merging the prefixes and arguments of those
         // typerefs that share the same symbol: that symbol is the current maximal symbol for which
         // the invariant holds, i.e., the one that conveys most information wrt subtyping. Before
         // merging, strip targs that refer to bound tparams (when we're computing the lub of type
         // constructors.) Also filter out all types that are a subtype of some other type.
-        if (isUniformFrontier) {
-          val fbounds     = findRecursiveBounds(ts0) map (_._2)
-          val tcLubList   = typeConstructorLubList(ts0)
-          def isRecur(tp: Type) = tp.typeSymbol.typeParams exists fbounds.contains
-
-          val ts1 = ts0 map { t =>
-            if (isRecur(t)) {
-              val basetypes = tcLubList.iterator map (bt => t baseType bt.typeSymbol)
-              basetypes find (t => !isRecur(t)) match {
-                case Some(tp) => logResult("Breaking recursion in lublist, substituting weaker type.\n  Was: %s\n  Now".format(t))(tp)
-                case _        => t
-              }
-            }
-            else t
+        if (commonSymbol ne NoSymbol) {
+          val fbounds = findRecursiveBounds(commonSymbol) flatMap (x => List(x._1, x._2))
+          val ts1 = if (fbounds.isEmpty) ts0 else {
+            val tclubs = typeConstructorLubList(ts0)
+            val minLub = minSymbol(tclubs map (_.typeSymbol))
+            val bases  = ts0 map (_ baseType minLub)
+            // 
+            // val minLubbableSym = minSymbol(
+            //   typeConstructorLubList(ts0)
+            //     map (_.typeSymbol)
+            //     filter (s => findRecursiveBounds(s).isEmpty)
+            // )
+            log("Calculated bases=%s for %s".format(bases, ts0))
+            // ts0 map (_ baseType minLubbableSym)
+            bases
           }
           val tails = tsBts map (_.tail)
-          mergePrefixAndArgs(elimSub(ts1, depth) map elimHigherOrderTypeParam, 1, depth) match {
+          val ts2 = ts1 map elimHigherOrderTypeParam
+          mergePrefixAndArgs(ts2, 1, depth) match {
             case Some(tp) => loop(tp :: pretypes, tails)
-            case _        => loop(pretypes, tails)
+            case _        => 
+              log("Failed in mergePrefixAndArgs(%s, 1, %s)".format(ts2, depth))
+              loop(pretypes, tails)
           }
         }
         else {
@@ -6136,6 +6136,9 @@ trait Types extends api.Types { self: SymbolTable =>
     (tps.head.typeSymbol /: tps.tail) {
       (sym1, tp2) => if (tp2.typeSymbol isLess sym1) tp2.typeSymbol else sym1
     }
+  
+  private def minSymbol(syms: List[Symbol]): Symbol =
+    syms.foldLeft(AnyClass: Symbol)((x, y) => if (x isLess y) x else y)
 
   /** A minimal type list which has a given list of types as its base type sequence */
   def spanningTypes(ts: List[Type]): List[Type] = ts match {
@@ -6618,7 +6621,12 @@ trait Types extends api.Types { self: SymbolTable =>
             debuglog("transposed irregular matrix!?" +(tps, argss))
             None
           case Some(argsst) =>
-            val args = map2(sym.typeParams, argsst) { (tparam, as) =>
+            val args = map2(sym.typeParams, argsst) { (tparam, as0) =>
+              val as = (
+                if (tparam.variance == variance) elimSub(as0, depth)
+                else if (tparam.variance == -variance) elimSuper(as0)
+                else as0
+              )
               if (as.tail forall (_ == as.head)) {
                 as.head
               }
