@@ -17,8 +17,7 @@ trait BasicBlocks {
   self: ICodes =>
 
   import opcodes._
-  import global.{ ifDebug, settings, log, nme }
-  import nme.isExceptionResultName
+  import global.{ nme, settings, log }
 
   object NoBasicBlock extends BasicBlock(-1, null)
 
@@ -308,10 +307,10 @@ trait BasicBlocks {
       if (!closed)
         instructionList = instructionList map (x => map.getOrElse(x, x))
       else
-        instrs.zipWithIndex collect {
-          case (oldInstr, i) if map contains oldInstr =>
-            code.touched |= replaceInstruction(i, map(oldInstr))
-        }
+        instrs.indices foreach (i =>
+          if (map contains instrs(i))
+            code.touched |= replaceInstruction(i, map(instrs(i)))
+        )
 
     ////////////////////// Emit //////////////////////
 
@@ -342,7 +341,7 @@ trait BasicBlocks {
            */
           instr match {
             case JUMP(_) | RETURN(_) | THROW(_) | SCOPE_EXIT(_)               => // ok
-            case STORE_LOCAL(local) if isExceptionResultName(local.sym.name)  => // ok
+            case STORE_LOCAL(local) if nme.isExceptionResultName(local.sym.name)  => // ok
             case x => log("Ignoring instruction, possibly at our peril, at " + pos + ": " + x)
           }
         }

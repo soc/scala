@@ -738,9 +738,9 @@ class Global(var currentSettings: Settings, var reporter: Reporter) extends Symb
 
     val line1 = fmt.format("phase name", "id", "description")
     val line2 = fmt.format("----------", "--", "-----------")
-    val descs = phaseDescriptors.zipWithIndex map {
-      case (ph, idx) => fmt.format(ph.phaseName, idx + 1, phasesDescMap(ph))
-    }
+    val descs = mapWithIndex(phaseDescriptors)((ph, idx) =>
+      fmt.format(ph.phaseName, idx + 1, phasesDescMap(ph))
+    )
     line1 :: line2 :: descs mkString
   }
   /** Summary of the per-phase values of nextFlags and newFlags, shown

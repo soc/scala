@@ -106,6 +106,14 @@ trait Collections {
       index += 1
     }
   }
+  final def collectWithIndex[A, B](xs: List[A])(pf: PartialFunction[A, Int => B]): List[B] = {
+    val buf = new ListBuffer[B]
+    foreachWithIndex(xs)((x, i) =>
+      if (pf isDefinedAt x)
+        buf += pf(x)(i)
+    )
+    buf.result
+  }
   
   // @inline
   final def findOrElse[A](xs: IterableOnce[A])(p: A => Boolean)(orElse: => A): A = {
@@ -126,24 +134,6 @@ trait Collections {
       index += 1
     }
     lb.toList
-  }
-  final def collectMap2[A, B, C](xs1: List[A], xs2: List[B])(p: (A, B) => Boolean): Map[A, B] = {
-    if (xs1.isEmpty || xs2.isEmpty)
-      return Map()
-
-    val buf = immutable.Map.newBuilder[A, B]
-    var ys1 = xs1
-    var ys2 = xs2
-    while (!ys1.isEmpty && !ys2.isEmpty) {
-      val x1 = ys1.head
-      val x2 = ys2.head
-      if (p(x1, x2))
-        buf += ((x1, x2))
-
-      ys1 = ys1.tail
-      ys2 = ys2.tail
-    }
-    buf.result
   }
   final def foreach2[A, B](xs1: List[A], xs2: List[B])(f: (A, B) => Unit): Unit = {
     var ys1 = xs1

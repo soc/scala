@@ -541,13 +541,10 @@ abstract class CopyPropagation {
 
       // this relies on having the same order in paramAccessors and
       // the arguments on the stack. It should be the same!
-      for ((p, i) <- paramAccessors.zipWithIndex) {
-//        assert(p.tpe == paramTypes(i), "In: " + ctor.fullName
-//               + " having acc: " + (paramAccessors map (_.tpe))+ " vs. params" + paramTypes
-//               + "\n\t failed at pos " + i + " with " + p.tpe + " == " + paramTypes(i))
+      foreachWithIndex(paramAccessors) { (p, i) =>
         if (p.tpe == paramTypes(i))
-          bindings += (p -> values.head);
-        values = values.tail;
+          bindings += (p -> values.head)
+        values = values.tail
       }
 
       debuglog("\t" + bindings)
