@@ -56,10 +56,6 @@ trait IterableLike[+A, +Repr]
        with IterableOnce[A] {
   self =>
   
-  /********* BEGIN TRAVLIKE *************/
-  
-  import Iterable.breaks._
-
   /** The type implementing this iterable */
   protected type Self = Repr
 
@@ -85,39 +81,6 @@ trait IterableLike[+A, +Repr]
   /** Creates a new builder for this collection type.
    */
   protected[this] def newBuilder: mutable.Builder[A, Repr]
-
-  /** Applies a function `f` to all elements of this $coll.
-   *
-   *  @param  f   the function that is applied for its side-effect to every element.
-   *              The result of function `f` is discarded.
-   *
-   *  @tparam  U  the type parameter describing the result of function `f`.
-   *              This result will always be ignored. Typically `U` is `Unit`,
-   *              but this is not necessary.
-   *
-   *  @usecase def foreach(f: A => Unit): Unit
-   *    @inheritdoc
-   *
-   *    Note: this method underlies the implementation of most other bulk operations.
-   *    It's important to implement this method in an efficient way.
-   *
-   */
-  // def foreach[U](f: A => U): Unit
-
-  /** Tests whether this $coll is empty.
-   *
-   *  @return    `true` if the $coll contain no elements, `false` otherwise.
-   */
-  // def isEmpty: Boolean = {
-  //   var result = true
-  //   breakable {
-  //     for (x <- this) {
-  //       result = false
-  //       break
-  //     }
-  //   }
-  //   result
-  // }
 
   /** Tests whether this $coll is known to have a finite size.
    *  All strict collections are known to have finite size. For a non-strict
@@ -284,58 +247,6 @@ trait IterableLike[+A, +Repr]
     b.result
   }
 
-  /** Tests whether a predicate holds for all elements of this $coll.
-   *
-   *  $mayNotTerminateInf
-   *
-   *  @param   p     the predicate used to test elements.
-   *  @return        `true` if the given predicate `p` holds for all elements
-   *                 of this $coll, otherwise `false`.
-   */
-  // def forall(p: A => Boolean): Boolean = {
-  //   var result = true
-  //   breakable {
-  //     for (x <- this)
-  //       if (!p(x)) { result = false; break }
-  //   }
-  //   result
-  // }
-
-  /** Tests whether a predicate holds for some of the elements of this $coll.
-   *
-   *  $mayNotTerminateInf
-   *
-   *  @param   p     the predicate used to test elements.
-   *  @return        `true` if the given predicate `p` holds for some of the
-   *                 elements of this $coll, otherwise `false`.
-   */
-  // def exists(p: A => Boolean): Boolean = {
-  //   var result = false
-  //   breakable {
-  //     for (x <- this)
-  //       if (p(x)) { result = true; break }
-  //   }
-  //   result
-  // }
-
-  /** Finds the first element of the $coll satisfying a predicate, if any.
-   *
-   *  $mayNotTerminateInf
-   *  $orderDependent
-   *
-   *  @param p    the predicate used to test elements.
-   *  @return     an option value containing the first element in the $coll
-   *              that satisfies `p`, or `None` if none exists.
-   */
-  // def find(p: A => Boolean): Option[A] = {
-  //   var result: Option[A] = None
-  //   breakable {
-  //     for (x <- this)
-  //       if (p(x)) { result = Some(x); break }
-  //   }
-  //   result
-  // }
-
   def scan[B >: A, That](z: B)(op: (B, B) => B)(implicit cbf: CanBuildFrom[Repr, B, That]): That = scanLeft(z)(op)
 
   def scanLeft[B, That](z: B)(op: (B, A) => B)(implicit bf: CanBuildFrom[Repr, B, That]): That = {
@@ -358,22 +269,6 @@ trait IterableLike[+A, +Repr]
     for (elem <- scanned) b += elem
     b.result
   }
-
-  /** Selects the first element of this $coll.
-   *  $orderDependent
-   *  @return  the first element of this $coll.
-   *  @throws `NoSuchElementException` if the $coll is empty.
-   */
-  // def head: A = {
-  //   var result: () => A = () => throw new NoSuchElementException
-  //   breakable {
-  //     for (x <- this) {
-  //       result = () => x
-  //       break
-  //     }
-  //   }
-  //   result()
-  // }
 
   /** Optionally selects the first element.
    *  $orderDependent
@@ -431,61 +326,6 @@ trait IterableLike[+A, +Repr]
     }
     b.result
   }
-  // 
-  // def take(n: Int): Repr = slice(0, n)
-  // 
-  // def drop(n: Int): Repr =
-  //   if (n <= 0) {
-  //     val b = newBuilder
-  //     b.sizeHint(this)
-  //     (b ++= thisCollection).result
-  //   }
-  //   else sliceWithKnownDelta(n, Int.MaxValue, -n)
-  // 
-  // def slice(from: Int, until: Int): Repr =
-  //   sliceWithKnownBound(math.max(from, 0), until)
-
-  // Precondition: from >= 0, until > 0, builder already configured for building.
-  private[this] def sliceInternal(from: Int, until: Int, b: Builder[A, Repr]): Repr = {
-    var i = 0
-    breakable {
-      for (x <- this) {
-        if (i >= from) b += x
-        i += 1
-        if (i >= until) break
-      }
-    }
-    b.result
-  }
-  // Precondition: from >= 0
-  private[scala] def sliceWithKnownDelta(from: Int, until: Int, delta: Int): Repr = {
-    val b = newBuilder
-    if (until <= from) b.result
-    else {
-      b.sizeHint(this, delta)
-      sliceInternal(from, until, b)
-    }
-  }
-  // Precondition: from >= 0
-  private[scala] def sliceWithKnownBound(from: Int, until: Int): Repr = {
-    val b = newBuilder
-    if (until <= from) b.result
-    else {
-      b.sizeHintBounded(until - from, this)
-      sliceInternal(from, until, b)
-    }
-  }
-  // 
-  // def takeWhile(p: A => Boolean): Repr = {
-  //   val b = newBuilder
-  //   breakable {
-  //     for (x <- this) {
-  //       if (!p(x)) break
-  //       b += x
-  //     }
-  //   }
-  //   b.result
-  // }
 
   def dropWhile(p: A => Boolean): Repr = {
     val b = newBuilder
@@ -556,13 +396,11 @@ trait IterableLike[+A, +Repr]
    */
   def copyToArray[B >: A](xs: Array[B], start: Int, len: Int) {
     var i = start
-    val end = (start + len) min xs.length
-    breakable {
-      for (x <- this) {
-        if (i >= end) break
-        xs(i) = x
-        i += 1
-      }
+    val end = math.min(start + len, xs.length)
+    for (x <- this) {
+      if (i >= end) return
+      xs(i) = x
+      i += 1
     }
   }
 
@@ -703,92 +541,11 @@ trait IterableLike[+A, +Repr]
     it ++ Iterator(Nil) map (x => (newBuilder ++= x).result)
   }
 
-  /************************ END TRAVLIKE ***************************/
-
-  // def iterator: Iterator[A]
-  //
-  // /** Checks if the other iterable collection contains the same elements in the same order as this $coll.
-  //  *
-  //  *  @param that  the collection to compare with.
-  //  *  @tparam A1   the type of the elements of collection `that`.
-  //  *  @return `true`, if both collections contain the same elements in the same order, `false` otherwise.
-  //  *
-  //  *  @usecase  def sameElements(that: Iterable[A]): Boolean
-  //  *    @inheritdoc
-  //  *
-  //  *    $orderDependent
-  //  *    $willNotTerminateInf
-  //  *
-  //  *    @param that  the collection to compare with.
-  //  *    @return `true`, if both collections contain the same elements in the same order, `false` otherwise.
-  //  */
-  // def sameElements[A1 >: A](that: Iterable[A1]): Boolean
-  //
-  // /** Returns a $coll formed from this $coll and another iterable collection
-  //  *  by combining corresponding elements in pairs.
-  //  *  If one of the two collections is longer than the other, its remaining elements are ignored.
-  //  *
-  //  *  @param   that  The iterable providing the second half of each result pair
-  //  *  @tparam  A1    the type of the first half of the returned pairs (this is always a supertype
-  //  *                 of the collection's element type `A`).
-  //  *  @tparam  B     the type of the second half of the returned pairs
-  //  *  @tparam  That  $zipthatinfo
-  //  *  @param   bf    $zipbfinfo
-  //  *  @return        a new collection of type `That` containing pairs consisting of
-  //  *                 corresponding elements of this $coll and `that`. The length
-  //  *                 of the returned collection is the minimum of the lengths of this $coll and `that`.
-  //  *
-  //  *  @usecase def zip[B](that: Iterable[B]): $Coll[(A, B)]
-  //  *    @inheritdoc
-  //  *
-  //  *    $orderDependent
-  //  *
-  //  *    @param   that  The iterable providing the second half of each result pair
-  //  *    @tparam  B     the type of the second half of the returned pairs
-  //  *    @return        a new $coll containing pairs consisting of
-  //  *                   corresponding elements of this $coll and `that`. The length
-  //  *                   of the returned collection is the minimum of the lengths of this $coll and `that`.
-  //  */
-  // def zip[A1 >: A, B, That](that: Iterable[B])(implicit bf: CBF[Repr, (A1, B), That]): That
-  //
-  // /** Zips this $coll with its indices.
-  //  *
-  //  *  @tparam  A1    the type of the first half of the returned pairs (this is always a supertype
-  //  *                 of the collection's element type `A`).
-  //  *  @tparam  That  the class of the returned collection. Where possible, `That` is
-  //  *                 the same class as the current collection class `Repr`, but this
-  //  *                 depends on the element type `(A1, Int)` being admissible for that class,
-  //  *                 which means that an implicit instance of type `CanBuildFrom[Repr, (A1, Int), That]`.
-  //  *                 is found.
-  //  *  @param  bf     an implicit value of class `CanBuildFrom` which determines the
-  //  *                 result class `That` from the current representation type `Repr`
-  //  *                 and the new element type `(A1, Int)`.
-  //  *  @return        A new collection of type `That` containing pairs consisting of all elements of this
-  //  *                 $coll paired with their index. Indices start at `0`.
-  //  *
-  //  *  @usecase def zipWithIndex: $Coll[(A, Int)]
-  //  *    @inheritdoc
-  //  *
-  //  *    $orderDependent
-  //  *
-  //  *    @return        A new $coll containing pairs consisting of all elements of this
-  //  *                   $coll paired with their index. Indices start at `0`.
-  //  *    @example
-  //  *      `List("a", "b", "c").zipWithIndex = List(("a", 0), ("b", 1), ("c", 2))`
-  //  *
-  //  */
-  // def zipWithIndex[A1 >: A, That](implicit bf: CBF[Repr, (A1, Int), That]): That
-
-  // override protected[this] def thisCollection: Iterable[A] = this.asInstanceOf[Iterable[A]]
-  // override protected[this] def toCollection(repr: Repr): Iterable[A] = repr.asInstanceOf[Iterable[A]]
-
   /** Creates a new iterator over all elements contained in this iterable object.
    *
    *  @return the new iterator
    */
   def iterator: Iterator[A]
-  
-  // = toBuffer.iterator
 
   /** Applies a function `f` to all elements of this $coll.
    *
@@ -799,7 +556,6 @@ trait IterableLike[+A, +Repr]
    *    @inheritdoc
    */
   def foreach[U](f: A => U): Unit = iterator foreach f
-  // def foreach[U](f: A => U): Unit
   
   def forall(p: A => Boolean): Boolean = iterator forall p
   def exists(p: A => Boolean): Boolean = iterator exists p
@@ -808,21 +564,6 @@ trait IterableLike[+A, +Repr]
   override def foldRight[B](z: B)(op: (A, B) => B): B = iterator.foldRight(z)(op)
   override def reduceRight[B >: A](op: (A, B) => B): B = iterator.reduceRight(op)
   def head: A = iterator.next
-
-  // override /*IterableLike*/ def forall(p: A => Boolean): Boolean =
-  //   iterator.forall(p)
-  // override /*IterableLike*/ def exists(p: A => Boolean): Boolean =
-  //   iterator.exists(p)
-  // override /*IterableLike*/ def find(p: A => Boolean): Option[A] =
-  //   iterator.find(p)
-  // override /*IterableLike*/ def isEmpty: Boolean =
-  //   !iterator.hasNext
-  // override /*IterableLike*/ def foldRight[B](z: B)(op: (A, B) => B): B =
-  //   iterator.foldRight(z)(op)
-  // override /*IterableLike*/ def reduceRight[B >: A](op: (A, B) => B): B =
-  //   iterator.reduceRight(op)
-  // override /*IterableLike*/ def head: A =
-  //   iterator.next
 
   // override 
   /*IterableLike*/ def slice(from: Int, until: Int): Repr = {

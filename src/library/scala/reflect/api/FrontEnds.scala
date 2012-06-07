@@ -4,19 +4,13 @@ package api
 trait FrontEnds { self: Universe =>
 
   trait FrontEnd {
-    object severity extends Enumeration
-    class Severity(val id: Int) extends severity.Value {
-      var count: Int = 0
-      override def toString() = this match {
-        case INFO => "INFO"
-        case WARNING => "WARNING"
-        case ERROR => "ERROR"
-        case _ => "<unknown>"
-      }
+    class Severity(val label: String, val id: Int) {
+      var count = 0
+      override def toString = label
     }
-    val INFO    = new Severity(0)
-    val WARNING = new Severity(1)
-    val ERROR   = new Severity(2)
+    val INFO    = new Severity("INFO", 0)
+    val WARNING = new Severity("WARNING", 1)
+    val ERROR   = new Severity("ERROR", 2)
 
     def hasErrors   = ERROR.count > 0
     def hasWarnings = WARNING.count > 0

@@ -16,7 +16,7 @@ import StringOps._
  */
 abstract class Reporter {
   protected def info0(pos: Position, msg: String, severity: Severity, force: Boolean): Unit
-
+  
   object severity extends Enumeration
   class Severity(val id: Int) extends severity.Value {
     var count: Int = 0

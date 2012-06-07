@@ -21,8 +21,7 @@ import generic._
  * @since 1.0
  * @author Matthias Zenger
  */
-trait Set[A] extends (A => Boolean)
-                with Iterable[A]
+trait Set[A] extends Iterable[A] //(A => Boolean)
                 with GenericSetTemplate[A, Set]
                 with SetLike[A, Set[A]] {
   override def companion: GenericCompanion[Set] = Set
@@ -35,6 +34,11 @@ trait Set[A] extends (A => Boolean)
  *  @define Coll `Set`
  */
 object Set extends SetFactory[Set] {
+  implicit final class SetPredicateOps[A](val set: Set[A]) extends AnyVal {
+    // AbstractFunction1[A, Boolean] {
+    def apply(x: A) = set contains x
+  }
+
   def newBuilder[A] = immutable.Set.newBuilder[A]
   override def empty[A]: Set[A] = immutable.Set.empty[A]
   implicit def canBuildFrom[A]: CanBuildFrom[Coll, A, Set[A]] = setCanBuildFrom[A]

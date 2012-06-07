@@ -85,8 +85,6 @@ trait IterableOnce[+A] extends Any {
   def exists(p: A => Boolean): Boolean
   def find(p: A => Boolean): Option[A]
   def copyToArray[B >: A](xs: Array[B], start: Int, len: Int): Unit
-  //
-  // def map[B](f: A => B): IterableOnce[B] = toIterator map f
 
   // for internal use
   protected[this] def reversed = {

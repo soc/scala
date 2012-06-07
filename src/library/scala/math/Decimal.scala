@@ -24,13 +24,6 @@ object Decimal {
   /** Cache ony for defaultMathContext using Decimals in a small range. */
   private lazy val cache = new Array[Decimal](maxCached - minCached + 1)
 
-  object RoundingMode extends Enumeration {
-    type RoundingMode = Value
-    // These are supposed to be the same as java.math.RoundingMode.values,
-    // though it seems unwise to rely on the correspondence.
-    val UP, DOWN, CEILING, FLOOR, HALF_UP, HALF_DOWN, HALF_EVEN, UNNECESSARY = Value
-  }
-
   /** Constructs a `Decimal` using the java Decimal static
    *  valueOf constructor.
    *
@@ -154,7 +147,6 @@ class Decimal(
   val mc: jm.MathContext)
 extends ScalaNumber with ScalaNumericConversions with Serializable {
   def this(bigDecimal: jm.BigDecimal) = this(bigDecimal, Decimal.defaultMathContext)
-  import Decimal.RoundingMode._
 
   /** Cuts way down on the wrapper noise. */
   private implicit def bigdec2Decimal(x: jm.BigDecimal): Decimal = new Decimal(x, mc)
@@ -290,8 +282,8 @@ extends ScalaNumber with ScalaNumericConversions with Serializable {
    */
   def setScale(scale: Int): Decimal = this.bigDecimal setScale scale
 
-  def setScale(scale: Int, mode: RoundingMode): Decimal =
-    this.bigDecimal.setScale(scale, mode.id)
+  def setScale(scale: Int, mode: jm.RoundingMode): Decimal =
+    this.bigDecimal.setScale(scale, mode)
 
   /** Converts this Decimal to a Byte.
    *  If the Decimal is too big to fit in a Byte, only the low-order 8 bits are returned.
