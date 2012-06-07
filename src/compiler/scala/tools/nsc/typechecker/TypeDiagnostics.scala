@@ -9,7 +9,6 @@ package typechecker
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
 import scala.util.control.ControlThrowable
-import scala.util.control.Exception.ultimately
 import symtab.Flags._
 import PartialFunction._
 

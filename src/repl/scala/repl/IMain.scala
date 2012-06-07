@@ -19,7 +19,6 @@ import scala.tools.nsc.util.ScalaClassLoader
 import ScalaClassLoader.URLClassLoader
 import scala.tools.nsc.util.Exceptional.unwrap
 import scala.collection.{ mutable, immutable }
-import scala.util.control.Exception.{ ultimately }
 import IMain._
 import java.util.concurrent.Future
 import typechecker.Analyzer

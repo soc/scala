@@ -13,7 +13,6 @@ import java.net.{ URLClassLoader => JURLClassLoader }
 import java.net.URL
 import scala.reflect.ReflectionUtils.unwrapHandler
 import ScalaClassLoader._
-import scala.util.control.Exception.{ catching }
 import language.implicitConversions
 
 trait HasClassPath {
@@ -38,8 +37,8 @@ trait ScalaClassLoader extends JClassLoader {
   def tryToInitializeClass[T <: AnyRef](path: String): Option[Class[T]] = tryClass(path, true)
 
   private def tryClass[T <: AnyRef](path: String, initialize: Boolean): Option[Class[T]] =
-    catching(classOf[ClassNotFoundException], classOf[SecurityException]) opt
-      Class.forName(path, initialize, this).asInstanceOf[Class[T]]
+    try Some(Class.forName(path, initialize, this).asInstanceOf[Class[T]])
+    catch { case _: ClassNotFoundException | _: SecurityException => None }
 
   /** Create an instance of a class with this classloader */
   def create(path: String): AnyRef =

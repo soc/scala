@@ -495,7 +495,10 @@ QUICK BUILD (QUICK)
       srcdir="${src.dir}/library"
       jvmargs="${scalacfork.jvmargs}">
       <include name="**/*.scala"/>
-      <compilationpath refid="locker.classpath"/>
+      <compilationpath>
+        <path refid="locker.classpath"/>
+        <pathelement location="${build-quick.dir}/classes/library"/>
+      </compilationpath>
     </scalacfork>
     <propertyfile file="${build-quick.dir}/classes/library/library.properties">
       <entry key="version.number" value="${version.number}"/>

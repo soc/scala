@@ -355,6 +355,10 @@ object Predef extends LowPriorityImplicits {
     def apply(from: String) = apply()
     def apply()             = mutable.StringBuilder.newBuilder
   }
+  
+  // Temporary
+    
+  @inline final def ultimately[T](fin: => Unit)(body: => T): T = try body finally fin
 
   // Type Constraints --------------------------------------------------------------
 
