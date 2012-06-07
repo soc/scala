@@ -35,6 +35,10 @@ package object scala {
   val AnyRef = new AnyRef {
     override def toString = "object AnyRef"
   }
+
+  type BigDecimal = scala.math.Decimal
+  val BigDecimal = scala.math.Decimal
+
   type IterableOnce[+A] = scala.collection.IterableOnce[A]
   type TraversableOnce[+A] = scala.collection.IterableOnce[A]
 

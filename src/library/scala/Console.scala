@@ -228,4 +228,5 @@ object Console {
    *  @param x the object to print.
    */
   def println(x: Any) { out.println(x) }
+  def println { println("") }
 }
