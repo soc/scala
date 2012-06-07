@@ -262,7 +262,7 @@ object ScalaRunTime {
     val high = (lv >>> 32).toInt
     low ^ (high + lowSign)
   }
-  @inline def hash(x: Number): Int  = runtime.BoxesRunTime.hashFromNumber(x)
+  @inline def hash(x: Number): Int  = BoxesRunTime.hashFromNumber(x)
 
   // The remaining overloads are here for completeness, but the compiler
   // inlines these definitions directly so they're not generally used.

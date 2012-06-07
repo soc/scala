@@ -652,13 +652,18 @@ PACKED QUICK BUILD (PACK)
       <fileset refid="dependency.fileset" />
       <mapper type="flatten" />
     </copy>
-    <jar
+    <!-- <jar
       encoding="UTF-8"
       compress="true"
       keepcompression="true"
       level="5"
       index="true"
       update="true"
+      destfile="${build-pack.dir}/lib/scala-library.jar">
+        <fileset dir="${build-quick.dir}/classes/library"/>
+    </jar> -->
+    <jar
+      encoding="UTF-8"
       destfile="${build-pack.dir}/lib/scala-library.jar">
         <fileset dir="${build-quick.dir}/classes/library"/>
     </jar>
@@ -681,11 +686,6 @@ PACKED QUICK BUILD (PACK)
     <mkdir dir="${build-pack.dir}/lib"/>
     <jar
       encoding="UTF-8"
-      compress="true"
-      keepcompression="true"
-      level="5"
-      index="true"
-      update="true"
       destfile="${build-pack.dir}/lib/scala-compiler.jar"
       manifest="${build-pack.dir}/META-INF/MANIFEST.MF">
         <fileset dir="${quick-compiler.dir}"/>
