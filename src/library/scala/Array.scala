@@ -47,14 +47,6 @@ class FallbackArrayBuilding {
  *  @version 1.0
  */
 object Array extends FallbackArrayBuilding {
-  implicit final class ArrayInvariantOps[A](val arr: Array[A]) extends AnyVal {
-    def toSet[A1 >: A]: immutable.Set[A1] = immutable.Set[A1]() ++ arr
-    // def map[B](f: A => B): IterableOnce[B] = trav.toIterator map f
-    // def flatMap[B](f: A => IterableOnce[B]): IterableOnce[B] = trav.toIterator flatMap f
-    // def withFilter(p: A => Boolean) = trav.toIterator filter p
-    // def filter(p: A => Boolean): IterableOnce[A] = withFilter(p)
-  }
-  
   implicit def canBuildFrom[T](implicit t: ArrayTag[T]): CanBuildFrom[Array[_], T, Array[T]] =
     new CanBuildFrom[Array[_], T, Array[T]] {
       def apply(from: Array[_]) = ArrayBuilder.make[T]()(t)

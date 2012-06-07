@@ -269,6 +269,12 @@ abstract class TreeGen extends api.AbsTreeGen {
   def mkAnd(tree1: Tree, tree2: Tree): Tree =
     Apply(Select(tree1, Boolean_and), List(tree2))
 
+  def mkAnd(trees: Seq[Tree]): Tree = trees match {
+    case Nil            => EmptyTree
+    case x :: Nil       => x
+    case x :: y :: rest => rest.foldLeft(mkAnd(x, y))(mkAnd)
+  }
+
   // tree1 OR tree2
   def mkOr(tree1: Tree, tree2: Tree): Tree =
     Apply(Select(tree1, Boolean_or), List(tree2))

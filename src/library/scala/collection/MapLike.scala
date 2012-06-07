@@ -59,83 +59,9 @@ trait MapLike[A, +B, +This <: MapLike[A, B, This] with Map[A, B]]
 {
   self =>
 
-  // def default(key: A): B
-  // def get(key: A): Option[B]
-  // def apply(key: A): B
-  // def +[B1 >: B](kv: (A, B1)): GenMap[A, B1]
-  // def - (key: A): Repr
-
   // This hash code must be symmetric in the contents but ought not
   // collide trivially.
   override def hashCode() = util.MurmurHash3.mapHash(this.toMap)
-
-  // /**  Returns the value associated with a key, or a default value if the key is not contained in the map.
-  //  *   @param   key      the key.
-  //  *   @param   default  a computation that yields a default value in case no binding for `key` is
-  //  *                     found in the map.
-  //  *   @tparam  B1       the result type of the default computation.
-  //  *   @return  the value associated with `key` if it exists,
-  //  *            otherwise the result of the `default` computation.
-  //  *   @usecase def getOrElse(key: A, default: => B): B
-  //  *     @inheritdoc
-  //  */
-  // def getOrElse[B1 >: B](key: A, default: => B1): B1
-  //
-  // /** Tests whether this map contains a binding for a key.
-  //  *
-  //  *  @param key the key
-  //  *  @return    `true` if there is a binding for `key` in this map, `false` otherwise.
-  //  */
-  // def contains(key: A): Boolean
-  //
-  // /** Tests whether this map contains a binding for a key. This method,
-  //  *  which implements an abstract method of trait `PartialFunction`,
-  //  *  is equivalent to `contains`.
-  //  *
-  //  *  @param key the key
-  //  *  @return    `true` if there is a binding for `key` in this map, `false` otherwise.
-  //  */
-  // def isDefinedAt(key: A): Boolean
-  //
-  // def keySet: Set[A]
-  //
-  // /** Collects all keys of this map in an iterable collection.
-  //  *
-  //  *  @return the keys of this map as an iterable.
-  //  */
-  // def keys: Iterable[A]
-  //
-  // /** Collects all values of this map in an iterable collection.
-  //  *
-  //  *  @return the values of this map as an iterable.
-  //  */
-  // def values: Iterable[B]
-  //
-  // /** Creates an iterator for all keys.
-  //  *
-  //  *  @return an iterator over all keys.
-  //  */
-  // def keysIterator: Iterator[A]
-  //
-  // /** Creates an iterator for all values in this map.
-  //  *
-  //  *  @return an iterator over all values that are associated with some key in this map.
-  //  */
-  // def valuesIterator: Iterator[B]
-  //
-  // /** Filters this map by retaining only keys satisfying a predicate.
-  //  *  @param  p   the predicate used to test keys
-  //  *  @return an immutable map consisting only of those key value pairs of this map where the key satisfies
-  //  *          the predicate `p`. The resulting map wraps the original map without copying any elements.
-  //  */
-  // def filterKeys(p: A => Boolean): GenMap[A, B]
-  //
-  // /** Transforms this map by applying a function to every retrieved value.
-  //  *  @param  f   the function used to transform values of this map.
-  //  *  @return a map view which maps every key of this map
-  //  *          to `f(this(key))`. The resulting map wraps the original map without copying any elements.
-  //  */
-  // def mapValues[C](f: B => C): GenMap[A, C]
 
   /** Compares two maps structurally; i.e. checks if all mappings
    *  contained in this map are also contained in the other map,
@@ -268,7 +194,7 @@ trait MapLike[A, +B, +This <: MapLike[A, B, This] with Map[A, B]]
 
   /** The implementation class of the set returned by `keySet`.
    */
-  protected class DefaultKeySet extends AbstractSet[A] with Set[A] with Serializable {
+  protected class DefaultKeySet extends AbstractSet[A] with Serializable {
     def contains(key : A) = self.contains(key)
     def iterator = keysIterator
     def + (elem: A): Set[A] = (Set[A]() ++ this + elem).asInstanceOf[Set[A]] // !!! concrete overrides abstract problem
@@ -281,11 +207,7 @@ trait MapLike[A, +B, +This <: MapLike[A, B, This] with Map[A, B]]
    *
    *  @return an iterator over all keys.
    */
-  def keysIterator: Iterator[A] = new AbstractIterator[A] {
-    val iter = self.iterator
-    def hasNext = iter.hasNext
-    def next() = iter.next._1
-  }
+  def keysIterator: Iterator[A] = self.iterator map (_._1)
 
   /** Collects all keys of this map in an iterable collection.
    *
@@ -311,11 +233,7 @@ trait MapLike[A, +B, +This <: MapLike[A, B, This] with Map[A, B]]
    *
    *  @return an iterator over all values that are associated with some key in this map.
    */
-  def valuesIterator: Iterator[B] = new AbstractIterator[B] {
-    val iter = self.iterator
-    def hasNext = iter.hasNext
-    def next() = iter.next._2
-  }
+  def valuesIterator: Iterator[B] = self.iterator map (_._2)
 
   /** Defines the default value computation for the map,
    *  returned when a key is not found

@@ -169,8 +169,6 @@ trait IterableOnce[+A] extends Any {
 
   def fold[A1 >: A](z: A1)(op: (A1, A1) => A1): A1 = foldLeft(z)(op)
 
-  def aggregate[B](z: B)(seqop: (B, A) => B, combop: (B, B) => B): B = foldLeft(z)(seqop)
-
   /** Copies all elements of this $coll to a buffer.
    *  $willNotTerminateInf
    *  @param  dest   The buffer to which elements are copied.
@@ -195,6 +193,8 @@ trait IterableOnce[+A] extends Any {
   def toList: List[A] = (new ListBuffer[A] ++= this).toList
 
   def toSeq: Seq[A] = Seq[A]() ++ this
+  
+  def toSet[A1 >: A]: immutable.Set[A1] = immutable.Set[A1]() ++ this
 
   def toIndexedSeq: immutable.IndexedSeq[A] = immutable.IndexedSeq() ++ this
 
@@ -347,17 +347,12 @@ object IterableOnce {
   }
 
   class FlattenOps[A](val travs: IterableOnce[IterableOnce[A]]) {
-
     def flatten: Iterator[A] = new AbstractIterator[A] {
       val its = travs.toIterator
       private var it: Iterator[A] = Iterator.empty
       def hasNext: Boolean = it.hasNext || its.hasNext && { it = its.next.toIterator; hasNext }
       def next(): A = if (hasNext) it.next() else Iterator.empty.next()
     }
-  }
-  
-  implicit final class InvariantOps[A](val trav: IterableOnce[A]) extends AnyVal {
-    def toSet[A1 >: A]: immutable.Set[A1] = immutable.Set[A1]() ++ trav
   }
 
   /** That's the actual IterableOnce map. */
