@@ -111,7 +111,6 @@ final class ListBuffer[A]
   override def toIndexedSeq = underlying.toIndexedSeq
   override def toMap[T, U](implicit ev: A <:< (T, U)): immutable.Map[T, U] = underlying.toMap(ev)
   override def toSeq: collection.Seq[A] = underlying.toSeq
-  override def toSet[B >: A]: immutable.Set[B] = underlying.toSet
 
   private def writeObject(out: ObjectOutputStream) {
     // write start

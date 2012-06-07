@@ -1101,7 +1101,7 @@ abstract class GenASM extends SubComponent with BytecodeWriters {
       val linkedClass  = moduleClass.companionClass
       val linkedModule = linkedClass.companionSymbol
       lazy val conflictingNames: Set[Name] = {
-        linkedClass.info.members collect { case sym if sym.name.isTermName => sym.name } toSet
+        Set(linkedClass.info.members collect { case sym if sym.name.isTermName => sym.name }: _*)
       }
       debuglog("Potentially conflicting names for forwarders: " + conflictingNames)
 

@@ -21,7 +21,7 @@ import generic._
  * @since 1.0
  * @author Matthias Zenger
  */
-trait Set[A] extends Iterable[A] //(A => Boolean)
+trait Set[A] extends Iterable[A]
                 with GenericSetTemplate[A, Set]
                 with SetLike[A, Set[A]] {
   override def companion: GenericCompanion[Set] = Set
@@ -34,7 +34,7 @@ trait Set[A] extends Iterable[A] //(A => Boolean)
  *  @define Coll `Set`
  */
 object Set extends SetFactory[Set] {
-  implicit final class SetPredicateOps[A](val set: Set[A]) extends AnyVal {
+  implicit final class SetPredicateOps[A](val set: Set[A]) extends runtime.AbstractFunction1[A, Boolean] {
     // AbstractFunction1[A, Boolean] {
     def apply(x: A) = set contains x
   }

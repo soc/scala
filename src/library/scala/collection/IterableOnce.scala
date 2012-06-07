@@ -200,8 +200,6 @@ trait IterableOnce[+A] extends Any {
 
   def toBuffer[B >: A]: mutable.Buffer[B] = new ArrayBuffer[B] ++= this
 
-  def toSet[B >: A]: immutable.Set[B] = immutable.Set() ++ this
-
   def toMap[T, U](implicit ev: A <:< (T, U)): immutable.Map[T, U] = {
     val b = immutable.Map.newBuilder[T, U]
     for (x <- self)
@@ -349,12 +347,17 @@ object IterableOnce {
   }
 
   class FlattenOps[A](val travs: IterableOnce[IterableOnce[A]]) {
+
     def flatten: Iterator[A] = new AbstractIterator[A] {
       val its = travs.toIterator
       private var it: Iterator[A] = Iterator.empty
       def hasNext: Boolean = it.hasNext || its.hasNext && { it = its.next.toIterator; hasNext }
       def next(): A = if (hasNext) it.next() else Iterator.empty.next()
     }
+  }
+  
+  implicit final class InvariantOps[A](val trav: IterableOnce[A]) extends AnyVal {
+    def toSet[A1 >: A]: immutable.Set[A1] = immutable.Set[A1]() ++ trav
   }
 
   /** That's the actual IterableOnce map. */

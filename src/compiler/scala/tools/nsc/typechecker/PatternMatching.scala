@@ -2019,7 +2019,7 @@ trait PatternMatching extends Transform with TypingTransformers with ast.TreeDSL
         if (!checked) None
         else {
           val subConsts = enumerateSubtypes(fullTp).map{ tps =>
-            tps.toSet[Type].map{ tp =>
+            tps.toSet.map { tp =>
               val domainC = TypeConst(tp)
               registerEquality(domainC)
               domainC

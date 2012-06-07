@@ -27,7 +27,6 @@ trait Set[A] extends Iterable[A]
                 with SetLike[A, Set[A]]
 {
   override def companion: GenericCompanion[Set] = Set
-  override def toSet[B >: A]: Set[B] = this.asInstanceOf[Set[B]]
 }
 
 /** $factoryInfo

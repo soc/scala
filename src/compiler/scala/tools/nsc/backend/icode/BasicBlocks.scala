@@ -283,7 +283,7 @@ trait BasicBlocks {
      */
     def removeInstructionsAt(positions: Int*) {
       assert(closed, this)
-      instrs = instrs.indices.toArray filterNot positions.toSet map instrs
+      instrs = instrs.indices.toArray filterNot positions.contains map instrs
       code.touched = true
     }
 

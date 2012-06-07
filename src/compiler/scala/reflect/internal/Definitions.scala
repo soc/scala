@@ -1054,16 +1054,16 @@ trait Definitions extends reflect.api.StandardDefinitions {
       newPolyMethod(1, owner, name, flags)(tparams => (Some(Nil), createFn(tparams.head)))
     }
 
-    lazy val isUnbox = unboxMethod.values.toSet[Symbol]
-    lazy val isBox = boxMethod.values.toSet[Symbol]
+    lazy val isUnbox: Set[Symbol] = unboxMethod.values.toSet[Symbol]
+    lazy val isBox: Set[Symbol] = boxMethod.values.toSet[Symbol]
 
     /** Is symbol a phantom class for which no runtime representation exists? */
     lazy val isPhantomClass = Set[Symbol](AnyClass, AnyValClass, NullClass, NothingClass)
 
     /** Is the symbol that of a parent which is added during parsing? */
-    lazy val isPossibleSyntheticParent = ProductClass.toSet[Symbol] + ProductRootClass + SerializableClass
+    lazy val isPossibleSyntheticParent: Set[Symbol] = ProductClass.toSet + ProductRootClass + SerializableClass
 
-    private lazy val boxedValueClassesSet = boxedClass.values.toSet[Symbol] + BoxedUnitClass
+    private lazy val boxedValueClassesSet: Set[Symbol] = boxedClass.values.toSet + BoxedUnitClass
 
     /** Is symbol a value class? */
     def isPrimitiveValueClass(sym: Symbol) = ScalaPrimitiveValueClasses contains sym
