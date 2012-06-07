@@ -1,0 +1,34 @@
+Ignoring unused library classes...
+  Original number of library classes: 21217
+  Final number of library classes:    451
+Optimizing...
+Unexpected error while performing partial evaluation:
+  Class       = [scala/runtime/ScalaRunTime$$anon$2]
+  Method      = [<init>(Lscala/Function0;)V]
+  Exception   = [java.lang.IllegalArgumentException] (Stacks have different current sizes [2] and [1])
+java.lang.IllegalArgumentException: Stacks have different current sizes [2] and [1]
+	at proguard.evaluation.Stack.generalize(Stack.java:125)
+	at proguard.evaluation.TracedStack.generalize(TracedStack.java:140)
+	at proguard.optimize.evaluation.PartialEvaluator.evaluateSingleInstructionBlock(PartialEvaluator.java:683)
+	at proguard.optimize.evaluation.PartialEvaluator.evaluateInstructionBlock(PartialEvaluator.java:602)
+	at proguard.optimize.evaluation.PartialEvaluator.visitExceptionInfo(PartialEvaluator.java:1071)
+	at proguard.classfile.visitor.ExceptionHandlerFilter.visitExceptionInfo(ExceptionHandlerFilter.java:67)
+	at proguard.classfile.attribute.CodeAttribute.exceptionsAccept(CodeAttribute.java:186)
+	at proguard.optimize.evaluation.PartialEvaluator.evaluateExceptionHandlers(PartialEvaluator.java:1011)
+	at proguard.optimize.evaluation.PartialEvaluator.evaluateInstructionBlockAndExceptionHandlers(PartialEvaluator.java:567)
+	at proguard.optimize.evaluation.PartialEvaluator.visitCodeAttribute0(PartialEvaluator.java:264)
+	at proguard.optimize.evaluation.PartialEvaluator.visitCodeAttribute(PartialEvaluator.java:181)
+	at proguard.optimize.info.ParameterUsageMarker.visitCodeAttribute(ParameterUsageMarker.java:176)
+	at proguard.classfile.attribute.CodeAttribute.accept(CodeAttribute.java:101)
+	at proguard.classfile.ProgramMethod.attributesAccept(ProgramMethod.java:79)
+	at proguard.optimize.info.ParameterUsageMarker.visitProgramMethod(ParameterUsageMarker.java:136)
+	at proguard.optimize.OptimizationInfoMemberFilter.visitProgramMethod(OptimizationInfoMemberFilter.java:81)
+	at proguard.classfile.ProgramMethod.accept(ProgramMethod.java:71)
+	at proguard.classfile.ProgramClass.methodsAccept(ProgramClass.java:504)
+	at proguard.classfile.visitor.AllMethodVisitor.visitProgramClass(AllMethodVisitor.java:47)
+	at proguard.classfile.ProgramClass.accept(ProgramClass.java:346)
+	at proguard.classfile.ClassPool.classesAccept(ClassPool.java:125)
+	at proguard.optimize.Optimizer.execute(Optimizer.java:341)
+	at proguard.ProGuard.optimize(ProGuard.java:307)
+	at proguard.ProGuard.execute(ProGuard.java:116)
+	at proguard.ProGuard.main(ProGuard.java:493)

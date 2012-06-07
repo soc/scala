@@ -10,7 +10,7 @@ package scala.tools.util.color
  *
  *  These aren't actually in use yet.
  */
-trait ColorNames {
+abstract class ColorNames {
   type ColorType
   def translateCode(ansiCode: String): ColorType
 

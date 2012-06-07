@@ -67,8 +67,9 @@ abstract class ClassfileParser {
   }
 
   private def parseErrorHandler[T]: PartialFunction[Throwable, T] = {
-    case e: MissingRequirementError => handleMissing(e)
-    case e: RuntimeException        => handleError(e)
+    case e: MissingRequirementError          => handleMissing(e)
+    case e: RuntimeException                 => handleError(e)
+    case e: java.util.NoSuchElementException => handleError(e)
   }
   @inline private def pushBusy[T](sym: Symbol)(body: => T): T = {
     busy match {
@@ -886,16 +887,18 @@ abstract class ClassfileParser {
           in.skip(attrLen)
         // Java annotations on classes / methods / fields with RetentionPolicy.RUNTIME
         case tpnme.RuntimeAnnotationATTR =>
+          def fail = throw new RuntimeException("Classfile for " + sym.fullName + " contains no scala annotation.")
           if (isScalaAnnot || !isScala) {
             val scalaSigAnnot = parseAnnotations(attrLen)
             if (isScalaAnnot)
               scalaSigAnnot match {
                 case Some(san: AnnotationInfo) =>
-                  val bytes =
-                    san.assocs.find({ _._1 == nme.bytes }).get._2.asInstanceOf[ScalaSigBytes].bytes
-                  unpickler.unpickle(bytes, 0, clazz, staticModule, in.file.toString)
-                case None =>
-                  throw new RuntimeException("Scala class file does not contain Scala annotation")
+                  val bytes = san.assocs find (_._1 == nme.bytes) match {
+                    case Some((_, bs: ScalaSigBytes)) =>
+                      unpickler.unpickle(bs.bytes, 0, clazz, staticModule, in.file.toString)
+                    case _ => fail
+                  }
+                case _ => fail
               }
             debuglog("[class] << " + sym.fullName + sym.annotationsString)
           }
