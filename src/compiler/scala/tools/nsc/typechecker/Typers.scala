@@ -137,13 +137,13 @@ trait Typers extends Modes with Adaptations with Taggings {
           } else {
             mkArg = mkNamedArg // don't pass the default argument (if any) here, but start emitting named arguments for the following args
             if (!param.hasDefault && !paramFailed) {
-              context.errBuffer.find(_.kind == ErrorKinds.Divergent) match {
+              context.errBuffer.find(_.kind == ErrorKind.Divergent) match {
                 case Some(divergentImplicit) =>
                   // DivergentImplicit error has higher priority than "no implicit found"
                   // no need to issue the problem again if we are still in silent mode
                   if (context.reportErrors) {
                     context.issue(divergentImplicit)
-                    context.condBufferFlush(_.kind  == ErrorKinds.Divergent)
+                    context.condBufferFlush(_.kind  == ErrorKind.Divergent)
                   }
                 case None =>
                   NoImplicitFoundError(fun, param)
@@ -4147,7 +4147,7 @@ trait Typers extends Modes with Adaptations with Taggings {
           }
           val (result, accessibleError) = silent(_.makeAccessible(tree1, sym, qual.tpe, qual)) match {
             case SilentTypeError(err) =>
-              if (err.kind != ErrorKinds.Access) {
+              if (err.kind != ErrorKind.Access) {
                 context issue err
                 return setError(tree)
               }

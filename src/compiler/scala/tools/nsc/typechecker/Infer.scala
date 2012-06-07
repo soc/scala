@@ -1625,7 +1625,7 @@ trait Infer {
     def inferPolyAlternatives(tree: Tree, argtypes: List[Type]): Unit = {
       val OverloadedType(pre, alts) = tree.tpe
       val sym0 = tree.symbol filter (alt => sameLength(alt.typeParams, argtypes))
-      def fail(kind: PolyAlternativeErrorKind.ErrorType) =
+      def fail(kind: PolyAlternativeErrorKind) =
         PolyAlternativeError(tree, argtypes, sym0, kind)
 
       if (sym0 == NoSymbol) return (

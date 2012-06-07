@@ -441,7 +441,7 @@ trait Namers extends MethodSynthesis {
     }
 
     private def checkSelectors(tree: Import): Unit = {
-      import DuplicatesErrorKinds._
+      import DuplicatesErrorKind._
       val Import(expr, selectors) = tree
       val base = expr.tpe
 
@@ -485,7 +485,7 @@ trait Namers extends MethodSynthesis {
         }
       }
 
-      def noDuplicates(names: List[Name], check: DuplicatesErrorKinds.Value) {
+      def noDuplicates(names: List[Name], check: DuplicatesErrorKind) {
         def loop(xs: List[Name]): Unit = xs match {
           case Nil      => ()
           case hd :: tl =>
@@ -1335,8 +1335,8 @@ trait Namers extends MethodSynthesis {
      */
     def validate(body: => Symbol): Symbol = {
       val sym = body
-      import SymValidateErrors._
-      def fail(kind: SymValidateErrors.Value) = SymbolValidationError(sym, kind)
+      import SymValidateError._
+      def fail(kind: SymValidateError) = SymbolValidationError(sym, kind)
 
       def checkWithDeferred(flag: Int) {
         if (sym hasFlag flag)

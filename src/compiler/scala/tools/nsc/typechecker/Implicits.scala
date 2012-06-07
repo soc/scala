@@ -79,7 +79,7 @@ trait Implicits {
     val implicitSearchContext = context.makeImplicit(reportAmbiguous)
     val result = new ImplicitSearch(tree, pt, isView, implicitSearchContext, pos).bestImplicit
     if (saveAmbiguousDivergent && implicitSearchContext.hasErrors) {
-      context.updateBuffer(implicitSearchContext.errBuffer.filter(err => err.kind == ErrorKinds.Ambiguous || err.kind == ErrorKinds.Divergent))
+      context.updateBuffer(implicitSearchContext.errBuffer.filter(err => err.kind == ErrorKind.Ambiguous || err.kind == ErrorKind.Divergent))
       debugwarn("update buffer: " + implicitSearchContext.errBuffer)
     }
     printInference("[infer implicit] inferred " + result)
@@ -814,7 +814,7 @@ trait Implicits {
             case SearchFailure  =>
               // We don't want errors that occur during checking implicit info
               // to influence the check of further infos.
-              context.condBufferFlush(_.kind != ErrorKinds.Divergent)
+              context.condBufferFlush(_.kind != ErrorKind.Divergent)
               rankImplicits(is, acc)
             case newBest        =>
               best = newBest

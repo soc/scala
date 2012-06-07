@@ -15,12 +15,10 @@ trait ContextErrors {
 
   import global._
 
-  object ErrorKinds extends Enumeration {
-    type ErrorKind = Value
-    val Normal, Access, Ambiguous, Divergent = Value
+  class ErrorKind
+  object ErrorKind {
+    val Normal, Access, Ambiguous, Divergent = new ErrorKind
   }
-
-  import ErrorKinds.ErrorKind
 
   trait AbsTypeError extends Throwable {
     def errPos: Position
@@ -28,34 +26,34 @@ trait ContextErrors {
     def kind: ErrorKind
   }
 
-  case class NormalTypeError(underlyingTree: Tree, errMsg: String, kind: ErrorKind = ErrorKinds.Normal)
+  case class NormalTypeError(underlyingTree: Tree, errMsg: String, kind: ErrorKind = ErrorKind.Normal)
     extends AbsTypeError {
 
     def errPos:Position = underlyingTree.pos
     override def toString() = "[Type error at:" + underlyingTree.pos + "] " + errMsg
   }
 
-  case class SymbolTypeError(underlyingSym: Symbol, errMsg: String, kind: ErrorKind = ErrorKinds.Normal)
+  case class SymbolTypeError(underlyingSym: Symbol, errMsg: String, kind: ErrorKind = ErrorKind.Normal)
     extends AbsTypeError {
 
     def errPos = underlyingSym.pos
   }
 
-  case class TypeErrorWrapper(ex: TypeError, kind: ErrorKind = ErrorKinds.Normal)
+  case class TypeErrorWrapper(ex: TypeError, kind: ErrorKind = ErrorKind.Normal)
     extends AbsTypeError {
     def errMsg = ex.msg
     def errPos = ex.pos
   }
 
-  case class TypeErrorWithUnderlyingTree(tree: Tree, ex: TypeError, kind: ErrorKind = ErrorKinds.Normal)
+  case class TypeErrorWithUnderlyingTree(tree: Tree, ex: TypeError, kind: ErrorKind = ErrorKind.Normal)
     extends AbsTypeError {
     def errMsg = ex.msg
     def errPos = tree.pos
   }
 
-  case class AmbiguousTypeError(underlyingTree: Tree, errPos: Position, errMsg: String, kind: ErrorKind = ErrorKinds.Ambiguous) extends AbsTypeError
+  case class AmbiguousTypeError(underlyingTree: Tree, errPos: Position, errMsg: String, kind: ErrorKind = ErrorKind.Ambiguous) extends AbsTypeError
 
-  case class PosAndMsgTypeError(errPos: Position, errMsg: String, kind: ErrorKind = ErrorKinds.Normal) extends AbsTypeError
+  case class PosAndMsgTypeError(errPos: Position, errMsg: String, kind: ErrorKind = ErrorKind.Normal) extends AbsTypeError
 
   object ErrorUtils {
     def issueNormalTypeError(tree: Tree, msg: String)(implicit context: Context) {
@@ -67,7 +65,7 @@ trait ContextErrors {
     }
 
     def issueDivergentImplicitsError(tree: Tree, msg: String)(implicit context: Context) {
-      issueTypeError(NormalTypeError(tree, msg, ErrorKinds.Divergent))
+      issueTypeError(NormalTypeError(tree, msg, ErrorKind.Divergent))
     }
 
     def issueAmbiguousTypeError(pre: Type, sym1: Symbol, sym2: Symbol, err: AmbiguousTypeError)(implicit context: Context) {
@@ -639,9 +637,9 @@ trait ContextErrors {
 
       implicit val context0 = getContext
 
-      object PolyAlternativeErrorKind extends Enumeration {
-        type ErrorType = Value
-        val WrongNumber, NoParams, ArgsDoNotConform = Value
+      class PolyAlternativeErrorKind
+      object PolyAlternativeErrorKind {
+        val WrongNumber, NoParams, ArgsDoNotConform = new PolyAlternativeErrorKind
       }
 
       private def ambiguousErrorMsgPos(pos: Position, pre: Type, sym1: Symbol, sym2: Symbol, rest: String) =
@@ -666,7 +664,7 @@ trait ContextErrors {
           underlyingSymbol(sym).fullLocationString + " cannot be accessed in " +
           location + explanation
         }
-        NormalTypeError(tree, errMsg, ErrorKinds.Access)
+        NormalTypeError(tree, errMsg, ErrorKind.Access)
       }
 
       def NoMethodInstanceError(fn: Tree, args: List[Tree], msg: String) =
@@ -799,7 +797,7 @@ trait ContextErrors {
         issueNormalTypeError(pat, errMsg)
       }
 
-      def PolyAlternativeError(tree: Tree, argtypes: List[Type], sym: Symbol, err: PolyAlternativeErrorKind.ErrorType) = {
+      def PolyAlternativeError(tree: Tree, argtypes: List[Type], sym: Symbol, err: PolyAlternativeErrorKind) = {
         import PolyAlternativeErrorKind._
         val msg =
           err match {
@@ -825,19 +823,21 @@ trait ContextErrors {
 
       implicit val context0 = context
 
-      object SymValidateErrors extends Enumeration {
+      class SymValidateError
+      object SymValidateError {
         val ImplicitConstr, ImplicitNotTermOrClass, ImplicitAtToplevel,
           OverrideClass, SealedNonClass, AbstractNonClass,
           OverrideConstr, AbstractOverride, LazyAndEarlyInit,
-          ByNameParameter, AbstractVar = Value
+          ByNameParameter, AbstractVar = new SymValidateError
       }
 
-      object DuplicatesErrorKinds extends Enumeration {
-        val RenamedTwice, AppearsTwice = Value
+      class DuplicatesErrorKind
+      object DuplicatesErrorKind {
+        val RenamedTwice, AppearsTwice = new DuplicatesErrorKind
       }
 
-      import SymValidateErrors._
-      import DuplicatesErrorKinds._
+      import SymValidateError._
+      import DuplicatesErrorKind._
       import symtab.Flags
 
       def TypeSigError(tree: Tree, ex: TypeError) = {
@@ -904,7 +904,7 @@ trait ContextErrors {
       def RootImportError(tree: Tree) =
         issueNormalTypeError(tree, "_root_ cannot be imported")
 
-      def SymbolValidationError(sym: Symbol, errKind: SymValidateErrors.Value) {
+      def SymbolValidationError(sym: Symbol, errKind: SymValidateError) {
         val msg = errKind match {
           case ImplicitConstr =>
             "`implicit' modifier not allowed for constructors"
@@ -957,7 +957,7 @@ trait ContextErrors {
         issueSymbolTypeError(sym,  "illegal dependent method type" + errorAddendum)(context)
       }
 
-      def DuplicatesError(tree: Tree, name: Name, kind: DuplicatesErrorKinds.Value) = {
+      def DuplicatesError(tree: Tree, name: Name, kind: DuplicatesErrorKind) = {
         val msg = kind match {
           case RenamedTwice =>
             "is renamed twice"

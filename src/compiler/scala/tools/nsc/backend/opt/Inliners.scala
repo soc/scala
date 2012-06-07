@@ -125,13 +125,10 @@ abstract class Inliners extends SubComponent {
    * Simple inliner.
    */
   class Inliner {
-    object NonPublicRefs extends Enumeration {
-      val Private, Protected, Public = Value
-
-      /** Cache whether a method calls private members. */
-      val usesNonPublics = mutable.Map.empty[IMethod, Value]
-    }
-    import NonPublicRefs._
+    class NonPublicRefs
+    val Private, Protected, Public = new NonPublicRefs
+    /** Cache whether a method calls private members. */
+    val usesNonPublics = mutable.Map.empty[IMethod, NonPublicRefs]
 
     /** The current iclass */
     private var currentIClazz: IClass = _
@@ -161,7 +158,7 @@ abstract class Inliners extends SubComponent {
 
     def clearCaches() {
       // methods
-      NonPublicRefs.usesNonPublics.clear()
+      usesNonPublics.clear()
       recentTFAs.clear
       tfa.knownUnsafe.clear()
       tfa.knownSafe.clear()
@@ -732,7 +729,7 @@ abstract class Inliners extends SubComponent {
         else if (!isSafeToInline(stackLength)) "it is unsafe (target may reference private fields)"
         else "of a bug (run with -Ylog:inline -Ydebug for more information)"
 
-      def canAccess(level: NonPublicRefs.Value) = level match {
+      def canAccess(level: NonPublicRefs) = level match {
         case Private    => caller.owner == inc.owner
         case Protected  => caller.owner.tpe <:< inc.owner.tpe
         case Public     => true
@@ -801,7 +798,7 @@ abstract class Inliners extends SubComponent {
             case _                            => Public
           }
 
-          def iterate(): NonPublicRefs.Value = inc.instructions.foldLeft(Public)((res, inc) => getAccess(inc) match {
+          def iterate(): NonPublicRefs = inc.instructions.foldLeft(Public)((res, inc) => getAccess(inc) match {
             case Private    => log("instruction " + inc + " requires private access.") ; return Private
             case Protected  => Protected
             case Public     => res
