@@ -11,12 +11,12 @@ package object reflect {
   // initialization, but in response to a doomed attempt to utilize it.
 
   // todo. default mirror (a static object) might become a source for memory leaks (because it holds a strong reference to a classloader)!
-  lazy val mirror: api.Mirror =
-    try mkMirror(defaultReflectionClassLoader)
-    catch {
-      case ex: UnsupportedOperationException =>
-        new DummyMirror(defaultReflectionClassLoader)
-    }
+  lazy val mirror: api.Mirror = new DummyMirror(defaultReflectionClassLoader)
+    // try mkMirror(defaultReflectionClassLoader)
+    // catch {
+    //   case ex: UnsupportedOperationException =>
+    //     new DummyMirror(defaultReflectionClassLoader)
+    // }
 
   private[scala] def mirrorDiagnostics(cl: ClassLoader): String = """
     |
