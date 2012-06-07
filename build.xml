@@ -128,7 +128,7 @@ INITIALISATION
   <target name="init.maven.jars" depends="init.maven.tasks">
     <artifact:dependencies pathId="dependency.classpath" filesetId="dependency.fileset">
       <dependency groupId="com.typesafe" artifactId="config" version="0.4.0"/>
-      <dependency groupId="org.improving" artifactId="jvminfo" version="0.1.1" />
+      <!-- <dependency groupId="org.improving" artifactId="jvminfo" version="0.1.1" /> -->
     </artifact:dependencies>
   </target>
 
