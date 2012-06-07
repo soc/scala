@@ -10,6 +10,8 @@
 
 package scala
 
+import language.implicitConversions
+
 /** `Short`, a 16-bit signed integer (equivalent to Java's `short` primitive type) is a
  *  subtype of [[scala.AnyVal]]. Instances of `Short` are not
  *  represented by an object in the underlying runtime system.
