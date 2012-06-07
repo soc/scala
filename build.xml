@@ -290,6 +290,10 @@ INITIALISATION
       <pathelement location="${build-locker.dir}/classes/compiler"/>
       <path refid="aux.libs"/>
     </path>
+    <path id="locker.classpath.plus">
+      <pathelement location="${build-quick.dir}/classes/library"/>
+      <path refid="locker.classpath"/>
+    </path>
     <path id="quick.classpath">
       <pathelement location="${quick-library.dir}"/>
       <pathelement location="${quick-compiler.dir}"/>
@@ -489,16 +493,13 @@ QUICK BUILD (QUICK)
     </javac>
     <scalacfork
       destdir="${build-quick.dir}/classes/library"
-      compilerpathref="locker.classpath"
+      compilerpathref="locker.classpath.plus"
       srcpath="${src.dir}/library"
       params="${scalac.args.quick}"
       srcdir="${src.dir}/library"
       jvmargs="${scalacfork.jvmargs}">
       <include name="**/*.scala"/>
-      <compilationpath>
-        <path refid="locker.classpath"/>
-        <pathelement location="${build-quick.dir}/classes/library"/>
-      </compilationpath>
+      <compilationpath refid="locker.classpath.plus"/>
     </scalacfork>
     <propertyfile file="${build-quick.dir}/classes/library/library.properties">
       <entry key="version.number" value="${version.number}"/>

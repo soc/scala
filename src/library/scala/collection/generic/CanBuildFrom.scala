@@ -13,6 +13,8 @@ package generic
 import mutable.Builder
 import scala.annotation.implicitNotFound
 
+trait CanBuildSelf[T, CC[X]] extends CanBuildFrom[CC[T], T, CC[T]] { }
+
 /** A base trait for builder factories.
  *
  *  @tparam From  the type of the underlying collection that requests

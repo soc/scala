@@ -43,10 +43,6 @@ abstract class GenericCompanion[+CC[X] <: Iterable[X]] {
    */
   def apply[A](elems: A*): CC[A] = {
     if (elems.isEmpty) empty[A]
-    else {
-      val b = newBuilder[A]
-      b ++= elems
-      b.result
-    }
+    else newBuilder[A] ++= elems result
   }
 }
