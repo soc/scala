@@ -727,16 +727,6 @@ trait IterableLike[+A, +Repr]
     b.result
   }
 
-  def sameElements[B >: A](that: Iterable[B]): Boolean = {
-    val these = this.iterator
-    val those = that.iterator
-    while (these.hasNext && those.hasNext)
-      if (these.next != those.next)
-        return false
-
-    !these.hasNext && !those.hasNext
-  }
-
   /** Method called from equality methods, so that user-defined subclasses can
    *  refuse to be equal to other collections of the same kind.
    *  @param   that   The object with which this $coll should be compared

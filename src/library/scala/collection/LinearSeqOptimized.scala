@@ -233,20 +233,6 @@ trait LinearSeqOptimized[+A, +Repr <: LinearSeqOptimized[A, Repr]] extends Linea
     (b.result, these)
   }
 
-  override /*IterableLike*/
-  def sameElements[B >: A](that: Iterable[B]): Boolean = that match {
-    case that1: LinearSeq[_] =>
-      var these = this
-      var those = that1
-      while (!these.isEmpty && !those.isEmpty && these.head == those.head) {
-        these = these.tail
-        those = those.tail
-      }
-      these.isEmpty && those.isEmpty
-    case _ =>
-      super.sameElements(that)
-  }
-
   override /*SeqLike*/
   def lengthCompare(len: Int): Int =  {
     var i = 0

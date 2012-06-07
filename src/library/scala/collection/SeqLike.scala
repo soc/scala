@@ -484,7 +484,7 @@ trait SeqLike[+A, +Repr] extends Any with IterableLike[A, Repr] {
    *            this sequence in the same order, `false` otherwise
    */
   override def equals(that: Any): Boolean = that match {
-    case that: Seq[_] => (that canEqual this) && (this sameElements that)
+    case that: Seq[_] => (that canEqual this) && (this corresponds that)(_ == _)
     case _            => false
   }
 

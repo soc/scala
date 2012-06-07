@@ -102,7 +102,6 @@ final class ListBuffer[A]
   override def reduceLeft[B >: A](op: (B, A) => B): B = underlying.reduceLeft(op)
   override def reduceRight[B >: A](op: (A, B) => B): B = underlying.reduceRight(op)
   override def reverseIterator: Iterator[A] = underlying.reverseIterator
-  override def sameElements[B >: A](that: Iterable[B]): Boolean = underlying.sameElements(that)
   override def segmentLength(p: A => Boolean, from: Int): Int = underlying.segmentLength(p, from)
   override def startsWith[B](that: collection.Seq[B]): Boolean = underlying startsWith that
   override def startsWith[B](that: collection.Seq[B], offset: Int): Boolean = underlying.startsWith(that, offset)

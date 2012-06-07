@@ -154,19 +154,6 @@ trait IndexedSeqOptimized[+A, +Repr] extends Any with IndexedSeqLike[A, Repr] { 
   def span(p: A => Boolean): (Repr, Repr) = splitAt(prefixLength(p))
 
   override /*IterableLike*/
-  def sameElements[B >: A](that: Iterable[B]): Boolean = that match {
-    case that: IndexedSeq[_] =>
-      val len = length
-      len == that.length && {
-        var i = 0
-        while (i < len && this(i) == that(i)) i += 1
-        i == len
-      }
-    case _ =>
-      super.sameElements(that)
-  }
-
-  override /*IterableLike*/
   def copyToArray[B >: A](xs: Array[B], start: Int, len: Int) {
     var i = 0
     var j = start
