@@ -1019,7 +1019,7 @@ abstract class Erasure extends AddInterfaces
 
                     if (parentTests.isEmpty) Literal(Constant(true))
                     else gen.evalOnce(qual, currentOwner, unit) { q =>
-                      atPos(tree.pos)(mkAnd(parentTests map mkIsInstanceOf(q)))
+                      atPos(tree.pos)(gen.mkAnd(parentTests map mkIsInstanceOf(q)))
                     }
                   case _ =>
                     tree

@@ -607,8 +607,11 @@ self =>
 /* --------- OPERAND/OPERATOR STACK --------------------------------------- */
 
     /** Modes for infix types. */
-    object InfixMode extends Enumeration {
-      val FirstOp, LeftOp, RightOp = Value
+    final class InfixMode(override val toString: String) { }
+    object InfixMode {
+      final val FirstOp = new InfixMode("FirstOp")
+      final val LeftOp  = new InfixMode("LeftOp")
+      final val RightOp = new InfixMode("RightOp")
     }
 
     var opstack: List[OpInfo] = Nil
@@ -809,7 +812,7 @@ self =>
         }
       }
 
-      def infixTypeRest(t: Tree, mode: InfixMode.Value): Tree = {
+      def infixTypeRest(t: Tree, mode: InfixMode): Tree = {
         if (isIdent && in.name != nme.STAR) {
           val opOffset = in.offset
           val leftAssoc = treeInfo.isLeftAssoc(in.name)
@@ -829,7 +832,7 @@ self =>
        *  InfixType ::= CompoundType {id [nl] CompoundType}
        *  }}}
        */
-      def infixType(mode: InfixMode.Value): Tree =
+      def infixType(mode: InfixMode): Tree =
         placeholderTypeBoundary { infixTypeRest(compoundType(), mode) }
 
       /** {{{

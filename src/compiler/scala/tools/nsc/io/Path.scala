@@ -48,19 +48,6 @@ object Path {
   implicit def string2path(s: String): Path = apply(s)
   implicit def jfile2path(jfile: JFile): Path = apply(jfile)
 
-  // java 7 style, we don't use it yet
-  // object AccessMode extends Enumeration {
-  //   val EXECUTE, READ, WRITE = Value
-  // }
-  // def checkAccess(modes: AccessMode*): Boolean = {
-  //   modes foreach {
-  //     case EXECUTE  => throw new Exception("Unsupported") // can't check in java 5
-  //     case READ     => if (!jfile.canRead()) return false
-  //     case WRITE    => if (!jfile.canWrite()) return false
-  //   }
-  //   true
-  // }
-
   def onlyDirs(xs: Iterator[Path]): Iterator[Directory] = xs filter (_.isDirectory) map (_.toDirectory)
   def onlyDirs(xs: List[Path]): List[Directory] = xs filter (_.isDirectory) map (_.toDirectory)
   def onlyFiles(xs: Iterator[Path]): Iterator[File] = xs filter (_.isFile) map (_.toFile)
