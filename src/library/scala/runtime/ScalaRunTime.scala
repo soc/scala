@@ -19,6 +19,9 @@ import java.lang.reflect.{ Method => JMethod }
  *  outside the API and subject to change or removal without notice.
  */
 object ScalaRunTime {
+  // For proguard - not sure why I can't talk it into keeping it
+  replStringOf("", 0)
+  
   def isArray(x: AnyRef): Boolean = isArray(x, 1)
   def isArray(x: Any, atLevel: Int): Boolean =
     x != null && isArrayClass(x.getClass, atLevel)
