@@ -61,7 +61,7 @@ trait MapLike[A, +B, +This <: MapLike[A, B, This] with Map[A, B]]
 
   // This hash code must be symmetric in the contents but ought not
   // collide trivially.
-  override def hashCode() = util.MurmurHash3.mapHash(this.toMap)
+  override def hashCode() = scala.util.hashing.MurmurHash3.mapHash(this.toMap)
 
   /** Compares two maps structurally; i.e. checks if all mappings
    *  contained in this map are also contained in the other map,

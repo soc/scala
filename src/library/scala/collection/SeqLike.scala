@@ -475,7 +475,7 @@ trait SeqLike[+A, +Repr] extends Any with IterableLike[A, Repr] {
   /** Hashcodes for $Coll produce a value from the hashcodes of all the
    *  elements of the $coll.
    */
-  override def hashCode() = util.MurmurHash3.seqHash(this.toSeq)
+  override def hashCode() = scala.util.hashing.MurmurHash3.seqHash(this.toSeq)
 
   /** The equals method for arbitrary sequences. Compares this sequence to
    *  some other object.

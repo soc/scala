@@ -158,7 +158,7 @@ extends IterableLike[A, This]
   // Calling map on a set drops duplicates: any hashcode collisions would
   // then be dropped before they can be added.
   // Hash should be symmetric in set entries, but without trivial collisions.
-  override def hashCode() = util.MurmurHash3.setHash(this.toSet)
+  override def hashCode() = scala.util.hashing.MurmurHash3.setHash(this.toSet)
 
   /** The empty set of the same type as this set
    * @return  an empty set of type `This`.

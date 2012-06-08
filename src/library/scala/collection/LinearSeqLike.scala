@@ -48,7 +48,7 @@ trait LinearSeqLike[+A, +Repr <: LinearSeqLike[A, Repr]] extends SeqLike[A, Repr
   override protected[this] def thisCollection: LinearSeq[A] = this.asInstanceOf[LinearSeq[A]]
   override protected[this] def toCollection(repr: Repr): LinearSeq[A] = repr.asInstanceOf[LinearSeq[A]]
 
-  override def hashCode() = util.MurmurHash3.seqHash(this.toSeq) // TODO - can we get faster via "linearSeqHash" ?
+  override def hashCode() = util.hashing.MurmurHash3.seqHash(thisCollection) // TODO - can we get faster via "linearSeqHash" ?
 
   override /*IterableLike*/
   def iterator: Iterator[A] = new AbstractIterator[A] {
