@@ -257,12 +257,16 @@ abstract class GenASM extends SubComponent with BytecodeWriters {
       && !sym.isMutable // lazy vals and vars both
     )
 
+    // Primitives are "abstract final" to prohibit instantiation
+    // without having to provide any implementations, but that is an
+    // illegal combination of modifiers at the bytecode level so
+    // suppress final if abstract if present.
     import asm.Opcodes._
     mkFlags(
       if (privateFlag) ACC_PRIVATE else ACC_PUBLIC,
       if (sym.isDeferred || sym.hasAbstractFlag) ACC_ABSTRACT else 0,
       if (sym.isInterface) ACC_INTERFACE else 0,
-      if (finalFlag) ACC_FINAL else 0,
+      if (finalFlag && !sym.hasAbstractFlag) ACC_FINAL else 0,
       if (sym.isStaticMember) ACC_STATIC else 0,
       if (sym.isBridge) ACC_BRIDGE | ACC_SYNTHETIC else 0,
       if (sym.isClass && !sym.isInterface) ACC_SUPER else 0,
@@ -1349,7 +1353,7 @@ abstract class GenASM extends SubComponent with BytecodeWriters {
       // typestate: entering mode with valid call sequences:
       //   ( visitInnerClass | visitField | visitMethod )* visitEnd
 
-      if (isStaticModule(c.symbol) || serialVUID != None || isParcelableClass) {
+      if (isStaticModule(c.symbol) || isParcelableClass) {
 
         if (isStaticModule(c.symbol)) { addModuleInstanceField() }
         addStaticInit(c.lookupStaticCtor)
@@ -1389,6 +1393,18 @@ abstract class GenASM extends SubComponent with BytecodeWriters {
       if (uncalledPrivates.nonEmpty)
         println("uncalledPrivates in " + clasz.symbol + " are " + uncalledPrivates.mkString(", "))
       **/
+
+      // add static serialVersionUID field if `clasz` annotated with `@SerialVersionUID(uid: Long)`
+      serialVUID foreach { value =>
+        val fieldName = "serialVersionUID"
+        jclass.visitField(
+          PublicStaticFinal,
+          fieldName,
+          tdesc_long,
+          null, // no java-generic-signature
+          value
+        ).visitEnd()
+      }
 
       clasz.fields  foreach genField
       clasz.methods foreach { im => genMethod(im, c.symbol.isInterface) }
@@ -1611,15 +1627,6 @@ abstract class GenASM extends SubComponent with BytecodeWriters {
             lastBlock emit CALL_METHOD(m.symbol.enclClass.primaryConstructor, Static(true))
           }
 
-          // add serialVUID code
-          serialVUID foreach { value =>
-            val fieldName   = "serialVersionUID"
-            val fieldSymbol = clasz.symbol.newValue(newTermName(fieldName), NoPosition, Flags.STATIC | Flags.FINAL) setInfo LongClass.tpe
-            clasz addField new IField(fieldSymbol)
-            lastBlock emit CONSTANT(Constant(value))
-            lastBlock emit STORE_FIELD(fieldSymbol, true)
-          }
-
           if (isParcelableClass) { addCreatorCode(lastBlock) }
 
           lastBlock emit RETURN(UNIT)
@@ -1648,17 +1655,6 @@ abstract class GenASM extends SubComponent with BytecodeWriters {
         clinit.visitTypeInsn(asm.Opcodes.NEW, thisName)
         clinit.visitMethodInsn(asm.Opcodes.INVOKESPECIAL,
                                thisName, INSTANCE_CONSTRUCTOR_NAME, mdesc_arglessvoid)
-      }
-
-      serialVUID foreach { value =>
-        val fieldName = "serialVersionUID"
-        jclass.visitField(
-          PublicStaticFinal,
-          fieldName,
-          tdesc_long,
-          null, // no java-generic-signature
-          value // TODO confirm whether initial value here is behaviorally equiv to fjbg's emitPUSH emitPUTSTATIC
-        ).visitEnd()
       }
 
       if (isParcelableClass) { legacyAddCreatorCode(clinit) }

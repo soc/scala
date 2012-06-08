@@ -235,7 +235,9 @@ trait Typers extends Modes with Adaptations with Taggings {
      *  @return     ...
      */
     def checkStable(tree: Tree): Tree =
-      if (treeInfo.isExprSafeToInline(tree)) tree else UnstableTreeError(tree)
+      if (treeInfo.isExprSafeToInline(tree)) tree
+      else if (tree.isErrorTyped) tree
+      else UnstableTreeError(tree)
 
     /** Would tree be a stable (i.e. a pure expression) if the type
      *  of its symbol was not volatile?
@@ -898,6 +900,10 @@ trait Typers extends Modes with Adaptations with Taggings {
 
       def adaptType(): Tree = {
         if (inFunMode(mode)) {
+          // [Eugene++] the commented line below makes sense for typechecking, say, TypeApply(Ident(`some abstract type symbol`), List(...))
+          // because otherwise Ident will have its tpe set to a TypeRef, not to a PolyType, and `typedTypeApply` will fail
+          // but this needs additional investigation, because it crashes t5228, gadts1 and maybe something else
+          // tree setType tree.tpe.normalize
           tree
         } else if (tree.hasSymbol && !tree.symbol.typeParams.isEmpty && !inHKMode(mode) &&
           !(tree.symbol.isJavaDefined && context.unit.isJava)) { // (7)
@@ -3587,11 +3593,10 @@ trait Typers extends Modes with Adaptations with Taggings {
           // hence we go the extra mile to hand-craft tis guy
           val original =
             if (arg1.isType)
-              (tree, arg1) match {
-                case (Annotated(annot, arg), tt @ TypeTree()) => Annotated(annot, tt.original)
+              arg1 match {
+                case tt @ TypeTree() => Annotated(ann, tt.original)
                 // this clause is needed to correctly compile stuff like "new C @D" or "@(inline @getter)"
-                case (Annotated(annot, arg), _) => Annotated(annot, arg1)
-                case _ => throw new Error("unexpected trees in typedAnnotated: tree = %s, arg1 = %s".format(showRaw(tree), showRaw(arg1)))
+                case _ => Annotated(ann, arg1)
               }
             else
               tree
