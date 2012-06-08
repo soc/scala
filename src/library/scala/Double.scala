@@ -19,7 +19,7 @@ import language.implicitConversions
  *  There is an implicit conversion from [[scala.Double]] => [[scala.runtime.RichDouble]]
  *  which provides useful non-primitive operations.
  */
-abstract class Double private extends AnyVal {
+final abstract class Double private extends AnyVal {
   def toByte: Byte
   def toShort: Short
   def toChar: Char
@@ -358,7 +358,7 @@ abstract class Double private extends AnyVal {
   */
   def %(x: Double): Double
 
-  override def getClass(): Class[Double] = ???
+  override def getClass(): Class[Double] = null
 }
 
 object Double extends AnyValCompanion {

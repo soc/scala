@@ -19,7 +19,7 @@ import language.implicitConversions
  *  There is an implicit conversion from [[scala.Long]] => [[scala.runtime.RichLong]]
  *  which provides useful non-primitive operations.
  */
-abstract class Long private extends AnyVal {
+final abstract class Long private extends AnyVal {
   def toByte: Byte
   def toShort: Short
   def toChar: Char
@@ -592,7 +592,7 @@ abstract class Long private extends AnyVal {
   */
   def %(x: Double): Double
 
-  override def getClass(): Class[Long] = ???
+  override def getClass(): Class[Long] = null
 }
 
 object Long extends AnyValCompanion {
@@ -624,7 +624,7 @@ object Long extends AnyValCompanion {
   /** The String representation of the scala.Long companion object.
    */
   override def toString = "object scala.Long"
-  
+
   /** Language mandated coercions from Long to "wider" types.
    */
   implicit def long2float(x: Long): Float = x.toFloat

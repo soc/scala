@@ -19,7 +19,7 @@ import language.implicitConversions
  *  There is an implicit conversion from [[scala.Int]] => [[scala.runtime.RichInt]]
  *  which provides useful non-primitive operations.
  */
-abstract class Int private extends AnyVal {
+final abstract class Int private extends AnyVal {
   def toByte: Byte
   def toShort: Short
   def toChar: Char
@@ -592,7 +592,7 @@ abstract class Int private extends AnyVal {
   */
   def %(x: Double): Double
 
-  override def getClass(): Class[Int] = ???
+  override def getClass(): Class[Int] = null
 }
 
 object Int extends AnyValCompanion {
@@ -624,7 +624,7 @@ object Int extends AnyValCompanion {
   /** The String representation of the scala.Int companion object.
    */
   override def toString = "object scala.Int"
-  
+
   /** Language mandated coercions from Int to "wider" types.
    */
   implicit def int2long(x: Int): Long = x.toLong

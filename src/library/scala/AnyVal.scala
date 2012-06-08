@@ -26,5 +26,5 @@ package scala
  *  The ''floating point types'' are [[scala.Float]] and [[scala.Double]].
  */
 abstract class AnyVal extends Any with NotNull {
-  def getClass(): Class[_ <: AnyVal] = ???
+  def getClass(): Class[_ <: AnyVal] = null
 }

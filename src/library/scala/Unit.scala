@@ -18,8 +18,8 @@ import language.implicitConversions
  *  runtime system. A method with return type `Unit` is analogous to a Java
  *  method which is declared `void`.
  */
-abstract class Unit private extends AnyVal {
-  override def getClass(): Class[Unit] = ???
+final abstract class Unit private extends AnyVal {
+  override def getClass(): Class[Unit] = null
 }
 
 object Unit extends AnyValCompanion {

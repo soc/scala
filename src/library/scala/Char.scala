@@ -19,7 +19,7 @@ import language.implicitConversions
  *  There is an implicit conversion from [[scala.Char]] => [[scala.runtime.RichChar]]
  *  which provides useful non-primitive operations.
  */
-abstract class Char private extends AnyVal {
+final abstract class Char private extends AnyVal {
   def toByte: Byte
   def toShort: Short
   def toChar: Char
@@ -592,7 +592,7 @@ abstract class Char private extends AnyVal {
   */
   def %(x: Double): Double
 
-  override def getClass(): Class[Char] = ???
+  override def getClass(): Class[Char] = null
 }
 
 object Char extends AnyValCompanion {
@@ -624,7 +624,7 @@ object Char extends AnyValCompanion {
   /** The String representation of the scala.Char companion object.
    */
   override def toString = "object scala.Char"
-  
+
   /** Language mandated coercions from Char to "wider" types.
    */
   implicit def char2int(x: Char): Int = x.toInt

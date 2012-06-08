@@ -19,7 +19,7 @@ import language.implicitConversions
  *  There is an implicit conversion from [[scala.Float]] => [[scala.runtime.RichFloat]]
  *  which provides useful non-primitive operations.
  */
-abstract class Float private extends AnyVal {
+final abstract class Float private extends AnyVal {
   def toByte: Byte
   def toShort: Short
   def toChar: Char
@@ -358,7 +358,7 @@ abstract class Float private extends AnyVal {
   */
   def %(x: Double): Double
 
-  override def getClass(): Class[Float] = ???
+  override def getClass(): Class[Float] = null
 }
 
 object Float extends AnyValCompanion {
@@ -403,7 +403,7 @@ object Float extends AnyValCompanion {
   /** The String representation of the scala.Float companion object.
    */
   override def toString = "object scala.Float"
-  
+
   /** Language mandated coercions from Float to "wider" types.
    */
   implicit def float2double(x: Float): Double = x.toDouble

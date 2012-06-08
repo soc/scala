@@ -19,7 +19,7 @@ import language.implicitConversions
  *  There is an implicit conversion from [[scala.Byte]] => [[scala.runtime.RichByte]]
  *  which provides useful non-primitive operations.
  */
-abstract class Byte private extends AnyVal {
+final abstract class Byte private extends AnyVal {
   def toByte: Byte
   def toShort: Short
   def toChar: Char
@@ -592,7 +592,7 @@ abstract class Byte private extends AnyVal {
   */
   def %(x: Double): Double
 
-  override def getClass(): Class[Byte] = ???
+  override def getClass(): Class[Byte] = null
 }
 
 object Byte extends AnyValCompanion {
@@ -624,7 +624,7 @@ object Byte extends AnyValCompanion {
   /** The String representation of the scala.Byte companion object.
    */
   override def toString = "object scala.Byte"
-  
+
   /** Language mandated coercions from Byte to "wider" types.
    */
   implicit def byte2short(x: Byte): Short = x.toShort

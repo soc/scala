@@ -19,7 +19,7 @@ import language.implicitConversions
  *  There is an implicit conversion from [[scala.Short]] => [[scala.runtime.RichShort]]
  *  which provides useful non-primitive operations.
  */
-abstract class Short private extends AnyVal {
+final abstract class Short private extends AnyVal {
   def toByte: Byte
   def toShort: Short
   def toChar: Char
@@ -592,7 +592,7 @@ abstract class Short private extends AnyVal {
   */
   def %(x: Double): Double
 
-  override def getClass(): Class[Short] = ???
+  override def getClass(): Class[Short] = null
 }
 
 object Short extends AnyValCompanion {
@@ -624,7 +624,7 @@ object Short extends AnyValCompanion {
   /** The String representation of the scala.Short companion object.
    */
   override def toString = "object scala.Short"
-  
+
   /** Language mandated coercions from Short to "wider" types.
    */
   implicit def short2int(x: Short): Int = x.toInt
