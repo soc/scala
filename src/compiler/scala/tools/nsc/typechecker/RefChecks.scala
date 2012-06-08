@@ -1305,9 +1305,9 @@ abstract class RefChecks extends InfoTransform with reflect.internal.transform.R
           }
           tree1 :: Nil
         }
-      case Import(_, _)                                        => Nil
-      case DefDef(mods, _, _, _, _, _) if (mods hasFlag MACRO) => Nil
-      case _                                                   => transform(tree) :: Nil
+      case Import(_, _)                                                                       => Nil
+      case DefDef(mods, _, _, _, _, _) if (mods hasFlag MACRO) || (tree.symbol hasFlag MACRO) => Nil
+      case _                                                                                  => List(transform(tree))
     }
 
     /* Check whether argument types conform to bounds of type parameters */
@@ -1482,7 +1482,7 @@ abstract class RefChecks extends InfoTransform with reflect.internal.transform.R
 
     private def transformCaseApply(tree: Tree, ifNot: => Unit) = {
       val sym = tree.symbol
-          
+
       def isClassTypeAccessible(tree: Tree): Boolean = tree match {
         case TypeApply(fun, targs) =>
           isClassTypeAccessible(fun)
@@ -1491,7 +1491,7 @@ abstract class RefChecks extends InfoTransform with reflect.internal.transform.R
           // the companion class is actually not a ClassSymbol, but a reference to an abstract type.
           module.symbol.companionClass.isClass
       }
-      
+
       val doTransform =
         sym.isSourceMethod &&
         sym.isCase &&

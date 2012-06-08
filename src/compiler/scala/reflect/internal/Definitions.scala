@@ -440,6 +440,8 @@ trait Definitions extends reflect.api.StandardDefinitions {
 
     lazy val ClassManifestClass    = requiredClass[scala.reflect.ClassManifest[_]]
     lazy val ClassManifestModule   = requiredModule[scala.reflect.ClassManifest.type]
+    lazy val ApiUniverseClass      = requiredClass[scala.reflect.api.Universe]
+         def ApiUniverseReify      = getMemberMethod(ApiUniverseClass, nme.reify)
 
     lazy val ExprClass     = getMember(requiredClass[scala.reflect.api.Exprs], tpnme.Expr)
          def ExprTree      = getMember(ExprClass, nme.tree)

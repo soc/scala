@@ -1,121 +1,17 @@
 package scala.reflect.makro
 
-import scala.reflect.api.Universe
-import language.implicitConversions
 import language.experimental.macros
+import scala.reflect.api.{Universe => ApiUniverse}
 
-/** This package is required by the compiler and <b>should not be used in client code</b>. */
+// anchors for materialization macros emitted during tag materialization in Implicits.scala
+// implementation is magically hardwired into `scala.reflect.reify.Taggers`
+//
+// todo. once we have implicit macros for tag generation, we can remove these anchors
+// [Eugene++] how do I hide this from scaladoc?
 package object internal {
-  /** This method is required by the compiler and <b>should not be used in client code</b>. */
-  def materializeArrayTag[T](u: Universe): ArrayTag[T] = macro materializeArrayTag_impl[T]
-
-  /** This method is required by the compiler and <b>should not be used in client code</b>. */
-  def materializeArrayTag_impl[T: c.TypeTag](c: Context)(u: c.Expr[Universe]): c.Expr[ArrayTag[T]] =
-    c.Expr[Nothing](c.materializeArrayTag(u.tree, implicitly[c.TypeTag[T]].tpe))(c.TypeTag.Nothing)
-
-  /** This method is required by the compiler and <b>should not be used in client code</b>. */
-  def materializeClassTag[T](u: Universe): ClassTag[T] = macro materializeClassTag_impl[T]
-
-  /** This method is required by the compiler and <b>should not be used in client code</b>. */
-  def materializeClassTag_impl[T: c.TypeTag](c: Context)(u: c.Expr[Universe]): c.Expr[ClassTag[T]] =
-    c.Expr[Nothing](c.materializeClassTag(u.tree, implicitly[c.TypeTag[T]].tpe))(c.TypeTag.Nothing)
-
-  /** This method is required by the compiler and <b>should not be used in client code</b>. */
-  def materializeTypeTag[T](u: Universe): u.TypeTag[T] = macro materializeTypeTag_impl[T]
-
-  /** This method is required by the compiler and <b>should not be used in client code</b>. */
-  def materializeTypeTag_impl[T: c.TypeTag](c: Context)(u: c.Expr[Universe]): c.Expr[u.value.TypeTag[T]] =
-    c.Expr[Nothing](c.materializeTypeTag(u.tree, implicitly[c.TypeTag[T]].tpe, concrete = false))(c.TypeTag.Nothing)
-
-  /** This method is required by the compiler and <b>should not be used in client code</b>. */
-  private[scala] implicit def context2utils(c0: Context) : Utils { val c: c0.type } = new { val c: c0.type = c0 } with Utils
-}
-
-package internal {
-  private[scala] abstract class Utils {
-    val c: Context
-
-    import c.mirror._
-    import definitions._
-
-    val coreTags = Map(
-      ByteClass.asType -> newTermName("Byte"),
-      ShortClass.asType -> newTermName("Short"),
-      CharClass.asType -> newTermName("Char"),
-      IntClass.asType -> newTermName("Int"),
-      LongClass.asType -> newTermName("Long"),
-      FloatClass.asType -> newTermName("Float"),
-      DoubleClass.asType -> newTermName("Double"),
-      BooleanClass.asType -> newTermName("Boolean"),
-      UnitClass.asType -> newTermName("Unit"),
-      AnyClass.asType -> newTermName("Any"),
-      ObjectClass.asType -> newTermName("Object"),
-      AnyValClass.asType -> newTermName("AnyVal"),
-      AnyRefClass.asType -> newTermName("AnyRef"),
-      NothingClass.asType -> newTermName("Nothing"),
-      NullClass.asType -> newTermName("Null"),
-      StringClass.asType -> newTermName("String"))
-
-    // todo. the following two methods won't be necessary once we implement implicit macro generators for tags
-
-    def materializeArrayTag(prefix: Tree, tpe: Type): Tree =
-      materializeClassTag(prefix, tpe)
-
-    def materializeClassTag(prefix: Tree, tpe: Type): Tree =
-      materializeTag(prefix, tpe, ClassTagModule, {
-        val erasure = c.reifyClass(tpe)
-        val factory = TypeApply(Select(Ident(ClassTagModule), "apply"), List(TypeTree(tpe)))
-        Apply(factory, List(erasure))
-      })
-
-    def materializeTypeTag(prefix: Tree, tpe: Type, concrete: Boolean): Tree = {
-      val tagModule = TypeTagModule
-      materializeTag(prefix, tpe, tagModule, c.reifyType(prefix, tpe, dontSpliceAtTopLevel = true, concrete = concrete))
-    }
-
-    private def materializeTag(prefix: Tree, tpe: Type, tagModule: Symbol, materializer: => Tree): Tree = {
-      val result =
-        tpe match {
-          case coreTpe if coreTags contains coreTpe =>
-            val ref = if (tagModule.owner.isPackageClass) Ident(tagModule) else Select(prefix, tagModule.name)
-            Select(ref, coreTags(coreTpe))
-          case _ =>
-            translatingReificationErrors(materializer)
-        }
-      try c.typeCheck(result)
-      catch { case terr @ c.TypeError(pos, msg) => failTag(result, terr) }
-    }
-
-    def materializeExpr(prefix: Tree, expr: Tree): Tree = {
-      val result = translatingReificationErrors(c.reifyTree(prefix, expr))
-      try c.typeCheck(result)
-      catch { case terr @ c.TypeError(pos, msg) => failExpr(result, terr) }
-    }
-
-    private def translatingReificationErrors(materializer: => Tree): Tree = {
-      try materializer
-      catch {
-        case ReificationError(pos, msg) =>
-          c.error(pos.asInstanceOf[c.Position], msg) // this cast is a very small price for the sanity of exception handling
-          EmptyTree
-        case UnexpectedReificationError(pos, err, cause) if cause != null =>
-          throw cause
-      }
-    }
-
-    private def failTag(result: Tree, reason: Any): Nothing = {
-      val Apply(TypeApply(fun, List(tpeTree)), _) = c.macroApplication
-      val tpe = tpeTree.tpe
-      val PolyType(_, MethodType(_, tagTpe)) = fun.tpe
-      val tagModule = tagTpe.typeSymbol.companionSymbol
-      if (c.compilerSettings.contains("-Xlog-implicits"))
-        c.echo(c.enclosingPosition, s"cannot materialize ${tagModule.name}[$tpe] as $result because:\n$reason")
-      c.abort(c.enclosingPosition, "No %s available for %s".format(tagModule.name, tpe))
-    }
-
-    private def failExpr(result: Tree, reason: Any): Nothing = {
-      val Apply(_, expr :: Nil) = c.macroApplication
-      c.abort(c.enclosingPosition, s"Cannot materialize $expr as $result because:\n$reason")
-    }
-  }
+  private[scala] def materializeArrayTag[T](u: ApiUniverse): ArrayTag[T] = macro ???
+  private[scala] def materializeErasureTag[T](u: ApiUniverse): ErasureTag[T] = macro ???
+  private[scala] def materializeClassTag[T](u: ApiUniverse): ClassTag[T] = macro ???
+  private[scala] def materializeTypeTag[T](u: ApiUniverse): u.TypeTag[T] = macro ???
+  private[scala] def materializeConcreteTypeTag[T](u: ApiUniverse): u.ConcreteTypeTag[T] = macro ???
 }

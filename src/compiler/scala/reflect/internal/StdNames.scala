@@ -127,6 +127,8 @@ trait StdNames {
     final val Symbol: NameType = "Symbol"
     final val ClassTag: NameType = "ClassTag"
     final val TypeTag : NameType = "TypeTag"
+    final val ConcreteTypeTag: NameType = "ConcreteTypeTag"
+    final val String: NameType  = "String"
 
     // fictions we use as both types and terms
     final val ERROR: NameType    = "<error>"
@@ -220,7 +222,6 @@ trait StdNames {
     final val Product: NameType         = "Product"
     final val Serializable: NameType    = "Serializable"
     final val Singleton: NameType       = "Singleton"
-    final val String: NameType          = "String"
     final val Throwable: NameType       = "Throwable"
 
     final val Annotation: NameType          = "Annotation"
