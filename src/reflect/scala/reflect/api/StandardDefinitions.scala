@@ -41,7 +41,7 @@ trait StandardDefinitions extends base.StandardDefinitions {
     def StringBuilderClass: ClassSymbol
     def SymbolClass : ClassSymbol
     def TraversableClass: ClassSymbol
-    def TupleClass: Array[ClassSymbol]
+    def TupleClass: Array[Symbol]
     def ScalaPrimitiveValueClasses: List[ClassSymbol]
     def ScalaNumericValueClasses: List[ClassSymbol]
   }

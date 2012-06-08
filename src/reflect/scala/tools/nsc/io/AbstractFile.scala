@@ -8,8 +8,8 @@ package scala.tools.nsc
 package io
 
 import java.io.{ FileOutputStream, IOException, InputStream, OutputStream, BufferedOutputStream }
-import java.io.{ File => JFile }
 import java.net.URL
+import java.io.{ File => JFile }
 import scala.collection.mutable.ArrayBuffer
 
 /**

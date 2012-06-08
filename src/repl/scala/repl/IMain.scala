@@ -7,7 +7,7 @@ package scala.repl
 
 import scala.tools.nsc._
 import Predef.{ println => _, _ }
-import util.stringFromWriter
+import util.{ stringFromWriter, TypeStrings, StructuredTypeStrings }
 import scala.reflect.internal.util._
 import java.net.URL
 import scala.sys.BooleanProp

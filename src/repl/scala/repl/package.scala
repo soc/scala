@@ -8,6 +8,8 @@ package scala
 import language.implicitConversions
 import scala.tools.reflect.StdTags
 import scala.reflect.runtime.{ universe => ru }
+import scala.reflect.{ ClassTag, classTag }
+import scala.reflect.base.{ MirrorOf, TypeCreator, Universe => BaseUniverse }
 
 /** The main REPL related classes and values are as follows.
  *  In addition to standard compiler classes Global and Settings, there are:

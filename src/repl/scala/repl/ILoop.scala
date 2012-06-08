@@ -766,7 +766,7 @@ class ILoop(in0: Option[BufferedReader], protected val out: JPrintWriter)
     }
     // Bind intp somewhere out of the regular namespace where
     // we can get at it in generated code.
-    addThunk(intp.quietBind(NamedParam[IMain]("$intp", intp)(tagOfIMain, classTag[IMain]))
+    addThunk(intp.quietBind(NamedParam[IMain]("$intp", intp)(tagOfIMain, classTag[IMain])))
     addThunk({
       import scala.tools.nsc.io._
       import Properties.userHome

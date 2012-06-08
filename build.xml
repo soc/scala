@@ -294,16 +294,12 @@ INITIALISATION
       <pathelement location="${build-locker.dir}/classes/compiler"/>
       <path refid="aux.libs"/>
     </path>
-    <path id="locker.classpath.plus">
-      <pathelement location="${build-quick.dir}/classes/library"/>
-      <path refid="locker.classpath"/>
-    </path>
     <path id="quick.classpath">
       <pathelement location="${quick-library.dir}"/>
       <pathelement location="${quick-reflect.dir}"/>
       <pathelement location="${quick-compiler.dir}"/>
       <pathelement location="${quick-repl.dir}"/>
-      <path refid="aux.libs"/>
+      <path refid="locker.classpath"/>
     </path>
     <path id="pack.classpath">
       <fileset dir="${build-pack.dir}/lib" erroronmissingdir="false"/>
@@ -533,13 +529,13 @@ QUICK BUILD (QUICK)
     </javac>
     <scalacfork
       destdir="${build-quick.dir}/classes/library"
-      compilerpathref="locker.classpath.plus"
+      compilerpathref="locker.classpath"
       srcpath="${src.dir}/library"
       params="${scalac.args.quick}"
       srcdir="${src.dir}/library"
       jvmargs="${scalacfork.jvmargs}">
       <include name="**/*.scala"/>
-      <compilationpath refid="locker.classpath.plus"/>
+      <compilationpath refid="quick.classpath"/>
     </scalacfork>
     <propertyfile file="${build-quick.dir}/classes/library/library.properties">
       <entry key="version.number" value="${version.number}"/>
@@ -566,15 +562,15 @@ QUICK BUILD (QUICK)
 
   <target name="quick.reflect" depends="quick.pre-reflect" unless="quick.reflect.available">
     <stopwatch name="quick.reflect.timer"/>
-    <mkdir dir="${build-reflect.dir}"/>
+    <mkdir dir="${quick-reflect.dir}"/>
     <scalacfork
-      destdir="${build-reflect.dir}"
+      destdir="${quick-reflect.dir}"
       compilerpathref="locker.classpath"
       params="${scalac.args.all}"
       srcdir="${src.dir}/reflect"
       jvmargs="${scalacfork.jvmargs}">
       <include name="**/*.scala"/>
-      <compilationpath refid="locker.classpath.plus"/>
+      <compilationpath refid="quick.classpath"/>
     </scalacfork>
     <touch file="${build-quick.dir}/reflect.complete" verbose="no"/>
     <stopwatch name="quick.reflect.timer" action="total"/>
@@ -639,7 +635,7 @@ QUICK BUILD (QUICK)
     <mkdir dir="${quick-repl.dir}"/>
     <scalacfork
       destdir="${quick-repl.dir}"
-      compilerpathref="quick.classpath"
+      compilerpathref="locker.classpath"
       srcpath="${src.dir}/repl"
       params="${scalac.args.quick}"
       srcdir="${src.dir}/repl"

@@ -498,10 +498,8 @@ trait Definitions extends api.StandardDefinitions {
     def isNoneType(tp: Type)    = tp.typeSymbol eq NoneModule
 
     // Product, Tuple, Function, AbstractFunction
-    private def mkArityArray(name: String, arity0: Int, countFrom: Int = 1): Array[ClassSymbol] = {
-      val arity = arity0 // math.min(arity0, 10)
-      val list = countFrom to arity map (i => getRequiredClass("scala." + name + i))
-      list.toArray
+    private def mkArityList(name: String, arity: Int, countFrom: Int = 1): List[ClassSymbol] = {
+      countFrom to arity map (i => getRequiredClass("scala." + name + i)) toList
     }
     def prepend[S >: ClassSymbol : ClassTag](elem0: S, elems: Array[ClassSymbol]): Array[S] = elem0 +: elems
 
@@ -512,10 +510,28 @@ trait Definitions extends api.StandardDefinitions {
     }
 
     val MaxTupleArity, MaxProductArity, MaxFunctionArity = 10
-    lazy val ProductClass          = { val arr = mkArityArray("Product", MaxProductArity) ; arr(0) = UnitClass ; arr }
-    lazy val TupleClass            = mkArityArray("Tuple", MaxTupleArity)
-    lazy val FunctionClass         = mkArityArray("Function", MaxFunctionArity, 0)
-    lazy val AbstractFunctionClass = mkArityArray("runtime.AbstractFunction", MaxFunctionArity, 0)
+    lazy val ProductClass          = { 
+      val arr = new Array[ClassSymbol](MaxProductArity + 1)
+      arr(0) = UnitClass
+      var i = 1
+      while (i <= MaxTupleArity) {
+        arr(i) = getRequiredClass("scala.Product" + i)
+        i += 1
+      }
+      arr
+    }
+    lazy val TupleClass            = { 
+      val arr = new Array[Symbol](MaxTupleArity + 1)
+      arr(0) = NoSymbol
+      var i = 1
+      while (i <= MaxTupleArity) {
+        arr(i) = getRequiredClass("scala.Tuple" + i)
+        i += 1
+      }
+      arr
+    }
+    lazy val FunctionClass         = mkArityList("Function", MaxFunctionArity, 0).toArray
+    lazy val AbstractFunctionClass = mkArityList("runtime.AbstractFunction", MaxFunctionArity, 0).toArray
 
     /** Creators for TupleN, ProductN, FunctionN. */
     def tupleType(elems: List[Type])                            = aritySpecificType(TupleClass, elems)
@@ -540,8 +556,8 @@ trait Definitions extends api.StandardDefinitions {
 
     def tupleField(n: Int, j: Int) = getMemberValue(TupleClass(n), nme.productAccessorName(j))
     // NOTE: returns true for NoSymbol since it's included in the TupleClass array -- is this intensional?
-    def isTupleSymbol(sym: Symbol) = TupleClass exists (_ == sym)
-    def isProductNClass(sym: Symbol) = ProductClass exists (_ == sym)
+    def isTupleSymbol(sym: Symbol)   = TupleClass contains sym
+    def isProductNClass(sym: Symbol) = ProductClass contains sym
 
     // No normalization.
     def isTupleTypeDirect(tp: Type) = tp match {
