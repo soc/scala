@@ -12,6 +12,7 @@ package array
 
 import scala.runtime.ScalaRunTime._
 import scala.runtime.BoxedUnit
+import scala.reflect.ClassTag
 
 /** A class of `ArrayOps` for arrays of `Unit` types. */
 class ofUnit(repr: Array[Unit]) extends ofRef(repr.asInstanceOf[Array[BoxedUnit]])

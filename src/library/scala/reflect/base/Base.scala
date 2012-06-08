@@ -4,7 +4,7 @@ package base
 import language.experimental.macros
 import java.io.PrintWriter
 import scala.annotation.switch
-import scala.ref.WeakReference
+import java.lang.ref.WeakReference
 import collection.mutable
 
 class Base extends Universe { self =>
@@ -273,14 +273,7 @@ class Base extends Universe { self =>
   private val generated = new mutable.HashMap[String, WeakReference[Symbol]]
 
   private def cached(name: String)(symExpr: => Symbol): Symbol =
-    generated get name match {
-      case Some(WeakReference(sym)) =>
-        sym
-      case _ =>
-        val sym = symExpr
-        generated(name) = WeakReference(sym)
-        sym
-    }
+    generated.getOrElseUpdate(name, new WeakReference(symExpr))
 
   object build extends BuildBase {
     def selectType(owner: Symbol, name: String): TypeSymbol = {

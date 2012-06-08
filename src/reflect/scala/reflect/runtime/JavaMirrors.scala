@@ -51,10 +51,8 @@ trait JavaMirrors extends internal.SymbolTable with api.JavaUniverse { self: Sym
     definitions.init()
   }
 
-  def runtimeMirror(cl: ClassLoader): Mirror = mirrors get cl match {
-    case Some(WeakReference(m)) => m
-    case _ => createMirror(rootMirror.RootClass, cl)
-  }
+  def runtimeMirror(cl: ClassLoader): Mirror =
+    mirrors.getOrElse(cl, createMirror(rootMirror.RootClass, cl))
 
   /** The API of a mirror for a reflective universe */
   class JavaMirror(owner: Symbol,
