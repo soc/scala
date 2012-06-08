@@ -963,16 +963,16 @@ abstract class Erasure extends AddInterfaces
               case s @ (ShortClass | ByteClass | CharClass) => numericConversion(qual, s)
               case BooleanClass                             => If(qual, LIT(true.##), LIT(false.##))
               case _                                        =>
-                global.typer.typed(gen.mkRuntimeCall(nme.hash_, qual :: Nil))
+                global.typer.typed(gen.mkRuntimeCall(nme.hash_, List(qual)))
             }
           }
           // Rewrite 5.getClass to ScalaRunTime.anyValClass(5)
           else if (isPrimitiveValueClass(qual.tpe.typeSymbol))
-            global.typer.typed(gen.mkRuntimeCall(nme.anyValClass, List(qual, typer.resolveClassTag(qual.tpe.widen, tree.pos))))
+            global.typer.typed(gen.mkRuntimeCall(nme.anyValClass, List(qual, typer.resolveErasureTag(qual.tpe.widen, tree.pos, true))))
           else
             tree
 
-        case Apply(Select(New(tpt), nme.CONSTRUCTOR), arg :: Nil) if (tpt.tpe.typeSymbol.isDerivedValueClass) =>
+        case Apply(Select(New(tpt), nme.CONSTRUCTOR), List(arg)) if (tpt.tpe.typeSymbol.isDerivedValueClass) =>
           InjectDerivedValue(arg) setSymbol tpt.tpe.typeSymbol
         case Apply(fn, args) =>
           def qualifier = fn match {

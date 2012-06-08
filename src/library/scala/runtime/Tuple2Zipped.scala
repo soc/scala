@@ -8,28 +8,25 @@
 
 package scala.runtime
 
-import scala.collection.{ TraversableLike, IterableLike }
+import scala.collection.IterableLike
 import scala.collection.generic.{ CanBuildFrom => CBF }
 
 /** This interface is intended as a minimal interface, not complicated
  *  by the requirement to resolve type constructors, for implicit search (which only
- *  needs to find an implicit conversion to Traversable for our purposes.)
+ *  needs to find an implicit conversion to Iterable for our purposes.)
  */
-trait ZippedTraversable2[+El1, +El2] {
+trait ZippedIterable2[+El1, +El2] {
   def foreach[U](f: (El1, El2) => U): Unit
 }
-object ZippedTraversable2 {
-  implicit def zippedTraversable2ToTraversable[El1, El2](zz: ZippedTraversable2[El1, El2]): Traversable[(El1, El2)] = {
-    new collection.AbstractTraversable[(El1, El2)] {
-      def foreach[U](f: ((El1, El2)) => U): Unit = zz foreach Function.untupled(f)
-    }
-  }
+object ZippedIterable2 {
+  implicit def zippedIterable2ToIterable[El1, El2](zz: ZippedIterable2[El1, El2]): Iterable[(El1, El2)] =
+    Iterable fromForeach (f => zz foreach Function.untupled(f))
 }
 
 class Tuple2Zipped[El1, Repr1, El2, Repr2](
-  coll1: TraversableLike[El1, Repr1],
+  coll1: IterableLike[El1, Repr1],
   coll2: IterableLike[El2, Repr2]
-) extends ZippedTraversable2[El1, El2] {
+) extends ZippedIterable2[El1, El2] {
   def map[B, To](f: (El1, El2) => B)(implicit cbf: CBF[Repr1, B, To]): To = {
     val b = cbf(coll1.repr)
     b.sizeHint(coll1)
@@ -45,7 +42,7 @@ class Tuple2Zipped[El1, Repr1, El2, Repr2](
     b.result
   }
 
-  def flatMap[B, To](f: (El1, El2) => TraversableOnce[B])(implicit cbf: CBF[Repr1, B, To]): To = {
+  def flatMap[B, To](f: (El1, El2) => IterableOnce[B])(implicit cbf: CBF[Repr1, B, To]): To = {
     val b = cbf(coll1.repr)
     val elems2 = coll2.iterator
 
@@ -108,7 +105,7 @@ class Tuple2Zipped[El1, Repr1, El2, Repr2](
 
 object Tuple2Zipped {
   class Ops[T1, T2](x: (T1, T2)) {
-    def invert[El1, CC1[X] <: TraversableOnce[X], El2, CC2[X] <: TraversableOnce[X], That]
+    def invert[El1, CC1[X] <: IterableOnce[X], El2, CC2[X] <: IterableOnce[X], That]
       (implicit w1: T1 <:< CC1[El1],
                 w2: T2 <:< CC2[El2],
                 bf: collection.generic.CanBuildFrom[CC1[_], (El1, El2), That]
@@ -123,7 +120,7 @@ object Tuple2Zipped {
       }
 
     def zipped[El1, Repr1, El2, Repr2]
-      (implicit w1: T1 => TraversableLike[El1, Repr1],
+      (implicit w1: T1 => IterableLike[El1, Repr1],
                 w2: T2 => IterableLike[El2, Repr2]
       ): Tuple2Zipped[El1, Repr1, El2, Repr2] = new Tuple2Zipped(x._1, x._2)
   }

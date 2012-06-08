@@ -32,7 +32,7 @@ package object scala {
   type serializable = annotation.serializable
 
   // A dummy used by the specialization annotation.
-  val AnyRef = new AnyRef {
+  val AnyRef = new Specializable {
     override def toString = "object AnyRef"
   }
 

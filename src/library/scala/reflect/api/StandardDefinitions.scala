@@ -39,9 +39,12 @@ trait StandardDefinitions extends StandardTypes {
     def ArrayModule: Symbol
     def ArrayModule_overloadedApply: Symbol
     def Array_apply: Symbol
+    def Array_clone: Symbol
+    def Array_length: Symbol
     def Array_update: Symbol
     def ByNameParamClass: Symbol
     def ClassTagModule: Symbol
+    def ConcreteTypeTagModule: Symbol
     def ConsClass: Symbol
     def EmptyPackageClass: Symbol
     def FunctionClass : Array[Symbol]
@@ -59,15 +62,16 @@ trait StandardDefinitions extends StandardTypes {
     def ProductClass  : Array[Symbol]
     def RepeatedParamClass: Symbol
     def ScalaPackageClass: Symbol
-    def ScalaPrimitiveValueClasses: List[ClassSymbol]
     def SeqClass: Symbol
     def SeqModule: Symbol
     def SomeClass: Symbol
     def SomeModule: Symbol
     def StringBuilderClass: Symbol
     def SymbolClass : Symbol
+    def TraversableClass: Symbol
     def TupleClass    : Array[Symbol]
     def TypeTagModule: Symbol
+    def ScalaPrimitiveValueClasses: List[ClassSymbol]
   }
 
   trait AbsDefinitions extends AbsDefinitionsInternal {
@@ -114,6 +118,7 @@ trait StandardDefinitions extends StandardTypes {
     // type tags
     def ClassTagClass: ClassSymbol
     def TypeTagClass: ClassSymbol
+    def ConcreteTypeTagClass: ClassSymbol
 
     /** Given a type T, returns the type corresponding to the VM's
      *  representation: ClassClass's type constructor applied to `arg`.

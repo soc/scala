@@ -26,8 +26,8 @@ trait Reifiers {
     result
   }
 
-  def reifyClass(tpe: Type): Tree =
-    scala.reflect.reify.`package`.reifyClass(mirror)(callsiteTyper, tpe)
+  def reifyErasure(tpe: Type, concrete: Boolean = true): Tree =
+    scala.reflect.reify.`package`.reifyErasure(mirror)(callsiteTyper, tpe, concrete)
 
   def unreifyTree(tree: Tree): Tree =
     Select(tree, definitions.ExprEval)

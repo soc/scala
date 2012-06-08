@@ -11,7 +11,7 @@ trait Util {
   val reifyDebug = settings.Yreifydebug.value
   val reifyCopypaste = settings.Yreifycopypaste.value
   val reifyTrace = scala.tools.nsc.util.trace when reifyDebug
-  object reifiedNodePrinters extends { val global: mirror.type = mirror } with scala.tools.nsc.ast.NodePrinters with NodePrinters
+  object reifiedNodePrinters extends { val global: mirror.type = mirror } with tools.nsc.ast.NodePrinters with NodePrinters
   val reifiedNodeToString = reifiedNodePrinters.reifiedNodeToString
 
   def reifyList(xs: List[Any]): Tree =

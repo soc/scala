@@ -6,16 +6,15 @@
 **                          |/                                          **
 \*                                                                      */
 
-package scala
+package scala.beans
 
-/** A common supertype for companion classes of primitive types.
+/** This annotation indicates that a JavaBean-compliant `BeanInfo` class
+ *  should be generated for this annotated Scala class.
  *
- *  A common trait for /companion/ objects of primitive types comes handy
- *  when parameterizing code on types. For instance, the specialized
- *  annotation is passed a sequence of types on which to specialize:
- *  {{{
- *     class Tuple1[@specialized(Unit, Int, Double) T]
- *  }}}
+ *  - A `'''val'''` becomes a read-only property.
+ *  - A `'''var'''` becomes a read-write property.
+ *  - A `'''def'''` becomes a method.
  *
+ *  @author Ross Judson (rjudson@managedobjects.com)
  */
-private[scala] trait AnyValCompanion extends Specializable { }
+class BeanInfo extends annotation.Annotation

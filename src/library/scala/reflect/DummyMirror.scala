@@ -7,101 +7,41 @@ import scala.reflect.api.Universe
 
 // todo. make Dummy objects not equal to themselves
 class DummyMirror(cl: ClassLoader) extends api.Mirror {
-  type AnnotatedType       = DummyType
-  type AnnotationInfo      = Object
-  type ArrayAnnotArg       = Object
-  type BoundedWildcardType = DummyType
-  type ClassInfoType       = DummyType
-  type ClassSymbol         = DummyClassSymbolApi
-  type ClassfileAnnotArg   = Object
-  type CompoundType        = DummyType
-  type Constant            = DummyConstant
-  type ConstantType        = DummyType
-  type ExistentialType     = DummyType
-  type FreeTerm            = Symbol
-  type FreeType            = Symbol
-  type LiteralAnnotArg     = Object
-  type MethodSymbol        = DummyMethodSymbolApi
-  type MethodType          = DummyType
-  type Modifiers           = DummyModifiers
-  type ModuleSymbol        = DummyModuleSymbolApi
-  type Name                = DummyName
-  type NestedAnnotArg      = Object
-  type NullaryMethodType   = DummyType
-  type PackageSymbol       = DummyPackageSymbolApi
-  type PolyType            = DummyType
-  type Position            = DummyPosition
-  type RefinedType         = DummyType
-  type SingleType          = DummyType
-  type SingletonType       = DummyType
-  type SuperType           = DummyType
-  type Symbol              = DummySymbolApi
-  type TermName            = DummyName
-  type TermSymbol          = DummyTermSymbolApi
-  type ThisType            = DummyType
-  type TreeCopier          = DummyTreeCopier
-  type Type                = DummyType
-  type TypeBounds          = DummyType
-  type TypeName            = DummyName
-  type TypeRef             = DummyType
-  type TypeSymbol          = DummyTypeSymbolApi
-
-  val DummyClassSymbol   = new DummyClassSymbolApi
-  val DummyMethodSymbol  = new DummyMethodSymbolApi
-  val DummyModuleSymbol  = new DummyModuleSymbolApi
-  val DummyName          = new DummyName
-  val DummyPackageSymbol = new DummyPackageSymbolApi
-  val DummySymbol        = new DummySymbolApi
-  val DummyTermSymbol    = new DummyTermSymbolApi
-  val DummyType          = new DummyType
-  val DummyTypeSymbol    = new DummyTypeSymbolApi
-  val NoMods             = new DummyModifiers
-  val NoPosition         = new DummyPosition
-  val NoSymbol           = new DummySymbol
-  val definitions        = new DummyDefinitions
-  val nme                = new DummyTermNames
-  val tpnme              = new DummyTypeNames
-
-  sealed class DummyName extends AbsName {
-    def isTermName: Boolean = notSupported()
-    def isTypeName: Boolean = notSupported()
-    def toTermName          = notSupported()
-    def toTypeName          = notSupported()
-    def decoded: String     = notSupported()
-    def encoded: String     = notSupported()
-    def decodedName         = notSupported()
-    def encodedName         = notSupported()
-  }
-  def newTermName(s: String): TermName = notSupported()
-  def newTypeName(s: String): TypeName = notSupported()
-
   // Members declared in scala.reflect.api.AnnotationInfos
   implicit def classfileAnnotArgTag: scala.reflect.ClassTag[ClassfileAnnotArg] = notSupported()
-
-  val AnnotationInfo = new AnnotationInfoExtractor {
-    def apply(atp: Type, args: List[Tree], assocs: List[(Name, ClassfileAnnotArg)]): AnnotationInfo = DummyName
+  type AnnotationInfo = DummyAnnotationInfo.type
+  object DummyAnnotationInfo
+  val AnnotationInfo: AnnotationInfoExtractor = DummyAnnotationInfoExtractor
+  object DummyAnnotationInfoExtractor extends AnnotationInfoExtractor {
+    def apply(atp: Type, args: List[Tree], assocs: List[(Name, ClassfileAnnotArg)]): AnnotationInfo = DummyAnnotationInfo
     def unapply(info: AnnotationInfo): Option[(Type, List[Tree], List[(Name, ClassfileAnnotArg)])] = notSupported()
   }
-  val LiteralAnnotArg = new LiteralAnnotArgExtractor {
-    def apply(const: Constant): LiteralAnnotArg = DummyName
+  type ClassfileAnnotArg = AnyRef
+  type LiteralAnnotArg = DummyLiteralAnnotArg.type
+  object DummyLiteralAnnotArg
+  val LiteralAnnotArg: LiteralAnnotArgExtractor = DummyLiteralAnnotArgExtractor
+  type ArrayAnnotArg = DummyArrayAnnotArg.type
+  object DummyArrayAnnotArg
+  val ArrayAnnotArg: ArrayAnnotArgExtractor = DummyArrayAnnotArgExtractor
+  type NestedAnnotArg = DummyNestedAnnotArg.type
+  object DummyNestedAnnotArg
+  val NestedAnnotArg: NestedAnnotArgExtractor = DummyNestedAnnotArgExtractor
+  object DummyLiteralAnnotArgExtractor extends LiteralAnnotArgExtractor {
+    def apply(const: Constant): LiteralAnnotArg = DummyLiteralAnnotArg
     def unapply(arg: LiteralAnnotArg): Option[Constant] = notSupported()
   }
-  val ArrayAnnotArg = new ArrayAnnotArgExtractor {
-    def apply(const: Array[ClassfileAnnotArg]): ArrayAnnotArg = DummyName
+  object DummyArrayAnnotArgExtractor extends ArrayAnnotArgExtractor {
+    def apply(const: Array[ClassfileAnnotArg]): ArrayAnnotArg = DummyArrayAnnotArg
     def unapply(arg: ArrayAnnotArg): Option[Array[ClassfileAnnotArg]] = notSupported()
   }
-  val NestedAnnotArg = new NestedAnnotArgExtractor {
-    def apply(anninfo: AnnotationInfo): NestedAnnotArg = DummyName
+  object DummyNestedAnnotArgExtractor extends NestedAnnotArgExtractor {
+    def apply(anninfo: AnnotationInfo): NestedAnnotArg = DummyNestedAnnotArg
     def unapply(arg: NestedAnnotArg): Option[AnnotationInfo] = notSupported()
-  }
-  val Constant = new ConstantExtractor {
-    def apply(const: Any): Constant = new DummyConstant
-    def unapply(arg: Constant): Option[Any] = notSupported()
   }
 
   // Members declared in scala.reflect.api.Constants
-  sealed class DummyConstant extends AbsConstant {
-    private def notSupported() = DummyMirror.this.notSupported()
+  type Constant = DummyConstant.type
+  object DummyConstant extends AbsConstant {
     val value: Any = notSupported()
     def tpe: Type = notSupported()
     def isNaN: Boolean = notSupported()
@@ -118,11 +58,23 @@ class DummyMirror(cl: ClassLoader) extends api.Mirror {
     def symbolValue: Symbol = notSupported()
     def convertTo(pt: Type): Constant = notSupported()
   }
-  
-  val FreeTerm = new FreeTermExtractor {
+  val Constant: ConstantExtractor = DummyConstantExtractor
+  object DummyConstantExtractor extends ConstantExtractor {
+    def apply(const: Any): Constant = DummyConstant
+    def unapply(arg: Constant): Option[Any] = notSupported()
+  }
+
+  // Members declared in scala.reflect.api.FreeVars
+  type FreeTerm = DummyFreeTerm.type
+  val DummyFreeTerm = DummySymbol
+  val FreeTerm: FreeTermExtractor = DummyFreeTermExtractor
+  object DummyFreeTermExtractor extends FreeTermExtractor {
     def unapply(freeTerm: FreeTerm): Option[(TermName, Type, Any, String)] = notSupported()
   }
-  val FreeType = new FreeTypeExtractor {
+  type FreeType = DummyFreeType.type
+  val DummyFreeType = DummySymbol
+  val FreeType: FreeTypeExtractor = DummyFreeTypeExtractor
+  object DummyFreeTypeExtractor extends FreeTypeExtractor {
     def unapply(freeType: FreeType): Option[(TypeName, Type, String)] = notSupported()
   }
   def freeTerms(tree: Tree): List[FreeTerm] = notSupported()
@@ -131,7 +83,7 @@ class DummyMirror(cl: ClassLoader) extends api.Mirror {
   def substituteFreeTypes(tree: Tree,subs: Map[FreeType,Type]): Tree = notSupported()
 
   // Members declared in scala.reflect.api.Importers
-  def mkImporter(from0: scala.reflect.api.Universe) = notSupported()
+  def mkImporter(from0: scala.reflect.api.Universe): Importer{val from: from0.type} = notSupported()
 
   // Members declared in scala.reflect.api.Mirror
   def classLoader: ClassLoader = cl
@@ -148,10 +100,26 @@ class DummyMirror(cl: ClassLoader) extends api.Mirror {
   def typeOfInstance(instance: Any): Type = notSupported()
   def typeToClass(tpe: Type): Class[_] = notSupported()
 
-  // Members declared in scala.reflect.api.Positions
-  sealed class DummyPosition extends api.Position {
-    private def notSupported() = DummyMirror.this.notSupported()
+  // Members declared in scala.reflect.api.Names
+  type Name = DummyName.type
+  type TypeName = DummyName.type
+  type TermName = DummyName.type
+  object DummyName extends AbsName {
+    def isTermName: Boolean = notSupported()
+    def isTypeName: Boolean = notSupported()
+    def toTermName: TermName = notSupported()
+    def toTypeName: TypeName = notSupported()
+    def decoded: String = notSupported()
+    def encoded: String = notSupported()
+    def decodedName: Name = notSupported()
+    def encodedName: Name = notSupported()
+  }
+  def newTermName(s: String): TermName = notSupported()
+  def newTypeName(s: String): TypeName = notSupported()
 
+  // Members declared in scala.reflect.api.Positions
+  type Position = DummyPosition.type
+  object DummyPosition extends api.Position {
     def pos: Position = notSupported()
     def withPos(newPos: scala.reflect.api.Position): Attachment = notSupported()
     def payload: Any = notSupported()
@@ -188,6 +156,7 @@ class DummyMirror(cl: ClassLoader) extends api.Mirror {
     def lineContent: String = notSupported()
     def show: String = notSupported()
   }
+  val NoPosition: Position = DummyPosition
   def atPos[T <: Tree](pos: Position)(tree: T): T = tree
   def ensureNonOverlapping(tree: Tree,others: List[Tree]): Unit = notSupported()
   def wrappingPos(trees: List[Tree]): Position = notSupported()
@@ -197,32 +166,33 @@ class DummyMirror(cl: ClassLoader) extends api.Mirror {
   def mkConsoleFrontEnd(minSeverity: Int): FrontEnd = notSupported()
 
   // Members declared in scala.reflect.api.Scopes
-  type Scope = Iterable[Symbol]
-  def newScope = Nil
-  def newScopeWith(elems: Symbol*) = Nil
-  def newNestedScope(outer: Scope) = Nil
+  type Scope = DummyScope.type
+  object DummyScope extends Iterable[Symbol] {
+    def iterator: Iterator[Symbol] = notSupported()
+  }
+  def newScope: Scope = DummyScope
+  def newScopeWith(elems: Symbol*): Scope = DummyScope
+  def newNestedScope(outer: Scope): Scope = DummyScope
 
   // Members declared in scala.reflect.api.StandardDefinitions
-  val AnyRefTpe: Type  = DummyType
-  val AnyTpe: Type     = DummyType
-  val AnyValTpe: Type  = DummyType
+  val AnyRefTpe: Type = DummyType
+  val AnyTpe: Type = DummyType
+  val AnyValTpe: Type = DummyType
   val BooleanTpe: Type = DummyType
-  val ByteTpe: Type    = DummyType
-  val CharTpe: Type    = DummyType
-  val DoubleTpe: Type  = DummyType
-  val FloatTpe: Type   = DummyType
-  val IntTpe: Type     = DummyType
-  val LongTpe: Type    = DummyType
+  val ByteTpe: Type = DummyType
+  val CharTpe: Type = DummyType
+  val DoubleTpe: Type = DummyType
+  val FloatTpe: Type = DummyType
+  val IntTpe: Type = DummyType
+  val LongTpe: Type = DummyType
   val NothingTpe: Type = DummyType
-  val NullTpe: Type    = DummyType
-  val ObjectTpe: Type  = DummyType
-  val ShortTpe: Type   = DummyType
-  val StringTpe: Type  = DummyType
-  val UnitTpe: Type    = DummyType
-
-  class DummyDefinitions extends AbsDefinitions {
-    private val DummySymbol = DummyMirror.this.DummySymbol
-
+  val NullTpe: Type = DummyType
+  val ObjectTpe: Type = DummyType
+  val ShortTpe: Type = DummyType
+  val StringTpe: Type = DummyType
+  val UnitTpe: Type = DummyType
+  val definitions: AbsDefinitions = DummyDefinitions
+  object DummyDefinitions extends AbsDefinitions {
     def ByNameParamClass = DummySymbol
     def JavaRepeatedParamClass = DummySymbol
     def RepeatedParamClass = DummySymbol
@@ -233,6 +203,8 @@ class DummyMirror(cl: ClassLoader) extends api.Mirror {
     def ArrayModule = DummySymbol
     def ArrayModule_overloadedApply = DummySymbol
     def Array_apply = DummySymbol
+    def Array_clone = DummySymbol
+    def Array_length = DummySymbol
     def Array_update = DummySymbol
     def BooleanClass = DummyClassSymbol
     def ByteClass = DummyClassSymbol
@@ -240,6 +212,8 @@ class DummyMirror(cl: ClassLoader) extends api.Mirror {
     def ClassClass = DummyClassSymbol
     def ClassTagClass = DummyClassSymbol
     def ClassTagModule = DummySymbol
+    def ConcreteTypeTagClass = DummyClassSymbol
+    def ConcreteTypeTagModule = DummySymbol
     def ConsClass = DummySymbol
     def DoubleClass = DummyClassSymbol
     def EmptyPackage = DummyPackageSymbol
@@ -247,6 +221,7 @@ class DummyMirror(cl: ClassLoader) extends api.Mirror {
     def FloatClass = DummyClassSymbol
     def FunctionClass: Array[Symbol] = Array()
     def IntClass = DummyClassSymbol
+    def IterableClass = DummySymbol
     def IteratorClass = DummySymbol
     def IteratorModule = DummySymbol
     def Iterator_apply = DummySymbol
@@ -277,7 +252,7 @@ class DummyMirror(cl: ClassLoader) extends api.Mirror {
     def StringBuilderClass = DummySymbol
     def StringClass = DummyClassSymbol
     def SymbolClass = DummySymbol
-    def IterableClass = DummySymbol
+    def TraversableClass = DummySymbol
     def TupleClass: Array[Symbol] = Array()
     def TypeTagClass = DummyClassSymbol
     def TypeTagModule = DummySymbol
@@ -288,22 +263,24 @@ class DummyMirror(cl: ClassLoader) extends api.Mirror {
     def vmSignature(sym: Symbol,info: Type): String = notSupported()
   }
 
-  sealed class DummyTermNames extends AbsTermNames {
+  // Members declared in scala.reflect.api.StandardNames
+  val nme: AbsTermNames = DummyAbsTermNames
+  val tpnme: AbsTypeNames = DummyAbsTypeNames
+  object DummyAbsTermNames extends AbsTermNames {
     type NameType = TermName
-    val DummyName = DummyMirror.this.DummyName
-
-    val EMPTY = DummyName
-    val ANON_FUN_NAME = DummyName
-    val ANON_CLASS_NAME = DummyName
-    val EMPTY_PACKAGE_NAME = DummyName
-    val IMPORT = DummyName
-    val MODULE_VAR_SUFFIX = DummyName
-    val ROOT = DummyName
-    val PACKAGE = DummyName
-    val ERROR = DummyName
-    val NO_NAME = DummyName
-    val WILDCARD = DummyName
-    def flattenedName(segments: Name*) = notSupported()
+    val EMPTY: NameType = DummyName
+    val ANON_FUN_NAME: NameType = DummyName
+    val ANON_CLASS_NAME: NameType = DummyName
+    val EMPTY_PACKAGE_NAME: NameType = DummyName
+    val IMPORT: NameType = DummyName
+    val MODULE_VAR_SUFFIX: NameType = DummyName
+    val ROOT: NameType = DummyName
+    val PACKAGE: NameType = DummyName
+    val SPECIALIZED_SUFFIX: NameType = DummyName
+    val ERROR: NameType = DummyName
+    val NO_NAME: NameType = DummyName
+    val WILDCARD: NameType = DummyName
+    def flattenedName(segments: Name*): NameType = notSupported()
     val EXPAND_SEPARATOR_STRING: String = ""
     val ANYNAME: TermName = DummyName
     val CONSTRUCTOR: TermName = DummyName
@@ -324,6 +301,7 @@ class DummyMirror(cl: ClassLoader) extends api.Mirror {
     val OUTER_SYNTH: TermName = DummyName
     val SELECTOR_DUMMY: TermName = DummyName
     val SELF: TermName = DummyName
+    val SPECIALIZED_INSTANCE: TermName = DummyName
     val STAR: TermName = DummyName
     val THIS: TermName = DummyName
     val BITMAP_NORMAL: TermName = DummyName
@@ -390,6 +368,8 @@ class DummyMirror(cl: ClassLoader) extends api.Mirror {
     def segments(name: String, assumeTerm: Boolean): List[Name] = notSupported()
     def originalName(name: Name): Name = notSupported()
     def stripModuleSuffix(name: Name): Name = notSupported()
+    def unspecializedName(name: Name): Name = notSupported()
+    def splitSpecializedName(name: Name): (Name, String, String) = notSupported()
     def dropLocalSuffix(name: Name): Name = notSupported()
     def expandedName(name: TermName, base: Symbol, separator: String = EXPAND_SEPARATOR_STRING): TermName = notSupported()
     def expandedSetterName(name: TermName, base: Symbol): TermName = notSupported()
@@ -405,22 +385,21 @@ class DummyMirror(cl: ClassLoader) extends api.Mirror {
     def localDummyName(clazz: Symbol): TermName = notSupported()
     def superName(name: Name): TermName = notSupported()
   }
-  sealed class DummyTypeNames extends AbsTypeNames {
+  object DummyAbsTypeNames extends AbsTypeNames {
     type NameType = TypeName
-    val DummyName = DummyMirror.this.DummyName
-
-    val EMPTY = DummyName
-    val ANON_FUN_NAME = DummyName
-    val ANON_CLASS_NAME = DummyName
-    val EMPTY_PACKAGE_NAME = DummyName
-    val IMPORT = DummyName
-    val MODULE_VAR_SUFFIX = DummyName
-    val ROOT = DummyName
-    val PACKAGE = DummyName
-    val ERROR = DummyName
-    val NO_NAME = DummyName
-    val WILDCARD = DummyName
-    def flattenedName(segments: Name*) = notSupported()
+    val EMPTY: NameType = DummyName
+    val ANON_FUN_NAME: NameType = DummyName
+    val ANON_CLASS_NAME: NameType = DummyName
+    val EMPTY_PACKAGE_NAME: NameType = DummyName
+    val IMPORT: NameType = DummyName
+    val MODULE_VAR_SUFFIX: NameType = DummyName
+    val ROOT: NameType = DummyName
+    val PACKAGE: NameType = DummyName
+    val SPECIALIZED_SUFFIX: NameType = DummyName
+    val ERROR: NameType = DummyName
+    val NO_NAME: NameType = DummyName
+    val WILDCARD: NameType = DummyName
+    def flattenedName(segments: Name*): NameType = notSupported()
     val REFINE_CLASS_NAME: TypeName = DummyName
     val BYNAME_PARAM_CLASS_NAME: TypeName = DummyName
     val EQUALS_PATTERN_NAME: TypeName = DummyName
@@ -435,11 +414,25 @@ class DummyMirror(cl: ClassLoader) extends api.Mirror {
     def interfaceName(implname: Name): TypeName = notSupported()
   }
 
-  class DummySymbol extends DummySymbolApi { }
-  class DummySymbolApi extends AbsSymbol {
+  // Members declared in scala.reflect.api.Symbols
+  val NoSymbol = DummySymbol
+  type Symbol = DummySymbolApi
+  object DummySymbol extends DummySymbolApi
+  type TypeSymbol = DummyTypeSymbolApi
+  object DummyTypeSymbol extends DummyTypeSymbolApi
+  type TermSymbol = DummyTermSymbolApi
+  object DummyTermSymbol extends DummyTermSymbolApi
+  type MethodSymbol = DummyMethodSymbolApi
+  object DummyMethodSymbol extends DummyMethodSymbolApi
+  type ModuleSymbol = DummyModuleSymbolApi
+  object DummyModuleSymbol extends DummyModuleSymbolApi
+  type PackageSymbol = DummyPackageSymbolApi
+  object DummyPackageSymbol extends DummyPackageSymbolApi
+  type ClassSymbol = DummyClassSymbolApi
+  object DummyClassSymbol extends DummyClassSymbolApi
+  trait DummySymbolApi extends AbsSymbol {
     this: Symbol =>
 
-    private def notSupported() = DummyMirror.this.notSupported()
     def pos: Position = notSupported()
     def modifiers: Set[Modifier] = notSupported()
     def hasModifier(mod: Modifier): Boolean = notSupported()
@@ -485,29 +478,29 @@ class DummyMirror(cl: ClassLoader) extends api.Mirror {
     def thisPrefix: Type = notSupported()
     def selfType: Type = notSupported()
     def alternatives: List[Symbol] = notSupported()
-    def resolveOverloaded(pre: Type = NoPrefix, targs: Seq[Type] = Nil, actuals: Seq[Type]): Symbol = notSupported()
+    def resolveOverloaded(pre: Type = NoPrefix, targs: Seq[Type] = List(), actuals: Seq[Type]): Symbol = notSupported()
     def newNestedSymbol(name: Name, pos: Position, flags: Long, isClass: Boolean): Symbol = notSupported()
     def setInternalFlags(flags: Long): this.type = notSupported()
     def setTypeSignature(tpe: Type): this.type = notSupported()
     def setAnnotations(annots: AnnotationInfo*): this.type = notSupported()
     def kind: String = notSupported()
   }
-  class DummyTypeSymbolApi extends DummySymbolApi with TypeSymbolApi {
+  trait DummyTypeSymbolApi extends DummySymbolApi with TypeSymbolApi {
     this: TypeSymbol =>
   }
-  class DummyTermSymbolApi extends DummySymbolApi with TermSymbolApi {
+  trait DummyTermSymbolApi extends DummySymbolApi with TermSymbolApi {
     this: TermSymbol =>
   }
-  class DummyMethodSymbolApi extends DummyTermSymbolApi with MethodSymbolApi {
+  trait DummyMethodSymbolApi extends DummyTermSymbolApi with MethodSymbolApi {
     this: MethodSymbol =>
   }
-  class DummyModuleSymbolApi extends DummyTermSymbolApi with ModuleSymbolApi {
+  trait DummyModuleSymbolApi extends DummyTermSymbolApi with ModuleSymbolApi {
     this: ModuleSymbol =>
   }
-  class DummyPackageSymbolApi extends DummyModuleSymbolApi with PackageSymbolApi {
+  trait DummyPackageSymbolApi extends DummyModuleSymbolApi with PackageSymbolApi {
     this: PackageSymbol =>
   }
-  class DummyClassSymbolApi extends DummyTypeSymbolApi with ClassSymbolApi {
+  trait DummyClassSymbolApi extends DummyTypeSymbolApi with ClassSymbolApi {
     this: ClassSymbol =>
   }
 
@@ -517,7 +510,7 @@ class DummyMirror(cl: ClassLoader) extends api.Mirror {
   // Members declared in scala.reflect.api.TreeBuildUtil
   // type TreeGen = DummyTreeGen.type // [Eugene] cannot compile if uncomment this
   val gen: TreeGen{val global: DummyMirror.this.type} = DummyTreeGen.asInstanceOf[TreeGen{val global: DummyMirror.this.type}]
-  def modifiersFromInternalFlags(flags: Long,privateWithin: Name,annotations: List[Tree]): Modifiers = NoMods
+  def modifiersFromInternalFlags(flags: Long,privateWithin: Name,annotations: List[Tree]): Modifiers = DummyModifiers
   def newFreeExistential(name: String,info: Type,value: => Any,flags: Long,origin: String) = DummySymbol
   def newFreeTerm(name: String,info: Type,value: => Any,flags: Long,origin: String) = DummySymbol
   def newFreeType(name: String,info: Type,value: => Any,flags: Long,origin: String) = DummySymbol
@@ -563,25 +556,26 @@ class DummyMirror(cl: ClassLoader) extends api.Mirror {
   def Bind(sym: Symbol,body: Tree): Bind = Bind(DummyName, EmptyTree)
   def Block(stats: Tree*): Block = Block()
   def CaseDef(pat: Tree,body: Tree): CaseDef = CaseDef(EmptyTree, EmptyTree, EmptyTree)
-  def ClassDef(sym: Symbol,impl: Template): ClassDef = ClassDef(NoMods, DummyName, Nil, Template(Nil, emptyValDef, Nil))
-  def DefDef(sym: Symbol,rhs: List[List[Symbol]] => Tree): DefDef = DefDef(NoMods, DummyName, Nil, Nil, EmptyTree, EmptyTree)
-  def DefDef(sym: Symbol,rhs: Tree): DefDef = DefDef(NoMods, DummyName, Nil, Nil, EmptyTree, EmptyTree)
-  def DefDef(sym: Symbol,mods: Modifiers,rhs: Tree): DefDef = DefDef(NoMods, DummyName, Nil, Nil, EmptyTree, EmptyTree)
-  def DefDef(sym: Symbol,vparamss: List[List[ValDef]],rhs: Tree): DefDef = DefDef(NoMods, DummyName, Nil, Nil, EmptyTree, EmptyTree)
-  def DefDef(sym: Symbol,mods: Modifiers,vparamss: List[List[ValDef]],rhs: Tree): DefDef = DefDef(NoMods, DummyName, Nil, Nil, EmptyTree, EmptyTree)
+  def ClassDef(sym: Symbol,impl: Template): ClassDef = ClassDef(DummyModifiers, DummyName, Nil, Template(Nil, emptyValDef, Nil))
+  def DefDef(sym: Symbol,rhs: List[List[Symbol]] => Tree): DefDef = DefDef(DummyModifiers, DummyName, Nil, Nil, EmptyTree, EmptyTree)
+  def DefDef(sym: Symbol,rhs: Tree): DefDef = DefDef(DummyModifiers, DummyName, Nil, Nil, EmptyTree, EmptyTree)
+  def DefDef(sym: Symbol,mods: Modifiers,rhs: Tree): DefDef = DefDef(DummyModifiers, DummyName, Nil, Nil, EmptyTree, EmptyTree)
+  def DefDef(sym: Symbol,vparamss: List[List[ValDef]],rhs: Tree): DefDef = DefDef(DummyModifiers, DummyName, Nil, Nil, EmptyTree, EmptyTree)
+  def DefDef(sym: Symbol,mods: Modifiers,vparamss: List[List[ValDef]],rhs: Tree): DefDef = DefDef(DummyModifiers, DummyName, Nil, Nil, EmptyTree, EmptyTree)
   def Ident(sym: Symbol): Ident = Ident(DummyName)
   def Ident(name: String): Ident = Ident(DummyName)
   def LabelDef(sym: Symbol,params: List[Symbol],rhs: Tree): LabelDef = LabelDef(DummyName, Nil, EmptyTree)
-
-  class DummyModifiers extends AbsModifiers {
+  type Modifiers = DummyModifiers.type
+  val NoMods: Modifiers = DummyModifiers
+  object DummyModifiers extends AbsModifiers {
     def modifiers: Set[Modifier] = notSupported()
     def hasModifier(mod: Modifier): Boolean = notSupported()
     def privateWithin: Name = notSupported()
     def annotations: List[Tree] = notSupported()
-    def mapAnnotations(f: List[Tree] => List[Tree]) = notSupported()
+    def mapAnnotations(f: List[Tree] => List[Tree]): Modifiers = notSupported()
   }
-  def Modifiers(mods: Set[scala.reflect.api.Modifier],privateWithin: Name,annotations: List[Tree]): Modifiers = NoMods
-  def ModuleDef(sym: Symbol,impl: Template): ModuleDef = ModuleDef(NoMods, DummyName, Template(Nil, emptyValDef, Nil))
+  def Modifiers(mods: Set[scala.reflect.api.Modifier],privateWithin: Name,annotations: List[Tree]): Modifiers = DummyModifiers
+  def ModuleDef(sym: Symbol,impl: Template): ModuleDef = ModuleDef(DummyModifiers, DummyName, Template(Nil, emptyValDef, Nil))
   def New(sym: Symbol,args: Tree*): Tree = New(EmptyTree)
   def New(tpe: Type,args: Tree*): Tree = New(EmptyTree)
   def New(tpt: Tree,argss: List[List[Tree]]): Tree = New(EmptyTree)
@@ -591,18 +585,16 @@ class DummyMirror(cl: ClassLoader) extends api.Mirror {
   def This(sym: Symbol): Tree = This(DummyName)
   def Throw(tpe: Type,args: Tree*): Throw = Throw(EmptyTree)
   def Try(body: Tree,cases: (Tree, Tree)*): Try = Try(EmptyTree)
-  def TypeDef(sym: Symbol): TypeDef = TypeDef(NoMods, DummyName, Nil, EmptyTree)
-  def TypeDef(sym: Symbol,rhs: Tree): TypeDef = TypeDef(NoMods, DummyName, Nil, EmptyTree)
-  def ValDef(sym: Symbol): ValDef = ValDef(NoMods, DummyName, EmptyTree, EmptyTree)
-  def ValDef(sym: Symbol,rhs: Tree): ValDef = ValDef(NoMods, DummyName, EmptyTree, EmptyTree)
-
+  def TypeDef(sym: Symbol): TypeDef = TypeDef(DummyModifiers, DummyName, Nil, EmptyTree)
+  def TypeDef(sym: Symbol,rhs: Tree): TypeDef = TypeDef(DummyModifiers, DummyName, Nil, EmptyTree)
+  def ValDef(sym: Symbol): ValDef = ValDef(DummyModifiers, DummyName, EmptyTree, EmptyTree)
+  def ValDef(sym: Symbol,rhs: Tree): ValDef = ValDef(DummyModifiers, DummyName, EmptyTree, EmptyTree)
   protected def duplicateTree(tree: Tree): Tree = notSupported()
-  object emptyValDef extends ValDef(NoMods, DummyName, EmptyTree, EmptyTree) { override def isEmpty = true }
-  def newStrictTreeCopier: TreeCopier = new DummyTreeCopier
-  def newLazyTreeCopier: TreeCopier = new DummyTreeCopier
-
-  sealed class DummyTreeCopier extends TreeCopierOps {
-    private def notSupported() = DummyMirror.this.notSupported()
+  object emptyValDef extends ValDef(DummyModifiers, DummyName, EmptyTree, EmptyTree) { override def isEmpty = true }
+  type TreeCopier = DummyTreeCopier.type
+  def newStrictTreeCopier: TreeCopier = DummyTreeCopier
+  def newLazyTreeCopier: TreeCopier = DummyTreeCopier
+  object DummyTreeCopier extends TreeCopierOps {
     def ClassDef(tree: Tree, mods: Modifiers, name: Name, tparams: List[TypeDef], impl: Template): ClassDef = notSupported()
     def PackageDef(tree: Tree, pid: RefTree, stats: List[Tree]): PackageDef = notSupported()
     def ModuleDef(tree: Tree, mods: Modifiers, name: Name, impl: Template): ModuleDef = notSupported()
@@ -648,6 +640,41 @@ class DummyMirror(cl: ClassLoader) extends api.Mirror {
     def ExistentialTypeTree(tree: Tree, tpt: Tree, whereClauses: List[Tree]): ExistentialTypeTree = notSupported()
   }
 
+  // Members declared in scala.reflect.api.Types
+  type Type = DummyType.type
+  type SingletonType = DummyType.type
+  type CompoundType = DummyType.type
+  type AnnotatedType = DummyType.type
+  val AnnotatedType: AnnotatedTypeExtractor = DummyAnnotatedTypeExtractor
+  type BoundedWildcardType = DummyType.type
+  val BoundedWildcardType: BoundedWildcardTypeExtractor = DummyBoundedWildcardTypeExtractor
+  type ClassInfoType = DummyType.type
+  val ClassInfoType: ClassInfoTypeExtractor = DummyClassInfoTypeExtractor
+  type ConstantType = DummyType.type
+  val ConstantType: ConstantTypeExtractor = DummyConstantTypeExtractor
+  type ExistentialType = DummyType.type
+  val ExistentialType: ExistentialTypeExtractor = DummyExistentialTypeExtractor
+  type MethodType = DummyType.type
+  val MethodType: MethodTypeExtractor = DummyMethodTypeExtractor
+  val NoPrefix: Type = DummyType
+  val NoType: Type = DummyType
+  type NullaryMethodType = DummyType.type
+  val NullaryMethodType: NullaryMethodTypeExtractor = DummyNullaryMethodTypeExtractor
+  type PolyType = DummyType.type
+  val PolyType: PolyTypeExtractor = DummyPolyTypeExtractor
+  type RefinedType = DummyType.type
+  val RefinedType: RefinedTypeExtractor = DummyRefinedTypeExtractor
+  type SingleType = DummyType.type
+  val SingleType: SingleTypeExtractor = DummySingleTypeExtractor
+  type SuperType = DummyType.type
+  val SuperType: SuperTypeExtractor = DummySuperTypeExtractor
+  type ThisType = DummyType.type
+  val ThisType: ThisTypeExtractor = DummyThisTypeExtractor
+  type TypeBounds = DummyType.type
+  val TypeBounds: TypeBoundsExtractor = DummyTypeBoundsExtractor
+  type TypeRef = DummyType.type
+  val TypeRef: TypeRefExtractor = DummyTypeRefExtractor
+  val WildcardType: Type = DummyType
   def appliedType(tycon: Type,args: List[Type]): Type = DummyType
   def existentialAbstraction(tparams: List[Symbol],tpe0: Type): Type = DummyType
   def glb(ts: List[Type]): Type = DummyType
@@ -659,9 +686,7 @@ class DummyMirror(cl: ClassLoader) extends api.Mirror {
   def refinedType(parents: List[Type],owner: Symbol,decls: Scope,pos: Position): Type = DummyType
   def singleType(pre: Type,sym: Symbol): Type = DummyType
   def typeRef(pre: Type,sym: Symbol,args: List[Type]): Type = DummyType
-
-  class DummyType extends AbsType {
-    private def notSupported() = throw new UnsupportedOperationException("Scala reflection not available on this platform." + mirrorDiagnostics(cl))
+  object DummyType extends AbsType {
     def =:=(that: Type): Boolean = notSupported()
     def <:<(that: Type): Boolean = notSupported()
     def asSeenFrom(pre: Type,clazz: Symbol): Type = notSupported()
@@ -674,6 +699,7 @@ class DummyMirror(cl: ClassLoader) extends api.Mirror {
     def exists(p: Type => Boolean): Boolean = notSupported()
     def find(p: Type => Boolean): Option[Type] = notSupported()
     def foreach(f: Type => Unit): Unit = notSupported()
+    def isConcrete: Boolean = notSupported()
     def isHigherKinded: Boolean = notSupported()
     def isSpliceable: Boolean = notSupported()
     def kind: String = notSupported()
@@ -692,82 +718,63 @@ class DummyMirror(cl: ClassLoader) extends api.Mirror {
     def underlying: Type = notSupported()
     def widen: Type = notSupported()
   }
-  val DummyAnnotatedTypeExtractor = new AnnotatedTypeExtractor {
+  object DummyAnnotatedTypeExtractor extends AnnotatedTypeExtractor {
     def apply(annotations: List[AnnotationInfo], underlying: Type, selfsym: Symbol): AnnotatedType = DummyType
     def unapply(tpe: AnnotatedType): Option[(List[AnnotationInfo], Type, Symbol)] = notSupported()
   }
-  val DummyBoundedWildcardTypeExtractor = new BoundedWildcardTypeExtractor {
+  object DummyBoundedWildcardTypeExtractor extends BoundedWildcardTypeExtractor {
     def apply(bounds: TypeBounds): BoundedWildcardType = DummyType
     def unapply(tpe: BoundedWildcardType): Option[TypeBounds] = notSupported()
   }
-  val DummyClassInfoTypeExtractor = new ClassInfoTypeExtractor {
+  object DummyClassInfoTypeExtractor extends ClassInfoTypeExtractor {
     def apply(parents: List[Type], decls: Scope, clazz: Symbol): ClassInfoType = DummyType
     def unapply(tpe: ClassInfoType): Option[(List[Type], Scope, Symbol)] = notSupported()
   }
-  val DummyConstantTypeExtractor = new ConstantTypeExtractor {
+  object DummyConstantTypeExtractor extends ConstantTypeExtractor {
     def apply(value: Constant): ConstantType = DummyType
     def unapply(tpe: ConstantType): Option[Constant] = notSupported()
   }
-  val DummyExistentialTypeExtractor = new ExistentialTypeExtractor {
+  object DummyExistentialTypeExtractor extends ExistentialTypeExtractor {
     def apply(quantified: List[Symbol], underlying: Type): ExistentialType = DummyType
     def unapply(tpe: ExistentialType): Option[(List[Symbol], Type)] = notSupported()
   }
-  val DummyMethodTypeExtractor = new MethodTypeExtractor {
+  object DummyMethodTypeExtractor extends MethodTypeExtractor {
     def apply(params: List[Symbol], resultType: Type): MethodType = DummyType
     def unapply(tpe: MethodType): Option[(List[Symbol], Type)] = notSupported()
   }
-  val DummyNullaryMethodTypeExtractor = new NullaryMethodTypeExtractor {
+  object DummyNullaryMethodTypeExtractor extends NullaryMethodTypeExtractor {
     def apply(resultType: Type): NullaryMethodType = DummyType
     def unapply(tpe: NullaryMethodType): Option[(Type)] = notSupported()
   }
-  val DummyPolyTypeExtractor = new PolyTypeExtractor {
+  object DummyPolyTypeExtractor extends PolyTypeExtractor {
     def apply(typeParams: List[Symbol], resultType: Type): PolyType = DummyType
     def unapply(tpe: PolyType): Option[(List[Symbol], Type)] = notSupported()
   }
-  val DummyRefinedTypeExtractor = new RefinedTypeExtractor {
+  object DummyRefinedTypeExtractor extends RefinedTypeExtractor {
     def apply(parents: List[Type], decls: Scope): RefinedType = DummyType
     def apply(parents: List[Type], decls: Scope, clazz: Symbol): RefinedType = DummyType
     def unapply(tpe: RefinedType): Option[(List[Type], Scope)] = notSupported()
   }
-  val DummySingleTypeExtractor = new SingleTypeExtractor {
+  object DummySingleTypeExtractor extends SingleTypeExtractor {
     def apply(pre: Type, sym: Symbol): Type = DummyType
     def unapply(tpe: SingleType): Option[(Type, Symbol)] = notSupported()
   }
-  val DummySuperTypeExtractor = new SuperTypeExtractor {
+  object DummySuperTypeExtractor extends SuperTypeExtractor {
     def apply(thistpe: Type, supertpe: Type): Type = DummyType
     def unapply(tpe: SuperType): Option[(Type, Type)] = notSupported()
   }
-  val DummyThisTypeExtractor = new ThisTypeExtractor {
+  object DummyThisTypeExtractor extends ThisTypeExtractor {
     def apply(sym: Symbol): Type = DummyType
     def unapply(tpe: ThisType): Option[Symbol] = notSupported()
   }
-  val DummyTypeBoundsExtractor = new TypeBoundsExtractor {
+  object DummyTypeBoundsExtractor extends TypeBoundsExtractor {
     def apply(lo: Type, hi: Type): TypeBounds = DummyType
     def unapply(tpe: TypeBounds): Option[(Type, Type)] = notSupported()
   }
-  val DummyTypeRefExtractor = new TypeRefExtractor {
+  object DummyTypeRefExtractor extends TypeRefExtractor {
     def apply(pre: Type, sym: Symbol, args: List[Type]): Type = DummyType
     def unapply(tpe: TypeRef): Option[(Type, Symbol, List[Type])] = notSupported()
   }
-
-  // Members declared in scala.reflect.api.Types
-  val AnnotatedType: AnnotatedTypeExtractor             = DummyAnnotatedTypeExtractor
-  val BoundedWildcardType: BoundedWildcardTypeExtractor = DummyBoundedWildcardTypeExtractor
-  val ClassInfoType: ClassInfoTypeExtractor             = DummyClassInfoTypeExtractor
-  val ConstantType: ConstantTypeExtractor               = DummyConstantTypeExtractor
-  val ExistentialType: ExistentialTypeExtractor         = DummyExistentialTypeExtractor
-  val MethodType: MethodTypeExtractor                   = DummyMethodTypeExtractor
-  val NoPrefix: Type                                    = DummyType
-  val NoType: Type                                      = DummyType
-  val NullaryMethodType: NullaryMethodTypeExtractor     = DummyNullaryMethodTypeExtractor
-  val PolyType: PolyTypeExtractor                       = DummyPolyTypeExtractor
-  val RefinedType: RefinedTypeExtractor                 = DummyRefinedTypeExtractor
-  val SingleType: SingleTypeExtractor                   = DummySingleTypeExtractor
-  val SuperType: SuperTypeExtractor                     = DummySuperTypeExtractor
-  val ThisType: ThisTypeExtractor                       = DummyThisTypeExtractor
-  val TypeBounds: TypeBoundsExtractor                   = DummyTypeBoundsExtractor
-  val TypeRef: TypeRefExtractor                         = DummyTypeRefExtractor
-  val WildcardType: Type                                = DummyType
 
   // Utils
   def notSupported() = {
