@@ -3,7 +3,8 @@
  * @author Alexander Spoon
  */
 
-package scala.repl
+package scala
+package repl
 
 import scala.tools.nsc._
 import Predef.{ println => _, _ }

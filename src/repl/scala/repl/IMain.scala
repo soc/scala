@@ -658,9 +658,9 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
     if (ids.isEmpty) IR.Success
     else interpret("import " + ids.mkString(", "))
 
-  def quietBind(p: NamedParam[_]): IR.Result               = beQuietDuring(bind(p))
-  def bind(p: NamedParam[_]): IR.Result                    = bind(p.name, p.tpe, p.value)
-  def bind[T: ClassTag](name: String, value: T): IR.Result = bind((name, value))
+  def quietBind(p: NamedParam[_]): IR.Result              = beQuietDuring(bind(p))
+  def bind(p: NamedParam[_]): IR.Result                   = bind(p.name, p.tpe, p.value)
+  def bind[T: TypeTag](name: String, value: T): IR.Result = bind((name, value))
 
   /** Reset this interpreter, forgetting all user-specified requests. */
   def reset() {

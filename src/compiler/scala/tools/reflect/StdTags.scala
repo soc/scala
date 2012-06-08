@@ -15,12 +15,12 @@ object StdTags {
     TypeRef(pre, definitions.ListClass, List(definitions.StringClass.asTypeConstructor))
   }, classOf[List[String]])
 
-  private def tagOfStaticClass[T: ClassTag] = TypeTag[T](staticClass(classTag[T].erasure.getName).asTypeConstructor, classTag[T].erasure)
+  def tagOfStaticClass[T: ClassTag] : TypeTag[T] =
+    TypeTag[T](staticClass(classTag[T].erasure.getName).asTypeConstructor, classTag[T].erasure)
+
   lazy val tagOfInt = TypeTag.Int
   lazy val tagOfFile = tagOfStaticClass[scala.tools.nsc.io.File]
   lazy val tagOfDirectory = tagOfStaticClass[scala.tools.nsc.io.Directory]
-  // lazy val tagOfStdReplVals = tagOfStaticClass[scala.tools.nsc.interpreter.StdReplVals]
-  // lazy val tagOfIMain = tagOfStaticClass[scala.tools.nsc.interpreter.IMain]
   lazy val tagOfThrowable = tagOfStaticClass[java.lang.Throwable]
   lazy val tagOfClassLoader = tagOfStaticClass[java.lang.ClassLoader]
 }

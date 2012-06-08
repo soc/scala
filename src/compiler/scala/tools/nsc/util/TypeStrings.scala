@@ -223,7 +223,8 @@ trait TypeStrings {
    */
   def fromValue(value: Any): String             = if (value == null) "Null" else fromClazz(anyClass(value))
   def fromClazz(clazz: JClass): String          = scalaName(clazz) + tparamString(clazz)
-  def fromTag[T: ClassTag] : String             = fromClazz(classTag[T].erasure)
+  def fromClassTag[T: ClassTag] : String = fromClazz(classTag[T].erasure)
+  def fromTypeTag[T: TypeTag] : String             = fromClazz(typeTag[T].erasure)
 
   /** Reducing fully qualified noise for some common packages.
    */
