@@ -87,6 +87,7 @@ package object collection {
   type GenIterable[+A]               = Iterable[A]
   type Traversable[+A]               = Iterable[A]
   type TraversableLike[+A, +Repr]    = IterableLike[A, Repr]
+  type AbstractTraversable[+A]       = AbstractIterable[A]
 
   /** Provides a CanBuildFrom instance that builds a specific target collection (`To')
    *  irrespective of the original collection (`From').
