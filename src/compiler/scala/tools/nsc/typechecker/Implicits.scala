@@ -17,6 +17,7 @@ import mutable.{ LinkedHashMap, ListBuffer }
 import scala.util.matching.Regex
 import symtab.Flags._
 import util.Statistics._
+import language.implicitConversions
 
 /** This trait provides methods to find various kinds of implicits.
  *
@@ -331,7 +332,7 @@ trait Implicits {
      *  The _complexity_ of a stripped core type corresponds roughly to the number of
      *  nodes in its ast, except that singleton types are widened before taking the complexity.
      *  Two types overlap if they have the same type symbol, or
-     *  if one or both are intersection types with a pair of overlapiing parent types.
+     *  if one or both are intersection types with a pair of overlapping parent types.
      */
     private def dominates(dtor: Type, dted: Type): Boolean = {
       def core(tp: Type): Type = tp.normalize match {
@@ -1128,9 +1129,9 @@ trait Implicits {
 
     private def TagSymbols =  TagMaterializers.keySet
     private val TagMaterializers = Map[Symbol, Symbol](
-      ArrayTagClass        -> MacroInternal_materializeArrayTag,
-      ClassTagClass        -> MacroInternal_materializeClassTag,
-      TypeTagClass         -> MacroInternal_materializeTypeTag
+      ClassTagClass   -> MacroInternal_materializeClassTag,
+      AbsTypeTagClass -> MacroInternal_materializeAbsTypeTag,
+      TypeTagClass    -> MacroInternal_materializeTypeTag
     )
 
     /** Creates a tree will produce a tag of the requested flavor.
@@ -1160,9 +1161,8 @@ trait Implicits {
       }
 
       val prefix = (
-        // ClassTags only exist for scala.reflect.mirror, so their materializer
-        // doesn't care about prefixes
-        if ((tagClass eq ArrayTagClass) || (tagClass eq ClassTagClass)) ReflectMirrorPrefix
+        // ClassTags are not path-dependent, so their materializer doesn't care about prefixes
+        if (tagClass eq ClassTagClass) gen.mkBasisUniverseRef
         else pre match {
           // [Eugene to Martin] this is the crux of the interaction between
           // implicits and reifiers here we need to turn a (supposedly
@@ -1227,18 +1227,35 @@ trait Implicits {
           EmptyTree
       }
     }
-    /** Creates a tree that calls the relevant factory method in object
-      * reflect.Manifest for type 'tp'.
-      */
-    private def manifestOfType(tp: Type): SearchResult = {
-      val tagInScope = context.withMacrosDisabled(resolveArrayTag(tp, pos))
-      val tree = (
-        if (tagInScope.isEmpty) mot(tp)
-        else gen.mkMethodCall(ReflectPackage, nme.arrayTagToClassManifest, tp :: Nil, tagInScope :: Nil)
-      )
-      tree match {
-        case EmptyTree  => SearchFailure
-        case _          => new SearchResult(tree, EmptyTreeTypeSubstituter)
+      val tagInScope =
+        if (full) resolveTypeTag(pos, NoType, tp, concrete = true, allowMaterialization = false)
+        else resolveClassTag(pos, tp, allowMaterialization = false)
+      if (tagInScope.isEmpty) mot(tp, Nil, Nil)
+      else {
+        if (full) {
+          if (ReflectRuntimeUniverse == NoSymbol) {
+            // todo. write a test for this
+            context.error(pos, s"""
+              |to create a manifest here, it is necessary to interoperate with the type tag `$tagInScope` in scope.
+              |however typetag -> manifest conversion requires Scala reflection, which is not present on the classpath.
+              |to proceed put scala-reflect.jar on your compilation classpath and recompile.""".trim.stripMargin)
+            return SearchFailure
+          }
+          if (resolveClassTag(pos, tp, allowMaterialization = true) == EmptyTree) {
+            context.error(pos, s"""
+              |to create a manifest here, it is necessary to interoperate with the type tag `$tagInScope` in scope.
+              |however typetag -> manifest conversion requires a class tag for the corresponding type to be present.
+              |to proceed add a class tag to the type `$tp` (e.g. by introducing a context bound) and recompile.""".trim.stripMargin)
+            return SearchFailure
+          }
+        }
+
+        val interop =
+          if (full) {
+            val cm = typed(Ident(ReflectRuntimeCurrentMirror))
+            gen.mkMethodCall(ReflectRuntimeUniverse, nme.typeTagToManifest, List(tp), List(cm, tagInScope))
+          } else gen.mkMethodCall(ReflectRuntimeUniverse, nme.classTagToClassManifest, List(tp), List(tagInScope))
+        wrapResult(interop)
       }
     }
 

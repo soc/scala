@@ -400,23 +400,23 @@ abstract class UnCurry extends InfoTransform
         def sequenceToArray(tree: Tree) = {
           val toArraySym = tree.tpe member nme.toArray
           assert(toArraySym != NoSymbol)
-          def getArrayTag(tp: Type): Tree = {
-            val tag = localTyper.resolveArrayTag(tp, tree.pos)
+          def getClassTag(tp: Type): Tree = {
+            val tag = localTyper.resolveClassTag(tree.pos, tp)
             // Don't want bottom types getting any further than this (SI-4024)
-            if (tp.typeSymbol.isBottomClass) getArrayTag(AnyClass.tpe)
+            if (tp.typeSymbol.isBottomClass) getClassTag(AnyClass.tpe)
             else if (!tag.isEmpty) tag
-            else if (tp.bounds.hi ne tp) getArrayTag(tp.bounds.hi)
-            else localTyper.TyperErrorGen.MissingArrayTagError(tree, tp)
+            else if (tp.bounds.hi ne tp) getClassTag(tp.bounds.hi)
+            else localTyper.TyperErrorGen.MissingClassTagError(tree, tp)
           }
-          def traversableArrayTag(tpe: Type): Tree = {
+          def iterableClassTag(tpe: Type): Tree = {
             (tpe baseType IterableClass).typeArgs match {
-              case targ :: _  => getArrayTag(targ)
+              case targ :: _  => getClassTag(targ)
               case _          => EmptyTree
             }
           }
           afterUncurry {
             localTyper.typedPos(pos) {
-              gen.mkMethodCall(tree, toArraySym, Nil, traversableArrayTag(tree.tpe) :: Nil)
+              gen.mkMethodCall(tree, toArraySym, Nil, iterableClassTag(tree.tpe) :: Nil)
             }
           }
         }

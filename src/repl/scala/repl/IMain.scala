@@ -7,7 +7,8 @@ package scala.repl
 
 import scala.tools.nsc._
 import Predef.{ println => _, _ }
-import util.{ Set => _, _ }
+import util.stringFromWriter
+import scala.reflect.internal.util._
 import java.net.URL
 import scala.sys.BooleanProp
 import scala.tools.nsc.io.{ AbstractFile, VirtualDirectory }
@@ -23,6 +24,8 @@ import IMain._
 import java.util.concurrent.Future
 import typechecker.Analyzer
 import language.implicitConversions
+import scala.reflect.runtime.{ universe => ru }
+import scala.reflect.{ ClassTag, classTag }
 import scala.tools.reflect.StdTags._
 
 /** directory to save .class files to */
@@ -193,18 +196,20 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
   lazy val compiler: global.type = global
 
   import global._
-  import definitions.{
-    ScalaPackage, JavaLangPackage, RootClass,
-    getClassIfDefined, getModuleIfDefined, getRequiredModule, getRequiredClass,
-    termMember, typeMember
-  }
-
-  private implicit def privateTreeOps(t: Tree): List[Tree] = {
-    (new Iterable[Tree] {
-      override def foreach[U](f: Tree => U): Unit = t foreach { x => f(x) ; () }
-      override def iterator = toBuffer.iterator
-    }).toList
-  }
+  // import definitions.{
+  //   ScalaPackage, JavaLangPackage, RootClass,
+  //   getClassIfDefined, getModuleIfDefined, getRequiredModule, getRequiredClass,
+  //   termMember, typeMember
+  // }
+  // 
+  // private implicit def privateTreeOps(t: Tree): List[Tree] = {
+  //   (new Iterable[Tree] {
+  //     override def foreach[U](f: Tree => U): Unit = t foreach { x => f(x) ; () }
+  //     override def iterator = toBuffer.iterator
+  //   }).toList
+  // }
+  import definitions.{ScalaPackage, JavaLangPackage, termMember, typeMember}
+  import rootMirror.{RootClass, getClassIfDefined, getModuleIfDefined, getRequiredModule, getRequiredClass}
 
   implicit class ReplTypeOps(tp: Type) {
     def orElse(other: => Type): Type    = if (tp ne NoType) tp else other
@@ -331,16 +336,7 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
   def getInterpreterClassLoader() = classLoader
 
   // Set the current Java "context" class loader to this interpreter's class loader
-  def setContextClassLoader() = {
-    classLoader.setAsContext()
-
-    // this is risky, but it's our only possibility to make default reflexive mirror to work with REPL
-    // so far we have only used the default mirror to create a few tags for the compiler
-    // so it shouldn't be in conflict with our classloader, especially since it respects its parent
-
-    // grrr, causes classloader deadlocks
-    // scala.reflect.mirror.classLoader = classLoader
-  }
+  def setContextClassLoader() = classLoader.setAsContext()
 
   /** Given a simple repl-defined name, returns the real name of
    *  the class representing it, e.g. for "Bippy" it may return
@@ -489,11 +485,17 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
       case Some(trees)  => trees
     }
     repltrace(
-      trees map (t =>
-        t map (t0 =>
+      trees map (t => {
+        // [Eugene to Paul] previously it just said `t map ...`
+        // because there was an implicit conversion from Tree to a list of Trees
+        // however Martin and I have removed the conversion
+        // (it was conflicting with the new reflection API),
+        // so I had to rewrite this a bit
+        val subs = t collect { case sub => sub }
+        subs map (t0 =>
           "  " + safePos(t0, -1) + ": " + t0.shortClass + "\n"
         ) mkString ""
-      ) mkString "\n"
+      }) mkString "\n"
     )
     // If the last tree is a bare expression, pinpoint where it begins using the
     // AST node position and snap the line off there.  Rewrite the code embodied
@@ -641,8 +643,8 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
       directlyBoundNames += newTermName(name)
     result
   }
-  def directBind(p: NamedParam[_]): IR.Result                       = directBind(p.name, p.tpe, p.value)
-  def directBind[T: ClassTag](name: String, value: T): IR.Result = directBind((name, value))
+  def directBind(p: NamedParam[_]): IR.Result                                 = directBind(p.name, p.tpe, p.value)
+  def directBind[T: ru.TypeTag : ClassTag](name: String, value: T): IR.Result = directBind((name, value))
 
   def rebind(p: NamedParam[_]): IR.Result = {
     val name     = p.name
@@ -658,9 +660,9 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
     if (ids.isEmpty) IR.Success
     else interpret("import " + ids.mkString(", "))
 
-  def quietBind(p: NamedParam[_]): IR.Result              = beQuietDuring(bind(p))
-  def bind(p: NamedParam[_]): IR.Result                   = bind(p.name, p.tpe, p.value)
-  def bind[T: TypeTag](name: String, value: T): IR.Result = bind((name, value))
+  def quietBind(p: NamedParam[_]): IR.Result                            = beQuietDuring(bind(p))
+  def bind(p: NamedParam[_]): IR.Result                                 = bind(p.name, p.tpe, p.value)
+  def bind[T: ru.TypeTag : ClassTag](name: String, value: T): IR.Result = bind((name, value))
 
   /** Reset this interpreter, forgetting all user-specified requests. */
   def reset() {
@@ -703,7 +705,7 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
 
       val unwrapped = unwrap(t)
       withLastExceptionLock[String]({
-        directBind[Throwable]("lastException", unwrapped)(classTag[Throwable])
+        directBind[Throwable]("lastException", unwrapped)(tagOfThrowable, classTag[Throwable])
         util.stackTraceString(unwrapped)
       }, util.stackTraceString(unwrapped))
     }
@@ -1037,7 +1039,7 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
     valueOfTerm(id) map (_.getClass)
 
   def typeOfTerm(id: String): Type = newTermName(id) match {
-    case nme.ROOTPKG  => definitions.RootClass.tpe
+    case nme.ROOTPKG  => RootClass.tpe
     case name         => requestForName(name).fold(NoType: Type)(_ compilerTypeOf name)
   }
 
@@ -1113,10 +1115,10 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
     val termname = newTypeName(name)
     findName(termname) orElse getModuleIfDefined(termname)
   }
-  // [Eugene to Paul] possibly you could make use of ClassTags here
-  def types[T: ClassTag] : Symbol = types(classTag[T].erasure.getName)
-  def terms[T: ClassTag] : Symbol = terms(classTag[T].erasure.getName)
-  def apply[T: ClassTag] : Symbol = apply(classTag[T].erasure.getName)
+  // [Eugene to Paul] possibly you could make use of TypeTags here
+  def types[T: ClassTag] : Symbol = types(classTag[T].runtimeClass.getName)
+  def terms[T: ClassTag] : Symbol = terms(classTag[T].runtimeClass.getName)
+  def apply[T: ClassTag] : Symbol = apply(classTag[T].runtimeClass.getName)
 
   def classSymbols  = allDefSymbols collect { case x: ClassSymbol => x }
   def methodSymbols = allDefSymbols collect { case x: MethodSymbol => x }

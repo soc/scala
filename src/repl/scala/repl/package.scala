@@ -6,7 +6,7 @@
 package scala
 
 import language.implicitConversions
-import scala.tools.reflect.StdTags.tagOfStaticClass
+import scala.tools.reflect.StdTags
 
 /** The main REPL related classes and values are as follows.
  *  In addition to standard compiler classes Global and Settings, there are:
@@ -39,8 +39,8 @@ package object repl extends ReplConfig with ReplStrings {
 
   val IR = Results
 
-  lazy val tagOfStdReplVals = tagOfStaticClass[StdReplVals]
-  lazy val tagOfIMain       = tagOfStaticClass[IMain]
+  def tagOfStdReplVals = StdTags.tagOfStdReplVals
+  def tagOfIMain       = StdTags.tagOfIMain
 
   implicit def postfixOps = language.postfixOps // make all postfix ops in this package compile without warning
 

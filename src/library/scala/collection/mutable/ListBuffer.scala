@@ -105,7 +105,7 @@ final class ListBuffer[A]
   override def segmentLength(p: A => Boolean, from: Int): Int = underlying.segmentLength(p, from)
   override def startsWith[B](that: collection.Seq[B]): Boolean = underlying startsWith that
   override def startsWith[B](that: collection.Seq[B], offset: Int): Boolean = underlying.startsWith(that, offset)
-  override def toArray[B >: A: ArrayTag]: Array[B] = underlying.toArray
+  override def toArray[B >: A: ClassTag]: Array[B] = underlying.toArray
   override def toBuffer[B >: A] = underlying.toBuffer
   override def toIndexedSeq = underlying.toIndexedSeq
   override def toMap[T, U](implicit ev: A <:< (T, U)): immutable.Map[T, U] = underlying.toMap(ev)

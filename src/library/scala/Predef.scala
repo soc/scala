@@ -112,24 +112,6 @@ object Predef extends LowPriorityImplicits {
   def classManifest[T](implicit m: ClassManifest[T]) = m
   def optManifest[T](implicit m: OptManifest[T])     = m
 
-  // Tag types and companions, and incantations for summoning
-  type ArrayTag[T]           = scala.reflect.ArrayTag[T]
-  type ErasureTag[T]         = scala.reflect.ErasureTag[T]
-  type ClassTag[T]           = scala.reflect.ClassTag[T]
-  type TypeTag[T]            = scala.reflect.TypeTag[T]
-  type ConcreteTypeTag[T]    = scala.reflect.ConcreteTypeTag[T]
-  val ClassTag               = scala.reflect.ClassTag // doesn't need to be lazy, because it's not a path-dependent type
-  // [Paul to Eugene] No lazy vals in Predef.  Too expensive.  Have to work harder on breaking initialization dependencies.
-  lazy val TypeTag           = scala.reflect.TypeTag // needs to be lazy, because requires scala.reflect.mirror instance
-  lazy val ConcreteTypeTag   = scala.reflect.ConcreteTypeTag
-
-  // [Eugene to Martin] it's really tedious to type "implicitly[...]" all the time, so I'm reintroducing these shortcuts
-  def arrayTag[T](implicit atag: ArrayTag[T])                      = atag
-  def erasureTag[T](implicit etag: ErasureTag[T])                  = etag
-  def classTag[T](implicit ctag: ClassTag[T])                      = ctag
-  def tag[T](implicit ttag: TypeTag[T])                            = ttag
-  def typeTag[T](implicit ttag: TypeTag[T])                        = ttag
-
   // Minor variations on identity functions
   def identity[A](x: A): A         = x    // @see `conforms` for the implicit version
   @inline def implicitly[T](implicit e: T) = e    // for summoning implicit values from the nether world -- TODO: when dependent method types are on by default, give this result type `e.type`, so that inliner has better chance of knowing which method to inline in calls like `implicitly[MatchingStrategy[Option]].zero`
@@ -243,33 +225,9 @@ object Predef extends LowPriorityImplicits {
   }
 
   final class ArrowAssoc[A](val __leftOfArrow: A) extends AnyVal {
-    @inline def -> [B](y: B): (A, B)          = new Tuple2(__leftOfArrow, y)
-    @inline def -> (y: Int): (A, Int)         = new Tuple2(__leftOfArrow, y)
-    @inline def -> (y: Boolean): (A, Boolean) = new Tuple2(__leftOfArrow, y)
-    @inline def -> (y: Double): (A, Double)   = new Tuple2(__leftOfArrow, y)
+    @inline def -> [B](y: B): Tuple2[A, B] = Tuple2(__leftOfArrow, y)
   }
-  final class IntArrowAssoc(val __leftOfArrow: Int) extends AnyVal {
-    @inline def -> [B](y: B): (Int, B)          = new Tuple2(__leftOfArrow, y)
-    @inline def -> (y: Int): (Int, Int)         = new Tuple2(__leftOfArrow, y)
-    @inline def -> (y: Boolean): (Int, Boolean) = new Tuple2(__leftOfArrow, y)
-    @inline def -> (y: Double): (Int, Double)   = new Tuple2(__leftOfArrow, y)
-  }
-  final class BooleanArrowAssoc(val __leftOfArrow: Boolean) extends AnyVal {
-    @inline def -> [B](y: B): (Boolean, B)          = new Tuple2(__leftOfArrow, y)
-    @inline def -> (y: Int): (Boolean, Int)         = new Tuple2(__leftOfArrow, y)
-    @inline def -> (y: Boolean): (Boolean, Boolean) = new Tuple2(__leftOfArrow, y)
-    @inline def -> (y: Double): (Boolean, Double)   = new Tuple2(__leftOfArrow, y)
-  }
-  final class DoubleArrowAssoc(val __leftOfArrow: Double) extends AnyVal {
-    @inline def -> [B](y: B): (Double, B)          = new Tuple2(__leftOfArrow, y)
-    @inline def -> (y: Int): (Double, Int)         = new Tuple2(__leftOfArrow, y)
-    @inline def -> (y: Boolean): (Double, Boolean) = new Tuple2(__leftOfArrow, y)
-    @inline def -> (y: Double): (Double, Double)   = new Tuple2(__leftOfArrow, y)
-  }
-  @inline implicit def any2ArrowAssoc[A](x: A): ArrowAssoc[A]            = new ArrowAssoc(x)
-  @inline implicit def int2ArrowAssoc(x: Int): IntArrowAssoc             = new IntArrowAssoc(x)
-  @inline implicit def boolean2ArrowAssoc(x: Boolean): BooleanArrowAssoc = new BooleanArrowAssoc(x)
-  @inline implicit def double2ArrowAssoc(x: Double): DoubleArrowAssoc    = new DoubleArrowAssoc(x)
+  @inline implicit def any2ArrowAssoc[A](x: A): ArrowAssoc[A] = new ArrowAssoc(x)
 
   // printing and reading -----------------------------------------------
 
@@ -279,9 +237,9 @@ object Predef extends LowPriorityImplicits {
   def printf(text: String, xs: Any*) = Console.print(text.format(xs: _*))
 
   // views --------------------------------------------------------------
-
-  implicit def arrayTagToClassManifest[T](elemTag: ArrayTag[T]): ClassManifest[T] =
-    ClassManifest.fromClass[T](ScalaRunTime.arrayElementClass(elemTag).asInstanceOf[Class[T]])
+  // 
+  // implicit def arrayTagToClassManifest[T](elemTag: ArrayTag[T]): ClassManifest[T] =
+  //   ClassManifest.fromClass[T](ScalaRunTime.arrayElementClass(elemTag).asInstanceOf[Class[T]])
 
   implicit def tuple2ToZippedOps[T1, T2](x: (T1, T2))                           = new runtime.Tuple2Zipped.Ops(x)
   implicit def seqToCharSequence(xs: collection.IndexedSeq[Char]): CharSequence = new runtime.SeqCharSequence(xs)

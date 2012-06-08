@@ -639,7 +639,6 @@ abstract class Erasure extends AddInterfaces
      */
     private def adaptMember(tree: Tree): Tree = {
       //Console.println("adaptMember: " + tree);
-      val x = 2 + 2
       tree match {
         case Apply(TypeApply(sel @ Select(qual, name), List(targ)), Nil)
         if tree.symbol == Any_asInstanceOf =>
@@ -968,7 +967,7 @@ abstract class Erasure extends AddInterfaces
           }
           // Rewrite 5.getClass to ScalaRunTime.anyValClass(5)
           else if (isPrimitiveValueClass(qual.tpe.typeSymbol))
-            global.typer.typed(gen.mkRuntimeCall(nme.anyValClass, List(qual, typer.resolveErasureTag(qual.tpe.widen, tree.pos, true))))
+            global.typer.typed(gen.mkRuntimeCall(nme.anyValClass, List(qual, typer.resolveClassTag(tree.pos, qual.tpe.widen))))
           else
             tree
 

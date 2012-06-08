@@ -5,6 +5,8 @@
 
 package scala.runtime
 
+import scala.reflect.{ ClassTag, classTag }
+
 class RichClass[T](val clazz: Class[T]) {
   def toTag: ClassTag[T] = ClassTag[T](clazz)
   // def toTypeString: String = TypeStrings.fromClazz(clazz)

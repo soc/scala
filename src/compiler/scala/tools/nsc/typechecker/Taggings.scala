@@ -22,20 +22,6 @@ trait Taggings {
       ).tree
     }
 
-    /** Finds in scope or materializes an ArrayTag.
-     *  Should be used instead of ClassTag or ClassManifest every time compiler needs to create an array.
-     *
-     *  @param   tp         Type we're looking an ArrayTag for, e.g. resolveArrayTag(IntClass.tpe, pos) will look for ArrayTag[Int].
-     *  @param   pos        Position for error reporting. Please, provide meaningful value.
-     *
-     *  @returns Tree that represents an `scala.reflect.ArrayTag` for `tp` if everything is okay.
-     *           EmptyTree if the result contains unresolved (i.e. not spliced) type parameters and abstract type members.
-     */
-    def resolveArrayTag(tp: Type, pos: Position): Tree = {
-      val taggedTp = appliedType(ArrayTagClass, tp)
-      resolveTag(taggedTp, pos)
-    }
-
     /** Finds in scope or materializes an ErasureTag (if `concrete` is false) or a ClassTag (if `concrete` is true).
      *  Should be used instead of ClassTag or ClassManifest every time compiler needs to persist an erasure.
      *

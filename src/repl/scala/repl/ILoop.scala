@@ -21,6 +21,7 @@ import util.ScalaClassLoader
 import ScalaClassLoader._
 import scala.tools.util._
 import language.{implicitConversions, existentials}
+import scala.reflect.{ClassTag, classTag}
 import scala.tools.reflect.StdTags._
 
 /** The Scala interactive shell.  It provides a read-eval-print loop
@@ -100,7 +101,7 @@ class ILoop(in0: Option[BufferedReader], protected val out: JPrintWriter)
   }
 
   def isAsync = !settings.Yreplsync.value
-  lazy val power = new Power(intp, new StdReplVals(this))(tagOfStdReplVals)
+  lazy val power = new Power(intp, new StdReplVals(this))(tagOfStdReplVals, classTag[StdReplVals])
   def history = in.history
 
   /** The context class loader at the time this object was created */
@@ -765,7 +766,7 @@ class ILoop(in0: Option[BufferedReader], protected val out: JPrintWriter)
     }
     // Bind intp somewhere out of the regular namespace where
     // we can get at it in generated code.
-    addThunk(intp.quietBind(NamedParam[IMain]("$intp", intp)))//(tagOfIMain)))
+    addThunk(intp.quietBind(NamedParam[IMain]("$intp", intp)(tagOfIMain, classTag[IMain])))
     addThunk({
       import scala.tools.nsc.io._
       import Properties.userHome

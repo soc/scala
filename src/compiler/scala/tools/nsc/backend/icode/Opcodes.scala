@@ -8,7 +8,7 @@ package backend
 package icode
 
 import scala.tools.nsc.ast._
-import scala.tools.nsc.util.{Position,NoPosition}
+import scala.reflect.internal.util.{Position,NoPosition}
 import scala.tools.nsc.backend.ScalaPrimitiveOpcodes.{ isNoOpCoercion }
 
 /*

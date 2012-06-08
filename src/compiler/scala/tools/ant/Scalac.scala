@@ -603,6 +603,16 @@ class Scalac extends ScalaMatchingTask with ScalacShared {
     // let CompilerCommand processes all params
     val command = new CompilerCommand(settings.splitParams(addParams), settings)
 
+    // resolve dependenciesFile path from project's basedir, so <ant antfile ...> call from other project works.
+    // the dependenciesFile may be relative path to basedir or absolute path, in either case, the following code
+    // will return correct answer.
+    // command.settings.dependenciesFile.value match {
+    //   case "none" =>
+    //   case x =>
+    //     val depFilePath = SPath(x)
+    //     command.settings.dependenciesFile.value = SPath(getProject.getBaseDir).normalize.resolve(depFilePath).path
+    // }
+
     (command.settings, sourceFiles, javaOnly)
   }
 

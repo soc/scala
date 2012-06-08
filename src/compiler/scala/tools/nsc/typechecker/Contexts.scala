@@ -30,9 +30,10 @@ trait Contexts { self: Analyzer =>
 
   private val startContext = {
     NoContext.make(
-    global.Template(Nil, emptyValDef, Nil) setSymbol global.NoSymbol setType global.NoType,
-    global.definitions.RootClass,
-    global.definitions.RootClass.info.decls)
+      Template(Nil, emptyValDef, Nil) setSymbol global.NoSymbol setType global.NoType,
+      rootMirror.RootClass,
+      rootMirror.RootClass.info.decls
+    )
   }
 
   var lastAccessCheckDetails: String = ""
@@ -529,7 +530,7 @@ trait Contexts { self: Analyzer =>
       (pre == NoPrefix) || {
         val ab = sym.accessBoundary(sym.owner)
 
-        (  (ab.isTerm || ab == definitions.RootClass)
+        (  (ab.isTerm || ab == rootMirror.RootClass)
         || (accessWithin(ab) || accessWithinLinked(ab)) &&
              (  !sym.hasLocalFlag
              || sym.owner.isImplClass // allow private local accesses to impl classes

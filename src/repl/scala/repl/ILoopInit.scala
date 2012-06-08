@@ -6,7 +6,7 @@
 package scala.repl
 
 import scala.tools.nsc._
-import util.Position
+import scala.reflect.internal.util.Position
 
 /**
  *  Machinery for the asynchronous initialization of the repl.

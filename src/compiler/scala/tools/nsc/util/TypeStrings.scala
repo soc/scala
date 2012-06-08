@@ -10,9 +10,11 @@ import java.lang.{ reflect => r }
 import r.TypeVariable
 import scala.reflect.NameTransformer
 import NameTransformer._
-import scala.reflect.{mirror => rm}
+import scala.reflect.runtime.{universe => ru}
+import scala.reflect.{ClassTag, classTag}
 import typechecker.DestructureTypes
-import scala.tools.util.StringOps.ojoin
+import scala.reflect.internal.util.StringOps.ojoin
+import language.implicitConversions
 
 /** A more principled system for turning types into strings.
  */
@@ -193,7 +195,7 @@ trait TypeStrings {
       else enclClass.getName + "." + (name stripPrefix enclPre)
     )
   }
-  def scalaName(m: ClassTag[_]): String = scalaName(m.erasure)
+  def scalaName(ct: ClassTag[_]): String = scalaName(ct.runtimeClass)
   def anyClass(x: Any): JClass          = if (x == null) null else x.getClass
 
   private def brackets(tps: String*): String =
@@ -209,9 +211,15 @@ trait TypeStrings {
   private def tparamString(clazz: JClass): String = {
     brackets(clazz.getTypeParameters map tvarString: _*)
   }
-  //
-  // private def tparamString[T: TypeTag] : String =
-  //   brackets(typeTag[T].tpe.typeArguments map (jc => tvarString(List(jc))): _*)
+
+  private def tparamString[T: ru.TypeTag] : String = {
+    // [Eugene++ to Paul] needs review!!
+    def typeArguments: List[ru.Type] = ru.typeOf[T].typeArguments
+    // [Eugene++] todo. need to use not the `rootMirror`, but a mirror with the REPL's classloader
+    // how do I get to it? acquiring context classloader seems unreliable because of multithreading
+    def typeVariables: List[java.lang.Class[_]] = typeArguments map (targ => ru.rootMirror.runtimeClass(targ))
+    brackets(typeArguments map (jc => tvarString(List(jc))): _*)
+  }
 
   /** Going for an overabundance of caution right now.  Later these types
    *  can be a lot more precise, but right now the tags have a habit of
@@ -221,10 +229,10 @@ trait TypeStrings {
    *  practice to rely on toString for correctness) generated the VALID string
    *  representation of the type.
    */
-  def fromValue(value: Any): String             = if (value == null) "Null" else fromClazz(anyClass(value))
-  def fromClazz(clazz: JClass): String          = scalaName(clazz) + tparamString(clazz)
-  def fromClassTag[T: ClassTag] : String = fromClazz(classTag[T].erasure)
-  def fromTypeTag[T: TypeTag] : String             = fromClazz(typeTag[T].erasure)
+  def fromTypedValue[T: ru.TypeTag : ClassTag](x: T): String = fromTag[T]
+  def fromValue(value: Any): String                          = if (value == null) "Null" else fromClazz(anyClass(value))
+  def fromClazz(clazz: JClass): String                       = scalaName(clazz) + tparamString(clazz)
+  def fromTag[T: ru.TypeTag : ClassTag] : String             = scalaName(classTag[T].runtimeClass) + tparamString[T]
 
   /** Reducing fully qualified noise for some common packages.
    */

@@ -48,8 +48,7 @@ trait PatternMatching extends Transform with TypingTransformers with ast.TreeDSL
 
   def patmatDebug(msg: String) = println(msg)
 
-  def newTransformer(unit: CompilationUnit): Transformer =
-    new MatchTransformer(unit)
+  def newTransformer(unit: CompilationUnit): Transformer = new MatchTransformer(unit)
 
   class MatchTransformer(unit: CompilationUnit) extends TypingTransformer(unit) {
     override def transform(tree: Tree): Tree = tree match {
@@ -188,7 +187,7 @@ trait PatternMatching extends Transform with TypingTransformers with ast.TreeDSL
 
       // the alternative to attaching the default case override would be to simply
       // append the default to the list of cases and suppress the unreachable case error that may arise (once we detect that...)
-      val matchFailGenOverride = match_ firstAttachment {case DefaultOverrideMatchAttachment(default) => ((scrut: Tree) => default)}
+      val matchFailGenOverride = match_.attachments.get[DefaultOverrideMatchAttachment].map{case DefaultOverrideMatchAttachment(default) => ((scrut: Tree) => default)}
 
       val selectorSym  = freshSym(selector.pos, pureType(selectorTp)) setFlag SYNTH_CASE
       // pt = Any* occurs when compiling test/files/pos/annotDepMethType.scala  with -Xexperimental
@@ -1094,16 +1093,13 @@ trait PatternMatching extends Transform with TypingTransformers with ast.TreeDSL
         def matchFailGen = (matchFailGenOverride orElse Some(CODE.MATCHERROR(_: Tree)))
         // patmatDebug("combining cases: "+ (casesNoSubstOnly.map(_.mkString(" >> ")).mkString("{", "\n", "}")))
 
-        def isSwitchAnnotation(tpe: Type) = tpe hasAnnotation SwitchClass
-        def isUncheckedAnnotation(tpe: Type) = tpe hasAnnotation UncheckedClass
-
         val (unchecked, requireSwitch) =
           if (settings.XnoPatmatAnalysis.value) (true, false)
           else scrut match {
             case Typed(_, tpt) =>
-              (isUncheckedAnnotation(tpt.tpe),
+              (treeInfo.isUncheckedAnnotation(tpt.tpe),
                // matches with two or fewer cases need not apply for switchiness (if-then-else will do)
-               isSwitchAnnotation(tpt.tpe) && casesNoSubstOnly.lengthCompare(2) > 0)
+               treeInfo.isSwitchAnnotation(tpt.tpe) && casesNoSubstOnly.lengthCompare(2) > 0)
             case _ =>
               (false, false)
           }
@@ -1472,7 +1468,7 @@ trait PatternMatching extends Transform with TypingTransformers with ast.TreeDSL
 
       // hashconsing trees (modulo value-equality)
       def unique(t: Tree, tpOverride: Type = NoType): Tree =
-        trees find (a => a.equalsStructure0(t)(sameValue)) match {
+        trees find (a => a.correspondsStructure(t)(sameValue)) match {
           case Some(orig) => orig // patmatDebug("unique: "+ (t eq orig, orig));
           case _ =>
             trees += t

@@ -55,6 +55,7 @@ PROPERTIES
 
   <!-- Sets location of pre-compiled libraries -->
   <property name="lib.starr.jar" value="${lib.dir}/scala-library.jar"/>
+  <property name="reflect.starr.jar" value="${lib.dir}/scala-reflect.jar"/>
   <property name="comp.starr.jar" value="${lib.dir}/scala-compiler.jar"/>
   <property name="jline.jar" value="${lib.dir}/jline.jar"/>
   <property name="ant.jar" value="${ant.home}/lib/ant.jar"/>
@@ -69,6 +70,7 @@ PROPERTIES
   <property name="build-pack.dir" value="${build.dir}/pack"/>
   <property name="quick-repl.dir" value="${build-quick.dir}/classes/repl"/>
   <property name="quick-library.dir" value="${build-quick.dir}/classes/library"/>
+  <property name="quick-reflect.dir" value="${build-quick.dir}/classes/reflect"/>
   <property name="quick-compiler.dir" value="${build-quick.dir}/classes/compiler"/>
 
   <property name="dists.dir" value="${basedir}/dists"/>
@@ -282,11 +284,13 @@ INITIALISATION
   -->
     <path id="starr.classpath">
       <pathelement location="${lib.starr.jar}"/>
+      <pathelement location="${reflect.starr.jar}"/>
       <pathelement location="${comp.starr.jar}"/>
       <path refid="aux.libs"/>
     </path>
     <path id="locker.classpath">
       <pathelement location="${build-locker.dir}/classes/library"/>
+      <pathelement location="${build-locker.dir}/classes/reflect"/>
       <pathelement location="${build-locker.dir}/classes/compiler"/>
       <path refid="aux.libs"/>
     </path>
@@ -296,6 +300,7 @@ INITIALISATION
     </path>
     <path id="quick.classpath">
       <pathelement location="${quick-library.dir}"/>
+      <pathelement location="${quick-reflect.dir}"/>
       <pathelement location="${quick-compiler.dir}"/>
       <pathelement location="${quick-repl.dir}"/>
       <path refid="aux.libs"/>
@@ -386,7 +391,30 @@ LOCAL REFERENCE BUILD (LOCKER)
     <stopwatch name="locker.lib.timer" action="total"/>
   </target>
 
-  <target name="locker.pre-comp" depends="locker.lib" unless="locker.available">
+
+  <target name="locker.pre-reflect" depends="locker.lib" unless="locker.available">
+    <condition property="locker.reflect.needed">
+      <not><available file="${build-locker.dir}/reflect.complete"/></not>
+    </condition>
+  </target>
+
+  <target name="locker.reflect" depends="locker.pre-reflect" if="locker.reflect.needed">
+    <stopwatch name="locker.reflect.timer"/>
+    <mkdir dir="${build-locker.dir}/classes/reflect"/>
+    <scalacfork
+      destdir="${build-locker.dir}/classes/reflect"
+      compilerpathref="starr.classpath"
+      params="${scalac.args.all}"
+      srcdir="${src.dir}/reflect"
+      jvmargs="${scalacfork.jvmargs}">
+      <include name="**/*.scala"/>
+      <compilationpath refid="locker.classpath"/>
+    </scalacfork>
+    <touch file="${build-locker.dir}/reflect.complete" verbose="no"/>
+    <stopwatch name="locker.reflect.timer" action="total"/>
+  </target>
+
+  <target name="locker.pre-comp" depends="locker.reflect" unless="locker.available">
     <condition property="locker.comp.needed">
       <not><available file="${build-locker.dir}/compiler.complete"/></not>
     </condition>
@@ -450,7 +478,19 @@ LOCAL REFERENCE BUILD (LOCKER)
     <delete file="${build-locker.dir}/library.complete"/>
   </target>
 
-  <target name="locker.unlock.pre-comp" depends="locker.unlock.lib">
+  <target name="locker.unlock.pre-reflect" depends="locker.unlock.lib">
+    <uptodate property="locker.reflect.available" targetfile="${build-locker.dir}/reflect.complete">
+      <srcfiles dir="${src.dir}">
+        <include name="reflect/**"/>
+      </srcfiles>
+    </uptodate>
+  </target>
+
+  <target name="locker.unlock.reflect" depends="locker.unlock.pre-reflect" unless="locker.reflect.available">
+    <delete file="${build-locker.dir}/reflect.complete"/>
+  </target>
+
+  <target name="locker.unlock.pre-comp" depends="locker.unlock.reflect">
     <uptodate property="locker.comp.available" targetfile="${build-locker.dir}/compiler.complete">
       <srcfiles dir="${src.dir}">
         <include name="compiler/**"/>
@@ -515,8 +555,32 @@ QUICK BUILD (QUICK)
     <touch file="${build-quick.dir}/library.complete" verbose="no"/>
     <stopwatch name="quick.lib.timer" action="total"/>
   </target>
-  
-  <target name="quick.pre-comp" depends="quick.lib">
+
+  <target name="quick.pre-reflect" depends="quick.lib">
+    <uptodate property="quick.reflect.available" targetfile="${build-quick.dir}/reflect.complete">
+      <srcfiles dir="${src.dir}">
+        <include name="reflect/**"/>
+      </srcfiles>
+    </uptodate>
+  </target>
+
+  <target name="quick.reflect" depends="quick.pre-reflect" unless="quick.reflect.available">
+    <stopwatch name="quick.reflect.timer"/>
+    <mkdir dir="${build-reflect.dir}"/>
+    <scalacfork
+      destdir="${build-reflect.dir}"
+      compilerpathref="locker.classpath"
+      params="${scalac.args.all}"
+      srcdir="${src.dir}/reflect"
+      jvmargs="${scalacfork.jvmargs}">
+      <include name="**/*.scala"/>
+      <compilationpath refid="locker.classpath.plus"/>
+    </scalacfork>
+    <touch file="${build-quick.dir}/reflect.complete" verbose="no"/>
+    <stopwatch name="quick.reflect.timer" action="total"/>
+  </target>
+
+  <target name="quick.pre-comp" depends="quick.reflect">
     <uptodate property="quick.comp.available" targetfile="${build-quick.dir}/compiler.complete">
       <srcfiles dir="${src.dir}">
         <include name="compiler/**"/>
@@ -674,7 +738,21 @@ PACKED QUICK BUILD (PACK)
     <copy file="${forkjoin.jar}" todir="${build-pack.dir}/lib"/>
   </target>
 
-  <target name="pack.pre-comp" depends="pack.lib">
+  <target name="pack.pre-reflect" depends="pack.lib">
+    <uptodate
+      property="pack.reflect.available"
+      targetfile="${build-pack.dir}/lib/scala-reflect.jar"
+      srcfile="${build-quick.dir}/reflect.complete"/>
+  </target>
+
+  <target name="pack.reflect" depends="pack.pre-reflect" unless="pack.reflect.available">
+    <mkdir dir="${build-pack.dir}/lib"/>
+    <jar destfile="${build-pack.dir}/lib/scala-reflect.jar">
+      <fileset dir="${build-quick.dir}/classes/reflect" />
+    </jar>
+  </target>
+
+  <target name="pack.pre-comp" depends="pack.reflect">
     <uptodate
       property="pack.comp.available"
       targetfile="${build-pack.dir}/lib/scala-compiler.jar"
@@ -800,9 +878,16 @@ STABLE REFERENCE (STARR)
     <copy todir="${basedir}/lib">
       <fileset dir="${build-pack.dir}/lib">
         <include name="scala-compiler.jar"/>
+        <include name="scala-reflect.jar"/>
         <include name="scala-library.jar"/>
       </fileset>
     </copy>
+  </target>
+
+  <target name="starr.clean" depends="starr.start">
+    <delete file="${basedir}/lib/scala-library.jar"/>
+    <delete file="${basedir}/lib/scala-reflect.jar"/>
+    <delete file="${basedir}/lib/scala-compiler.jar"/>
   </target>
 
   <!-- remove SHA1 files for no starr, so we don't lose artifacts. -->
@@ -810,6 +895,7 @@ STABLE REFERENCE (STARR)
     <delete>
       <fileset dir="${basedir}/lib">
         <include name="scala-compiler.jar.desired.sha1"/>
+        <include name="scala-reflect.jar.desired.sha1"/>
         <include name="scala-library.jar.desired.sha1"/>
       </fileset>
     </delete>

@@ -181,7 +181,7 @@ trait IterableOnce[+A] extends Any {
   def copyToArray[B >: A](xs: Array[B]): Unit =
     copyToArray(xs, 0, xs.length)
 
-  def toArray[B >: A : ArrayTag]: Array[B] = {
+  def toArray[B >: A : ClassTag]: Array[B] = {
     if (isIterableAgain) {
       val result = new Array[B](size)
       copyToArray(result, 0)

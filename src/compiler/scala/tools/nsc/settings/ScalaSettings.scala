@@ -77,7 +77,6 @@ trait ScalaSettings extends AbsScalaSettings
   val XlogImplicits = BooleanSetting    ("-Xlog-implicits", "Show more detail on why some implicits are not applicable.")
   val logImplicitConv = BooleanSetting  ("-Xlog-implicit-conversions", "Print a message whenever an implicit conversion is inserted.")
   val logReflectiveCalls = BooleanSetting("-Xlog-reflective-calls", "Print a message when a reflective method call is generated")
-  val logRuntimeSplices = BooleanSetting("-Xlog-runtime-splices", "Print a message when Expr.eval or Expr.value cannot be resolved statically.")
   val logFreeTerms  = BooleanSetting    ("-Xlog-free-terms", "Print a message when reification creates a free term.")
   val logFreeTypes  = BooleanSetting    ("-Xlog-free-types", "Print a message when reification resorts to generating a free type.")
   val maxClassfileName = IntSetting     ("-Xmax-classfile-name", "Maximum filename length for generated classes", 255, Some((72, 255)), _ => None)
@@ -97,6 +96,7 @@ trait ScalaSettings extends AbsScalaSettings
   val showPhases    = BooleanSetting    ("-Xshow-phases", "Print a synopsis of compiler phases.")
   val sourceReader  = StringSetting     ("-Xsource-reader", "classname", "Specify a custom method for reading source files.", "")
   val XnoPatmatAnalysis = BooleanSetting ("-Xno-patmat-analysis", "Don't perform exhaustivity/unreachability analysis. Also, ignore @switch annotation.")
+  val XfullLubs     = BooleanSetting    ("-Xfull-lubs", "Retains pre 2.10 behavior of less aggressive truncation of least upper bounds.")
 
   /** Compatibility stubs for options whose value name did
    *  not previously match the option name.

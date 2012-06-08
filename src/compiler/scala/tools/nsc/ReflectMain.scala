@@ -2,15 +2,13 @@ package scala.tools.nsc
 
 import util.ScalaClassLoader
 import scala.tools.util.PathResolver
-import util.ClassPath.DefaultJavaContext
 
 object ReflectMain extends Driver {
 
-  private def reflectionClassloaderFromSettings(settings: Settings) = {
+  private def classloaderFromSettings(settings: Settings) = {
     val classpath = new PathResolver(settings).result
     ScalaClassLoader.fromURLs(classpath.asURLs, getClass.getClassLoader)
   }
 
-  override def newCompiler(): Global = new ReflectGlobal(settings, reporter, reflectionClassloaderFromSettings(settings))
-
+  override def newCompiler(): Global = new ReflectGlobal(settings, reporter, classloaderFromSettings(settings))
 }
