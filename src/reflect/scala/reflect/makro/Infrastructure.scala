@@ -3,22 +3,22 @@ package makro
 
 trait Infrastructure {
   self: Context =>
-
-  /** Determines whether the compiler expanding a macro targets JVM.
-   */
-  val forJVM: Boolean
-
-  /** Determines whether the compiler expanding a macro targets CLR.
-   */
-  val forMSIL: Boolean
-
-  /** Determines whether the compiler expanding a macro is a presentation compiler.
-   */
-  val forInteractive: Boolean
-
-  /** Determines whether the compiler expanding a macro is a Scaladoc compiler.
-   */
-  val forScaladoc: Boolean
+  // 
+  // /** Determines whether the compiler expanding a macro targets JVM.
+  //  */
+  // val forJVM: Boolean
+  // 
+  // /** Determines whether the compiler expanding a macro targets CLR.
+  //  */
+  // val forMSIL: Boolean
+  // 
+  // /** Determines whether the compiler expanding a macro is a presentation compiler.
+  //  */
+  // val forInteractive: Boolean
+  // 
+  // /** Determines whether the compiler expanding a macro is a Scaladoc compiler.
+  //  */
+  // val forScaladoc: Boolean
 
   /** Exposes current compilation run.
    */

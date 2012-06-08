@@ -21,7 +21,6 @@ trait StandardNames extends base.StandardNames {
     val PACKAGE: NameType
     val ROOT: NameType
     val WILDCARD: NameType
-    val SPECIALIZED_SUFFIX: NameType
 
     def flattenedName(segments: Name*): NameType
   }

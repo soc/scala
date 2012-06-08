@@ -37,7 +37,6 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
        with PhaseAssembly
        with Trees
        with TreePrinters
-       with DocComments
        with Positions { self =>
 
   // [Eugene++] would love to find better homes for the new things dumped into Global

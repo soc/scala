@@ -140,7 +140,7 @@ abstract class StatisticsInfo {
       inform("#sametype                : " + sametypeCount)
       inform("#toplevel lub            : " + lubCount)
       inform("#all lub                 : " + nestedLubCount)
-      inform("ms type-flow-analysis: " + analysis.timer.millis)
+      // inform("ms type-flow-analysis: " + analysis.timer.millis)
 
       if (phase.name == "typer") {
         inform("time spent typechecking    : " + showRelTyper(typerNanos))

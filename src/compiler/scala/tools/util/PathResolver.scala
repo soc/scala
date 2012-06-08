@@ -198,7 +198,7 @@ class PathResolver(settings: Settings, context: JavaContext) {
      * and then when typing relative names, instead of picking <root>.scala.relect, typedIdentifier will pick up the
      * <root>.reflect package created by the bootstrapping. Thus, no bootstrapping for scaladoc!
      * TODO: we should refactor this as a separate -bootstrap option to have a clean implementation, no? */
-    def sourcePath          = if (!settings.isScaladoc) cmdLineOrElse("sourcepath", Defaults.scalaSourcePath) else ""
+    def sourcePath          = cmdLineOrElse("sourcepath", Defaults.scalaSourcePath)
 
     /** Against my better judgment, giving in to martin here and allowing
      *  CLASSPATH to be used automatically.  So for the user-specified part

@@ -41,7 +41,7 @@ trait StandardDefinitions extends base.StandardDefinitions {
     def StringBuilderClass: ClassSymbol
     def SymbolClass : ClassSymbol
     def TraversableClass: ClassSymbol
-    def TupleClass: Array[Symbol] // cannot make it Array[ClassSymbol], because TupleClass(0) is supposed to be NoSymbol. weird
+    def TupleClass: Array[ClassSymbol]
     def ScalaPrimitiveValueClasses: List[ClassSymbol]
     def ScalaNumericValueClasses: List[ClassSymbol]
   }

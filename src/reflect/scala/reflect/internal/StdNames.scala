@@ -993,32 +993,6 @@ trait StdNames {
       reflMethodName
     )
     def isReflectionCacheName(name: Name) = reflectionCacheNames exists (name startsWith _)
-
-    @switch def productAccessorName(j: Int): TermName = j match {
-      case 1  => nme._1
-      case 2  => nme._2
-      case 3  => nme._3
-      case 4  => nme._4
-      case 5  => nme._5
-      case 6  => nme._6
-      case 7  => nme._7
-      case 8  => nme._8
-      case 9  => nme._9
-      case 10 => nme._10
-      case 11 => nme._11
-      case 12 => nme._12
-      case 13 => nme._13
-      case 14 => nme._14
-      case 15 => nme._15
-      case 16 => nme._16
-      case 17 => nme._17
-      case 18 => nme._18
-      case 19 => nme._19
-      case 20 => nme._20
-      case 21 => nme._21
-      case 22 => nme._22
-      case _  => newTermName("_" + j)
-    }
     // @deprecated("Use a method in tpnme", "2.10.0") def dropSingletonName(name: Name): TypeName = tpnme.dropSingletonName(name)
     // @deprecated("Use a method in tpnme", "2.10.0") def singletonName(name: Name): TypeName     = tpnme.singletonName(name)
     // @deprecated("Use a method in tpnme", "2.10.0") def implClassName(name: Name): TypeName     = tpnme.implClassName(name)

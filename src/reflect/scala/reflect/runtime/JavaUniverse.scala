@@ -19,8 +19,8 @@ class JavaUniverse extends internal.SymbolTable with ReflectSetup with runtime.S
   override val gen = new TreeGen { val global: self.type = self }
 
   lazy val settings = new Settings
-  def forInteractive = false
-  def forScaladoc = false
+  // def forInteractive = false
+  // def forScaladoc = false
 
   def log(msg: => AnyRef): Unit = println(" [] "+msg)
 

@@ -1365,9 +1365,6 @@ trait Typers extends Modes with Adaptations with Tags {
             unit.error(clazz.pos, "value class needs to have exactly one public val parameter")
         }
       }
-      for (tparam <- clazz.typeParams)
-        if (tparam hasAnnotation definitions.SpecializedClass)
-          unit.error(tparam.pos, "type parameter of value class may not be specialized")
     }
 
     def parentTypes(templ: Template): List[Tree] =
@@ -3067,7 +3064,7 @@ trait Typers extends Modes with Adaptations with Tags {
 
     // if there's a ClassTag that allows us to turn the unchecked type test for `pt` into a checked type test
     // return the corresponding extractor (an instance of ClassTag[`pt`])
-    def extractorForUncheckedType(pos: Position, pt: Type): Option[Tree] = if (!opt.virtPatmat || isPastTyper) None else {
+    def extractorForUncheckedType(pos: Position, pt: Type): Option[Tree] = if (isPastTyper) None else {
       // only look at top-level type, can't (reliably) do anything about unchecked type args (in general)
       pt.normalize.typeConstructor match {
         // if at least one of the types in an intersection is checkable, use the checkable ones

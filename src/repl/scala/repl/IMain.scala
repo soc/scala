@@ -14,7 +14,8 @@ import scala.sys.BooleanProp
 import scala.tools.nsc.io.{ AbstractFile, VirtualDirectory }
 import reporters._
 import symtab.Flags
-import scala.reflect.internal.{ Names, AbstractFileClassLoader }
+import scala.tools.reflect.AbstractFileClassLoader
+import scala.reflect.internal.Names
 import scala.tools.util.PathResolver
 import scala.tools.nsc.util.ScalaClassLoader
 import ScalaClassLoader.URLClassLoader

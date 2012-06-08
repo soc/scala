@@ -15,11 +15,11 @@ trait Infrastructure {
     var loader: ClassLoader = ScalaClassLoader.fromURLs(classpath, self.getClass.getClassLoader)
 
     // [Eugene] a heuristic to detect REPL
-    if (universe.settings.exposeEmptyPackage.value) {
-      import scala.tools.nsc.interpreter._
-      val virtualDirectory = universe.settings.outputDirs.getSingleOutput.get
-      loader = new AbstractFileClassLoader(virtualDirectory, loader) {}
-    }
+    // if (universe.settings.exposeEmptyPackage.value) {
+    //   import scala.tools.nsc.interpreter._
+    //   val virtualDirectory = universe.settings.outputDirs.getSingleOutput.get
+    //   loader = new AbstractFileClassLoader(virtualDirectory, loader) {}
+    // }
 
     loader
   }

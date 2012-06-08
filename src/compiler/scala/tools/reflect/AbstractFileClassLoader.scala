@@ -2,8 +2,8 @@
  * Copyright 2005-2011 LAMP/EPFL
  */
 
-package scala.reflect
-package internal
+package scala.tools
+package reflect
 
 import scala.tools.nsc.io.{ File, AbstractFile }
 import scala.tools.nsc.util.ScalaClassLoader

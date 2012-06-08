@@ -7,7 +7,6 @@ import scala.tools.nsc.CompilerCommand
 import scala.tools.nsc.Global
 import scala.tools.nsc.typechecker.Modes
 import scala.tools.nsc.io.VirtualDirectory
-import scala.tools.nsc.interpreter.AbstractFileClassLoader
 import scala.tools.nsc.util.FreshNameCreator
 import scala.reflect.internal.Flags
 import scala.reflect.internal.util.{BatchSourceFile, NoSourceFile, NoFile}

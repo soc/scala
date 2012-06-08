@@ -7,6 +7,7 @@ package scala
 
 import language.implicitConversions
 import scala.tools.reflect.StdTags
+import scala.reflect.runtime.{ universe => ru }
 
 /** The main REPL related classes and values are as follows.
  *  In addition to standard compiler classes Global and Settings, there are:
@@ -38,9 +39,18 @@ package object repl extends ReplConfig with ReplStrings {
   type OutputStream   = java.io.OutputStream
 
   val IR = Results
-
-  def tagOfStdReplVals = StdTags.tagOfStdReplVals
-  def tagOfIMain       = StdTags.tagOfIMain
+  
+  private val ourClassloader = getClass.getClassLoader
+  private def staticClassTag[T: ClassTag] : ru.TypeTag[T] = {
+    ru.TypeTag[T](
+      ru.runtimeMirror(ourClassloader),
+      new TypeCreator {
+        def apply[U <: BaseUniverse with Singleton](m: MirrorOf[U]): U # Type =
+          m.staticClass(classTag[T].runtimeClass.getName).asTypeConstructor.asInstanceOf[U # Type]
+      })
+  }
+  lazy val tagOfStdReplVals = staticClassTag[scala.repl.StdReplVals]
+  lazy val tagOfIMain       = staticClassTag[scala.repl.IMain]
 
   implicit def postfixOps = language.postfixOps // make all postfix ops in this package compile without warning
 

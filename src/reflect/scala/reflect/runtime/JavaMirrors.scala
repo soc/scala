@@ -1,7 +1,7 @@
 package scala.reflect
 package runtime
 
-import scala.ref.WeakReference
+import java.lang.ref.WeakReference
 import scala.collection.mutable.WeakHashMap
 
 import java.lang.{Class => jClass, Package => jPackage}
@@ -16,8 +16,6 @@ import internal.ClassfileConstants._
 import internal.pickling.UnPickler
 import collection.mutable.{ HashMap, ListBuffer }
 import internal.Flags._
-//import scala.tools.nsc.util.ScalaClassLoader
-//import scala.tools.nsc.util.ScalaClassLoader._
 import ReflectionUtils.{singletonInstance}
 import language.existentials
 
@@ -51,8 +49,10 @@ trait JavaMirrors extends internal.SymbolTable with api.JavaUniverse { self: Sym
     definitions.init()
   }
 
-  def runtimeMirror(cl: ClassLoader): Mirror =
-    mirrors.getOrElse(cl, createMirror(rootMirror.RootClass, cl))
+  def runtimeMirror(cl: ClassLoader): Mirror = mirrors get cl match {
+    case Some(m) if m.get != null => m.get
+    case _                        => createMirror(rootMirror.RootClass, cl)
+  }
 
   /** The API of a mirror for a reflective universe */
   class JavaMirror(owner: Symbol,
@@ -989,11 +989,11 @@ trait JavaMirrors extends internal.SymbolTable with api.JavaUniverse { self: Sym
   override def mirrorThatLoaded(sym: Symbol): Mirror = {
     val root = sym.enclosingRootClass
     def findLoader = {
-      val loaders = (mirrors collect { case (cl, ref) if ref.get.get.RootClass == root => cl })
+      val loaders = (mirrors collect { case (cl, ref) if ref.get.RootClass == root => cl })
       assert(loaders.nonEmpty, sym)
       loaders.head
     }
-    mirrors(rootToLoader getOrElseUpdate(root, findLoader)).get.get
+    mirrors(rootToLoader.getOrElseUpdate(root, findLoader)).get
   }
 
   private def byName(sym: Symbol): (Name, Symbol) = sym.name -> sym

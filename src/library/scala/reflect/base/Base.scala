@@ -273,7 +273,10 @@ class Base extends Universe { self =>
   private val generated = new mutable.HashMap[String, WeakReference[Symbol]]
 
   private def cached(name: String)(symExpr: => Symbol): Symbol =
-    generated.getOrElseUpdate(name, new WeakReference(symExpr))
+    generated.getOrElseUpdate(name, new WeakReference(symExpr)).get match {
+      case null => NoSymbol
+      case sym  => sym
+    }
 
   object build extends BuildBase {
     def selectType(owner: Symbol, name: String): TypeSymbol = {

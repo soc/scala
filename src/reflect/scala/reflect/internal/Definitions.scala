@@ -57,7 +57,7 @@ trait Definitions extends api.StandardDefinitions {
   private def enterNewMethod(owner: Symbol, name: TermName, formals: List[Type], restpe: Type, flags: Long = 0L): MethodSymbol =
     owner.info.decls enter newMethod(owner, name, formals, restpe, flags)
 
-  abstract class DefinitionsClass extends AbsDefinitions {
+  abstract class DefinitionsClass extends DefinitionsApi {
     import ClassfileConstants._
 
     private var isInitialized = false
@@ -332,6 +332,7 @@ trait Definitions extends api.StandardDefinitions {
     lazy val ScalaNumberClass           = requiredClass[scala.math.ScalaNumber]
     lazy val TraitSetterAnnotationClass = requiredClass[scala.runtime.TraitSetter]
     lazy val DelayedInitClass           = requiredClass[scala.DelayedInit]
+      def delayedInitMethod = getMemberMethod(DelayedInitClass, nme.delayedInit)
 
     lazy val TypeConstraintClass   = requiredClass[scala.annotation.TypeConstraint]
     lazy val SingletonClass        = enterNewClass(ScalaPackageClass, tpnme.Singleton, anyparam, ABSTRACT | TRAIT | FINAL)
@@ -539,8 +540,8 @@ trait Definitions extends api.StandardDefinitions {
 
     def tupleField(n: Int, j: Int) = getMemberValue(TupleClass(n), nme.productAccessorName(j))
     // NOTE: returns true for NoSymbol since it's included in the TupleClass array -- is this intensional?
-    def isTupleSymbol(sym: Symbol) = TupleClass contains sym
-    def isProductNClass(sym: Symbol) = ProductClass contains sym
+    def isTupleSymbol(sym: Symbol) = TupleClass exists (_ == sym)
+    def isProductNClass(sym: Symbol) = ProductClass exists (_ == sym)
 
     // No normalization.
     def isTupleTypeDirect(tp: Type) = tp match {
@@ -1066,7 +1067,7 @@ trait Definitions extends api.StandardDefinitions {
     lazy val isPhantomClass = Set[Symbol](AnyClass, AnyValClass, NullClass, NothingClass)
 
     /** Is the symbol that of a parent which is added during parsing? */
-    lazy val isPossibleSyntheticParent: Set[Symbol] = ProductClass.toSet + ProductRootClass + SerializableClass
+    lazy val isPossibleSyntheticParent: Set[Symbol] = ProductClass.toSet[Symbol] + ProductRootClass + SerializableClass
 
     private lazy val boxedValueClassesSet: Set[Symbol] = boxedClass.values.toSet + BoxedUnitClass
 
