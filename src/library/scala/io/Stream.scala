@@ -8,20 +8,9 @@ package io
 package stream
 
 import scala.collection.{ mutable, immutable }
-import java.net.{ URI, URL }
 import java.io._
 
 object Stream {
-  def slurp(is: => InputStream)(implicit _codec: Codec): String = {
-    val s = new ReadStream {
-      def inputStream = is
-      def codec = _codec
-    }
-    s.readAsString()
-  }
-  def slurpUrl(url: URL)(implicit codec: Codec): String    = slurp(url.openStream())
-  def slurpUrl(url: String)(implicit codec: Codec): String = slurpUrl(new java.net.URL(url))
-
   /** Call a function on something Closeable, finally closing it. */
   def closing[T <: Closeable, U](stream: T)(f: T => U): U =
     try f(stream) finally stream.close()
@@ -42,7 +31,7 @@ trait ReadStream extends Stream {
     Iterator continually f(in) takeWhile (x => (x != end) || { in.close() ; false })
 
   def bytesIterator(): Iterator[Byte] =
-    mkClosingIterator(bufferedInput(), -1)(_.read().toByte)
+    mkClosingIterator(bufferedInput(), -1: Byte)(_.read().toByte)
 
   def charsIterator(): Iterator[Char] =
     mkClosingIterator(bufferedReader(), -1)(codec wrap _.read()) map (_.toChar)

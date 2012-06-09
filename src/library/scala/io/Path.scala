@@ -3,7 +3,10 @@ package io
 
 import stream._
 import java.io.{ File => JFile, _ }
-// import java.io.{ File => JFile }
+import java.nio.file.{ Path => JPath, _ }
+import scala.collection.{ mutable, immutable, convert }
+import convert.decorateAsScala._
+import java.util.concurrent.LinkedBlockingQueue
 
 class Path(val file: JFile)(implicit val codec: Codec) {
   def this(path: String) = this(new JFile(path))
@@ -66,6 +69,50 @@ class Path(val file: JFile)(implicit val codec: Codec) {
     else throw new IOException("Could not read entire source (%d of %d bytes)".format(offset, len))
   }
 
+  def java7path = java.nio.file.Paths.get(file.toURI)
+
+  def eventQueue: LinkedBlockingQueue[WatchEvent[JPath]] = {
+    if (!this.isDirectory)
+      return null
+
+    def key   = Path.getWatchKey(this)
+    val queue = new LinkedBlockingQueue[WatchEvent[JPath]]
+    spawn {
+      while (true) key.pollEvents.asScala.toList match {
+        case Nil    => Thread.sleep(100)
+        case xs     => xs foreach (queue put _.asInstanceOf[WatchEvent[JPath]])
+      }
+    }
+    queue
+  }
+  def onEvent(f: (JPath, WatchEvent.Kind[JPath]) => Unit): this.type = {
+    spawn {
+      val queue = eventQueue
+      while (true) {
+        val x = queue.take()
+        f(x.context, x.kind)
+      }
+    }
+    this
+  }
+  //
+  // def onEvent(f: (JPath, WatchEvent.Kind[_]) => Unit) {
+  //   val key   = Path.getWatchKey(this)
+  //   // val queue = new LinkedBlockingQueue[WatchEvent[_]]
+  //
+  //   if (this.isDirectory) {
+  //     spawn {
+  //       Thread.currentThread.setDaemon(true)
+  //       while (key.isValid) key.pollEvents.asScala.toList match {
+  //         case Nil    => synchronized { wait(1000) }
+  //         case xs     => xs foreach (x => f(x.context.asInstanceOf[JPath], x.kind))
+  //       }
+  //     }
+  //     // () => Iterator.continually[WatchEvent[_]](queue.poll()) takeWhile (_ != null)
+  //   }
+  //   // else () => Iterator.empty
+  // }
+
   override def hashCode = file.hashCode
   override def equals(other: Any) = other match {
     case x: Path  => file == x.file
@@ -75,6 +122,11 @@ class Path(val file: JFile)(implicit val codec: Codec) {
 }
 
 object Path {
+  private def getWatchKey(p: Path) =
+    watching.getOrElseUpdate(p, p.java7path.register(watchService, AllFileEvents))
+  private lazy val watching = mutable.HashMap[Path, WatchKey]()
+  private lazy val watchService = FileSystem.default.newWatchService
+
   def apply(path: String): Path = new Path(path)
   def apply(file: JFile): Path  = new Path(file)
 
@@ -83,4 +135,8 @@ object Path {
   implicit def path2javaFile(path: Path): JFile          = path.file
   implicit def string2scalaPath(path: String): Path      = new Path(path)
   implicit def file2scalaPath(file: JFile): Path         = new Path(file)
+
+  // java 7
+  implicit def path2java7path(path: Path): java.nio.file.Path =
+    java.nio.file.Paths.get(path.file.toURI)
 }

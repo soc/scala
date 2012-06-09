@@ -156,6 +156,16 @@ object Iterator {
     def hasNext = true
     def next = elem
   }
+  def flatContinually[A](elems: => IterableOnce[A]): Iterator[A] = new AbstractIterator[A] {
+    private var latest: Iterator[A] = _
+    def hasNext = true
+    def next = {
+      while (latest == null || latest.isEmpty)
+        latest = elems.toIterator
+
+      latest.next
+    }
+  }
 }
 
 import Iterator.empty
