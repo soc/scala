@@ -2093,19 +2093,19 @@ abstract class GenICode extends SubComponent  {
 
   /** Local variable scopes. Keep track of line numbers for debugging info. */
   class Scope(val outer: Scope) {
-    val locals: ListBuffer[Local] = new ListBuffer
+    val locals = new ListBuffer[Local]
 
     def add(l: Local)     = locals += l
     def remove(l: Local)  = locals -= l
 
     /** Return all locals that are in scope. */
-    def varsInScope: Buffer[Local] = outer.varsInScope.clone() ++= locals
+    def varsInScope: ListBuffer[Local] = outer.varsInScope.clone() ++= locals
 
     override def toString() = locals.mkString(outer.toString + "[", ", ", "]")
   }
 
   object EmptyScope extends Scope(null) {
     override def toString() = "[]"
-    override def varsInScope: Buffer[Local] = new ListBuffer
+    override def varsInScope = ListBuffer[Local]()
   }
 }

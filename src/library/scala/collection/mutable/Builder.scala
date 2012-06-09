@@ -33,7 +33,7 @@ trait Builder[-Elem, +To] extends Growable[Elem] {
   /** Clears the contents of this builder.
    *  After execution of this method the builder will contain no elements.
    */
-  def clear()
+  def clear(): Unit
 
   /** Produces a collection from the added elements.
    *  The builder's contents are undefined after this operation.

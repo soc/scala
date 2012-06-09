@@ -41,74 +41,12 @@ import scala.reflect.ClassTag
  *  @define willNotTerminateInf
  */
 @SerialVersionUID(3419063961353022662L)
-final class ListBuffer[A]
-      extends AbstractBuffer[A]
-         with GenericIterableTemplate[A, ListBuffer]
-         with BufferLike[A, ListBuffer[A]]
-         with Builder[A, List[A]]
-         with Serializable
-{
-  import scala.collection.Iterable
-  
-  override def companion: GenericCompanion[ListBuffer] = ListBuffer
-  private def underlying: immutable.Seq[A] = start
+final class ListBuffer[A] extends Builder[A, List[A]] with Serializable {
+  private def underlying: List[A] = start
   private var start: List[A] = Nil
   private var last0: ::[A] = _
   private var exported: Boolean = false
   private var len = 0
-
-  override def /: [B](z: B)(op: (B, A) => B): B = underlying./:(z)(op)
-  override def :\ [B](z: B)(op: (A, B) => B): B = underlying.:\(z)(op)
-  override def contains(elem: Any): Boolean = underlying contains elem
-  override def containsSlice[B](that: collection.Seq[B]): Boolean = underlying containsSlice that
-  override def copyToArray[B >: A](xs: Array[B]) = underlying.copyToArray(xs)
-  override def copyToArray[B >: A](xs: Array[B], start: Int) = underlying.copyToArray(xs, start)
-  override def copyToArray[B >: A](xs: Array[B], start: Int, len: Int) = underlying.copyToArray(xs, start, len)
-  override def copyToBuffer[B >: A](dest: Buffer[B]) = underlying.copyToBuffer(dest)
-  override def corresponds[B](that: collection.Seq[B])(p: (A,B) => Boolean): Boolean = underlying.corresponds(that)(p)
-  override def count(p: A => Boolean): Int = underlying count p
-  override def endsWith[B](that: collection.Seq[B]): Boolean = underlying endsWith that
-  override def exists(p: A => Boolean): Boolean = underlying exists p
-  override def find(p: A => Boolean): Option[A] = underlying find p
-  override def foldLeft[B](z: B)(op: (B, A) => B): B = underlying.foldLeft(z)(op)
-  override def foldRight[B](z: B)(op: (A, B) => B): B = underlying.foldRight(z)(op)
-  override def forall(p: A => Boolean): Boolean = underlying forall p
-  override def foreach[B](f: A => B): Unit = underlying foreach f
-  override def hasDefiniteSize = underlying.hasDefiniteSize
-  override def head: A = underlying.head
-  override def headOption: Option[A] = underlying.headOption
-  override def indexOfSlice[B >: A](that: collection.Seq[B]): Int = underlying indexOfSlice that
-  override def indexOfSlice[B >: A](that: collection.Seq[B], from: Int): Int = underlying.indexOfSlice(that, from)
-  override def indexOf[B >: A](elem: B): Int = underlying indexOf elem
-  override def indexOf[B >: A](elem: B, from: Int): Int = underlying.indexOf(elem, from)
-  override def indexWhere(p: A => Boolean): Int = underlying indexWhere p
-  override def indexWhere(p: A => Boolean, from: Int): Int = underlying.indexWhere(p, from)
-  override def indices: Range = underlying.indices
-  override def isDefinedAt(x: Int): Boolean = underlying isDefinedAt x
-  override def isEmpty: Boolean = underlying.isEmpty
-  override def last: A = underlying.last
-  override def lastIndexOfSlice[B >: A](that: collection.Seq[B]): Int = underlying lastIndexOfSlice that
-  override def lastIndexOfSlice[B >: A](that: collection.Seq[B], end: Int): Int = underlying.lastIndexOfSlice(that, end)
-  override def lastIndexOf[B >: A](elem: B): Int = underlying lastIndexOf elem
-  override def lastIndexOf[B >: A](elem: B, end: Int): Int = underlying.lastIndexOf(elem, end)
-  override def lastIndexWhere(p: A => Boolean): Int = underlying lastIndexWhere p
-  override def lastIndexWhere(p: A => Boolean, end: Int): Int = underlying.lastIndexWhere(p, end)
-  override def lastOption: Option[A] = underlying.lastOption
-  override def lengthCompare(len: Int): Int = underlying lengthCompare len
-  override def mkString(sep: String): String = underlying.mkString(sep)
-  override def nonEmpty: Boolean = underlying.nonEmpty
-  override def prefixLength(p: A => Boolean) = underlying prefixLength p
-  override def reduceLeft[B >: A](op: (B, A) => B): B = underlying.reduceLeft(op)
-  override def reduceRight[B >: A](op: (A, B) => B): B = underlying.reduceRight(op)
-  override def reverseIterator: Iterator[A] = underlying.reverseIterator
-  override def segmentLength(p: A => Boolean, from: Int): Int = underlying.segmentLength(p, from)
-  override def startsWith[B](that: collection.Seq[B]): Boolean = underlying startsWith that
-  override def startsWith[B](that: collection.Seq[B], offset: Int): Boolean = underlying.startsWith(that, offset)
-  override def toArray[B >: A: ClassTag]: Array[B] = underlying.toArray
-  override def toBuffer[B >: A] = underlying.toBuffer
-  override def toIndexedSeq = underlying.toIndexedSeq
-  override def toMap[T, U](implicit ev: A <:< (T, U)): immutable.Map[T, U] = underlying.toMap(ev)
-  override def toSeq: collection.Seq[A] = underlying.toSeq
 
   private def writeObject(out: ObjectOutputStream) {
     // write start
@@ -156,15 +94,8 @@ final class ListBuffer[A]
    *
    *  This operation takes constant time.
    */
-  override def length = len
-
-  // Don't use the inherited size, which forwards to a List and is O(n).
-  override def size = length
-
-  // Implementations of abstract methods in Buffer
-  override def apply(n: Int): A =
-    if (n < 0 || n >= len) throw new IndexOutOfBoundsException(n.toString())
-    else underlying.apply(n)
+  def length = len
+  def size = length
 
   /** Replaces element at index `n` with the new element
    *  `newelem`. Takes time linear in the buffer size. (except the
@@ -223,9 +154,6 @@ final class ListBuffer[A]
   override def ++=(xs: IterableOnce[A]): this.type =
     if (xs.asInstanceOf[AnyRef] eq this) ++= (this take size) else super.++=(xs)
 
-  override def ++=:(xs: IterableOnce[A]): this.type =
-    if (xs.asInstanceOf[AnyRef] eq this) ++=: (this take size) else super.++=:(xs)
-
   /** Clears the buffer contents.
    */
   def clear() {
@@ -248,6 +176,12 @@ final class ListBuffer[A]
     len += 1
     this
   }
+  
+  def append(elems: A*) { appendAll(elems) }
+  def appendAll(xs: IterableOnce[A]) { this ++= xs }
+  def prepend(elems: A*) { prependAll(elems) }
+  def prependAll(xs: IterableOnce[A]) { xs ++=: this }
+  def ++=:(xs: IterableOnce[A]): this.type = { insertAll(0, xs.toSeq); this }
 
   /** Inserts new elements at the index `n`. Opposed to method
    *  `update`, this method will not replace an element with a new
@@ -257,7 +191,7 @@ final class ListBuffer[A]
    *  @param  seq   the iterable object providing all elements to insert.
    *  @throws Predef.IndexOutOfBoundsException if `n` is out of bounds.
    */
-  def insertAll(n: Int, seq: Iterable[A]) {
+  def insertAll(n: Int, seq: collection.Iterable[A]) {
     try {
       if (exported) copy()
       var elems = seq.toList.reverse
@@ -295,7 +229,7 @@ final class ListBuffer[A]
    *  @param n         the index which refers to the first element to remove.
    *  @param count     the number of elements to remove.
    */
-  override def remove(n: Int, count: Int) {
+  def remove(n: Int, count: Int) {
     if (exported) copy()
     val n1 = n max 0
     val count1 = count min (len - n1)
@@ -322,6 +256,8 @@ final class ListBuffer[A]
     }
     len -= count1
   }
+  
+  def trimEnd(n: Int) { remove(length - n max 0, n) }
 
 // Implementation of abstract method in Builder
 
@@ -330,7 +266,7 @@ final class ListBuffer[A]
   /** Converts this buffer to a list. Takes constant time. The buffer is
    *  copied lazily, the first time it is mutated.
    */
-  override def toList: List[A] = {
+  def toList: List[A] = {
     exported = !start.isEmpty
     start
   }
@@ -387,7 +323,7 @@ final class ListBuffer[A]
    *  @param elem  the element to remove.
    *  @return      this $coll.
    */
-  override def -= (elem: A): this.type = {
+  def -= (elem: A): this.type = {
     if (exported) copy()
     if (start.isEmpty) {}
     else if (start.head == elem) {
@@ -409,35 +345,10 @@ final class ListBuffer[A]
     this
   }
 
-  override def iterator: Iterator[A] = new AbstractIterator[A] {
-    // Have to be careful iterating over mutable structures.
-    // This used to have "(cursor ne last0)" as part of its hasNext
-    // condition, which means it can return true even when the iterator
-    // is exhausted.  Inconsistent results are acceptable when one mutates
-    // a structure while iterating, but we should never return hasNext == true
-    // on exhausted iterators (thus creating exceptions) merely because
-    // values were changed in-place.
-    var cursor: List[A] = null
-    var delivered = 0
-
-    // Note: arguably this should not be a "dynamic test" against
-    // the present length of the buffer, but fixed at the size of the
-    // buffer when the iterator is created.  At the moment such a
-    // change breaks tests: see comment on def units in Global.scala.
-    def hasNext: Boolean = delivered < ListBuffer.this.length
-    def next(): A =
-      if (!hasNext)
-        throw new NoSuchElementException("next on empty Iterator")
-      else {
-        if (cursor eq null) cursor = start
-        else cursor = cursor.tail
-        delivered += 1
-        cursor.head
-      }
-  }
+  def iterator: Iterator[A] = readOnly.iterator
 
   /** expose the underlying list but do not mark it as exported */
-  override def readOnly: List[A] = start
+  def readOnly: List[A] = start
 
   // Private methods
 
@@ -452,6 +363,8 @@ final class ListBuffer[A]
     }
   }
 
+  override def toString = start.mkString("ListBuffer(", ", ", ")")
+  override def hashCode = readOnly.hashCode
   override def equals(that: Any): Boolean = that match {
     case that: ListBuffer[_] => this.readOnly equals that.readOnly
     case _                   => super.equals(that)
@@ -462,19 +375,13 @@ final class ListBuffer[A]
    *  @return a `ListBuffer` with the same elements.
    */
   override def clone(): ListBuffer[A] = (new ListBuffer[A]) ++= this
-
-  /** Defines the prefix of the string representation.
-   *
-   *  @return the string representation of this buffer.
-   */
-  override def stringPrefix: String = "ListBuffer"
 }
 
 /** $factoryInfo
  *  @define Coll `ListBuffer`
  *  @define coll list buffer
  */
-object ListBuffer extends SeqFactory[ListBuffer] {
-  implicit def canBuildFrom[A]: CanBuildFrom[Coll, A, ListBuffer[A]] = ReusableCBF.asInstanceOf[GenericCanBuildFrom[A]]
-  def newBuilder[A]: Builder[A, ListBuffer[A]] = new GrowingBuilder(new ListBuffer[A])
+object ListBuffer {
+  def apply[A](elems: A*): ListBuffer[A] = new ListBuffer[A] ++= elems
+  @inline implicit def listbufferToSequence[A](buffer: ListBuffer[A]): List[A] = buffer.readOnly
 }

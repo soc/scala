@@ -22,15 +22,8 @@ import collection.Iterator
  *  @define Coll `mutable.Stack`
  */
 object Stack extends SeqFactory[Stack] {
-  class StackBuilder[A] extends Builder[A, Stack[A]] {
-    val lbuff = new ListBuffer[A]
-    def +=(elem: A) = { lbuff += elem; this }
-    def clear() = lbuff.clear()
-    def result = new Stack(lbuff.result)
-  }
-
   implicit def canBuildFrom[A]: CanBuildFrom[Coll, A, Stack[A]] = ReusableCBF.asInstanceOf[GenericCanBuildFrom[A]]
-  def newBuilder[A]: Builder[A, Stack[A]] = new StackBuilder[A]
+  def newBuilder[A]: Builder[A, Stack[A]] = new ListBuffer[A] mapResult (x => new Stack(x.toList))
   val empty: Stack[Nothing] = new Stack(Nil)
 }
 
@@ -93,7 +86,7 @@ extends AbstractSeq[A]
    *  @throws   IndexOutOfBoundsException if the index is not valid
    */
   def update(n: Int, newelem: A) =
-    if(n < 0 || n >= length) throw new IndexOutOfBoundsException(n.toString)
+    if (n < 0 || n >= length) throw new IndexOutOfBoundsException(n.toString)
     else elems = elems.take(n) ++ (newelem :: elems.drop(n+1))
 
   /** Push an element on the stack.
@@ -101,7 +94,7 @@ extends AbstractSeq[A]
    *  @param   elem       the element to push on the stack.
    *  @return the stack with the new element on top.
    */
-  def push(elem: A): this.type = { elems = elem :: elems; this }
+  def push(elem: A): this.type = { elems ::= elem; this }
 
   /** Push two or more elements onto the stack. The last element
    *  of the sequence will be on top of the new stack.
@@ -127,19 +120,14 @@ extends AbstractSeq[A]
    *  @throws Predef.NoSuchElementException
    *  @return the top element
    */
-  def top: A =
-    elems.head
+  def top: A = elems.head
 
   /** Removes the top element from the stack.
    *
    *  @throws Predef.NoSuchElementException
    *  @return the top element
    */
-  def pop(): A = {
-    val res = elems.head
-    elems = elems.tail
-    res
-  }
+  def pop(): A = try top finally elems = elems.tail
 
   /**
    * Removes all elements from the stack. After this operation completed,

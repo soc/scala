@@ -11,7 +11,7 @@ import scala.collection.JavaConverters._
 
 class SimpleHistory extends JLineHistory {
   private var _index: Int = 0
-  private val buf: Buffer[String] = new ListBuffer[String]
+  private val buf = new ListBuffer[String]
   private def toEntries(): Seq[JEntry] = buf.zipWithIndex map { case (x, i) => Entry(i, x) }
   private def setTo(num: Int)          = { _index = num ; true }
   private def minusOne                 = { _index -= 1 ; true }

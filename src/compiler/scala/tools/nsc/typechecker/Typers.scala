@@ -2598,9 +2598,9 @@ trait Typers extends Modes with Adaptations with Tags {
           }
 
           def matching(stat: Tree): List[Tree] = {
-            val (pos, neg) = newStats.partition(synt => matches(stat, synt))
-            newStats = neg
-            pos.toList
+            val (pos, neg) = newStats.toList.partition(synt => matches(stat, synt))
+            newStats = ListBuffer(neg: _*)
+            pos
           }
 
           (stats foldRight List[Tree]())((stat, res) => {

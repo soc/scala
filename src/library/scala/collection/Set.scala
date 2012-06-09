@@ -35,7 +35,6 @@ trait Set[A] extends Iterable[A]
  */
 object Set extends SetFactory[Set] {
   implicit final class SetPredicateOps[A](val set: Set[A]) extends runtime.AbstractFunction1[A, Boolean] {
-    // AbstractFunction1[A, Boolean] {
     def apply(x: A) = set contains x
   }
 

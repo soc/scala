@@ -33,7 +33,7 @@ object ListSet extends ImmutableSetFactory[ListSet] {
    */
   class ListSetBuilder[Elem](initial: ListSet[Elem]) extends Builder[Elem, ListSet[Elem]] {
     def this() = this(empty[Elem])
-    protected val elems = (new mutable.ListBuffer[Elem] ++= initial).reverse
+    protected val elems = new ListBuffer[Elem] ++= initial.toSeq.reverse
     protected val seen  = new mutable.HashSet[Elem] ++= initial
 
     def +=(x: Elem): this.type = {
