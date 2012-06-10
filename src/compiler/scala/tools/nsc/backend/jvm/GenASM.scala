@@ -341,8 +341,8 @@ abstract class GenASM extends SubComponent with BytecodeWriters {
   }
 
   private def firstCommonSuffix(as: List[Symbol], bs: List[Symbol]): Symbol = {
-    assert(!(as contains NoSymbol))
-    assert(!(bs contains NoSymbol))
+    assert(!(as contains (NoSymbol: Symbol)))
+    assert(!(bs contains (NoSymbol: Symbol)))
     var chainA = as
     var chainB = bs
     var fcs: Symbol = NoSymbol

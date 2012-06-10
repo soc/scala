@@ -674,13 +674,15 @@ trait SeqLike[+A, +Repr] extends Any with IterableLike[A, Repr] {
   def containsSlice[B](that: Seq[B]): Boolean = indexOfSlice(that) != -1
 
   /** Tests whether this $coll contains a given value as an element.
+   *  The interesting signature is to provide some type safety for
+   *  covariant collections.
    *  $mayNotTerminateInf
    *
    *  @param elem  the element to test.
    *  @return     `true` if this $coll has an element that is equal (as
    *              determined by `==`) to `elem`, `false` otherwise.
    */
-  def contains(elem: Any): Boolean = exists (_ == elem)
+  def contains[A1](x: A1)(implicit ev: A <:< A1): Boolean = exists (_ == x)
 
   /** Computes the multiset difference between this $coll and another sequence.
    *

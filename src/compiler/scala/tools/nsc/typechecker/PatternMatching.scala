@@ -1218,7 +1218,7 @@ trait PatternMatching extends Transform with TypingTransformers with ast.TreeDSL
 
     abstract class CommonCodegen extends AbsCodegen { import CODE._
       def fun(arg: Symbol, body: Tree): Tree           = Function(ValDef(arg) :: Nil, body)
-      def genTypeApply(tfun: Tree, args: Type*): Tree  = if(args contains NoType) tfun else TypeApply(tfun, args.toList map TypeTree)
+      def genTypeApply(tfun: Tree, args: Type*): Tree  = if(args contains (NoType: Type)) tfun else TypeApply(tfun, args.toList map TypeTree)
       def tupleSel(binder: Symbol)(i: Int): Tree       = (REF(binder) DOT nme.productAccessorName(i)) // make tree that accesses the i'th component of the tuple referenced by binder
       def index(tgt: Tree)(i: Int): Tree               = tgt APPLY (LIT(i))
       def drop(tgt: Tree)(n: Int): Tree                = (tgt DOT vpmName.drop) (LIT(n))
@@ -1239,7 +1239,7 @@ trait PatternMatching extends Transform with TypingTransformers with ast.TreeDSL
       // duplicated out of frustration with cast generation
       def mkZero(tp: Type): Tree = {
         tp.typeSymbol match {
-          case UnitClass    => Literal(Constant())
+          case UnitClass    => Literal(Constant(()))
           case BooleanClass => Literal(Constant(false))
           case FloatClass   => Literal(Constant(0.0f))
           case DoubleClass  => Literal(Constant(0.0d))

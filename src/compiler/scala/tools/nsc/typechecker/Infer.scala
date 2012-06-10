@@ -928,7 +928,7 @@ trait Infer {
       val kindErrors = checkKindBounds(tparams, targs, pre, owner)
 
       if(!kindErrors.isEmpty) {
-        if (targs contains WildcardType) true
+        if (targs contains (WildcardType: Type)) true
         else { KindBoundErrors(tree, prefix, targs, tparams, kindErrors); false }
       } else if (!isWithinBounds(pre, owner, tparams, targs)) {
         if (!(targs exists (_.isErroneous)) && !(tparams exists (_.isErroneous))) {

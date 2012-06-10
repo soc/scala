@@ -26,7 +26,7 @@ trait Phased {
   }
   def getMulti = multi
   def setMulti(phases: Seq[PhaseName]): Boolean = {
-    if (phases contains NoPhaseName) false
+    if (phases contains (NoPhaseName: PhaseName)) false
     else {
       multi = phases
       true

@@ -392,7 +392,7 @@ trait Macros extends scala.tools.reflect.FastTrack with Traces {
                     atpe = atpe.dealias // SI-5706
                     // strip the { type PrefixType = ... } refinement off the Context or otherwise we get compatibility errors
                     atpe = atpe match {
-                      case RefinedType(List(tpe), Scope(sym)) if tpe == MacroContextClass.tpe && sym.allOverriddenSymbols.contains(MacroContextPrefixType) => tpe
+                      case RefinedType(List(tpe), Scope(sym)) if tpe == MacroContextClass.tpe && sym.allOverriddenSymbols.contains(MacroContextPrefixType: Symbol) => tpe
                       case _ => atpe
                     }
                     checkSubType("parameter " + rparam.name, rparam.tpe, atpe)

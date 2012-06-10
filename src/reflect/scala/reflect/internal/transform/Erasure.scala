@@ -264,7 +264,7 @@ trait Erasure {
     if (parents.isEmpty) ObjectClass.tpe
     else {
       val psyms = parents map (_.typeSymbol)
-      if (psyms contains ArrayClass) {
+      if (psyms contains (ArrayClass: Symbol)) {
         // treat arrays specially
         arrayType(
           intersectionDominator(

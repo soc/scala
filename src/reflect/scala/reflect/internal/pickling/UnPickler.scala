@@ -353,7 +353,7 @@ abstract class UnPickler /*extends reflect.generic.UnPickler*/ {
           // if the method is overloaded, the params cannot be determined (see readSymbol) => return NoType.
           // Only happen for trees, "case Apply" in readTree() takes care of selecting the correct
           // alternative after parsing the arguments.
-          if (params.contains(NoSymbol) || restpe == NoType) NoType
+          if (params.contains(NoSymbol: Symbol) || restpe == NoType) NoType
           else MethodType(params, restpe)
         case POLYtpe =>
           val restpe = readTypeRef()

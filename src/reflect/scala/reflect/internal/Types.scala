@@ -4067,7 +4067,7 @@ trait Types extends api.Types { self: SymbolTable =>
      *  of the arguments cannot be mapped, then return Nil.  */
     def mapOverAnnotArgs(args: List[Tree]): List[Tree] = {
       val args1 = args mapConserve mapOver
-      if (args1 contains UnmappableTree) Nil
+      if (args1 contains (UnmappableTree: Tree)) Nil
       else args1
     }
 
@@ -6348,7 +6348,7 @@ trait Types extends api.Types { self: SymbolTable =>
             val syms = narrowts map (t =>
               t.nonPrivateMember(proto.name).suchThat(sym =>
                 sym.tpe matches prototp.substThis(lubThisType.typeSymbol, t)))
-            if (syms contains NoSymbol) NoSymbol
+            if (syms contains (NoSymbol: Symbol)) NoSymbol
             else {
               val symtypes =
                 map2(narrowts, syms)((t, sym) => t.memberInfo(sym).substThis(t.typeSymbol, lubThisType))
@@ -6652,7 +6652,7 @@ trait Types extends api.Types { self: SymbolTable =>
                 }
               }
             }
-            if (args contains NoType) None
+            if (args contains (NoType: Type)) None
             else Some(existentialAbstraction(capturedParams.toList, typeRef(pre, sym, args)))
         }
       } catch {
