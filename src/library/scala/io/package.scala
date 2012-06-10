@@ -1,6 +1,6 @@
 package scala
 
-import java.io.{ File => JFile, _ }
+import java.io._  // { File => JFile, _ }
 import java.net.URL
 import java.nio.file.{ Path => JPath, _ }
 import scala.io.stream._
@@ -8,6 +8,8 @@ import java.util.concurrent._
 
 package object io {
   import StandardWatchEventKinds._
+
+  type JFile = java.io.File
 
   type FileEvent = WatchEvent.Kind[_]
   val CreateEvent = ENTRY_CREATE

@@ -13,7 +13,6 @@ package io
 import java.io.{
   FileInputStream, FileOutputStream, BufferedReader, BufferedWriter, InputStreamReader, OutputStreamWriter,
   BufferedInputStream, BufferedOutputStream, IOException, PrintStream, PrintWriter, Closeable => JCloseable }
-import java.io.{ File => JFile }
 import java.nio.channels.{ Channel, FileChannel }
 import scala.io.Codec
 import language.{reflectiveCalls, implicitConversions}
@@ -25,7 +24,7 @@ object File {
   def apply(path: Path)(implicit codec: Codec) = new File(path.jfile)(codec)
 
   // Create a temporary file, which will be deleted upon jvm exit.
-  def makeTemp(prefix: String = Path.randomPrefix, suffix: String = null, dir: JFile = null) = {
+  def makeTemp(prefix: String = Path.randomPrefix, suffix: String = null, dir: scala.io.JFile = null) = {
     val jfile = java.io.File.createTempFile(prefix, suffix, dir)
     jfile.deleteOnExit()
     apply(jfile)
@@ -75,7 +74,7 @@ import Path._
  *  @author  Paul Phillips
  *  @since   2.8
  */
-class File(jfile: JFile)(implicit constructorCodec: Codec) extends Path(jfile) with Streamable.Chars {
+class File(jfile: scala.io.JFile)(implicit constructorCodec: Codec) extends Path(jfile) with Streamable.Chars {
   override val creationCodec = constructorCodec
   def withCodec(codec: Codec): File = new File(jfile)(codec)
 
@@ -184,7 +183,7 @@ class File(jfile: JFile)(implicit constructorCodec: Codec) extends Path(jfile) w
   def setExecutable(executable: Boolean, ownerOnly: Boolean = true): Boolean = {
     type JBoolean = java.lang.Boolean
     val method =
-      try classOf[JFile].getMethod("setExecutable", classOf[Boolean], classOf[Boolean])
+      try classOf[scala.io.JFile].getMethod("setExecutable", classOf[Boolean], classOf[Boolean])
       catch { case _: NoSuchMethodException => return false }
 
     try method.invoke(jfile, executable: JBoolean, ownerOnly: JBoolean).asInstanceOf[JBoolean].booleanValue

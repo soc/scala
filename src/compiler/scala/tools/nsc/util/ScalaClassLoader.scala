@@ -8,7 +8,6 @@ package util
 
 import java.lang.{ ClassLoader => JClassLoader }
 import java.lang.reflect.{ Constructor, Modifier, Method }
-import java.io.{ File => JFile }
 import java.net.{ URLClassLoader => JURLClassLoader }
 import java.net.URL
 import scala.reflect.runtime.ReflectionUtils.unwrapHandler
@@ -103,7 +102,7 @@ object ScalaClassLoader {
   def contextChain  = loaderChain(contextLoader)
 
   def pathToErasure[T: ClassTag]   = pathToClass(classTag[T].runtimeClass)
-  def pathToClass(clazz: Class[_]) = clazz.getName.replace('.', JFile.separatorChar) + ".class"
+  def pathToClass(clazz: Class[_]) = clazz.getName.replace('.', java.io.File.separatorChar) + ".class"
   def locate[T: ClassTag]          = contextLoader getResource pathToErasure[T]
 
   /** Tries to guess the classpath by type matching the context classloader

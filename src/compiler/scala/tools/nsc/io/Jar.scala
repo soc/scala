@@ -34,8 +34,8 @@ import language.implicitConversions
 // static Attributes.Name   SPECIFICATION_VERSION
 
 class Jar(file: File) extends collection.AbstractIterable[JarEntry] {
-  def this(jfile: JFile) = this(File(jfile))
-  def this(path: String) = this(File(path))
+  def this(jfile: java.io.File) = this(File(jfile))
+  def this(path: String)        = this(File(path))
 
   protected def errorFn(msg: String): Unit = Console println msg
 

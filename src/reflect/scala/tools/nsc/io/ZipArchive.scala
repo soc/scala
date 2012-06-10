@@ -8,7 +8,6 @@ package io
 
 import java.net.URL
 import java.io.{ IOException, InputStream, ByteArrayInputStream }
-import java.io.{ File => JFile }
 import java.util.zip.{ ZipEntry, ZipFile, ZipInputStream }
 import scala.collection.{ immutable, mutable }
 import annotation.tailrec
@@ -22,7 +21,7 @@ import annotation.tailrec
  *  @version 2.0,
  */
 object ZipArchive {
-  def fromPath(path: String): FileZipArchive = fromFile(new JFile(path))
+  def fromPath(path: String): FileZipArchive = fromFile(new scala.io.JFile(path))
   def fromPath(path: Path): FileZipArchive = fromFile(path.toFile)
 
   /**
@@ -30,7 +29,7 @@ object ZipArchive {
    * @return  A ZipArchive if `file` is a readable zip file, otherwise null.
    */
   def fromFile(file: File): FileZipArchive = fromFile(file.jfile)
-  def fromFile(file: JFile): FileZipArchive =
+  def fromFile(file: scala.io.JFile): FileZipArchive =
     try   { new FileZipArchive(file) }
     catch { case _: IOException => null }
 
@@ -58,7 +57,7 @@ object ZipArchive {
 }
 import ZipArchive._
 
-abstract class ZipArchive(override val file: JFile) extends AbstractFile with Equals {
+abstract class ZipArchive(override val file: scala.io.JFile) extends AbstractFile with Equals {
   self =>
 
   override def underlyingSource = Some(this)
@@ -110,7 +109,7 @@ abstract class ZipArchive(override val file: JFile) extends AbstractFile with Eq
   }
 }
 
-final class FileZipArchive(file: JFile) extends ZipArchive(file) {
+final class FileZipArchive(file: scala.io.JFile) extends ZipArchive(file) {
   def iterator: Iterator[Entry] = {
     val zipFile = new ZipFile(file)
     val root    = new DirEntry("/")

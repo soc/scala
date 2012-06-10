@@ -9,8 +9,6 @@
 package scala.tools.nsc
 package io
 
-import java.io.{ File => JFile }
-
 object Directory {
   import scala.util.Properties.{ tmpDir, userHome, userDir }
 
@@ -22,7 +20,7 @@ object Directory {
   def apply(path: Path): Directory = path.toDirectory
 
   // Like File.makeTemp but creates a directory instead
-  def makeTemp(prefix: String = Path.randomPrefix, suffix: String = null, dir: JFile = null): Directory = {
+  def makeTemp(prefix: String = Path.randomPrefix, suffix: String = null, dir: scala.io.JFile = null): Directory = {
     val path = File.makeTemp(prefix, suffix, dir)
     path.delete()
     path.createDirectory()
@@ -35,7 +33,7 @@ import Path._
  *  @author  Paul Phillips
  *  @since   2.8
  */
-class Directory(jfile: JFile) extends Path(jfile) {
+class Directory(jfile: scala.io.JFile) extends Path(jfile) {
   override def toAbsolute: Directory = if (isAbsolute) this else super.toAbsolute.toDirectory
   override def toDirectory: Directory = this
   override def toFile: File = new File(jfile)

@@ -8,7 +8,6 @@ package scala.tools.nsc
 package io
 
 import java.io.{ ByteArrayInputStream, ByteArrayOutputStream, InputStream, OutputStream }
-import java.io.{ File => JFile }
 
 /** This class implements an in-memory file.
  *
@@ -40,7 +39,7 @@ class VirtualFile(val name: String, override val path: String) extends AbstractF
   def absolute = this
 
   /** Returns null. */
-  final def file: JFile = null
+  final def file: scala.io.JFile = null
 
   override def sizeOption: Option[Int] = Some(content.size)
 

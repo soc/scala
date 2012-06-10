@@ -9,7 +9,6 @@ package io
 import java.io.{
   FileInputStream, FileOutputStream, BufferedReader, BufferedWriter, InputStreamReader, OutputStreamWriter,
   BufferedInputStream, BufferedOutputStream, RandomAccessFile }
-import java.io.{ File => JFile }
 import java.net.{ URI, URL }
 import scala.util.Random.alphanumeric
 import language.implicitConversions
@@ -30,7 +29,7 @@ import language.implicitConversions
  */
 
 object Path {
-  def isExtensionJarOrZip(jfile: JFile): Boolean = isExtensionJarOrZip(jfile.getName)
+  def isExtensionJarOrZip(jfile: scala.io.JFile): Boolean = isExtensionJarOrZip(jfile.getName)
   def isExtensionJarOrZip(name: String): Boolean = {
     val ext = extension(name)
     ext == "jar" || ext == "zip"
@@ -48,7 +47,7 @@ object Path {
 
   // not certain these won't be problematic, but looks good so far
   implicit def string2path(s: String): Path = apply(s)
-  implicit def jfile2path(jfile: JFile): Path = apply(jfile)
+  implicit def jfile2path(jfile: scala.io.JFile): Path = apply(jfile)
 
   def onlyDirs(xs: Iterator[Path]): Iterator[Directory] = xs filter (_.isDirectory) map (_.toDirectory)
   def onlyDirs(xs: List[Path]): List[Directory] = xs filter (_.isDirectory) map (_.toDirectory)
@@ -58,8 +57,8 @@ object Path {
   def roots: List[Path] = java.io.File.listRoots().toList map Path.apply
 
   def apply(segments: Seq[String]): Path = apply(segments mkString java.io.File.separator)
-  def apply(path: String): Path = apply(new JFile(path))
-  def apply(jfile: JFile): Path =
+  def apply(path: String): Path = apply(new scala.io.JFile(path))
+  def apply(jfile: scala.io.JFile): Path =
     if (jfile.isFile) new File(jfile)
     else if (jfile.isDirectory) new Directory(jfile)
     else new Path(jfile)
@@ -73,7 +72,7 @@ import Path._
 /** The Path constructor is private so we can enforce some
  *  semantics regarding how a Path might relate to the world.
  */
-class Path private[io] (val jfile: JFile) {
+class Path private[io] (val jfile: scala.io.JFile) {
   val separator = java.io.File.separatorChar
   val separatorStr = java.io.File.separator
 
@@ -98,7 +97,7 @@ class Path private[io] (val jfile: JFile) {
   /** Creates a new Path with the specified path appended.  Assumes
    *  the type of the new component implies the type of the result.
    */
-  def /(child: Path): Path = if (isEmpty) child else new Path(new JFile(jfile, child.path))
+  def /(child: Path): Path = if (isEmpty) child else new Path(new scala.io.JFile(jfile, child.path))
   def /(child: Directory): Directory = /(child: Path).toDirectory
   def /(child: File): File = /(child: Path).toFile
 
@@ -240,7 +239,7 @@ class Path private[io] (val jfile: JFile) {
    *  Use with caution!
    */
   def deleteRecursively(): Boolean = deleteRecursively(jfile)
-  private def deleteRecursively(f: JFile): Boolean = {
+  private def deleteRecursively(f: scala.io.JFile): Boolean = {
     if (f.isDirectory) f.listFiles match {
       case null =>
       case xs   => xs foreach deleteRecursively

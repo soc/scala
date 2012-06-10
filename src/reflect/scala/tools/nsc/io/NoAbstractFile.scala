@@ -7,7 +7,6 @@ package scala.tools.nsc
 package io
 
 import java.io.InputStream
-import java.io.{ File => JFile }
 
 /** A distinguished object so you can avoid both null
  *  and Option.
@@ -17,7 +16,7 @@ object NoAbstractFile extends AbstractFile {
   def container: AbstractFile = this
   def create(): Unit = ???
   def delete(): Unit = ???
-  def file: JFile = null
+  def file: scala.io.JFile = null
   def input: InputStream = null
   def isDirectory: Boolean = false
   def iterator: Iterator[AbstractFile] = Iterator.empty

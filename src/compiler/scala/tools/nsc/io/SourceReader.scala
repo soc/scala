@@ -34,10 +34,10 @@ class SourceReader(decoder: CharsetDecoder, reporter: Reporter) {
   }
 
   /** Reads the file with the specified name. */
-  def read(filename: String): Array[Char]= read(new JFile(filename))
+  def read(filename: String): Array[Char]= read(new java.io.File(filename))
 
   /** Reads the specified file. */
-  def read(file: JFile): Array[Char] = {
+  def read(file: java.io.File): Array[Char] = {
     val c = new FileInputStream(file).getChannel
 
     try read(c)

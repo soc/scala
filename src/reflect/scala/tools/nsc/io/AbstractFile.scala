@@ -9,7 +9,6 @@ package io
 
 import java.io.{ FileOutputStream, IOException, InputStream, OutputStream, BufferedOutputStream }
 import java.net.URL
-import java.io.{ File => JFile }
 import scala.collection.mutable.ArrayBuffer
 
 /**
@@ -104,7 +103,7 @@ abstract class AbstractFile extends reflect.internal.AbstractFileApi with Iterab
   def container : AbstractFile
 
   /** Returns the underlying File if any and null otherwise. */
-  def file: JFile
+  def file: scala.io.JFile
 
   /** An underlying source, if known.  Mostly, a zip/jar file. */
   def underlyingSource: Option[AbstractFile] = None
@@ -225,7 +224,7 @@ abstract class AbstractFile extends reflect.internal.AbstractFileApi with Iterab
     val lookup = lookupName(name, isDir)
     if (lookup != null) lookup
     else {
-      val jfile = new JFile(file, name)
+      val jfile = new scala.io.JFile(file, name)
       if (isDir) jfile.mkdirs() else jfile.createNewFile()
       new PlainFile(jfile)
     }
