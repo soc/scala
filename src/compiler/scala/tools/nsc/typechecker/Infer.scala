@@ -856,7 +856,9 @@ trait Infer {
                             (if (isInProperSubClassOrObject(sym2, sym1)) 1 else 0)
 //        println("is more specific? "+sym1+":"+ftpe1+sym1.locationString+"/"+sym2+":"+ftpe2+sym2.locationString+":"+
 //                specificCount+"/"+subClassCount)
-        specificCount + subClassCount > 0
+        val annotationCount = implicitWeight(sym1) - implicitWeight(sym2)
+
+        specificCount + subClassCount + annotationCount > 0
       }
     }
 /*
