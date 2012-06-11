@@ -138,27 +138,21 @@ trait Ordering[T] extends Comparator[T] with Serializable {
   implicit def mkOrderingOps(lhs: T): Ops = new Ops(lhs)
 }
 
-trait LowPriorityOrderingImplicits {
-  /** This would conflict with all the nice implicit Orderings
-   *  available, but thanks to the magic of prioritized implicits
-   *  via subclassing we can make `Ordered[A] => Ordering[A]` only
-   *  turn up if nothing else works.  Since `Ordered[A]` extends
-   *  `Comparable[A]` anyway, we can throw in some Java interop too.
-   */
-  implicit def ordered[A <% Comparable[A]]: Ordering[A] = new Ordering[A] {
-    def compare(x: A, y: A): Int = x compareTo y
-  }
-  implicit def comparatorToOrdering[A](implicit cmp: Comparator[A]): Ordering[A] = new Ordering[A] {
-    def compare(x: A, y: A) = cmp.compare(x, y)
-  }
-}
-
 /** This is the companion object for the [[scala.math.Ordering]] trait.
   *
   * It contains many implicit orderings as well as well as methods to construct
   * new orderings.
   */
-object Ordering extends LowPriorityOrderingImplicits {
+object Ordering {
+  @annotation.implicitWeight(-1)
+  implicit def ordered[A <% Comparable[A]]: Ordering[A] = new Ordering[A] {
+    def compare(x: A, y: A): Int = x compareTo y
+  }
+  @annotation.implicitWeight(-1)
+  implicit def comparatorToOrdering[A](implicit cmp: Comparator[A]): Ordering[A] = new Ordering[A] {
+    def compare(x: A, y: A) = cmp.compare(x, y)
+  }
+
   def apply[T](implicit ord: Ordering[T]) = ord
 
   trait ExtraImplicits {

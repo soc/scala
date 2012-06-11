@@ -854,8 +854,6 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
         supersym == NoSymbol || supersym.isIncompleteIn(base)
       }
 
-    // Does not always work if the rawInfo is a SourcefileLoader, see comment
-    // in "def coreClassesFirst" in Global.
     def exists = !owner.isPackageClass || { rawInfo.load(this); rawInfo != NoType }
 
     final def isInitialized: Boolean =

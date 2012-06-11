@@ -83,7 +83,8 @@ abstract class SymbolTable extends makro.Universe
   // For too long have we suffered in order to sort NAMES.
   // I'm pretty sure there's a reasonable default for that.
   // Notice challenge created by Ordering's invariance.
-  implicit def lowPriorityNameOrdering[T <: Names#Name]: Ordering[T] =
+  @annotation.implicitWeight(-1)
+  implicit def fallbackNameOrdering[T <: Names#Name]: Ordering[T] =
     SimpleNameOrdering.asInstanceOf[Ordering[T]]
 
   private object SimpleNameOrdering extends Ordering[Names#Name] {

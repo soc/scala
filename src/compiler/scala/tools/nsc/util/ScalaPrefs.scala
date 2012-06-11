@@ -13,13 +13,12 @@ trait ScalaPrefs {
   def exceptionFormatter: Exceptional.Formatter
 }
 
-trait LowPriorityScalaPrefs {
+object ScalaPrefs {
+  @annotation.implicitWeight(-1)
   implicit object DefaultScalaPrefs extends ScalaPrefs {
     def codeSources        = Sources.defaultSources
     def exceptionFormatter = Exceptional.Formatter(this)
   }
-}
 
-object ScalaPrefs extends LowPriorityScalaPrefs {
   def apply(implicit prefs: ScalaPrefs): ScalaPrefs = prefs
 }

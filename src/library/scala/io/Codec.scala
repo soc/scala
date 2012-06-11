@@ -76,14 +76,10 @@ class Codec(val charSet: Charset) {
     })
 }
 
-trait LowPriorityCodecImplicits {
-  self: Codec.type =>
-
+object Codec {
   /** The Codec of Last Resort. */
-  implicit def fallbackSystemCodec: Codec = defaultCharsetCodec
-}
+  @annotation.implicitWeight(-1) implicit def fallbackSystemCodec: Codec = defaultCharsetCodec
 
-object Codec extends LowPriorityCodecImplicits {
   final val ISO8859: Codec = new Codec(Charset forName "ISO-8859-1")
   final val UTF8: Codec    = new Codec(Charset forName "UTF-8")
 

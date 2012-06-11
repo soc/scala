@@ -9,13 +9,14 @@
 package scala
 
 import scala.collection.{ mutable, immutable, generic }
-import immutable.StringOps
-import mutable.ArrayOps
+import mutable.{ ArrayOps, WrappedArray }
+import immutable.{ StringOps, WrappedString }
 import generic.CanBuildFrom
 import annotation.{ elidable, implicitNotFound }
 import annotation.elidable.ASSERTION
 import language.{ implicitConversions, existentials }
 import scala.runtime.ScalaRunTime
+import annotation.{ implicitWeight => weight }
 
 /** The `Predef` object provides definitions that are accessible in all Scala
  *  compilation units without explicit qualification.
@@ -69,7 +70,71 @@ import scala.runtime.ScalaRunTime
  *  Short value to a Long value as required, and to add additional higher-order
  *  functions to Array values. These are described in more detail in the documentation of [[scala.Array]].
  */
-object Predef extends LowPriorityImplicits {
+object Predef {
+  /** Former LowPriorityImplicits **/
+
+  /** We prefer the java.lang.* boxed types to these wrappers in
+   *  any potential conflicts.  Conflicts do exist because the wrappers
+   *  need to implement ScalaNumber in order to have a symmetric equals
+   *  method, but that implies implementing java.lang.Number as well.
+   */
+  @weight(-1) implicit def intWrapper(x: Int)         = new runtime.RichInt(x)
+  @weight(-1) implicit def charWrapper(c: Char)       = new runtime.RichChar(c)
+  @weight(-1) implicit def longWrapper(x: Long)       = new runtime.RichLong(x)
+  @weight(-1) implicit def floatWrapper(x: Float)     = new runtime.RichFloat(x)
+  @weight(-1) implicit def doubleWrapper(x: Double)   = new runtime.RichDouble(x)
+
+  // These eight implicits exist solely to exclude Null from the domain of
+  // the boxed types, so that e.g. "var x: Int = null" is a compile time
+  // error rather than a delayed null pointer exception by way of the
+  // conversion from java.lang.Integer.  If defined in the same file as
+  // Integer2int, they would have higher priority because Null is a subtype
+  // of Integer.  We balance that out and create conflict by moving the
+  // definition into the superclass.
+  //
+  // Caution: do not adjust tightrope tension without safety goggles in place.
+  @weight(-1) implicit def Byte2byteNullConflict(x: Null): Byte          = sys.error("value error")
+  @weight(-1) implicit def Short2shortNullConflict(x: Null): Short       = sys.error("value error")
+  @weight(-1) implicit def Character2charNullConflict(x: Null): Char     = sys.error("value error")
+  @weight(-1) implicit def Integer2intNullConflict(x: Null): Int         = sys.error("value error")
+  @weight(-1) implicit def Long2longNullConflict(x: Null): Long          = sys.error("value error")
+  @weight(-1) implicit def Float2floatNullConflict(x: Null): Float       = sys.error("value error")
+  @weight(-1) implicit def Double2doubleNullConflict(x: Null): Double    = sys.error("value error")
+  @weight(-1) implicit def Boolean2booleanNullConflict(x: Null): Boolean = sys.error("value error")
+
+  @weight(-1) implicit def genericWrapArray[T](xs: Array[T]): WrappedArray[T] =
+    if (xs eq null) null
+    else WrappedArray.make(xs)
+
+  // Since the JVM thinks arrays are covariant, one 0-length Array[AnyRef]
+  // is as good as another for all T <: AnyRef.  Instead of creating 100,000,000
+  // unique ones by way of this implicit, let's share one.
+  @weight(-1) implicit def wrapRefArray[T <: AnyRef](xs: Array[T]): WrappedArray[T] = {
+    if (xs eq null) null
+    else if (xs.length == 0) WrappedArray.empty[T]
+    else new WrappedArray.ofRef[T](xs)
+  }
+
+  @weight(-1) implicit def wrapIntArray(xs: Array[Int]): WrappedArray[Int] = if (xs ne null) new WrappedArray.ofInt(xs) else null
+  @weight(-1) implicit def wrapDoubleArray(xs: Array[Double]): WrappedArray[Double] = if (xs ne null) new WrappedArray.ofDouble(xs) else null
+  @weight(-1) implicit def wrapLongArray(xs: Array[Long]): WrappedArray[Long] = if (xs ne null) new WrappedArray.ofLong(xs) else null
+  @weight(-1) implicit def wrapFloatArray(xs: Array[Float]): WrappedArray[Float] = if (xs ne null) new WrappedArray.ofFloat(xs) else null
+  @weight(-1) implicit def wrapCharArray(xs: Array[Char]): WrappedArray[Char] = if (xs ne null) new WrappedArray.ofChar(xs) else null
+  @weight(-1) implicit def wrapByteArray(xs: Array[Byte]): WrappedArray[Byte] = if (xs ne null) new WrappedArray.ofByte(xs) else null
+  @weight(-1) implicit def wrapShortArray(xs: Array[Short]): WrappedArray[Short] = if (xs ne null) new WrappedArray.ofShort(xs) else null
+  @weight(-1) implicit def wrapBooleanArray(xs: Array[Boolean]): WrappedArray[Boolean] = if (xs ne null) new WrappedArray.ofBoolean(xs) else null
+
+  @weight(-1) implicit def wrapString(s: String): WrappedString = if (s ne null) new WrappedString(s) else null
+  @weight(-1) implicit def unwrapString(ws: WrappedString): String = if (ws ne null) ws.self else null
+
+  @weight(-1) implicit def fallbackStringCanBuildFrom[T]: CanBuildFrom[String, T, immutable.IndexedSeq[T]] =
+    new CanBuildFrom[String, T, immutable.IndexedSeq[T]] {
+      def apply(from: String) = immutable.IndexedSeq.newBuilder[T]
+      def apply() = immutable.IndexedSeq.newBuilder[T]
+    }
+
+  /** End LowPriorityImplicits **/
+
   /**
    * Retrieve the runtime representation of a class type. `classOf[T]` is equivalent to
    * the class literal `T.class` in Java.

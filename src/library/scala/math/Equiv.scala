@@ -35,13 +35,10 @@ trait Equiv[T] extends Any with Serializable {
   def equiv(x: T, y: T): Boolean
 }
 
-trait LowPriorityEquiv {
-  self: Equiv.type =>
-
+object Equiv {
+  @annotation.implicitWeight(-1)
   implicit def universalEquiv[T] : Equiv[T] = universal[T]
-}
 
-object Equiv extends LowPriorityEquiv {
   def reference[T <: AnyRef] : Equiv[T] = new Equiv[T] {
     def equiv(x: T, y: T) = x eq y
   }

@@ -38,7 +38,7 @@ class StdReplVals(final val r: ILoop) extends ReplVals {
   )
   def lastRequest = intp.lastRequest
 
-  class ReplImplicits extends power.Implicits2 {
+  class ReplImplicits extends power.Implicits {
     import intp.global._
 
     private val tagFn = ReplVals.mkCompilerTypeFromTag[intp.global.type](global)

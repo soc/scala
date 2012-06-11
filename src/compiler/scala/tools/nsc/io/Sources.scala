@@ -57,14 +57,10 @@ class Sources(val path: String) {
   )
 }
 
-trait LowPrioritySourcesImplicits {
-  self: Sources.type =>
-
-  implicit def fallbackSources: Sources = defaultSources
-}
-
-object Sources extends LowPrioritySourcesImplicits {
+object Sources {
   val empty = new Sources("")
+
+  @annotation.implicitWeight(-1) implicit def fallbackSources: Sources = defaultSources
 
   private def libraryInits      = ClassPath.scalaLibrary.toList flatMap (_.toAbsolute.parents)
   private def librarySourceDir  = libraryInits map (_ / "src") find (_.isDirectory)

@@ -16,6 +16,7 @@ import io.{ Path }
 import language.implicitConversions
 import scala.reflect.runtime.{universe => ru}
 import scala.reflect.{ClassTag, classTag}
+import scala.annotation.{ implicitWeight => weight }
 
 /** A class for methods to be injected into the intp in power mode.
  */
@@ -139,10 +140,9 @@ class Power[ReplValsImpl <: ReplVals : ru.TypeTag: ClassTag](val intp: IMain, re
     )
   }
 
-  trait LowPriorityInternalInfo {
-    implicit def apply[T: ru.TypeTag : ClassTag] : InternalInfo[T] = new InternalInfo[T](None)
+  object InternalInfo {
+    @weight(-1) implicit def apply[T: ru.TypeTag : ClassTag] : InternalInfo[T] = new InternalInfo[T](None)
   }
-  object InternalInfo extends LowPriorityInternalInfo { }
 
   /** Now dealing with the problem of acidentally calling a method on Type
    *  when you're holding a Symbol and seeing the Symbol converted to the
@@ -150,11 +150,8 @@ class Power[ReplValsImpl <: ReplVals : ru.TypeTag: ClassTag](val intp: IMain, re
    *  symbol, by only implicitly installing one method, "?", and the rest
    *  of the conveniences exist on that wrapper.
    */
-  trait LowPriorityInternalInfoWrapper {
-    implicit def apply[T: ru.TypeTag : ClassTag] : InternalInfoWrapper[T] = new InternalInfoWrapper[T](None)
-  }
-  object InternalInfoWrapper extends LowPriorityInternalInfoWrapper {
-
+  object InternalInfoWrapper {
+    @weight(-1) implicit def apply[T: ru.TypeTag : ClassTag] : InternalInfoWrapper[T] = new InternalInfoWrapper[T](None)
   }
   class InternalInfoWrapper[T: ru.TypeTag : ClassTag](value: Option[T] = None) {
     def ? : InternalInfo[T] = new InternalInfo[T](value)
@@ -223,8 +220,12 @@ class Power[ReplValsImpl <: ReplVals : ru.TypeTag: ClassTag](val intp: IMain, re
     }
   }
 
-  trait LowPriorityPrettifier {
-    implicit object AnyPrettifier extends Prettifier[Any] {
+  object StringPrettifier extends Prettifier[String] {
+    def show(x: String) = println(x)
+    def prettify(x: String) = List(Prettifier stringOf x)
+  }
+  object Prettifier {
+    @weight(-1) implicit object AnyPrettifier extends Prettifier[Any] {
       def show(x: Any): Unit = prettify(x) foreach println
       def prettify(x: Any): IterableOnce[String] = x match {
         case x: Name                => List(x.decode)
@@ -234,12 +235,7 @@ class Power[ReplValsImpl <: ReplVals : ru.TypeTag: ClassTag](val intp: IMain, re
         case x                      => List(Prettifier.stringOf(x))
       }
     }
-  }
-  object StringPrettifier extends Prettifier[String] {
-    def show(x: String) = println(x)
-    def prettify(x: String) = List(Prettifier stringOf x)
-  }
-  object Prettifier extends LowPriorityPrettifier {
+
     def stringOf(x: Any): String = scala.runtime.ScalaRunTime.stringOf(x)
     def prettify[T](value: T): IterableOnce[String] = default[T] prettify value
     def default[T] = new Prettifier[T] {
@@ -318,14 +314,12 @@ class Power[ReplValsImpl <: ReplVals : ru.TypeTag: ClassTag](val intp: IMain, re
     def infos = syms map (_.info)
   }
 
-  trait Implicits1 {
-    // fallback
-    implicit def replPrinting[T](x: T)(implicit pretty: Prettifier[T] = Prettifier.default[T]) =
+  trait Implicits {
+    @weight(-2) implicit def replPrinting[T](x: T)(implicit pretty: Prettifier[T] = Prettifier.default[T]) =
       new SinglePrettifierClass[T](x)
 
-    implicit def liftToTypeName(s: String): TypeName = newTypeName(s)
-  }
-  trait Implicits2 extends Implicits1 {
+    @weight(-2) implicit def liftToTypeName(s: String): TypeName = newTypeName(s)
+
     class RichSymbol(sym: Symbol) {
       // convenient type application
       def apply(targs: Type*): Type = typeRef(NoPrefix, sym, targs.toList)
@@ -336,21 +330,21 @@ class Power[ReplValsImpl <: ReplVals : ru.TypeTag: ClassTag](val intp: IMain, re
         else if (s1 isLess s2) -1
         else 1
     }
-    implicit lazy val powerSymbolOrdering: Ordering[Symbol] = Ordering[Name] on (_.name)
-    implicit lazy val powerTypeOrdering: Ordering[Type]     = Ordering[Symbol] on (_.typeSymbol)
+    @weight(-1) implicit lazy val powerSymbolOrdering: Ordering[Symbol] = Ordering[Name] on (_.name)
+    @weight(-1) implicit lazy val powerTypeOrdering: Ordering[Type]     = Ordering[Symbol] on (_.typeSymbol)
 
-    implicit def replInternalInfo[T: ru.TypeTag : ClassTag](x: T): InternalInfoWrapper[T] = new InternalInfoWrapper[T](Some(x))
-    implicit def replEnhancedStrings(s: String): RichReplString = new RichReplString(s)
-    implicit def replMultiPrinting[T: Prettifier](xs: IterableOnce[T]): MultiPrettifierClass[T] =
+    @weight(-1) implicit def replInternalInfo[T: ru.TypeTag : ClassTag](x: T): InternalInfoWrapper[T] = new InternalInfoWrapper[T](Some(x))
+    @weight(-1) implicit def replEnhancedStrings(s: String): RichReplString = new RichReplString(s)
+    @weight(-1) implicit def replMultiPrinting[T: Prettifier](xs: IterableOnce[T]): MultiPrettifierClass[T] =
       new MultiPrettifierClass[T](xs.toSeq)
-    implicit def replPrettifier[T] : Prettifier[T] = Prettifier.default[T]
-    implicit def replTypeApplication(sym: Symbol): RichSymbol = new RichSymbol(sym)
+    @weight(-1) implicit def replPrettifier[T] : Prettifier[T] = Prettifier.default[T]
+    @weight(-1) implicit def replTypeApplication(sym: Symbol): RichSymbol = new RichSymbol(sym)
 
-    implicit def replInputStream(in: InputStream)(implicit codec: Codec) = new RichInputStream(in)
-    implicit def replEnhancedURLs(url: URL)(implicit codec: Codec): RichReplURL = new RichReplURL(url)(codec)
+    @weight(-1) implicit def replInputStream(in: InputStream)(implicit codec: Codec) = new RichInputStream(in)
+    @weight(-1) implicit def replEnhancedURLs(url: URL)(implicit codec: Codec): RichReplURL = new RichReplURL(url)(codec)
 
-    implicit def liftToTermName(s: String): TermName = newTermName(s)
-    implicit def replListOfSymbols(xs: List[Symbol]) = new RichSymbolList(xs)
+    @weight(-1) implicit def liftToTermName(s: String): TermName = newTermName(s)
+    @weight(-1) implicit def replListOfSymbols(xs: List[Symbol]) = new RichSymbolList(xs)
   }
 
   trait ReplUtilities {

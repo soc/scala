@@ -2,7 +2,7 @@ package scala
 package io
 
 import stream._
-import java.io.{ File => JFile, _ }
+import java.io._
 import java.nio.file.{ Path => JPath, _ }
 import scala.collection.{ mutable, immutable, convert }
 import convert.decorateAsScala._
