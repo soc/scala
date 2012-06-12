@@ -68,13 +68,15 @@ PROPERTIES
   <property name="build-locker.dir" value="${build.dir}/locker"/>
   <property name="build-quick.dir" value="${build.dir}/quick"/>
   <property name="build-pack.dir" value="${build.dir}/pack"/>
+  <property name="locker-library.dir" value="${build-locker.dir}/classes/library"/>
+  <property name="locker-reflect.dir" value="${build-locker.dir}/classes/reflect"/>
+  <property name="locker-compiler.dir" value="${build-locker.dir}/classes/compiler"/>
   <property name="quick-repl.dir" value="${build-quick.dir}/classes/repl"/>
   <property name="quick-library.dir" value="${build-quick.dir}/classes/library"/>
   <property name="quick-reflect.dir" value="${build-quick.dir}/classes/reflect"/>
   <property name="quick-compiler.dir" value="${build-quick.dir}/classes/compiler"/>
 
   <property name="dists.dir" value="${basedir}/dists"/>
-
   <property name="copyright.string" value="Copyright 2002-2011, LAMP/EPFL"/>
 
   <!-- These are NOT the flags used to run SuperSabbus, but the ones written
@@ -249,11 +251,7 @@ INITIALISATION
     <mkdir dir="${lib-extra.dir}"/>
 
     <path id="lib.extra">
-      <!-- needs ant 1.7.1 -->
-      <!-- <fileset dir="${lib-extra.dir}" erroronmissingdir="false"> -->
-      <fileset dir="${lib-extra.dir}">
-        <include name="**/*.jar"/>
-      </fileset>
+      <fileset dir="${lib-extra.dir}" erroronmissingdir="false" />
     </path>
 
     <!-- Auxiliary libs placed on every classpath. -->
@@ -298,9 +296,9 @@ INITIALISATION
       <path refid="aux.libs"/>
     </path>
     <path id="locker.classpath">
-      <pathelement location="${build-locker.dir}/classes/library"/>
-      <pathelement location="${build-locker.dir}/classes/reflect"/>
-      <pathelement location="${build-locker.dir}/classes/compiler"/>
+      <pathelement location="${locker-library.dir}"/>
+      <pathelement location="${locker-reflect.dir}"/>
+      <pathelement location="${locker-compiler.dir}"/>
       <path refid="aux.libs"/>
     </path>
     <path id="quick.classpath">
@@ -308,13 +306,16 @@ INITIALISATION
       <pathelement location="${quick-reflect.dir}"/>
       <pathelement location="${quick-compiler.dir}"/>
       <pathelement location="${quick-repl.dir}"/>
-      <path refid="locker.classpath"/>
+      <path refid="aux.libs"/>
     </path>
     <path id="pack.classpath">
       <fileset dir="${build-pack.dir}/lib" erroronmissingdir="false"/>
     </path>
 
+    <echo message="starr.classpath: ${toString:starr.classpath}" />
+    <echo message="locker.classpath: ${toString:locker.classpath}" />
     <echo message="quick.classpath: ${toString:quick.classpath}" />
+    <echo message="pack.classpath: ${toString:pack.classpath}" />
 
     <taskdef resource="scala/tools/ant/sabbus/antlib.xml" classpathref="starr.classpath"/>
   </target>
@@ -341,7 +342,7 @@ LOCAL Adapted ASM
       destdir="${build-asm.dir}/classes"
       classpath="${build-asm.dir}/classes"
       includes="**/*.java"
-      target="1.5" source="1.5">
+      target="1.6" source="1.6">
         <compilerarg line="${javac.args} -XDignore.symbol.file"/>
     </javac>
     <touch file="${build-asm.dir}/asm.complete" verbose="no"/>
@@ -368,11 +369,11 @@ LOCAL REFERENCE BUILD (LOCKER)
 
   <target name="locker.lib" depends="locker.pre-lib" if="locker.lib.needed">
     <stopwatch name="locker.lib.timer"/>
-    <mkdir dir="${build-locker.dir}/classes/library"/>
+    <mkdir dir="${locker-library.dir}"/>
     <javac
       srcdir="${src.dir}/library"
-      destdir="${build-locker.dir}/classes/library"
-      classpath="${build-locker.dir}/classes/library"
+      destdir="${locker-library.dir}"
+      classpath="${locker-library.dir}"
       includes="**/*.java"
       target="1.6" source="1.6">
         <compilerarg line="${javac.args} -XDignore.symbol.file"/>
@@ -381,16 +382,19 @@ LOCAL REFERENCE BUILD (LOCKER)
          (32768 characters for XP, since executed with Java's "exec"). See
          src/build/msil.xml in msil branch for more details. -->
     <scalacfork
-      destdir="${build-locker.dir}/classes/library"
+      destdir="${locker-library.dir}"
       compilerpathref="starr.classpath"
       srcpath="${src.dir}/library"
       params="${scalac.args.all}"
       srcdir="${src.dir}/library"
       jvmargs="${scalacfork.jvmargs}">
       <include name="**/*.scala"/>
-      <compilationpath refid="locker.classpath"/>
+      <compilationpath>
+        <pathelement location="${locker-library.dir}"/>
+        <path refid="aux.libs"/>
+      </compilationpath>
     </scalacfork>
-    <propertyfile file="${build-locker.dir}/classes/library/library.properties">
+    <propertyfile file="${locker-library.dir}/library.properties">
       <entry key="version.number" value="${version.number}"/>
       <entry key="maven.version.number" value="${maven.version.number}"/>
       <entry key="osgi.version.number" value="${osgi.version.number}"/>
@@ -400,7 +404,6 @@ LOCAL REFERENCE BUILD (LOCKER)
     <stopwatch name="locker.lib.timer" action="total"/>
   </target>
 
-
   <target name="locker.pre-reflect" depends="locker.lib" unless="locker.available">
     <condition property="locker.reflect.needed">
       <not><available file="${build-locker.dir}/reflect.complete"/></not>
@@ -409,15 +412,19 @@ LOCAL REFERENCE BUILD (LOCKER)
 
   <target name="locker.reflect" depends="locker.pre-reflect" if="locker.reflect.needed">
     <stopwatch name="locker.reflect.timer"/>
-    <mkdir dir="${build-locker.dir}/classes/reflect"/>
+    <mkdir dir="${locker-reflect.dir}"/>
     <scalacfork
-      destdir="${build-locker.dir}/classes/reflect"
+      destdir="${locker-reflect.dir}"
       compilerpathref="starr.classpath"
       params="${scalac.args.all}"
       srcdir="${src.dir}/reflect"
       jvmargs="${scalacfork.jvmargs}">
       <include name="**/*.scala"/>
-      <compilationpath refid="locker.classpath"/>
+      <compilationpath>
+        <pathelement location="${locker-library.dir}"/>
+        <pathelement location="${locker-reflect.dir}"/>
+        <path refid="aux.libs"/>
+      </compilationpath>
     </scalacfork>
     <touch file="${build-locker.dir}/reflect.complete" verbose="no"/>
     <stopwatch name="locker.reflect.timer" action="total"/>
@@ -431,32 +438,37 @@ LOCAL REFERENCE BUILD (LOCKER)
 
   <target name="locker.comp" depends="locker.pre-comp" if="locker.comp.needed">
     <stopwatch name="locker.comp.timer"/>
-    <mkdir dir="${build-locker.dir}/classes/compiler"/>
+    <mkdir dir="${locker-compiler.dir}"/>
     <!-- TODO If we have cross dependencies, move this below scalacfork... -->
     <javac
       srcdir="${src.dir}/compiler"
-      destdir="${build-locker.dir}/classes/compiler"
+      destdir="${locker-compiler.dir}"
       includes="**/*.java"
       target="1.6" source="1.6">
         <compilerarg line="${javac.args}"/>
         <classpath refid="locker.classpath"/>
     </javac>
     <scalacfork
-      destdir="${build-locker.dir}/classes/compiler"
+      destdir="${locker-compiler.dir}"
       compilerpathref="starr.classpath"
       params="${scalac.args.all}"
       srcdir="${src.dir}/compiler"
       jvmargs="${scalacfork.jvmargs}">
       <include name="**/*.scala"/>
-      <compilationpath refid="locker.classpath"/>
+      <compilationpath>
+        <pathelement location="${locker-library.dir}"/>
+        <pathelement location="${locker-reflect.dir}"/>
+        <pathelement location="${locker-compiler.dir}"/>
+        <path refid="aux.libs"/>
+      </compilationpath>
     </scalacfork>
-    <propertyfile file="${build-locker.dir}/classes/compiler/compiler.properties">
+    <propertyfile file="${locker-compiler.dir}/compiler.properties">
       <entry key="version.number" value="${version.number}"/>
       <entry key="maven.version.number" value="${maven.version.number}"/>
       <entry key="osgi.version.number" value="${osgi.version.number}"/>
       <entry key="copyright.string" value="${copyright.string}"/>
     </propertyfile>
-    <copy todir="${build-locker.dir}/classes/compiler">
+    <copy todir="${locker-compiler.dir}">
       <fileset dir="${src.dir}/compiler">
         <include name="**/*.tmpl"/>         <!-- runners -->
         <include name="**/*.xml"/>          <!-- antlib.xml -->
@@ -512,7 +524,7 @@ LOCAL REFERENCE BUILD (LOCKER)
   </target>
 
   <target name="locker.unlock" depends="locker.unlock.comp">
-    <delete file="${build-locker.dir}/all.complete" />
+    <delete file="${build-locker.dir}/*.complete" />
   </target>
 
 <!-- ===========================================================================
@@ -531,32 +543,35 @@ QUICK BUILD (QUICK)
 
   <target name="quick.lib" depends="quick.pre-lib" unless="quick.lib.available">
     <stopwatch name="quick.lib.timer"/>
-    <mkdir dir="${build-quick.dir}/classes/library"/>
+    <mkdir dir="${quick-library.dir}"/>
     <javac
       srcdir="${src.dir}/library"
-      destdir="${build-quick.dir}/classes/library"
-      classpath="${build-quick.dir}/classes/library"
+      destdir="${quick-library.dir}"
+      classpath="${quick-library.dir}"
       includes="**/*.java"
       target="1.6" source="1.6">
       <compilerarg line="${javac.args} -XDignore.symbol.file"/>
     </javac>
     <scalacfork
-      destdir="${build-quick.dir}/classes/library"
+      destdir="${quick-library.dir}"
       compilerpathref="locker.classpath"
       srcpath="${src.dir}/library"
       params="${scalac.args.quick}"
       srcdir="${src.dir}/library"
       jvmargs="${scalacfork.jvmargs}">
       <include name="**/*.scala"/>
-      <compilationpath refid="quick.classpath"/>
+      <compilationpath>
+        <pathelement location="${quick-library.dir}"/>
+        <path refid="aux.libs"/>
+      </compilationpath>
     </scalacfork>
-    <propertyfile file="${build-quick.dir}/classes/library/library.properties">
+    <propertyfile file="${quick-library.dir}/library.properties">
       <entry key="version.number" value="${version.number}"/>
       <entry key="maven.version.number" value="${maven.version.number}"/>
       <entry key="osgi.version.number" value="${osgi.version.number}"/>
       <entry key="copyright.string" value="${copyright.string}"/>
     </propertyfile>
-    <copy todir="${build-quick.dir}/classes/library">
+    <copy todir="${quick-library.dir}">
       <fileset dir="${src.dir}/library">
         <include name="**/*.properties"/>
       </fileset>
@@ -583,7 +598,11 @@ QUICK BUILD (QUICK)
       srcdir="${src.dir}/reflect"
       jvmargs="${scalacfork.jvmargs}">
       <include name="**/*.scala"/>
-      <compilationpath refid="quick.classpath"/>
+      <compilationpath>
+        <pathelement location="${quick-library.dir}"/>
+        <pathelement location="${quick-reflect.dir}"/>
+        <path refid="aux.libs"/>
+      </compilationpath>
     </scalacfork>
     <touch file="${build-quick.dir}/reflect.complete" verbose="no"/>
     <stopwatch name="quick.reflect.timer" action="total"/>
@@ -607,7 +626,7 @@ QUICK BUILD (QUICK)
       includes="**/*.java"
       target="1.6" source="1.6">
         <compilerarg line="${javac.args}"/>
-        <classpath refid="quick.classpath"/>
+        <classpath refid="locker.classpath"/>
     </javac>
     <scalacfork
       destdir="${quick-compiler.dir}"
@@ -616,7 +635,12 @@ QUICK BUILD (QUICK)
       srcdir="${src.dir}/compiler"
       jvmargs="${scalacfork.jvmargs}">
       <include name="**/*.scala"/>
-      <compilationpath refid="quick.classpath"/>
+      <compilationpath>
+        <pathelement location="${quick-library.dir}"/>
+        <pathelement location="${quick-reflect.dir}"/>
+        <pathelement location="${quick-compiler.dir}"/>
+        <path refid="aux.libs"/>
+      </compilationpath>
     </scalacfork>
     <propertyfile file="${quick-compiler.dir}/compiler.properties">
       <entry key="version.number" value="${version.number}"/>
@@ -624,7 +648,7 @@ QUICK BUILD (QUICK)
       <entry key="osgi.version.number" value="${osgi.version.number}"/>
       <entry key="copyright.string" value="${copyright.string}"/>
     </propertyfile>
-    <copy todir="${build-quick.dir}/classes/compiler">
+    <copy todir="${quick-compiler.dir}">
       <fileset dir="${src.dir}/compiler">
         <include name="**/*.tmpl"/>         <!-- runners -->
         <include name="**/*.xml"/>          <!-- antlib.xml -->
@@ -737,12 +761,12 @@ PACKED QUICK BUILD (PACK)
       index="true"
       update="true"
       destfile="${build-pack.dir}/lib/scala-library.jar">
-        <fileset dir="${build-quick.dir}/classes/library"/>
+        <fileset dir="${quick-library.dir}"/>
     </jar> -->
     <jar
       encoding="UTF-8"
       destfile="${build-pack.dir}/lib/scala-library.jar">
-        <fileset dir="${build-quick.dir}/classes/library"/>
+        <fileset dir="${quick-library.dir}"/>
     </jar>
     <copy file="${forkjoin.jar}" todir="${build-pack.dir}/lib"/>
   </target>
@@ -757,7 +781,7 @@ PACKED QUICK BUILD (PACK)
   <target name="pack.reflect" depends="pack.pre-reflect" unless="pack.reflect.available">
     <mkdir dir="${build-pack.dir}/lib"/>
     <jar destfile="${build-pack.dir}/lib/scala-reflect.jar">
-      <fileset dir="${build-quick.dir}/classes/reflect" />
+      <fileset dir="${quick-reflect.dir}" />
     </jar>
   </target>
 
