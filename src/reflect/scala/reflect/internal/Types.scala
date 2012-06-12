@@ -6139,7 +6139,7 @@ trait Types extends api.Types { self: SymbolTable =>
           val fbounds = findRecursiveBounds(commonSymbol) flatMap (x => List(x._1, x._2))
           val ts1 = if (fbounds.isEmpty) ts0 else {
             val tclubs = typeConstructorLubList(ts0)
-            val minLub = minSymbol(tclubs map (_.typeSymbol))
+            val minLub = minSymbol(tclubs map (_.typeSymbol) filter (s => findRecursiveBounds(s).isEmpty))
             val bases  = ts0 map (_ baseType minLub)
             // 
             // val minLubbableSym = minSymbol(
@@ -6147,7 +6147,7 @@ trait Types extends api.Types { self: SymbolTable =>
             //     map (_.typeSymbol)
             //     filter (s => findRecursiveBounds(s).isEmpty)
             // )
-            log("Calculated bases=%s for %s".format(bases, ts0))
+            log("Calculated bases for %s: %s".format(ts0.mkString(", "), bases.mkString("\n  ")))
             // ts0 map (_ baseType minLubbableSym)
             bases
           }
