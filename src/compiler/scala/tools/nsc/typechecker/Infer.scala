@@ -1268,6 +1268,7 @@ trait Infer {
               for (arg <- args) {
                 if (sym == ArrayClass) check(arg, bound)
                 else if (arg.typeArgs.nonEmpty) ()   // avoid spurious warnings with higher-kinded types
+                else if (sym == NonLocalReturnControlClass) ()  // no way to suppress unchecked warnings on try/catch
                 else arg match {
                   case TypeRef(_, sym, _) if isLocalBinding(sym) =>
                     ;

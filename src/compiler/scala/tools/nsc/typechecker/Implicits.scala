@@ -1352,11 +1352,17 @@ trait Implicits {
           EmptyTree
       }
     }
-    private def manifestOfType(tp: Type): SearchResult = {
-      val tagInScope = resolveClassTag(pos, tp, allowMaterialization = false)
+    private def manifestOfType(tp: Type, full: Boolean): SearchResult = {
+      val tagInScope = (
+        if (full) resolveTypeTag(pos, NoType, tp, concrete = true, allowMaterialization = false)
+        else resolveClassTag(pos, tp, allowMaterialization = false)
+      )
       val tree = (
-        if (tagInScope.isEmpty) mot(tp)
-        else gen.mkMethodCall(ReflectRuntimeUniverse, nme.classTagToClassManifest, List(tp), List(tagInScope))
+        if (full) {
+          val cm = typed(Ident(ReflectRuntimeCurrentMirror))
+          gen.mkMethodCall(ReflectRuntimeUniverse, nme.typeTagToManifest, List(tp), List(cm, tagInScope))
+        }
+        else gen.mkMethodCall(ReflectBasis, nme.classTagToClassManifest, List(tp), List(tagInScope))
       )
       tree match {
         case EmptyTree  => SearchFailure
@@ -1367,8 +1373,10 @@ trait Implicits {
     /** The tag corresponding to type `pt`, provided `pt` is a flavor of a tag.
      */
     private def implicitTagOrOfExpectedType(pt: Type): SearchResult = pt.dealias match {
+      case TypeRef(_, FullManifestClass, arg :: Nil) =>
+        manifestOfType(arg, full = true)
       case TypeRef(_, ClassManifestClass, arg :: Nil) =>
-        manifestOfType(arg)
+        manifestOfType(arg, full = false)
       case TypeRef(pre, sym, arg :: Nil) if TagSymbols(sym) =>
         tagOfType(pre, arg, sym)
       case tp@TypeRef(_, sym, _) if sym.isAbstractType =>
