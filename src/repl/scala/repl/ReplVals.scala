@@ -85,9 +85,8 @@ class StdReplVals(final val r: ILoop) extends ReplVals {
   final lazy val isettings                = intp.isettings
   final lazy val completion               = reader.completion
   final lazy val history                  = reader.history
-  final lazy val phased                   = power.phased
+  // final lazy val phased                   = power.phased
   final lazy val analyzer                 = global.analyzer
-
 
   final lazy val replenv = new {
     val global: intp.global.type = intp.global

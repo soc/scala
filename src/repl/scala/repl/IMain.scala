@@ -23,7 +23,6 @@ import scala.tools.nsc.util.Exceptional.unwrap
 import scala.collection.{ mutable, immutable }
 import IMain._
 import java.util.concurrent.Future
-import typechecker.Analyzer
 import language.implicitConversions
 import scala.reflect.runtime.{ universe => ru }
 import scala.reflect.{ ClassTag, classTag }
@@ -1265,6 +1264,16 @@ object IMain {
       }
 
       filtered.nonEmpty
+    }
+
+    def type2[T: TypeTag](body: => T): String = "" + typeOf[T]
+    def type3[T: TypeTag](body: => T): String = {
+      List(
+          "// Type signature",
+        afterTyper("" + typeOf[T]),
+        "\n// Internal Type structure",
+        afterTyper("" + deconstruct.show(typeOf[T]))
+      ).mkString("\n")
     }
 
     def typeCommand(expr: String, verbose: Boolean): String = {

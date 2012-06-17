@@ -255,14 +255,14 @@ class ILoop(in0: Option[BufferedReader], protected val out: JPrintWriter)
     nullary("replay", "reset execution and replay all previous commands", replay),
     nullary("reset", "reset the repl to its initial state, forgetting all session entries", resetCommand),
     nullary("silent", "disable/enable automatic printing of results", verbosity),
-    cmd("type", "[-v] <expr>", "display the type of an expression without evaluating it", typeCommand),
+    // cmd("type", "[-v] <expr>", "display the type of an expression without evaluating it", typeCommand),
     nullary("warnings", "show the suppressed warnings from the most recent line which had any", warningsCommand)
   )
 
   /** Power user commands */
-  lazy val powerCommands: List[LoopCommand] = List(
-    cmd("phase", "<phase>", "set the implicit phase for power commands", phaseCommand)
-  )
+  // lazy val powerCommands: List[LoopCommand] = List(
+  //   cmd("phase", "<phase>", "set the implicit phase for power commands", phaseCommand)
+  // )
 
   private def importsCommand(line: String): Result = {
     val tokens    = words(line)
@@ -415,15 +415,17 @@ class ILoop(in0: Option[BufferedReader], protected val out: JPrintWriter)
     }
   }
   private lazy val javap = substituteAndLog[Javap]("javap", NoJavap)(newJavap())
-
-  // Still todo: modules.
-  private def typeCommand(line: String): Result = {
-    line.trim match {
-      case ""                      => ":type [-v] <expression>"
-      case s if s startsWith "-v " => intp.typeCommand(s stripPrefix "-v " trim, verbose = true)
-      case s                       => intp.typeCommand(s, verbose = false)
-    }
-  }
+  //
+  // // Still todo: modules.
+  // private def typeCommand[T: TypeTag](expr: => T): Result = {
+  //   intp type2 body
+  //   //
+  //   // line.trim match {
+  //   //   case ""                      => ":type [-v] <expression>"
+  //   //   case s if s startsWith "-v " => intp.typeCommand(s stripPrefix "-v " trim, verbose = true)
+  //   //   case s                       => intp.typeCommand(s, verbose = false)
+  //   // }
+  // }
 
   private def warningsCommand(): Result = {
     intp.lastWarnings foreach { case (pos, msg) => intp.reporter.warning(pos, msg) }
@@ -442,40 +444,40 @@ class ILoop(in0: Option[BufferedReader], protected val out: JPrintWriter)
         else res.show()
       }
   }
-
-  private def pathToPhaseWrapper = intp.pathToTerm("$r") + ".phased.atCurrent"
-  private def phaseCommand(name: String): Result = {
-    val phased: Phased = power.phased
-    import phased.NoPhaseName
-
-    if (name == "clear") {
-      phased.set(NoPhaseName)
-      intp.clearExecutionWrapper()
-      "Cleared active phase."
-    }
-    else if (name == "") phased.get match {
-      case NoPhaseName => "Usage: :phase <expr> (e.g. typer, erasure.next, erasure+3)"
-      case ph          => "Active phase is '%s'.  (To clear, :phase clear)".format(phased.get)
-    }
-    else {
-      val what = phased.parse(name)
-      if (what.isEmpty || !phased.set(what))
-        "'" + name + "' does not appear to represent a valid phase."
-      else {
-        intp.setExecutionWrapper(pathToPhaseWrapper)
-        val activeMessage =
-          if (what.toString.length == name.length) "" + what
-          else "%s (%s)".format(what, name)
-
-        "Active phase is now: " + activeMessage
-      }
-    }
-  }
+  //
+  // private def pathToPhaseWrapper = intp.pathToTerm("$r") + ".phased.atCurrent"
+  // private def phaseCommand(name: String): Result = {
+  //   val phased: Phased = power.phased
+  //   import phased.NoPhaseName
+  //
+  //   if (name == "clear") {
+  //     phased.set(NoPhaseName)
+  //     intp.clearExecutionWrapper()
+  //     "Cleared active phase."
+  //   }
+  //   else if (name == "") phased.get match {
+  //     case NoPhaseName => "Usage: :phase <expr> (e.g. typer, erasure.next, erasure+3)"
+  //     case ph          => "Active phase is '%s'.  (To clear, :phase clear)".format(phased.get)
+  //   }
+  //   else {
+  //     val what = phased.parse(name)
+  //     if (what.isEmpty || !phased.set(what))
+  //       "'" + name + "' does not appear to represent a valid phase."
+  //     else {
+  //       intp.setExecutionWrapper(pathToPhaseWrapper)
+  //       val activeMessage =
+  //         if (what.toString.length == name.length) "" + what
+  //         else "%s (%s)".format(what, name)
+  //
+  //       "Active phase is now: " + activeMessage
+  //     }
+  //   }
+  // }
 
   /** Available commands */
-  def commands: List[LoopCommand] = standardCommands ++ (
-    if (isReplPower) powerCommands else Nil
-  )
+  def commands: List[LoopCommand] = standardCommands // ++ (
+   //    if (isReplPower) powerCommands else Nil
+   //  )
 
   val replayQuestionMessage =
     """|That entry seems to have slain the compiler.  Shall I replay
@@ -614,8 +616,8 @@ class ILoop(in0: Option[BufferedReader], protected val out: JPrintWriter)
   private def unleashAndSetPhase() {
     if (isReplPower) {
       power.unleash()
-      // Set the phase to "typer"
-      intp beSilentDuring phaseCommand("typer")
+      // // Set the phase to "typer"
+      // intp beSilentDuring phaseCommand("typer")
     }
   }
 

@@ -222,7 +222,7 @@ class Power[T : ru.TypeTag : ClassTag](val intp: IMain, vals: T) {
     @weight(-1) implicit def replPrettifier[T] : Prettifier[T] = Prettifier.default[T]
   }
 
-  lazy val phased: Phased       = new { val global: intp.global.type = intp.global } with Phased { }
+  // lazy val phased: Phased       = new { val global: intp.global.type = intp.global } with Phased { }
 
   def context(code: String)  = analyzer.rootContext(unit(code))
   def source(code: String)   = newSourceFile(code)
