@@ -1322,31 +1322,33 @@ trait Implicits {
 //       }
 //     }
 
-    private def mot(tp: Type): Tree = {
+    private def mot(tp: Type, full: Boolean): Tree = {
+      def factory = if (full) FullManifestModule else ClassManifestModule
       val tp1 = tp.normalize.deconst 
       tp1 match {
         case ArrayOf(tp) =>
           gen.mkMethodCall(
-            ClassManifestModule,
+            factory,
             newTermName("arrayType"),
             tp :: Nil,
             inferImplicit(tree, appliedType(ClassManifestClass, tp), true, false, context).tree :: Nil
           )
         case TypeRef(_, sym, _) if isPrimitiveValueClass(sym) || isPhantomClass(sym) || sym == ObjectClass =>
-          Select(gen.mkAttributedRef(ClassManifestModule), sym.name.toString)
+          Select(gen.mkAttributedRef(factory), sym.name.toString)
         case TypeRef(_, RepeatedParamClass | ByNameParamClass, _) =>
           EmptyTree
-        case TypeRef(_, sym, _) if sym.isClass =>
-          val arg0 = gen.mkClassOf(tp1)
+        case TypeRef(_, sym, args) if sym.isClass =>
+          val margs = if (full) args map (tp => mot(tp, full)) else Nil
+          val arg0  = gen.mkClassOf(tp1)
           val arg = tp match {
             case _: ExistentialType => gen.mkCast(arg0, ClassType(tp))
             case _                  => arg0
           }
           gen.mkMethodCall(
-            ClassManifestModule,
+            factory,
             newTermName("classType"),
             tp :: Nil,
-            arg :: Nil
+            arg :: margs
           )
         case _ =>
           EmptyTree
@@ -1357,8 +1359,9 @@ trait Implicits {
         if (full) resolveTypeTag(pos, NoType, tp, concrete = true, allowMaterialization = false)
         else resolveClassTag(pos, tp, allowMaterialization = false)
       )
-      val tree = (
-        if (full) {
+      val tree: Tree = (
+        if (tagInScope.isEmpty) mot(tp, full)
+        else if (full) {
           val cm = typed(Ident(ReflectRuntimeCurrentMirror))
           gen.mkMethodCall(ReflectRuntimeUniverse, nme.typeTagToManifest, List(tp), List(cm, tagInScope))
         }
