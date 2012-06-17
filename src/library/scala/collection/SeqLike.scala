@@ -920,7 +920,7 @@ object SeqLike {
         val wit = W.iterator.drop(n0)
         var i = if (forward) 0 else (n1-n0-1)
         while (i != done) {
-          Warr(i) = wit.next.asInstanceOf[AnyRef]
+          Warr(i) = wit.next.asAnyRef
           i += delta
         }
 
@@ -1024,7 +1024,7 @@ object SeqLike {
         var answer = -1
         while (m+m0+n1-n0 <= m1) {
           while (i+m >= largest) {
-            cache(largest%(n1-n0)) = iter.next.asInstanceOf[AnyRef]
+            cache(largest%(n1-n0)) = iter.next.asAnyRef
             largest += 1
           }
           if (Wopt(i) == cache((i+m)%(n1-n0))) {

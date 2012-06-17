@@ -728,7 +728,7 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
       if (args.nonEmpty)
         repldbg("  with args: " + args.mkString(", "))
 
-      m.invoke(evalClass, args.map(_.asInstanceOf[AnyRef]): _*)
+      m.invoke(evalClass, args.map(_.asAnyRef): _*)
     }
 
     def callEither(name: String, args: Any*): Either[Throwable, AnyRef] =

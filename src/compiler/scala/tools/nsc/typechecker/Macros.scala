@@ -738,7 +738,7 @@ trait Macros extends scala.tools.reflect.FastTrack with Traces {
           val primary = loadMacroImpl(primaryClassloader)
           primary match {
             case Some((implObj, implMeth)) =>
-              def runtime(args: List[Any]) = implMeth.invoke(implObj, (args map (_.asInstanceOf[AnyRef])): _*).asInstanceOf[Any]
+              def runtime(args: List[Any]) = implMeth.invoke(implObj, (args map (_.asAnyRef)): _*).asInstanceOf[Any]
               Some(runtime _)
             case None =>
               if (settings.XmacroFallbackClasspath.value != "") {
@@ -746,7 +746,7 @@ trait Macros extends scala.tools.reflect.FastTrack with Traces {
                 val fallback = loadMacroImpl(fallbackClassloader)
                 fallback match {
                   case Some((implObj, implMeth)) =>
-                    def runtime(args: List[Any]) = implMeth.invoke(implObj, (args map (_.asInstanceOf[AnyRef])): _*).asInstanceOf[Any]
+                    def runtime(args: List[Any]) = implMeth.invoke(implObj, (args map (_.asAnyRef)): _*).asInstanceOf[Any]
                     Some(runtime _)
                   case None =>
                     None

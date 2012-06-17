@@ -14,7 +14,7 @@ import symtab.Flags.{ DEFERRED }
 
 trait ReferenceEquality {
   override def hashCode = System.identityHashCode(this)
-  override def equals(that: Any) = this eq that.asInstanceOf[AnyRef]
+  override def equals(that: Any) = this eq that.asAnyRef
 }
 
 trait Members {

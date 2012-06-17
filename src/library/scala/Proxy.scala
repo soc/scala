@@ -29,8 +29,8 @@ trait Proxy extends Any {
   override def equals(that: Any): Boolean = that match {
     case null  => false
     case _     => 
-      val x = that.asInstanceOf[AnyRef]
-      (x eq this.asInstanceOf[AnyRef]) || (x eq self.asInstanceOf[AnyRef]) || (x equals self)
+      val x = that.asAnyRef
+      (x eq this.asAnyRef) || (x eq self.asAnyRef) || (x equals self)
   }
   override def toString = "" + self
 }

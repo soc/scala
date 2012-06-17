@@ -105,7 +105,7 @@ trait JavaMirrors extends internal.SymbolTable with api.JavaUniverse { self: Sym
 
 // ----------- Implementations of mirror operations and classes  -------------------
 
-    def reflect(obj: Any): InstanceMirror = new JavaInstanceMirror(obj.asInstanceOf[AnyRef])
+    def reflect(obj: Any): InstanceMirror = new JavaInstanceMirror(obj.asAnyRef)
 
     def reflectClass(cls: ClassSymbol): ClassMirror = {
       if (!cls.isStatic) throw new Error("this is an inner class, use reflectClass on an InstanceMirror to obtain its ClassMirror")

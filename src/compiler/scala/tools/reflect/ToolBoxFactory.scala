@@ -223,14 +223,14 @@ abstract class ToolBoxFactory[U <: JavaUniverse](val u: U) { factorySelf =>
         // hence, blocks were translated into nullary functions, so
         // presumably, it was useful to immediately evaluate them to get the result of a block
         // @Eugene writes: anyways, I'll stash the old sources here in comments in case anyone wants to revive them
-        // val result = jmeth.invoke(singleton, freeTerms map (sym => sym.asInstanceOf[FreeTermVar].value.asInstanceOf[AnyRef]): _*)
+        // val result = jmeth.invoke(singleton, freeTerms map (sym => sym.asInstanceOf[FreeTermVar].value.asAnyRef): _*)
         // if (etpe.typeSymbol != FunctionClass(0)) result
         // else {
         //   val applyMeth = result.getClass.getMethod("apply")
         //   applyMeth.invoke(result)
         // }
         val (singleton, jmeth) = compileExpr(expr)
-        val result = jmeth.invoke(singleton, thunks map (_.asInstanceOf[AnyRef]): _*)
+        val result = jmeth.invoke(singleton, thunks map (_.asAnyRef): _*)
         result
       }
 

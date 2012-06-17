@@ -162,7 +162,7 @@ sealed abstract class List[+A] extends AbstractSeq[A]
         val head0 = pending.head
         val head1 = f(head0)
 
-        if (head1 eq head0.asInstanceOf[AnyRef])
+        if (head1 eq head0.asAnyRef)
           loop(mapped, unchanged, pending.tail)
         else {
           val b = if (mapped eq null) new ListBuffer[B] else mapped
@@ -182,7 +182,7 @@ sealed abstract class List[+A] extends AbstractSeq[A]
       case Nil      => this
       case x :: Nil =>
         val y = f(x)
-        if (x.asInstanceOf[AnyRef] eq y) this
+        if (x.asAnyRef eq y) this
         else y :: Nil
       case _ =>
         loop(null, this, this)

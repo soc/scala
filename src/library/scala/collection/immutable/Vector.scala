@@ -217,7 +217,7 @@ override def companion: GenericCompanion[Vector] = Vector
     s.initFrom(this)
     s.dirty = dirty
     s.gotoPosWritable(focus, idx, focus ^ idx)  // if dirty commit changes; go to new pos and prepare for writing
-    s.display0(idx & 0x1f) = elem.asInstanceOf[AnyRef]
+    s.display0(idx & 0x1f) = elem.asAnyRef
     s
   }
 
@@ -246,7 +246,7 @@ override def companion: GenericCompanion[Vector] = Vector
         s.initFrom(this)
         s.dirty = dirty
         s.gotoPosWritable(focus, blockIndex, focus ^ blockIndex)
-        s.display0(lo) = value.asInstanceOf[AnyRef]
+        s.display0(lo) = value.asAnyRef
         s
       } else {
 
@@ -269,7 +269,7 @@ override def companion: GenericCompanion[Vector] = Vector
             s.shiftTopLevel(0, shiftBlocks) // shift right by n blocks
             s.debug
             s.gotoFreshPosWritable(newFocus, newBlockIndex, newFocus ^ newBlockIndex) // maybe create pos; prepare for writing
-            s.display0(lo) = value.asInstanceOf[AnyRef]
+            s.display0(lo) = value.asAnyRef
             //assert(depth == s.depth)
             s
           } else {
@@ -284,7 +284,7 @@ override def companion: GenericCompanion[Vector] = Vector
             s.dirty = dirty
             s.shiftTopLevel(0, shiftBlocks) // shift right by n elements
             s.gotoPosWritable(newFocus, newBlockIndex, newFocus ^ newBlockIndex) // prepare for writing
-            s.display0(shift-1) = value.asInstanceOf[AnyRef]
+            s.display0(shift-1) = value.asAnyRef
             s.debug
             s
           }
@@ -302,7 +302,7 @@ override def companion: GenericCompanion[Vector] = Vector
           s.dirty = dirty
           s.debug
           s.gotoFreshPosWritable(newFocus, newBlockIndex, newFocus ^ newBlockIndex) // could optimize: we know it will create a whole branch
-          s.display0(lo) = value.asInstanceOf[AnyRef]
+          s.display0(lo) = value.asAnyRef
           s.debug
           //assert(s.depth == depth+1)
           s
@@ -314,7 +314,7 @@ override def companion: GenericCompanion[Vector] = Vector
           s.initFrom(this)
           s.dirty = dirty
           s.gotoFreshPosWritable(newFocus, newBlockIndex, newFocus ^ newBlockIndex)
-          s.display0(lo) = value.asInstanceOf[AnyRef]
+          s.display0(lo) = value.asAnyRef
           //assert(s.depth == depth)
           s
         }
@@ -323,7 +323,7 @@ override def companion: GenericCompanion[Vector] = Vector
     } else {
       // empty vector, just insert single element at the back
       val elems = new Array[AnyRef](32)
-      elems(31) = value.asInstanceOf[AnyRef]
+      elems(31) = value.asAnyRef
       val s = new Vector(31,32,0)
       s.depth = 1
       s.display0 = elems
@@ -344,7 +344,7 @@ override def companion: GenericCompanion[Vector] = Vector
         s.initFrom(this)
         s.dirty = dirty
         s.gotoPosWritable(focus, blockIndex, focus ^ blockIndex)
-        s.display0(lo) = value.asInstanceOf[AnyRef]
+        s.display0(lo) = value.asAnyRef
         s
       } else {
         val shift = startIndex & ~((1<<5*(depth-1))-1)
@@ -364,7 +364,7 @@ override def companion: GenericCompanion[Vector] = Vector
             s.shiftTopLevel(shiftBlocks, 0) // shift left by n blocks
             s.debug
             s.gotoFreshPosWritable(newFocus, newBlockIndex, newFocus ^ newBlockIndex)
-            s.display0(lo) = value.asInstanceOf[AnyRef]
+            s.display0(lo) = value.asAnyRef
             s.debug
             //assert(depth == s.depth)
             s
@@ -380,7 +380,7 @@ override def companion: GenericCompanion[Vector] = Vector
             s.dirty = dirty
             s.shiftTopLevel(shiftBlocks, 0) // shift right by n elements
             s.gotoPosWritable(newFocus, newBlockIndex, newFocus ^ newBlockIndex)
-            s.display0(32 - shift) = value.asInstanceOf[AnyRef]
+            s.display0(32 - shift) = value.asAnyRef
             s.debug
             s
           }
@@ -392,7 +392,7 @@ override def companion: GenericCompanion[Vector] = Vector
           s.initFrom(this)
           s.dirty = dirty
           s.gotoFreshPosWritable(newFocus, newBlockIndex, newFocus ^ newBlockIndex)
-          s.display0(lo) = value.asInstanceOf[AnyRef]
+          s.display0(lo) = value.asAnyRef
           //assert(s.depth == depth+1) might or might not create new level!
           if (s.depth == depth+1) {
             //println("creating new level " + s.depth + " (had "+0+" free space)")
@@ -403,7 +403,7 @@ override def companion: GenericCompanion[Vector] = Vector
       }
     } else {
       val elems = new Array[AnyRef](32)
-      elems(0) = value.asInstanceOf[AnyRef]
+      elems(0) = value.asAnyRef
       val s = new Vector(0,1,0)
       s.depth = 1
       s.display0 = elems
@@ -692,7 +692,7 @@ final class VectorBuilder[A]() extends Builder[A,Vector[A]] with VectorPointer[A
       blockIndex = newBlockIndex
       lo = 0
     }
-    display0(lo) = elem.asInstanceOf[AnyRef]
+    display0(lo) = elem.asAnyRef
     lo += 1
     this
   }

@@ -23,7 +23,7 @@ object ArrayStack extends SeqFactory[ArrayStack] {
   def newBuilder[A]: Builder[A, ArrayStack[A]] = new ArrayStack[A]
   def empty: ArrayStack[Nothing] = new ArrayStack()
   def apply[A: ClassTag](elems: A*): ArrayStack[A] = {
-    val els: Array[AnyRef] = elems.reverseMap(_.asInstanceOf[AnyRef])(breakOut)
+    val els: Array[AnyRef] = elems.reverseMap(_.asAnyRef)(breakOut)
     if (els.length == 0) new ArrayStack()
     else new ArrayStack[A](els, els.length)
   }
@@ -97,7 +97,7 @@ extends AbstractSeq[T]
    *  @throws   IndexOutOfBoundsException if the index is not valid
    */
   def update(n: Int, newelem: T) =
-    table(index - 1 - n) = newelem.asInstanceOf[AnyRef]
+    table(index - 1 - n) = newelem.asAnyRef
 
   /** Push an element onto the stack.
    *
@@ -105,7 +105,7 @@ extends AbstractSeq[T]
    */
   def push(x: T) {
     if (index == table.length) table = ArrayStack.growArray(table)
-    table(index) = x.asInstanceOf[AnyRef]
+    table(index) = x.asAnyRef
     index += 1
   }
 

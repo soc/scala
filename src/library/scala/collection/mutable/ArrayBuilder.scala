@@ -92,7 +92,7 @@ object ArrayBuilder {
       this
     }
 
-    override def ++=(xs: IterableOnce[T]): this.type = (xs.asInstanceOf[AnyRef]) match {
+    override def ++=(xs: IterableOnce[T]): this.type = (xs.asAnyRef) match {
       case xs: WrappedArray.ofRef[_] =>
         ensureSize(this.size + xs.length)
         Array.copy(xs.array, 0, elems, this.size, xs.length)

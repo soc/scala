@@ -91,7 +91,7 @@ object ScalaRunTime {
 
   /** update generic array element */
   def array_update(xs: AnyRef, idx: Int, value: Any): Unit = xs match {
-    case x: Array[AnyRef]  => x(idx) = value.asInstanceOf[AnyRef]
+    case x: Array[AnyRef]  => x(idx) = value.asAnyRef
     case x: Array[Int]     => x(idx) = value.asInstanceOf[Int]
     case x: Array[Double]  => x(idx) = value.asInstanceOf[Double]
     case x: Array[Long]    => x(idx) = value.asInstanceOf[Long]
@@ -151,7 +151,7 @@ object ScalaRunTime {
     val arr = new Array[AnyRef](xs.length)
     var i = 0
     for (x <- xs) {
-      arr(i) = x.asInstanceOf[AnyRef]
+      arr(i) = x.asAnyRef
       i += 1
     }
     arr

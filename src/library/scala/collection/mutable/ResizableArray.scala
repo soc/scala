@@ -45,7 +45,7 @@ trait ResizableArray[A] extends IndexedSeq[A]
 
   def update(idx: Int, elem: A) {
     if (idx >= size0) throw new IndexOutOfBoundsException(idx.toString)
-    array(idx) = elem.asInstanceOf[AnyRef]
+    array(idx) = elem.asAnyRef
   }
 
   override def foreach[U](f: A => U) {

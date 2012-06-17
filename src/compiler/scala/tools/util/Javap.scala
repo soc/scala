@@ -69,7 +69,7 @@ class JavapClass(
     else parser(opts) foreach { case (name, value) =>
       val field = EnvClass getDeclaredField name
       field setAccessible true
-      field.set(env, value.asInstanceOf[AnyRef])
+      field.set(env, value.asAnyRef)
     }
 
     env

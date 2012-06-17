@@ -68,7 +68,7 @@ abstract class AnyValManifest[T <: AnyVal](override val toString: String) extend
     case _: AnyValManifest[_] => true
     case _                    => false
   }
-  override def equals(that: Any): Boolean = this eq that.asInstanceOf[AnyRef]
+  override def equals(that: Any): Boolean = this eq that.asAnyRef
   override val hashCode = System.identityHashCode(this)
 }
 
@@ -210,7 +210,7 @@ object Manifest {
     new ClassTypeManifest[T](Some(prefix), clazz, args.toList)
 
   private abstract class PhantomManifest[T](override val toString: String) extends ClassTypeManifest[T](None, classOf[java.lang.Object], Nil) {
-    override def equals(that: Any): Boolean = this eq that.asInstanceOf[AnyRef]
+    override def equals(that: Any): Boolean = this eq that.asAnyRef
     override val hashCode = System.identityHashCode(this)
   }
 

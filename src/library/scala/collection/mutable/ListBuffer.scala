@@ -152,7 +152,7 @@ final class ListBuffer[A] extends Builder[A, List[A]] with Serializable {
   }
 
   override def ++=(xs: IterableOnce[A]): this.type =
-    if (xs.asInstanceOf[AnyRef] eq this) ++= (this take size) else super.++=(xs)
+    if (xs.asAnyRef eq this) ++= (this take size) else super.++=(xs)
 
   /** Clears the buffer contents.
    */

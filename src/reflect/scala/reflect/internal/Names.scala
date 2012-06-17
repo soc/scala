@@ -199,7 +199,7 @@ trait Names extends api.Names {
     // Presently disabled.
     // override def equals(other: Any) = paranoidEquals(other)
     private def paranoidEquals(other: Any): Boolean = {
-      val cmp = this eq other.asInstanceOf[AnyRef]
+      val cmp = this eq other.asAnyRef
       if (cmp || !nameDebug)
         return cmp
 

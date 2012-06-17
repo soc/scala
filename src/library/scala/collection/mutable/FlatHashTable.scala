@@ -142,7 +142,7 @@ trait FlatHashTable[A] extends FlatHashTable.HashUtils[A] {
       entry = table(h)
       //Statistics.collisions += 1
     }
-    table(h) = elem.asInstanceOf[AnyRef]
+    table(h) = elem.asAnyRef
     tableSize = tableSize + 1
     nnSizeMapAdd(h)
     if (tableSize >= threshold) growTable()

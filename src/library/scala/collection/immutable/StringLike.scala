@@ -243,7 +243,7 @@ self =>
 
   private def unwrapArg(arg: Any): AnyRef = arg match {
     case x: ScalaNumber => x.underlying
-    case x              => x.asInstanceOf[AnyRef]
+    case x              => x.asAnyRef
   }
 
   /** Uses the underlying string as a pattern (in a fashion similar to

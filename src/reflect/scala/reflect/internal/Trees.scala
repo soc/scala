@@ -72,7 +72,7 @@ trait Trees extends api.Trees { self: SymbolTable =>
     }
 
     override def hashCode(): Int = System.identityHashCode(this)
-    override def equals(that: Any) = this eq that.asInstanceOf[AnyRef]
+    override def equals(that: Any) = this eq that.asAnyRef
 
     override def duplicate: this.type =
       (duplicator transform this).asInstanceOf[this.type]

@@ -291,6 +291,7 @@ object Predef {
 
   final class ArrowAssoc[A](val __leftOfArrow: A) extends AnyVal {
     @inline def -> [B](y: B): Tuple2[A, B] = Tuple2(__leftOfArrow, y)
+    @inline def asAnyRef: AnyRef = __leftOfArrow.asInstanceOf[AnyRef]
   }
   @inline implicit def any2ArrowAssoc[A](x: A): ArrowAssoc[A] = new ArrowAssoc(x)
 

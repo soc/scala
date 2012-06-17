@@ -1002,7 +1002,7 @@ trait ContextErrors {
               if (AnyRefClass.tpe <:< req) {
                 if (sym == AnyClass || sym == UnitClass) {
                   "Note: " + sym.name + " is not implicitly converted to AnyRef.  You can safely\n" +
-                  "pattern match `x: AnyRef` or cast `x.asInstanceOf[AnyRef]` to do so."
+                  "pattern match `x: AnyRef` or cast `x.asAnyRef` to do so."
                 }
                 else boxedClass get sym match {
                   case Some(boxed)  =>

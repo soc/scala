@@ -267,7 +267,7 @@ object Pickler {
     unitPickler
       .wrapped { _ => x } { x => () }
       .labelled (x.getClass.getName)
-      .cond (x eq _.asInstanceOf[AnyRef])
+      .cond (x eq _.asAnyRef)
 
   /** A pickler the handles instances of classes that have an empty constructor.
    *  It represents than as `$new ( <name of class> )`.

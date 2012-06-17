@@ -168,7 +168,7 @@ object HashMap extends ImmutableMapFactory[HashMap] with BitOperations.Int {
     override def updated0[B1 >: B](key: A, hash: Int, level: Int, value: B1, kv: (A, B1), merger: Merger[A, B1]): HashMap[A, B1] =
       if (hash == this.hash && key == this.key ) {
         if (merger eq null) {
-          if (this.value.asInstanceOf[AnyRef] eq value.asInstanceOf[AnyRef]) this
+          if (this.value.asAnyRef eq value.asAnyRef) this
           else new HashMap1(key, hash, value, kv)
         } else {
           val nkv = merger(this.kv, kv)

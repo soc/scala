@@ -168,7 +168,7 @@ trait SyntheticMethods extends ast.TreeDSL {
      *  0 args:
      *    def equals(that: Any) = that.isInstanceOf[this.C] && that.asInstanceOf[this.C].canEqual(this)
      *  1+ args:
-     *    def equals(that: Any) = (this eq that.asInstanceOf[AnyRef]) || {
+     *    def equals(that: Any) = (this eq that.asAnyRef) || {
      *      (that.isInstanceOf[this.C]) && {
      *        val x$1 = that.asInstanceOf[this.C]
      *        (this.arg_1 == x$1.arg_1) && (this.arg_2 == x$1.arg_2) && ... && (x$1 canEqual this)
@@ -184,7 +184,7 @@ trait SyntheticMethods extends ast.TreeDSL {
     }
 
     /** The equality method for value classes
-     *  def equals(that: Any) = (this.asInstanceOf[AnyRef]) eq that.asInstanceOf[AnyRef]) || {
+     *  def equals(that: Any) = (this.asAnyRef) eq that.asAnyRef) || {
      *    (that.isInstanceOf[this.C]) && {
      *     val x$1 = that.asInstanceOf[this.C]
      *     (this.underlying == that.underlying

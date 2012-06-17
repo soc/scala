@@ -77,7 +77,7 @@ class ArrayBuffer[A](override protected val initialSize: Int)
    */
   def +=(elem: A): this.type = {
     ensureSize(size0 + 1)
-    array(size0) = elem.asInstanceOf[AnyRef]
+    array(size0) = elem.asAnyRef
     size0 += 1
     this
   }
@@ -109,7 +109,7 @@ class ArrayBuffer[A](override protected val initialSize: Int)
   def +=:(elem: A): this.type = {
     ensureSize(size0 + 1)
     copy(0, 1, size0)
-    array(0) = elem.asInstanceOf[AnyRef]
+    array(0) = elem.asAnyRef
     size0 += 1
     this
   }
