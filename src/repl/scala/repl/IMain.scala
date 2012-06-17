@@ -72,7 +72,10 @@ private class ReplVirtualDirectory(out: JPrintWriter) extends VirtualDirectory("
  *  @author Moez A. Abdel-Gawad
  *  @author Lex Spoon
  */
-class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends Imports {
+class IMain(initialSettings: Settings, protected val out: JPrintWriter)
+        extends Imports
+           with ReplSettings {
+
   imain =>
 
   /** Leading with the eagerly evaluated.
@@ -85,6 +88,8 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
   private var _isInitialized: Future[Boolean]       = null      // set up initialization future
   private var bindExceptions                        = true      // whether to bind the lastException variable
   private var _executionWrapper                     = ""        // code to be wrapped around all lines
+
+  def compilerSettings = currentSettings
 
   /** We're going to go to some trouble to initialize the compiler asynchronously.
    *  It's critical that nothing call into it until it's been initialized or we will
@@ -271,9 +276,6 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
   def executionWrapper = _executionWrapper
   def setExecutionWrapper(code: String) = _executionWrapper = code
   def clearExecutionWrapper() = _executionWrapper = ""
-
-  /** interpreter settings */
-  lazy val isettings = new ISettings(this)
 
   /** Instantiate a compiler.  Overridable. */
   protected def newCompiler(settings: Settings, reporter: Reporter): ReplGlobal = {
@@ -1149,10 +1151,10 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
   def aliasForType(path: String) = ByteCode.aliasForType(path)
 
   def withoutUnwrapping(op: => Unit): Unit = {
-    val saved = isettings.unwrapStrings
-    isettings.unwrapStrings = false
+    val saved = unwrapStrings
+    unwrapStrings = false
     try op
-    finally isettings.unwrapStrings = saved
+    finally unwrapStrings = saved
   }
 
   def symbolDefString(sym: Symbol) = {
@@ -1353,8 +1355,8 @@ object IMain {
   }
   class ReplStrippingWriter(intp: IMain) extends StrippingTruncatingWriter(intp.out) {
     import intp._
-    def maxStringLength    = isettings.maxPrintString
-    def isStripping        = isettings.unwrapStrings
+    def maxStringLength    = intp.maxPrintString
+    def isStripping        = intp.unwrapStrings
     def isTruncating       = reporter.truncationOK
 
     def stripImpl(str: String): String = naming.unmangle(str)

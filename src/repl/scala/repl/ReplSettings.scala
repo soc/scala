@@ -10,7 +10,10 @@ package scala.repl
  * @version 1.0
  * @author Lex Spoon, 2007/3/24
  **/
-class ISettings(intp: IMain) {
+
+trait ReplSettings {
+  def compilerSettings: scala.tools.nsc.Settings
+
   /** A list of paths where :load should look */
   var loadPath = List(".")
 
@@ -35,26 +38,11 @@ class ISettings(intp: IMain) {
    */
   var unwrapStrings = true
 
+  def deprecation = compilerSettings.deprecation.value
   def deprecation_=(x: Boolean) = {
-    val old = intp.settings.deprecation.value
-    intp.settings.deprecation.value = x
-    if (!old && x) println("Enabled -deprecation output.")
-    else if (old && !x) println("Disabled -deprecation output.")
+    val saved = deprecation
+    compilerSettings.deprecation.value = x
+    if (!saved && x) println("Enabled -deprecation output.")
+    else if (saved && !x) println("Disabled -deprecation output.")
   }
-  def deprecation: Boolean = intp.settings.deprecation.value
-
-  def allSettings = Map(
-    "maxPrintString" -> maxPrintString,
-    "maxAutoprintCompletion" -> maxAutoprintCompletion,
-    "unwrapStrings" -> unwrapStrings,
-    "deprecation" -> deprecation
-  )
-
-  private def allSettingsString =
-    allSettings.toList sortBy (_._1) map { case (k, v) => "  " + k + " = " + v + "\n" } mkString
-
-  override def toString = """
-    | ISettings {
-    | %s
-    | }""".stripMargin.format(allSettingsString)
 }
