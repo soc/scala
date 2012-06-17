@@ -52,56 +52,51 @@ class ILoop(in0: Option[BufferedReader], protected val out: JPrintWriter)
    *  I'm trying to work around it by moving operations into a class from
    *  which it will appear a stable prefix.
    */
-  private def onIntp[T](f: IMain => T): T = f(intp)
-
-  class IMainOps[T <: IMain](val intp: T) {
-    import intp._
-    import global._
-
-    def printAfterTyper(msg: => String) =
-      intp.reporter printUntruncatedMessage afterTyper(msg)
-
-    /** Strip NullaryMethodType artifacts. */
-    private def replInfo(sym: Symbol) = {
-      sym.info match {
-        case NullaryMethodType(restpe) if sym.isAccessor  => restpe
-        case info                                         => info
-      }
-    }
-    def echoTypeStructure(sym: Symbol) =
-      printAfterTyper("" + deconstruct.show(replInfo(sym)))
-
-    def echoTypeSignature(sym: Symbol, verbose: Boolean) = {
-      if (verbose) ILoop.this.echo("// Type signature")
-      printAfterTyper("" + replInfo(sym))
-
-      if (verbose) {
-        ILoop.this.echo("\n// Internal Type structure")
-        echoTypeStructure(sym)
-      }
-    }
-  }
-  implicit def stabilizeIMain(intp: IMain) = new IMainOps[intp.type](intp)
+  // private def onIntp[T](f: IMain => T): T = f(intp)
+  //
+  // class IMainOps[T <: IMain](val intp: T) {
+  //   import intp._
+  //   import global._
+  //
+  //   def printAfterTyper(msg: => String) =
+  //     intp.reporter printUntruncatedMessage afterTyper(msg)
+  //
+  //   /** Strip NullaryMethodType artifacts. */
+  //   private def replInfo(sym: Symbol) = {
+  //     sym.info match {
+  //       case NullaryMethodType(restpe) if sym.isAccessor  => restpe
+  //       case info                                         => info
+  //     }
+  //   }
+  //   def echoTypeStructure(sym: Symbol) =
+  //     printAfterTyper("" + deconstruct.show(replInfo(sym)))
+  //
+  //   def echoTypeSignature(sym: Symbol, verbose: Boolean) = {
+  //     if (verbose) ILoop.this.echo("// Type signature")
+  //     printAfterTyper("" + replInfo(sym))
+  //
+  //     if (verbose) {
+  //       ILoop.this.echo("\n// Internal Type structure")
+  //       echoTypeStructure(sym)
+  //     }
+  //   }
+  // }
+  // implicit def stabilizeIMain(intp: IMain) = new IMainOps[intp.type](intp)
 
   /** TODO -
    *  -n normalize
    *  -l label with case class parameter names
    *  -c complete - leave nothing out
    */
-  private def typeCommandInternal(expr: String, verbose: Boolean): Result = {
-    onIntp { intp =>
-      val sym = intp.symbolOfLine(expr)
-      if (sym.exists) intp.echoTypeSignature(sym, verbose)
-      else ""
-    }
-  }
+  // private def typeCommandInternal(expr: String, verbose: Boolean): Result =
+  //   intp.typeCommand(expr, verbose)
 
   override def echoCommandMessage(msg: String) {
     intp.reporter printUntruncatedMessage msg
   }
 
   def isAsync = !settings.Yreplsync.value
-  lazy val power = new Power(intp, new StdReplVals(this))(tagOfStdReplVals, classTag[StdReplVals])
+  lazy val power = new Power(intp, new StdReplVals(this)) //(tagOfStdReplVals, classTag[StdReplVals])
   def history = in.history
 
   /** The context class loader at the time this object was created */
@@ -294,62 +289,77 @@ class ILoop(in0: Option[BufferedReader], protected val out: JPrintWriter)
     }
   }
 
-  private def implicitsCommand(line: String): Result = onIntp { intp =>
-    import intp._
-    import global._
-
-    def p(x: Any) = intp.reporter.printMessage("" + x)
-
+  private def implicitsCommand(line: String): Result = {
     // If an argument is given, only show a source with that
     // in its name somewhere.
-    val args     = line split "\\s+"
-    val filtered = intp.implicitSymbolsBySource filter {
-      case (source, syms) =>
-        (args contains "-v") || {
-          if (line == "") (source.fullName.toString != "scala.Predef")
-          else (args exists (source.name.toString contains _))
-        }
-    }
+    val args = line split "\\s+"
+    val filter: Global#Symbol => Boolean = (
+      if (args contains "-v") _ => true
+      else if (line == "") s => s.fullName.toString != "scala.Predef"
+      else s => args exists (s.name.toString contains _)
+    )
 
-    if (filtered.isEmpty)
-      return "No implicits have been imported other than those in Predef."
-
-    filtered foreach {
-      case (source, syms) =>
-        p("/* " + syms.size + " implicit members imported from " + source.fullName + " */")
-
-        // This groups the members by where the symbol is defined
-        val byOwner = syms groupBy (_.owner)
-        val sortedOwners = byOwner.toList sortBy { case (owner, _) => afterTyper(source.info.baseClasses indexOf owner) }
-
-        sortedOwners foreach {
-          case (owner, members) =>
-            // Within each owner, we cluster results based on the final result type
-            // if there are more than a couple, and sort each cluster based on name.
-            // This is really just trying to make the 100 or so implicits imported
-            // by default into something readable.
-            val memberGroups: List[List[Symbol]] = {
-              val groups = members groupBy (_.tpe.finalResultType) toList
-              val (big, small) = groups partition (_._2.size > 3)
-              val xss = (
-                (big sortBy (_._1.toString) map (_._2)) :+
-                (small flatMap (_._2))
-              )
-
-              xss map (xs => xs sortBy (_.name.toString))
-            }
-
-            val ownerMessage = if (owner == source) " defined in " else " inherited from "
-            p("  /* " + members.size + ownerMessage + owner.fullName + " */")
-
-            memberGroups foreach { group =>
-              group foreach (s => p("  " + intp.symbolDefString(s)))
-              p("")
-            }
-        }
-        p("")
-    }
+    if (intp.implicitsCommand(filter)) ()
+    else "No implicits have been imported other than those in Predef."
   }
+
+  //
+  // private def implicitsCommand(line: String): Result = onIntp { intp =>
+  //   import intp._
+  //   import global._
+  //
+  //   def p(x: Any) = intp.reporter.printMessage("" + x)
+  //
+  //   // If an argument is given, only show a source with that
+  //   // in its name somewhere.
+  //   val args     = line split "\\s+"
+  //   val filtered = intp.implicitSymbolsBySource filter {
+  //     case (source, syms) =>
+  //       (args contains "-v") || {
+  //         if (line == "") (source.fullName.toString != "scala.Predef")
+  //         else (args exists (source.name.toString contains _))
+  //       }
+  //   }
+  //
+  //   if (filtered.isEmpty)
+  //     return "No implicits have been imported other than those in Predef."
+  //
+  //   filtered foreach {
+  //     case (source, syms) =>
+  //       p("/* " + syms.size + " implicit members imported from " + source.fullName + " */")
+  //
+  //       // This groups the members by where the symbol is defined
+  //       val byOwner = syms groupBy (_.owner)
+  //       val sortedOwners = byOwner.toList sortBy { case (owner, _) => afterTyper(source.info.baseClasses indexOf owner) }
+  //
+  //       sortedOwners foreach {
+  //         case (owner, members) =>
+  //           // Within each owner, we cluster results based on the final result type
+  //           // if there are more than a couple, and sort each cluster based on name.
+  //           // This is really just trying to make the 100 or so implicits imported
+  //           // by default into something readable.
+  //           val memberGroups: List[List[Symbol]] = {
+  //             val groups = members groupBy (_.tpe.finalResultType) toList
+  //             val (big, small) = groups partition (_._2.size > 3)
+  //             val xss = (
+  //               (big sortBy (_._1.toString) map (_._2)) :+
+  //               (small flatMap (_._2))
+  //             )
+  //
+  //             xss map (xs => xs sortBy (_.name.toString))
+  //           }
+  //
+  //           val ownerMessage = if (owner == source) " defined in " else " inherited from "
+  //           p("  /* " + members.size + ownerMessage + owner.fullName + " */")
+  //
+  //           memberGroups foreach { group =>
+  //             group foreach (s => p("  " + intp.symbolDefString(s)))
+  //             p("")
+  //           }
+  //       }
+  //       p("")
+  //   }
+  // }
 
   private def findToolsJar() = {
     val jdkPath = Directory(jdkHome)
@@ -407,11 +417,11 @@ class ILoop(in0: Option[BufferedReader], protected val out: JPrintWriter)
   private lazy val javap = substituteAndLog[Javap]("javap", NoJavap)(newJavap())
 
   // Still todo: modules.
-  private def typeCommand(line0: String): Result = {
-    line0.trim match {
+  private def typeCommand(line: String): Result = {
+    line.trim match {
       case ""                      => ":type [-v] <expression>"
-      case s if s startsWith "-v " => typeCommandInternal(s stripPrefix "-v " trim, true)
-      case s                       => typeCommandInternal(s, false)
+      case s if s startsWith "-v " => intp.typeCommand(s stripPrefix "-v " trim, verbose = true)
+      case s                       => intp.typeCommand(s, verbose = false)
     }
   }
 

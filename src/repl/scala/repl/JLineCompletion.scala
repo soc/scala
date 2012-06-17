@@ -29,7 +29,7 @@ class JLineCompletion(val intp: IMain) extends Completion with CompletionOutput 
     else getModuleIfDefined(name)
   )
   def getType(name: String, isModule: Boolean) = getSymbol(name, isModule).tpe
-  def typeOf(name: String)                     = getType(name, false)
+  def seenTypeOf(name: String)                     = getType(name, false)
   def moduleOf(name: String)                   = getType(name, true)
 
   trait CompilerCompletion {

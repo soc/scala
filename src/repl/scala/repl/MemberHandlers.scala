@@ -115,7 +115,7 @@ trait MemberHandlers {
           if (replProps.vids) """" + " @ " + "%%8x".format(System.identityHashCode(%s)) + " """.trim.format(req fullPath name)
           else ""
 
-        """ + "%s%s: %s = " + %s""".format(prettyName, vidString, string2code(req typeOf name), resultString)
+        """ + "%s%s: %s = " + %s""".format(prettyName, vidString, string2code(req seenTypeOf name), resultString)
       }
     }
   }
@@ -126,7 +126,7 @@ trait MemberHandlers {
     // true if not a macro and 0-arity
     override def definesValue = !isMacro && flattensToEmpty(vparamss)
     override def resultExtractionCode(req: Request) =
-      if (mods.isPublic) codegenln(name, ": ", req.typeOf(name)) else ""
+      if (mods.isPublic) codegenln(name, ": ", req.seenTypeOf(name)) else ""
   }
 
   class AssignHandler(member: Assign) extends MemberHandler(member) {

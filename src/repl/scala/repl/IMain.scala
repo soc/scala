@@ -891,7 +891,7 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
       val evalResult =
         if (!handlers.last.definesValue) ""
         else handlers.last.definesTerm match {
-          case Some(vname) if typeOf contains vname =>
+          case Some(vname) if seenTypeOf contains vname =>
             "lazy val %s = %s".format(lineRep.resultName, fullPath(vname))
           case _  => ""
         }
@@ -934,7 +934,7 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
       // compile the object containing the user's code
       lineRep.compile(ObjectSourceCode(handlers)) && {
         // extract and remember types
-        typeOf
+        seenTypeOf
         typesOfDefinedTerms
 
         // Assign symbols to the original trees
@@ -959,8 +959,8 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
     lazy val resultSymbol = lineRep.resolvePathToSymbol(accessPath)
     def applyToResultMember[T](name: Name, f: Symbol => T) = afterTyper(f(resultSymbol.info.nonPrivateDecl(name)))
 
-    /* typeOf lookup with encoding */
-    def lookupTypeOf(name: Name) = typeOf.getOrElse(name, typeOf(global.encode(name.toString)))
+    /* seenTypeOf lookup with encoding */
+    def lookupTypeOf(name: Name) = seenTypeOf.getOrElse(name, seenTypeOf(global.encode(name.toString)))
     def simpleNameOfType(name: TypeName) = (compilerTypeOf get name) map (_.typeSymbol.simpleName)
 
     private def typeMap[T](f: Type => T) =
@@ -969,7 +969,7 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
     /** Types of variables defined by this request. */
     lazy val compilerTypeOf = typeMap[Type](x => x) withDefaultValue NoType
     /** String representations of same. */
-    lazy val typeOf         = typeMap[String](tp => afterTyper(tp.toString))
+    lazy val seenTypeOf         = typeMap[String](tp => afterTyper(tp.toString))
 
     // lazy val definedTypes: Map[Name, Type] = {
     //   typeNames map (x => x -> afterTyper(resultSymbol.info.nonPrivateDecl(x).tpe)) toMap
@@ -1137,7 +1137,7 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
 
   def lastRequest         = if (prevRequests.isEmpty) null else prevRequests.last
   def prevRequestList     = prevRequests.toList
-  def allSeenTypes        = prevRequestList flatMap (_.typeOf.values.toList) distinct
+  def allSeenTypes        = prevRequestList flatMap (_.seenTypeOf.values.toList) distinct
   def allImplicits        = allHandlers filter (_.definesImplicit) flatMap (_.definedNames)
   def importHandlers      = allHandlers collect { case x: ImportHandler => x }
 
@@ -1187,6 +1187,118 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
 
 /** Utility methods for the Interpreter. */
 object IMain {
+  implicit class IMainOps(val intp: IMain) {
+    import intp._
+    import global._
+
+    // lazy val tagOfStdReplVals = staticTypeTag[scala.tools.nsc.interpreter.StdReplVals]
+
+    protected def echo(msg: String) = {
+      Console.out println msg
+      Console.out.flush()
+    }
+
+    def wrapCommand(line: String): String = {
+      def failMsg = "Argument to :wrap must be the name of a method with signature [T](=> T): T"
+
+      words(line) match {
+        case Nil            =>
+          intp.executionWrapper match {
+            case ""   => "No execution wrapper is set."
+            case s    => "Current execution wrapper: " + s
+          }
+        case "clear" :: Nil =>
+          intp.executionWrapper match {
+            case ""   => "No execution wrapper is set."
+            case s    => intp.clearExecutionWrapper() ; "Cleared execution wrapper."
+          }
+        case wrapper :: Nil =>
+          intp.typeOfExpression(wrapper) match {
+            case PolyType(List(targ), MethodType(List(arg), restpe)) =>
+              intp setExecutionWrapper intp.pathToTerm(wrapper)
+              "Set wrapper to '" + wrapper + "'"
+            case tp =>
+              failMsg + "\nFound: <unknown>"
+          }
+        case _ => failMsg
+      }
+    }
+
+    def implicitsCommand(filt: Symbol => Boolean): Boolean = {
+      def p(x: Any) = intp.reporter.printMessage("" + x)
+      val filtered = intp.implicitSymbolsBySource filter (pair => filt(pair._1))
+
+      filtered foreach {
+        case (source, syms) =>
+          p("/* " + syms.size + " implicit members imported from " + source.fullName + " */")
+
+          // This groups the members by where the symbol is defined
+          val byOwner = syms groupBy (_.owner)
+          val sortedOwners = byOwner.toList sortBy { case (owner, _) => afterTyper(source.info.baseClasses indexOf owner) }
+
+          sortedOwners foreach {
+            case (owner, members) =>
+              // Within each owner, we cluster results based on the final result type
+              // if there are more than a couple, and sort each cluster based on name.
+              // This is really just trying to make the 100 or so implicits imported
+              // by default into something readable.
+              val memberGroups: List[List[Symbol]] = {
+                val groups = members groupBy (_.tpe.finalResultType) toList
+                val (big, small) = groups partition (_._2.size > 3)
+                val xss = (
+                  (big sortBy (_._1.toString) map (_._2)) :+
+                  (small flatMap (_._2))
+                )
+
+                xss map (xs => xs sortBy (_.name.toString))
+              }
+
+              val ownerMessage = if (owner == source) " defined in " else " inherited from "
+              p("  /* " + members.size + ownerMessage + owner.fullName + " */")
+
+              memberGroups foreach { group =>
+                group foreach (s => p("  " + intp.symbolDefString(s)))
+                p("")
+              }
+          }
+          p("")
+      }
+
+      filtered.nonEmpty
+    }
+
+    def typeCommand(expr: String, verbose: Boolean): String = {
+      val sym = intp.symbolOfLine(expr)
+      if (sym.exists)
+        echoTypeSignature(sym, verbose)
+
+      ""
+    }
+
+    def printAfterTyper(msg: => String) =
+      intp.reporter printUntruncatedMessage afterTyper(msg)
+
+    /** Strip NullaryMethodType artifacts. */
+    private def replInfo(sym: Symbol) = {
+      sym.info match {
+        case NullaryMethodType(restpe) if sym.isAccessor  => restpe
+        case info                                         => info
+      }
+    }
+    def echoTypeStructure(sym: Symbol) =
+      printAfterTyper("" + deconstruct.show(replInfo(sym)))
+
+    def echoTypeSignature(sym: Symbol, verbose: Boolean) = {
+      if (verbose) echo("// Type signature")
+      printAfterTyper("" + replInfo(sym))
+
+      if (verbose) {
+        echo("\n// Internal Type structure")
+        echoTypeStructure(sym)
+      }
+    }
+  }
+
   // The two name forms this is catching are the two sides of this assignment:
   //
   // $line3.$read.$iw.$iw.Bippy =

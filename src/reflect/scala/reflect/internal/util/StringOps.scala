@@ -34,6 +34,11 @@ trait StringOps {
       s.substring(0, idx + 1)
     }
   }
+  def sanitize(s: String): String = sanitize(s.getBytes())
+  def sanitize(s: Array[Byte]): String = (s map {
+    case x if x.toChar.isControl  => '?'
+    case x                        => x.toChar
+  }).mkString
 
   def decompose(str: String, sep: Char): List[String] = {
     def ws(start: Int): List[String] =
