@@ -5,21 +5,16 @@
 
 package scala.repl
 
+// import scala.tools.nsc._
+// import reporters._
 import scala.tools.nsc._
-import reporters._
 import typechecker.Analyzer
 
 /** A layer on top of Global so I can guarantee some extra
  *  functionality for the repl.  It doesn't do much yet.
  */
 trait ReplGlobal extends Global {
-  // This exists mostly because using the reporter too early leads to deadlock.
-  private def echo(msg: String) { Console println msg }
-
-  override def abort(msg: String): Nothing = {
-    echo("ReplGlobal.abort: " + msg)
-    super.abort(msg)
-  }
+  self =>
 
   override lazy val analyzer = new {
     val global: ReplGlobal.this.type = ReplGlobal.this

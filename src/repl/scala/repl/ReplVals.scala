@@ -8,8 +8,7 @@ package scala.repl
 import language.implicitConversions
 import scala.tools.nsc.ast.TreeDSL
 import scala.reflect.internal.util.StringOps
-import scala.reflect.{ ClassTag, classTag, api, base, runtime }
-import scala.reflect.runtime.{ universe => ru }
+import scala.reflect.{ api, base, runtime }
 import java.net.URL
 
 trait ReplUniverseOps {
@@ -24,9 +23,10 @@ trait ReplUniverseOps {
 
   def lub[T1: TypeTag, T2: TypeTag] : Type              = global.lub(List(typeOf[T1], typeOf[T2]))
   def lub[T1: TypeTag, T2: TypeTag, T3: TypeTag] : Type = global.lub(List(typeOf[T1], typeOf[T2], typeOf[T3]))
-
   def glb[T1: TypeTag, T2: TypeTag] : Type              = global.glb(List(typeOf[T1], typeOf[T2]))
   def glb[T1: TypeTag, T2: TypeTag, T3: TypeTag] : Type = global.glb(List(typeOf[T1], typeOf[T2], typeOf[T3]))
+
+  def toolbox = scala.tools.reflect.ToolBox(scala.reflect.runtime.currentMirror)
 
   implicit class ReplStringOps(val s: String) {
     def t: TypeName = newTypeName(s)
@@ -60,7 +60,7 @@ trait ReplUniverseOps {
 }
 
 trait ReplGlobalOps extends ReplUniverseOps with ReplInternalInfos {
-  val global: scala.tools.nsc.Global
+  val intp: scala.repl.IMain
   import global._
 
   implicit final class ReplSymbolListOps(val syms: List[Symbol]) {
@@ -83,7 +83,7 @@ class StdReplVals(final val r: ILoop) {
   final lazy val analyzer                 = global.analyzer
 
   final lazy val replenv = new {
-    val global: intp.global.type = intp.global
+    val intp: StdReplVals.this.intp.type = StdReplVals.this.intp
   } with power.Implicits with ReplGlobalOps { }
 
   object treedsl extends { val global: intp.global.type = intp.global } with TreeDSL { }

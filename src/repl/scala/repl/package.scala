@@ -6,10 +6,7 @@
 package scala
 
 import language.implicitConversions
-import scala.tools.reflect.StdTags
-import scala.reflect.runtime.{ universe => ru }
-import scala.reflect.{ ClassTag, classTag }
-import scala.reflect.base.{ MirrorOf, TypeCreator, Universe => BaseUniverse }
+import scala.collection.convert._
 
 /** The main REPL related classes and values are as follows.
  *  In addition to standard compiler classes Global and Settings, there are:
@@ -28,7 +25,7 @@ import scala.reflect.base.{ MirrorOf, TypeCreator, Universe => BaseUniverse }
  *  InteractiveReader contains { history: History, completion: Completion }
  *  IMain contains { global: Global }
  */
-package object repl extends ReplConfig with ReplStrings {
+package object repl extends ReplConfig with ReplStrings with DecorateAsJava with DecorateAsScala {
   type Global = scala.tools.nsc.Global
   type Phase = scala.tools.nsc.Phase
   
@@ -42,24 +39,30 @@ package object repl extends ReplConfig with ReplStrings {
 
   val IR = Results
   
-  private val ourClassloader = getClass.getClassLoader
-  private def staticClassTag[T: ClassTag] : ru.TypeTag[T] = {
-    ru.TypeTag[T](
-      ru.runtimeMirror(ourClassloader),
-      new TypeCreator {
-        def apply[U <: BaseUniverse with Singleton](m: MirrorOf[U]): U # Type =
-          m.staticClass(classTag[T].runtimeClass.getName).asTypeConstructor.asInstanceOf[U # Type]
-      })
-  }
-  lazy val tagOfStdReplVals = staticClassTag[scala.repl.StdReplVals]
-  lazy val tagOfIMain       = staticClassTag[scala.repl.IMain]
+  def classTag[T](implicit ctag: ClassTag[T]) = ctag
+  def typeTag[T](implicit ttag: TypeTag[T])   = ttag
+  type ClassTag[T]                            = scala.reflect.ClassTag[T]
+  type TypeTag[T]                             = ru.TypeTag[T]
+  def typeOf[T: TypeTag] : ru.Type            = typeTag[T].tpe
 
+  lazy val ru = scala.reflect.runtime.universe
+  // new scala.reflect.runtime.JavaUniverse {
+  //   override def missingHook(owner: Symbol, name: Name): Symbol = super.missingHook(owner, name)
+  //   override def rootClassLoader: ClassLoader = this.getClass.getClassLoader
+  //   override def init() = super.init()
+  //   override def runtimeMirror(cl: ClassLoader): Mirror = super.runtimeMirror(cl)
+  // }
+  //
   implicit def postfixOps = language.postfixOps // make all postfix ops in this package compile without warning
 
-  private[repl] implicit def javaCharSeqCollectionToScala(xs: JCollection[_ <: CharSequence]): List[String] = {
-    import collection.JavaConverters._
+  private[repl] implicit def javaCharSeqCollectionToScala(xs: JCollection[_ <: CharSequence]): List[String] =
     xs.asScala.toList map ("" + _)
-  }
+
+  //
+  // private[repl] implicit def javaCharSeqCollectionToScala(xs: JCollection[_ <: CharSequence]): List[String] = {
+  //   import collection.JavaConverters._
+  //   xs.asScala.toList map ("" + _)
+  // }
 
   private[repl] implicit def enrichAnyRefWithTap[T](x: T) = new TapMaker(x)
   private[repl] def tracing[T](msg: String)(x: T): T = x.tapTrace(msg)

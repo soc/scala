@@ -11,11 +11,10 @@ import scala.util.matching.Regex
 import scala.reflect.internal.util.{ BatchSourceFile }
 import session.{ History }
 import scala.io.Codec
-import java.net.{ URL, MalformedURLException }
+import java.net.URL
 import io.{ Path }
 import language.implicitConversions
-import scala.reflect.{ ClassTag, classTag, api, base, runtime }
-import scala.reflect.runtime.{universe => ru}
+import scala.reflect.{ api, base, runtime }
 import scala.annotation.{ implicitWeight => weight }
 
 trait TagWrappers {
@@ -35,7 +34,8 @@ trait TagWrappers {
 }
 
 trait ReplInternalInfos extends TagWrappers {
-  val global: scala.tools.nsc.Global
+  val intp: scala.repl.IMain
+  lazy val global: intp.global.type = intp.global
   import global._
 
   override implicit def newTaggedValue[T : TypeTag : ClassTag](value: T): TaggedValue[T] = new TaggedValue[T](value)
@@ -103,11 +103,9 @@ object Power {
  *  The type "T" determines what will be imported directly into the
  *  repl: all the members of that type.
  */
-class Power[T : ru.TypeTag : ClassTag](val intp: IMain, vals: T) {
+class Power[T : TypeTag : ClassTag](val intp: IMain, vals: T) {
   import intp.{ beQuietDuring, typeOfExpression, interpret, parse }
   import intp.global._
-
-  private def customInit   = replProps.powerInitCode.option flatMap (f => io.File(f).safeSlurp())
 
   def banner = """
     |** Power User mode enabled - TICK TICK WHIR **
@@ -116,17 +114,11 @@ class Power[T : ru.TypeTag : ClassTag](val intp: IMain, vals: T) {
 
   private def initImports = List(
     "scala.repl._",
-    "scala.collection.JavaConverters._",
-    "$r.global.{ error => _, _ }",
-    "definitions.{ getClass => _, _ }",
-    "$r.replenv._",
-    "treedsl.CODE._"
+    // "scala.collection.JavaConverters._",
+    "$r.replenv._"
+    // "treedsl.CODE._"
   )
-
-  def init = customInit match {
-    case Some(x)  => x
-    case _        => initImports.mkString("import ", ", ", "")
-  }
+  def init = initImports.mkString("import ", ", ", "")
 
   /** Starts up power mode and runs whatever is in init.
    */
@@ -221,8 +213,6 @@ class Power[T : ru.TypeTag : ClassTag](val intp: IMain, vals: T) {
       new MultiPrettifierClass[T](xs.toSeq)
     @weight(-1) implicit def replPrettifier[T] : Prettifier[T] = Prettifier.default[T]
   }
-
-  // lazy val phased: Phased       = new { val global: intp.global.type = intp.global } with Phased { }
 
   def context(code: String)  = analyzer.rootContext(unit(code))
   def source(code: String)   = newSourceFile(code)

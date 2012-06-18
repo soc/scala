@@ -6,12 +6,11 @@
 package scala.repl
 package session
 
-import scala.collection.mutable.{ Buffer, ListBuffer }
-import scala.collection.JavaConverters._
+import scala.collection.{ mutable, immutable }
 
 class SimpleHistory extends JLineHistory {
   private var _index: Int = 0
-  private val buf = new ListBuffer[String]
+  private val buf = mutable.ListBuffer[String]()
   private def toEntries(): Seq[JEntry] = buf.zipWithIndex map { case (x, i) => Entry(i, x) }
   private def setTo(num: Int)          = { _index = num ; true }
   private def minusOne                 = { _index -= 1 ; true }

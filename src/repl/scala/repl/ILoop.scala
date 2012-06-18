@@ -21,8 +21,6 @@ import util.ScalaClassLoader
 import ScalaClassLoader._
 import scala.tools.util._
 import language.{implicitConversions, existentials}
-import scala.reflect.{ClassTag, classTag}
-import scala.tools.reflect.StdTags._
 
 /** The Scala interactive shell.  It provides a read-eval-print loop
  *  around the Interpreter class.
@@ -639,7 +637,8 @@ class ILoop(in0: Option[BufferedReader], protected val out: JPrintWriter)
     }
     // Bind intp somewhere out of the regular namespace where
     // we can get at it in generated code.
-    addThunk(intp.quietBind(NamedParam[IMain]("$intp", intp)(tagOfIMain, classTag[IMain])))
+    addThunk(intp.quietBind("$intp" -> intp))
+      // intp.quietBind(NamedParam[IMain]("$intp", intp)))
     addThunk({
       import scala.tools.nsc.io._
       import Properties.userHome

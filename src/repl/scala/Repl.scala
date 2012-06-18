@@ -7,7 +7,6 @@ package scala
 
 import scala.tools.nsc._
 import java.net.URL
-import scala.tools.util.PathResolver
 import scala.tools.nsc.io.{ Jar, File }
 import scala.tools.nsc.util.{ ClassPath, ScalaClassLoader }
 import Properties.{ versionString, copyrightString }

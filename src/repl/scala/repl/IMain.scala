@@ -7,7 +7,7 @@ package scala.repl
 
 import scala.tools.nsc._
 import Predef.{ println => _, _ }
-import util.{ stringFromWriter, TypeStrings, StructuredTypeStrings }
+import scala.tools.nsc.util.{ stringFromWriter, TypeStrings, StructuredTypeStrings }
 import scala.reflect.internal.util._
 import java.net.URL
 import scala.sys.BooleanProp
@@ -24,9 +24,6 @@ import scala.collection.{ mutable, immutable }
 import IMain._
 import java.util.concurrent.Future
 import language.implicitConversions
-import scala.reflect.runtime.{ universe => ru }
-import scala.reflect.{ ClassTag, classTag }
-import scala.tools.reflect.StdTags._
 
 /** directory to save .class files to */
 private class ReplVirtualDirectory(out: JPrintWriter) extends VirtualDirectory("(memory)", None) {
@@ -80,14 +77,14 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter)
 
   /** Leading with the eagerly evaluated.
    */
-  val virtualDirectory: VirtualDirectory            = new ReplVirtualDirectory(out) // "directory" for classfiles
-  private var currentSettings: Settings             = initialSettings
-  private[repl] var printResults                     = true      // whether to print result lines
-  private[repl] var totalSilence                     = false     // whether to print anything
-  private var _initializeComplete                   = false     // compiler is initialized
-  private var _isInitialized: Future[Boolean]       = null      // set up initialization future
-  private var bindExceptions                        = true      // whether to bind the lastException variable
-  private var _executionWrapper                     = ""        // code to be wrapped around all lines
+  val virtualDirectory: VirtualDirectory      = new ReplVirtualDirectory(out) // "directory" for classfiles
+  private var currentSettings: Settings       = initialSettings
+  private[repl] var printResults              = true      // whether to print result lines
+  private[repl] var totalSilence              = false     // whether to print anything
+  private var _initializeComplete             = false     // compiler is initialized
+  private var _isInitialized: Future[Boolean] = null      // set up initialization future
+  private var bindExceptions                  = true      // whether to bind the lastException variable
+  private var _executionWrapper               = ""        // code to be wrapped around all lines
 
   def compilerSettings = currentSettings
 
@@ -197,24 +194,9 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter)
       else null
     }
   }
-  @deprecated("Use `global` for access to the compiler instance.", "2.9.0")
-  lazy val compiler: global.type = global
 
   import global._
-  // import definitions.{
-  //   ScalaPackage, JavaLangPackage, RootClass,
-  //   getClassIfDefined, getModuleIfDefined, getRequiredModule, getRequiredClass,
-  //   termMember, typeMember
-  // }
-  // 
-  // private implicit def privateTreeOps(t: Tree): List[Tree] = {
-  //   (new Iterable[Tree] {
-  //     override def foreach[U](f: Tree => U): Unit = t foreach { x => f(x) ; () }
-  //     override def iterator = toBuffer.iterator
-  //   }).toList
-  // }
-  import definitions.{ScalaPackage, JavaLangPackage, termMember, typeMember}
-  import rootMirror.{RootClass, getClassIfDefined, getModuleIfDefined, getRequiredModule, getRequiredClass}
+  import rootMirror.{getModule, getClassByName, getRequiredClass, getRequiredModule, getRequiredPackage, getClassIfDefined, getModuleIfDefined, getPackageObject, getPackageObjectIfDefined, requiredClass, requiredModule}
 
   implicit class ReplTypeOps(tp: Type) {
     def orElse(other: => Type): Type    = if (tp ne NoType) tp else other
@@ -281,7 +263,7 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter)
   protected def newCompiler(settings: Settings, reporter: Reporter): ReplGlobal = {
     settings.outputDirs setSingleOutput virtualDirectory
     settings.exposeEmptyPackage.value = true
-    new Global(settings, reporter) with ReplGlobal
+    new Global(settings, reporter) with ReplGlobal { }
   }
 
   /** Parent classloader.  Overridable. */
@@ -307,8 +289,9 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter)
     ensureClassLoader()
   }
   final def ensureClassLoader() {
-    if (_classLoader == null)
+    if (_classLoader == null) {
       _classLoader = makeClassLoader()
+    }
   }
   def classLoader: AbstractFileClassLoader = {
     ensureClassLoader()
@@ -320,12 +303,14 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter)
      *  getResourceAsStream as well as findClass.
      */
     override protected def findAbstractFile(name: String): AbstractFile = {
-      super.findAbstractFile(name) match {
-        // deadlocks on startup if we try to translate names too early
-        case null if isInitializeComplete =>
-          generatedName(name) map (x => super.findAbstractFile(x)) orNull
-        case file                         =>
-          file
+      replLog[AbstractFile]({ case x => "findAbstractFile(" + name + ") == " + x }) {
+        super.findAbstractFile(name) match {
+          // deadlocks on startup if we try to translate names too early
+          case null if isInitializeComplete =>
+            generatedName(name) map (x => super.findAbstractFile(x)) orNull
+          case file                         =>
+            file
+        }
       }
     }
   }
@@ -646,7 +631,7 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter)
     result
   }
   def directBind(p: NamedParam[_]): IR.Result                                 = directBind(p.name, p.tpe, p.value)
-  def directBind[T: ru.TypeTag : ClassTag](name: String, value: T): IR.Result = directBind((name, value))
+  def directBind[T: TypeTag : ClassTag](name: String, value: T): IR.Result = directBind((name, value))
 
   def rebind(p: NamedParam[_]): IR.Result = {
     val name     = p.name
@@ -662,9 +647,9 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter)
     if (ids.isEmpty) IR.Success
     else interpret("import " + ids.mkString(", "))
 
-  def quietBind(p: NamedParam[_]): IR.Result                            = beQuietDuring(bind(p))
-  def bind(p: NamedParam[_]): IR.Result                                 = bind(p.name, p.tpe, p.value)
-  def bind[T: ru.TypeTag : ClassTag](name: String, value: T): IR.Result = bind((name, value))
+  def quietBind(p: NamedParam[_]): IR.Result                         = beQuietDuring(bind(p))
+  def bind(p: NamedParam[_]): IR.Result                              = bind(p.name, p.tpe, p.value)
+  def bind[T: TypeTag : ClassTag](name: String, value: T): IR.Result = bind((name, value))
 
   /** Reset this interpreter, forgetting all user-specified requests. */
   def reset() {
@@ -707,7 +692,7 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter)
 
       val unwrapped = unwrap(t)
       withLastExceptionLock[String]({
-        directBind[Throwable]("lastException", unwrapped)(tagOfThrowable, classTag[Throwable])
+        directBind[Throwable]("lastException", unwrapped) //(tagOfThrowable, classTag[Throwable])
         util.stackTraceString(unwrapped)
       }, util.stackTraceString(unwrapped))
     }
@@ -766,7 +751,7 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter)
       val readRoot  = getRequiredModule(readPath)   // the outermost wrapper
       (accessPath split '.').foldLeft(readRoot: Symbol) {
         case (sym, "")    => sym
-        case (sym, name)  => afterTyper(termMember(sym, name))
+        case (sym, name)  => afterTyper(definitions.termMember(sym, name))
       }
     }
     /** We get a bunch of repeated warnings for reasons I haven't
@@ -970,7 +955,7 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter)
     /** Types of variables defined by this request. */
     lazy val compilerTypeOf = typeMap[Type](x => x) withDefaultValue NoType
     /** String representations of same. */
-    lazy val seenTypeOf         = typeMap[String](tp => afterTyper(tp.toString))
+    lazy val seenTypeOf = printResult("seenTypeOf")(typeMap[String](tp => afterTyper(tp.toString)))
 
     // lazy val definedTypes: Map[Name, Type] = {
     //   typeNames map (x => x -> afterTyper(resultSymbol.info.nonPrivateDecl(x).tpe)) toMap
@@ -984,6 +969,8 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter)
 
     /** load and run the code using reflection */
     def loadAndRun: (String, Boolean) = {
+      showCodeIfDebugging(line)
+
       try   { ("" + (lineRep call sessionNames.print), true) }
       catch { case ex => (lineRep.bindError(ex), false) }
     }
@@ -1080,7 +1067,7 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter)
   }
 
   object exprTyper extends {
-    val repl: IMain.this.type = imain
+    val intp: IMain.this.type = imain
   } with ExprTyper { }
 
   def parse(line: String): Option[List[Tree]] = exprTyper.parse(line)

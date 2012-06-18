@@ -33,6 +33,12 @@ trait ReplConfig {
       ex.printStackTrace
     }
   }
+  private[repl] def replLog[T](msg: PartialFunction[T, String])(value: T): T = {
+    if (isReplDebug && msg.isDefinedAt(value))
+      echo(msg(value))
+
+    value
+  }
   private[repl] def repldbg(msg: => String)    = if (isReplDebug) echo(msg)
   private[repl] def repltrace(msg: => String)  = if (isReplTrace) echo(msg)
   private[repl] def replinfo(msg: => String)   = if (isReplInfo)  echo(msg)

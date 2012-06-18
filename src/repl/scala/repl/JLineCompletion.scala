@@ -15,21 +15,22 @@ import collection.mutable.ListBuffer
 class JLineCompletion(val intp: IMain) extends Completion with CompletionOutput {
   val global: intp.global.type = intp.global
   import global._
-  import definitions.{ PredefModule, AnyClass, AnyRefClass, ScalaPackage, JavaLangPackage }
-  import rootMirror.{ RootClass, getModuleIfDefined }
+  import definitions.{ AnyClass, AnyRefClass, PredefModule, ScalaPackage, JavaLangPackage }
+  import intp.debugging
+
   type ExecResult = Any
-  import intp.{ debugging }
 
   // verbosity goes up with consecutive tabs
   private var verbosity: Int = 0
   def resetVerbosity() = verbosity = 0
 
-  def getSymbol(name: String, isModule: Boolean) = (
-    if (isModule) getModuleIfDefined(name)
-    else getModuleIfDefined(name)
-  )
+  def staticClass = rootMirror
+
+  def getSymbol(name: String, isModule: Boolean): Symbol =
+    if (isModule) rootMirror.staticModule(name) else rootMirror.staticClass(name)
+
   def getType(name: String, isModule: Boolean) = getSymbol(name, isModule).tpe
-  def seenTypeOf(name: String)                     = getType(name, false)
+  def seenTypeOf(name: String)                 = getType(name, false)
   def moduleOf(name: String)                   = getType(name, true)
 
   trait CompilerCompletion {

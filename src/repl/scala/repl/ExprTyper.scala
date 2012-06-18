@@ -8,17 +8,18 @@ package scala.repl
 import scala.tools.nsc._
 import scala.reflect.internal.util.BatchSourceFile
 import scala.tools.nsc.ast.parser.Tokens.EOF
+import scala.reflect.{ api }
 
 trait ExprTyper {
-  val repl: IMain
+  val intp: IMain
 
-  import repl._
+  import intp._
   import global.{ reporter => _, Import => _, _ }
-  import definitions._
+  import definitions.{ UnitClass }
   import syntaxAnalyzer.{ UnitParser, UnitScanner, token2name }
   import naming.freshInternalVarName
 
-  object codeParser extends { val global: repl.global.type = repl.global } with CodeHandlers[Tree] {
+  object codeParser extends { val global: intp.global.type = intp.global } with CodeHandlers[Tree] {
     def applyRule[T](code: String, rule: UnitParser => T): T = {
       reporter.reset()
       val scanner = newUnitParser(code)
@@ -32,7 +33,7 @@ trait ExprTyper {
 
     def defns(code: String) = stmts(code) collect { case x: DefTree => x }
     def expr(code: String)  = applyRule(code, _.expr())
-    def stmts(code: String) = applyRule(code, _.templateStats())
+    def stmts(code: String) = applyRule(code, _.templateStats()).map(x => (x: Tree)).toList
     def stmt(code: String)  = stmts(code).last  // guaranteed nonempty
   }
 
@@ -46,10 +47,6 @@ trait ExprTyper {
       else Some(trees)
     }
   }
-  // def parsesAsExpr(line: String) = {
-  //   import codeParser._
-  //   (opt expr line).isDefined
-  // }
 
   def symbolOfLine(code: String): Symbol = {
     def asExpr(): Symbol = {
@@ -70,11 +67,11 @@ trait ExprTyper {
       }
     }
     def asDefn(): Symbol = {
-      val old = repl.definedSymbolList.toSet
+      val old = intp.definedSymbolList.toSet
 
       interpretSynthetic(code) match {
         case IR.Success =>
-          repl.definedSymbolList filterNot old match {
+          intp.definedSymbolList filterNot old match {
             case Nil        => NoSymbol
             case sym :: Nil => sym
             case syms       => NoSymbol.newOverloaded(NoPrefix, syms)

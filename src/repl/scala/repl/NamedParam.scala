@@ -8,9 +8,6 @@ package scala.repl
 import scala.tools.nsc._
 import language.implicitConversions
 import util.TypeStrings
-import scala.reflect.{ ClassTag, classTag }
-import scala.reflect.runtime.{ universe => ru }
-import ru.{ TypeTag }
 
 object NamedParam {
   def apply[T](name: String, tpe: String, value: T): NamedParam[T]    = new UntypedParam(name, tpe, value)
