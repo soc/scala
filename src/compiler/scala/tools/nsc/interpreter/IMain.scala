@@ -148,6 +148,9 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
   import formatting._
   import reporter.{ printMessage, withoutTruncating }
 
+  /** directory to save .class files to */
+  lazy val javaCompiler = new javac.JavaCompiler(classLoader, virtualDirectory)
+
   // This exists mostly because using the reporter too early leads to deadlock.
   private def echo(msg: String) { Console println msg }
   private def _initSources = List(new BatchSourceFile("<init>", "class $repl_$init { }"))
@@ -557,7 +560,7 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
     Right(buildRequest(line, trees))
   }
 
-  // normalize non-public types so we don't see protected aliases like Self
+    // normalize non-public types so we don't see protected aliases like Self
   def normalizeNonPublic(tp: Type) = tp match {
     case TypeRef(_, sym, _) if sym.isAliasType && !sym.isPublic => tp.normalize
     case _                                                      => tp
@@ -646,7 +649,7 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
       directlyBoundNames += newTermName(name)
     result
   }
-  def directBind(p: NamedParam): IR.Result                                    = directBind(p.name, p.tpe, p.value)
+  def directBind(p: NamedParam): IR.Result                       = directBind(p.name, p.tpe, p.value)
   def directBind[T: ru.TypeTag : ClassTag](name: String, value: T): IR.Result = directBind((name, value))
 
   def rebind(p: NamedParam): IR.Result = {
@@ -663,12 +666,12 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
     if (ids.isEmpty) IR.Success
     else interpret("import " + ids.mkString(", "))
 
-  def quietBind(p: NamedParam): IR.Result                               = beQuietDuring(bind(p))
-  def bind(p: NamedParam): IR.Result                                    = bind(p.name, p.tpe, p.value)
+  def quietBind(p: NamedParam): IR.Result                  = beQuietDuring(bind(p))
+  def bind(p: NamedParam): IR.Result                       = bind(p.name, p.tpe, p.value)
   def bind[T: ru.TypeTag : ClassTag](name: String, value: T): IR.Result = bind((name, value))
   def bindSyntheticValue(x: Any): IR.Result                             = bindValue(freshInternalVarName(), x)
-  def bindValue(x: Any): IR.Result                                      = bindValue(freshUserVarName(), x)
-  def bindValue(name: String, x: Any): IR.Result                        = bind(name, TypeStrings.fromValue(x), x)
+  def bindValue(x: Any): IR.Result                         = bindValue(freshUserVarName(), x)
+  def bindValue(name: String, x: Any): IR.Result           = bind(name, TypeStrings.fromValue(x), x)
 
   /** Reset this interpreter, forgetting all user-specified requests. */
   def reset() {
@@ -712,7 +715,7 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
       val unwrapped = unwrap(t)
       withLastExceptionLock[String]({
         directBind[Throwable]("lastException", unwrapped)(tagOfThrowable, classTag[Throwable])
-        util.stackTraceString(unwrapped)
+          util.stackTraceString(unwrapped)
       }, util.stackTraceString(unwrapped))
     }
 
@@ -988,9 +991,9 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
 
     /** load and run the code using reflection */
     def loadAndRun: (String, Boolean) = {
-      try   { ("" + (lineRep call sessionNames.print), true) }
-      catch { case ex => (lineRep.bindError(ex), false) }
-    }
+        try   { ("" + (lineRep call sessionNames.print), true) }
+        catch { case ex => (lineRep.bindError(ex), false) }
+      }
 
     override def toString = "Request(line=%s, %s trees)".format(line, trees.size)
   }
@@ -1059,8 +1062,8 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
     classOfTerm(id) flatMap { clazz =>
       clazz.supers find (!_.isScalaAnonymous) map { nonAnon =>
         (nonAnon, runtimeTypeOfTerm(id))
-      }
     }
+  }
   }
 
   def runtimeTypeOfTerm(id: String): Type = {
@@ -1099,7 +1102,7 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
   protected def onlyTypes(xs: List[Name]) = xs collect { case x: TypeName => x }
 
   def definedTerms      = onlyTerms(allDefinedNames) filterNot isInternalTermName
-  def definedTypes      = onlyTypes(allDefinedNames)
+  def definedTypes   = onlyTypes(allDefinedNames)
   def definedSymbols    = prevRequestList.flatMap(_.definedSymbols.values).toSet[Symbol]
   def definedSymbolList = prevRequestList flatMap (_.definedSymbolList) filterNot (s => isInternalTermName(s.name))
 
@@ -1142,9 +1145,9 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
 
   def lastRequest         = if (prevRequests.isEmpty) null else prevRequests.last
   def prevRequestList     = prevRequests.toList
-  def allSeenTypes        = prevRequestList flatMap (_.typeOf.values.toList) distinct
-  def allImplicits        = allHandlers filter (_.definesImplicit) flatMap (_.definedNames)
-  def importHandlers      = allHandlers collect { case x: ImportHandler => x }
+  def allSeenTypes                    = prevRequestList flatMap (_.typeOf.values.toList) distinct
+  def allImplicits                    = allHandlers filter (_.definesImplicit) flatMap (_.definedNames)
+  def importHandlers                  = allHandlers collect { case x: ImportHandler => x }
 
   def visibleTermNames: List[Name] = definedTerms ++ importedTerms distinct
 
