@@ -51,8 +51,7 @@ class ILoop(in0: Option[BufferedReader], protected val out: JPrintWriter)
    *  -l label with case class parameter names
    *  -c complete - leave nothing out
    */
-  // private def typeCommandInternal(expr: String, verbose: Boolean): Result =
-  //   intp.typeCommand(expr, verbose)
+  private def typeCommandInternal(expr: String): Result = intp.typeCommand(expr, true)
 
   override def echoCommandMessage(msg: String) {
     intp.reporter printUntruncatedMessage msg
@@ -68,20 +67,6 @@ class ILoop(in0: Option[BufferedReader], protected val out: JPrintWriter)
   // classpath entries added via :cp
   var addedClasspath: String = ""
 
-  /** A reverse list of commands to replay if the user requests a :replay */
-  var replayCommandStack: List[String] = Nil
-
-  /** A list of commands to replay if the user requests a :replay */
-  def replayCommands = replayCommandStack.reverse
-
-  /** Record a command for replay should the user request a :replay */
-  def addReplay(cmd: String) = replayCommandStack ::= cmd
-
-  def savingReplayStack[T](body: => T): T = {
-    val saved = replayCommandStack
-    try body
-    finally replayCommandStack = saved
-  }
   def savingReader[T](body: => T): T = {
     val saved = in
     try body
@@ -200,7 +185,6 @@ class ILoop(in0: Option[BufferedReader], protected val out: JPrintWriter)
 
   /** Standard commands **/
   lazy val standardCommands = List(
-    cmd("cp", "<path>", "add a jar or directory to the classpath", addClasspath),
     cmd("help", "[command]", "print this summary or command-specific help", helpCommand),
     historyCommand,
     cmd("h?", "<string>", "search the history", searchHistory),
@@ -211,10 +195,9 @@ class ILoop(in0: Option[BufferedReader], protected val out: JPrintWriter)
     nullary("paste", "enter paste mode: all input up to ctrl-D compiled together", pasteCommand),
     nullary("power", "enable power user mode", powerCmd),
     nullary("quit", "exit the interpreter", () => Result(false, None)),
-    nullary("replay", "reset execution and replay all previous commands", replay),
     nullary("reset", "reset the repl to its initial state, forgetting all session entries", resetCommand),
     nullary("silent", "disable/enable automatic printing of results", verbosity),
-    // cmd("type", "[-v] <expr>", "display the type of an expression without evaluating it", typeCommand),
+    cmd("type", "[-v] <expr>", "display the type of an expression without evaluating it", typeCommandInternal),
     nullary("warnings", "show the suppressed warnings from the most recent line which had any", warningsCommand)
   )
 
@@ -338,31 +321,6 @@ class ILoop(in0: Option[BufferedReader], protected val out: JPrintWriter)
   /** Available commands */
   def commands: List[LoopCommand] = standardCommands
 
-  val replayQuestionMessage =
-    """|That entry seems to have slain the compiler.  Shall I replay
-       |your session? I can re-run each line except the last one.
-       |[y/n]
-    """.trim.stripMargin
-
-  private val crashRecovery: PartialFunction[Throwable, Boolean] = {
-    case ex: Throwable =>
-      echo(intp.global.throwableAsString(ex))
-
-      ex match {
-        case _: NoSuchMethodError | _: NoClassDefFoundError =>
-          echo("\nUnrecoverable error.")
-          throw ex
-        case _  =>
-          def fn(): Boolean =
-            try in.readYesOrNo(replayQuestionMessage, { echo("\nYou must enter y or n.") ; fn() })
-            catch { case _: RuntimeException => false }
-
-          if (fn()) replay()
-          else echo("\nAbandoning crashed session.")
-      }
-      true
-  }
-
   /** The main read-eval-print loop for the repl.  It calls
    *  command() for each line of input, and stops when
    *  command() returns false.
@@ -380,13 +338,13 @@ class ILoop(in0: Option[BufferedReader], protected val out: JPrintWriter)
       }
       if (line eq null) false               // assume null means EOF
       else command(line) match {
-        case Result(false, _)           => false
-        case Result(_, Some(finalLine)) => addReplay(finalLine) ; true
-        case _                          => true
+        case Result(false, _)   => false
+        case Result(_, Some(_)) => true
+        case _                  => true
       }
     }
     def innerLoop() {
-      if ( try processLine(readOneLine()) catch crashRecovery )
+      if (processLine(readOneLine()))
         innerLoop()
     }
     innerLoop()
@@ -395,35 +353,16 @@ class ILoop(in0: Option[BufferedReader], protected val out: JPrintWriter)
   /** interpret all lines from a specified file */
   def interpretAllFrom(file: File) {
     savingReader {
-      savingReplayStack {
-        file applyReader { reader =>
-          in = SimpleReader(reader, out, false)
-          echo("Loading " + file + "...")
-          loop()
-        }
+      file applyReader { reader =>
+        in = SimpleReader(reader, out, false)
+        echo("Loading " + file + "...")
+        loop()
       }
     }
   }
 
-  /** create a new interpreter and replay the given commands */
-  def replay() {
-    reset()
-    if (replayCommandStack.isEmpty)
-      echo("Nothing to replay.")
-    else for (cmd <- replayCommands) {
-      echo("Replaying: " + cmd)  // flush because maybe cmd will have its own output
-      command(cmd)
-      echo("")
-    }
-  }
   def resetCommand() {
     echo("Resetting interpreter state.")
-    if (replayCommandStack.nonEmpty) {
-      echo("Forgetting this session history:\n")
-      replayCommands foreach echo
-      echo("")
-      replayCommandStack = Nil
-    }
     if (intp.namedDefinedTerms.nonEmpty)
       echo("Forgetting all expression results and named terms: " + intp.namedDefinedTerms.mkString(", "))
     if (intp.definedTypes.nonEmpty)
@@ -444,23 +383,12 @@ class ILoop(in0: Option[BufferedReader], protected val out: JPrintWriter)
   }
 
   def loadCommand(arg: String) = {
-    var shouldReplay: Option[String] = None
+    var success = false
     withFile(arg)(f => {
       interpretAllFrom(f)
-      shouldReplay = Some(":load " + arg)
+      success = true
     })
-    Result(true, shouldReplay)
-  }
-
-  def addClasspath(arg: String): Unit = {
-    val f = File(arg).normalize
-    if (f.exists) {
-      addedClasspath = ClassPath.join(addedClasspath, f.path)
-      val totalClasspath = ClassPath.join(settings.classpath.value, addedClasspath)
-      echo("Added '%s'.  Your new classpath is:\n\"%s\"".format(f.path, totalClasspath))
-      replay()
-    }
-    else echo("The path '" + f + "' doesn't seem to exist.")
+    Result(true, if (success) Some(":load " + arg) else None)
   }
 
   def powerCmd(): Result = {
@@ -600,7 +528,6 @@ class ILoop(in0: Option[BufferedReader], protected val out: JPrintWriter)
       for (filename <- settings.loadfiles.value) {
         val cmd = ":load " + filename
         command(cmd)
-        addReplay(cmd)
         echo("")
       }
     case _ =>

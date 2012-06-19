@@ -903,7 +903,6 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter)
     }
 
     // get it
-    def getEvalTyped[T] : Option[T] = getEval map (_.asInstanceOf[T])
     def getEval: Option[AnyRef] = {
       // ensure it has been compiled
       compile
@@ -955,7 +954,7 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter)
     /** Types of variables defined by this request. */
     lazy val compilerTypeOf = typeMap[Type](x => x) withDefaultValue NoType
     /** String representations of same. */
-    lazy val seenTypeOf = printResult("seenTypeOf")(typeMap[String](tp => afterTyper(tp.toString)))
+    lazy val seenTypeOf = typeMap[String](tp => afterTyper(tp.toString))
 
     // lazy val definedTypes: Map[Name, Type] = {
     //   typeNames map (x => x -> afterTyper(resultSymbol.info.nonPrivateDecl(x).tpe)) toMap
