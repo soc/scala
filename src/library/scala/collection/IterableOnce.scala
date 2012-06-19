@@ -9,9 +9,12 @@
 package scala.collection
 
 import mutable.{ Buffer, Builder, ListBuffer, ArrayBuffer }
+import generic.CanBuildFrom
 import annotation.unchecked.{ uncheckedVariance => uV }
 import language.{implicitConversions, higherKinds}
 import scala.reflect.ClassTag
+import scala.collection.generic.CanBuildFrom
+import scala.annotation.unchecked.{ uncheckedVariance => uV }
 
 /** A template trait for collections which can be traversed either once only
  *  or one or more times.

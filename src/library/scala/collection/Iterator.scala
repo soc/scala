@@ -1007,6 +1007,7 @@ trait Iterator[+A] extends IterableOnce[A] {
 
   def toIterator: Iterator[A] = self
 
+
   /** Converts this iterator to a string.
    *
    *  @return `"empty iterator"` or `"non-empty iterator"`, depending on

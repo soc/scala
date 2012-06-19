@@ -911,6 +911,7 @@ trait JavaParsers extends ast.parser.ParsersCommon with JavaScanners {
         buf ++= importDecl()
       while (in.token != EOF && in.token != RBRACE) {
         while (in.token == SEMI) in.nextToken
+        if (in.token != EOF)
         buf ++= typeDecl(modifiers(false))
       }
       accept(EOF)

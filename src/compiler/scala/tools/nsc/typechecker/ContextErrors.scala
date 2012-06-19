@@ -88,7 +88,7 @@ trait ContextErrors {
     import infer.setError
 
     object TyperErrorGen {
-      implicit val context0: Context = infer.getContext
+      implicit val contextTyperErrorGen: Context = infer.getContext
 
       def UnstableTreeError(tree: Tree) = {
         def addendum = {
@@ -640,7 +640,7 @@ trait ContextErrors {
 
     object InferErrorGen {
 
-      implicit val context0 = getContext
+      implicit val contextInferErrorGen = getContext
 
       class PolyAlternativeErrorKind
       object PolyAlternativeErrorKind {
@@ -826,7 +826,7 @@ trait ContextErrors {
 
     object NamerErrorGen {
 
-      implicit val context0 = context
+      implicit val contextNamerErrorGen = context
 
       class SymValidateError
       object SymValidateError {
@@ -863,7 +863,7 @@ trait ContextErrors {
           case CyclicReference(sym, info: TypeCompleter) =>
             issueNormalTypeError(tree, typer.cyclicReferenceMessage(sym, info.tree) getOrElse ex.getMessage())
           case _ =>
-            context0.issue(TypeErrorWithUnderlyingTree(tree, ex))
+            contextNamerErrorGen.issue(TypeErrorWithUnderlyingTree(tree, ex))
         }
       }
 

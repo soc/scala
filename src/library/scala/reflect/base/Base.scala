@@ -447,7 +447,7 @@ class Base extends Universe { self =>
     }
   }
 
-  def show(tree: Tree) = s"<tree ${tree.getClass}>"
+  def treeToString(tree: Tree) = s"<tree ${tree.getClass}>"
 
   trait TermTree extends Tree
 

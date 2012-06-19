@@ -73,6 +73,8 @@ override def companion: GenericCompanion[Vector] = Vector
 
   def length = endIndex - startIndex
 
+  override def toVector: Vector[A] = this
+
   override def lengthCompare(len: Int): Int = length - len
 
   private[collection] final def initIterator[B >: A](s: VectorIterator[B]) {

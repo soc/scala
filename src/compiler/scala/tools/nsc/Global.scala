@@ -12,7 +12,7 @@ import scala.tools.util.{ Profiling, PathResolver }
 import scala.collection.{ mutable, immutable }
 import io.{ SourceReader, AbstractFile, Path }
 import reporters.{ Reporter, ConsoleReporter }
-import util.{ Exceptional, ClassPath, MergedClassPath, Statistics, StatisticsInfo, ScalaClassLoader, returning }
+import util.{ Exceptional, ClassPath, MergedClassPath, StatisticsInfo, ScalaClassLoader, returning }
 import scala.reflect.internal.util.{ NoPosition, SourceFile, NoSourceFile, BatchSourceFile, ScriptSourceFile }
 import scala.reflect.internal.pickling.{ PickleBuffer, PickleFormat }
 import settings.{ AestheticSettings }
@@ -36,7 +36,7 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
        with CompilationUnits
        with PhaseAssembly
        with Trees
-       with TreePrinters
+       with Printers
        with Positions { self =>
 
   // [Eugene++] would love to find better homes for the new things dumped into Global
