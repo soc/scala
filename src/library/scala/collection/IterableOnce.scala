@@ -200,6 +200,12 @@ trait IterableOnce[+A] extends Any {
   
   def toSet[A1 >: A]: immutable.Set[A1] = immutable.Set[A1]() ++ this
 
+  def toVector: Vector[A] = convertTo[Vector]
+
+  def convertTo[Col[_]](implicit cbf: CanBuildFrom[Nothing, A, Col[A @uV]]): Col[A @uV] = (
+    cbf() ++= this result
+  )
+
   def toIndexedSeq: immutable.IndexedSeq[A] = immutable.IndexedSeq() ++ this
 
   def toBuffer[B >: A]: mutable.Buffer[B] = new ArrayBuffer[B] ++= this
