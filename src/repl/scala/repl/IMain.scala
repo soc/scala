@@ -1241,27 +1241,17 @@ object IMain {
     }
   }
 
-  trait TruncatingWriter {
-    def maxStringLength: Int
-    def isTruncating: Boolean
+  class ReplStrippingWriter(intp: IMain) extends JPrintWriter(intp.out) {
+    import intp._
+
+    def maxStringLength             = intp.maxPrintString
+    def isTruncating                = reporter.truncationOK
     def truncate(str: String): String = {
       if (isTruncating && (maxStringLength != 0 && str.length > maxStringLength))
         (str take maxStringLength - 3) + "..."
       else str
     }
-  }
-  abstract class StrippingTruncatingWriter(out: JPrintWriter)
-          extends JPrintWriter(out)
-             with TruncatingWriter {
-    self =>
-
-    def clean(str: String): String  = truncate(strip(str))
-    def strip(str: String): String  = intp.naming.unmangle(str)
+    def clean(str: String): String  = truncate(naming unmangle str)
     override def write(str: String) = super.write(clean(str))
-  }
-  class ReplStrippingWriter(intp: IMain) extends StrippingTruncatingWriter(intp.out) {
-    import intp._
-    def maxStringLength    = intp.maxPrintString
-    def isTruncating       = reporter.truncationOK
   }
 }
