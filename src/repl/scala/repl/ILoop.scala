@@ -48,6 +48,26 @@ class ILoop(in0: Option[BufferedReader], protected val out: JPrintWriter)
   lazy val intp: IMain = new ILoopInterpreter
   lazy val power = new Power(intp, new StdReplVals(this))
 
+  // Resuming after ctrl-Z; terminal is hosed.
+  SIG.CONT handle {
+    if (in != null) {
+      repldbg("Caught SIGCONT: resetting terminal.")
+      in.reset()
+      in.redrawLine()
+    }
+  }
+
+  // Catching fat-fingered ctrl-Cs.
+  SIG.INT handle {
+    if (in != null) {
+      if (in.currentLine == "") sys.exit(0)
+      else {
+        echoCommandMessage("\nUse :quit or ctrl-C on an empty line to exit.")
+        in.redrawLine()
+      }
+    }
+  }
+
   /** TODO -
    *  -n normalize
    *  -l label with case class parameter names
