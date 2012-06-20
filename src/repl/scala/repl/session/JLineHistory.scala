@@ -38,7 +38,14 @@ trait JLineHistory extends JHistory with History {
 
 object JLineHistory {
   class JLineFileHistory extends SimpleHistory with FileBackedHistory {
+    // def removeRange(start: Int, count: Int): List[String] = {
+    //   var lines: List[String] = Nil
+    //   1 to count foreach (_ => lines ::= remove(start).toString)
+    //   lines.reverse
+    // }
+    //
     override def add(item: CharSequence): Unit = {
+      repldbg("history.add(%s)".format(item))
       if (!isEmpty && last == item)
         repldbg("Ignoring duplicate entry '" + item + "'")
       else {

@@ -34,7 +34,7 @@ trait LoopCommands {
     // called if no args are given
     def showUsage(): Result = {
       "usage is " + usageMsg
-      Result(true, None)
+      Result(true, 1)
     }
 
     def onError(msg: String) = {
@@ -71,11 +71,10 @@ trait LoopCommands {
   }
 
   // the result of a single command
-  case class Result(val keepRunning: Boolean, val lineToRecord: Option[String])
+  case class Result(keepRunning: Boolean, linesEntered: Int) { }
 
   object Result {
-    // the default result means "keep running, and don't record that line"
-    val default = Result(true, None)
+    val default = Result(true, 1)
 
     // most commands do not want to micromanage the Result, but they might want
     // to print something to the console, so we accomodate Unit and String returns.

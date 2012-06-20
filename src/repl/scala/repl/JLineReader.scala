@@ -6,7 +6,7 @@
 package scala.repl
 
 import scala.tools.nsc._
-import jline.console.ConsoleReader
+import jline.console.{ KeyMap, ConsoleReader }
 import jline.console.completer._
 import session._
 import Completion._
@@ -35,6 +35,17 @@ class JLineReader(_completion: => Completion) extends InteractiveReader {
   }
 
   class JLineConsoleReader extends ConsoleReader with ConsoleReaderHelper {
+    // public static final String VI_MOVE        = "vi-move";
+    // public static final String VI_INSERT      = "vi-insert";
+    // public static final String EMACS          = "emacs";
+    // public static final String EMACS_STANDARD = "emacs-standard";
+    // public static final String EMACS_CTLX     = "emacs-ctlx";
+    // public static final String EMACS_META     = "emacs-meta";
+
+    def enterViInsertMode() = setKeyMap(KeyMap.VI_INSERT)
+    def enterViMoveMode()   = setKeyMap(KeyMap.VI_MOVE)
+    def enterEmacsMode()    = setKeyMap(KeyMap.EMACS)
+
     // working around protected/trait/java insufficiencies.
     def goBack(num: Int): Unit = back(num)
     def readOneKey(prompt: String) = {

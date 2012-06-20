@@ -112,7 +112,7 @@ class ILoop(in0: Option[BufferedReader], protected val out: JPrintWriter)
       case Nil  => echo(cmd + ": no such command.  Type :help for help.")
       case xs   => echo(cmd + " is ambiguous: did you mean " + xs.map(":" + _.name).mkString(" or ") + "?")
     }
-    Result(true, None)
+    Result(true, 0)
   }
   private def matchingCommands(cmd: String) = commands filter (_.name startsWith cmd)
   private def uniqueCommand(cmd: String): Option[LoopCommand] = {
@@ -154,7 +154,7 @@ class ILoop(in0: Option[BufferedReader], protected val out: JPrintWriter)
     cmd("javap", "<path|class>", "disassemble a file or class name", javapCommand),
     nullary("paste", "enter paste mode: all input up to ctrl-D compiled together", pasteCommand),
     nullary("power", "enable power user mode", powerCmd),
-    nullary("quit", "exit the interpreter", () => Result(false, None)),
+    nullary("quit", "exit the interpreter", () => Result(false, 0)),
     nullary("warnings", "show the suppressed warnings from the most recent line which had any", warningsCommand)
   )
 
@@ -273,24 +273,33 @@ class ILoop(in0: Option[BufferedReader], protected val out: JPrintWriter)
   /** Available commands */
   def commands: List[LoopCommand] = standardCommands
 
+  def readLine() = {
+    out.flush()
+    in readLine prompt
+  }
+
   /** The main read-eval-print loop for the repl.  It calls
    *  command() for each line of input, and stops when
    *  command() returns false.
    */
   def loop() {
-    def readOneLine() = {
-      out.flush()
-      in readLine prompt
-    }
     // return false if repl should exit
     def processLine(line: String): Boolean = {
       if (isAsync) {
         if (!awaitInitialized()) return false
         runThunks()
       }
-      (line ne null) && command(line).keepRunning
+      (line ne null) && (command(line) match {
+        case Result(false, _) => false
+        case Result(true, n)  => true
+          (history eq NoHistory) || (n <= 1) || {
+            val coalesced = history.removeRange(history.size - n, n) mkString "\n"
+            history add coalesced
+            true
+          }
+       })
     }
-    while (processLine(readOneLine())) { }
+    while (processLine(readLine())) { }
   }
 
   def powerCmd(): Result = {
@@ -321,8 +330,8 @@ class ILoop(in0: Option[BufferedReader], protected val out: JPrintWriter)
         case _        => ambiguousError(cmd)
       }
     }
-    else if (intp.global == null) Result(false, None)  // Notice failure to create compiler
-    else Result(true, interpretStartingWith(line))
+    else if (intp.global == null) Result(false, 0)  // Notice failure to create compiler
+    else Result(true, interpretStartingWith(line, 1))
   }
 
   private def readWhile(cond: String => Boolean) = {
@@ -357,36 +366,12 @@ class ILoop(in0: Option[BufferedReader], protected val out: JPrintWriter)
   /** Interpret expressions starting with the first line.
     * Read lines until a complete compilation unit is available
     * or until a syntax error has been seen.  If a full unit is
-    * read, go ahead and interpret it.  Return the full string
-    * to be recorded for replay, if any.
+    * read, go ahead and interpret it.  Return the number of
+    * lines read.
     */
-  def interpretStartingWith(code: String): Option[String] = {
+  def interpretStartingWith(code: String, linesRead: Int): Int = {
     // signal completion non-completion input has been received
     in.completion.resetVerbosity()
-
-    def reallyInterpret = {
-      val reallyResult = intp.interpret(code)
-      (reallyResult, reallyResult match {
-        case IR.Error       => None
-        case IR.Success     => Some(code)
-        case IR.Incomplete  =>
-          if (in.interactive && code.endsWith("\n\n")) {
-            echo("You typed two blank lines.  Starting a new command.")
-            None
-          }
-          else in.readLine(ContinueString) match {
-            case null =>
-              // we know compilation is going to fail since we're at EOF and the
-              // parser thinks the input is still incomplete, but since this is
-              // a file being read non-interactively we want to fail.  So we send
-              // it straight to the compiler for the nice error message.
-              intp.compileString(code)
-              None
-
-            case line => interpretStartingWith(code + "\n" + line)
-          }
-      })
-    }
 
     /** Here we place ourselves between the user and the interpreter and examine
      *  the input they are ostensibly submitting.  We intervene in several cases:
@@ -397,20 +382,38 @@ class ILoop(in0: Option[BufferedReader], protected val out: JPrintWriter)
      *  3) If the Completion object's execute returns Some(_), we inject that value
      *     and avoid the interpreter, as it's likely not valid scala code.
      */
-    if (code == "") None
+    if (code == "") linesRead
     else if (!paste.running && code.trim.startsWith(PromptString)) {
       paste.transcript(code)
-      None
+      linesRead
     }
     else if (Completion.looksLikeInvocation(code) && intp.mostRecentVar != "") {
-      interpretStartingWith(intp.mostRecentVar + code)
+      interpretStartingWith(intp.mostRecentVar + code, linesRead)
     }
     else if (code.trim startsWith "//") {
       // line comment, do nothing
-      None
+      linesRead
     }
-    else
-      reallyInterpret._2
+    else intp.interpret(code) match {
+      case IR.Error       => linesRead
+      case IR.Success     => linesRead
+      case IR.Incomplete  =>
+        if (in.interactive && code.endsWith("\n\n")) {
+          echo("You typed two blank lines.  Starting a new command.")
+          linesRead
+        }
+        else in.readLine(ContinueString) match {
+          case null =>
+            // we know compilation is going to fail since we're at EOF and the
+            // parser thinks the input is still incomplete, but since this is
+            // a file being read non-interactively we want to fail.  So we send
+            // it straight to the compiler for the nice error message.
+            intp.compileString(code)
+            linesRead
+
+          case line => interpretStartingWith(code + "\n" + line, linesRead + 1)
+        }
+    }
   }
 
   /** Tries to create a JLineReader, falling back to SimpleReader:

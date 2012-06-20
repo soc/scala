@@ -45,7 +45,10 @@ object InteractiveReader {
   val msgEINTR = "Interrupted system call"
   def restartSysCalls[R](body: => R, reset: => Unit): R =
     try body catch {
-      case e: IOException if e.getMessage == msgEINTR => reset ; body
+      case e =>
+        println("Caught " + e + " / " + e.getMessage)
+        throw e
+      // case e: IOException if e.getMessage == msgEINTR => reset ; body
     }
 
   def apply(): InteractiveReader = SimpleReader()

@@ -27,6 +27,7 @@ trait ReplUniverseOps {
   def glb[T1: TypeTag, T2: TypeTag, T3: TypeTag] : Type = global.glb(List(typeOf[T1], typeOf[T2], typeOf[T3]))
 
   def toolbox = scala.tools.reflect.ToolBox(scala.reflect.runtime.currentMirror)
+  def keymaps = jline.console.KeyMap.keyMaps.asScala
 
   implicit class ReplStringOps(val s: String) {
     def t: TypeName = newTypeName(s)

@@ -62,4 +62,5 @@ class SimpleHistory extends JLineHistory {
   def removeFirst(): CharSequence               = remove(0)
   def removeLast(): CharSequence                = remove(buf.length - 1)
   def remove(i: Int): CharSequence              = buf.remove(i)
+  def removeRange(start: Int, count: Int)       = try buf.slice(start, start + count).toList finally buf.remove(start, count)
 }

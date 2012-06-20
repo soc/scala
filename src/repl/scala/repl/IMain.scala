@@ -152,7 +152,52 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
     _initializeComplete = true
     true
   }
-  private def tquoted(s: String) = "\"\"\"" + s + "\"\"\""
+  // object quoting {
+  //   val q   = "\""
+  //   val bs  = "\\"
+  //   val bs2 = bs + bs
+  //   val tq  = q + q + q
+  //   val bq  = bs + q
+  //
+  //   def double(s: String): String = (
+  //     List(bs -> bs2, q -> bq).foldLeft(s) { case (s, (f, t)) => s.replaceAllLiterally(f, t) }
+  //   )
+  //   def triple(s: String): String = (
+  //     s.replaceAllLiterally(tq,
+  //   )
+  // }
+  // private def tquoted(s: String) = {
+  //   val tquoteIndices = s.indices dropRight 2 filter (i => s.substring(i, i + 3) == tq)
+  //   if (tquoteIndices.isEmpty) double(s)
+  //   else tquoteIndices match {
+  //     case start :: end :: rest =>
+  //
+  //
+  //   val segments = s split tquote toList
+  //
+  //
+  //   segments match {
+  //     case Nil      => ""
+  //     case x :: Nil => quoted(x)
+  //
+  //
+  // private def tquoted(s: String) = {
+  //   s indexOf tquote match {
+  //     case -1                     => tquote + s + tquote
+  //     case 0 if s endsWith tquote => s
+  //     case idx                    =>
+  //       s drop (idx + 3) indexOf tquote match {
+  //         case -1   => s   // no matching quote?
+  //         case end  => (s take idx)
+  //
+  //   if (s contains "\"\"\"") {
+  //     List(
+  //       """\""" -> """\\""",
+  //       "\"" -> "\\\""
+  //     ).foldLeft(s) { case (s, (f, t)) => s.replaceAllLiterally(f, t) }
+  //   }
+  //   else "\"\"\"" + s + "\"\"\""
+  // }
 
   // argument is a thunk to execute after init is done
   def initialize(postInitSignal: => Unit) {
@@ -816,11 +861,11 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
         if (!isReplPower) Nil // power mode only for now
         // $intp is not bound; punt, but include the line.
         else if (path == "$intp") List(
-          "def $line = " + tquoted(originalLine),
+          "def $line = \"" + string2code(originalLine) + "\"",
           "def $trees = Nil"
         )
         else List(
-          "def $line  = " + tquoted(originalLine),
+          "def $line = \"" + string2code(originalLine) + "\"",
           "def $req = %s.requestForReqId(%s).orNull".format(path, reqId),
           "def $trees = if ($req eq null) Nil else $req.trees".format(lineRep.readName, path, reqId)
         )

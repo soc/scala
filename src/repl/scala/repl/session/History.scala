@@ -10,16 +10,24 @@ package session
  *  reference to the jline classes.  Very sparse right now.
  */
 trait History {
+  def add(item: CharSequence): Unit
   def asStrings: List[String]
-  def index: Int
-  def size: Int
   def grep(s: String): List[String]
+  def index: Int
+  def remove(index: Int): CharSequence
+  def removeRange(start: Int, count: Int): List[String]
+  def set(index: Int, item: CharSequence): Unit
+  def size: Int
 }
 object NoHistory extends History {
-  def asStrings       = Nil
-  def grep(s: String) = Nil
-  def index           = 0
-  def size            = 0
+  def add(item: CharSequence)             = ()
+  def asStrings                           = Nil
+  def grep(s: String)                     = Nil
+  def index                               = 0
+  def remove(index: Int)                  = null
+  def removeRange(start: Int, count: Int) = Nil
+  def set(index: Int, item: CharSequence) = ()
+  def size                                = 0
 }
 
 object History {
