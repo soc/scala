@@ -69,10 +69,7 @@ private class ReplVirtualDirectory(out: JPrintWriter) extends VirtualDirectory("
  *  @author Moez A. Abdel-Gawad
  *  @author Lex Spoon
  */
-class IMain(initialSettings: Settings, protected val out: JPrintWriter)
-        extends Imports
-           with ReplSettings {
-
+class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends Imports {
   imain =>
 
   /** Leading with the eagerly evaluated.
@@ -83,9 +80,10 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter)
   private[repl] var totalSilence              = false     // whether to print anything
   private var _initializeComplete             = false     // compiler is initialized
   private var _isInitialized: Future[Boolean] = null      // set up initialization future
-  private var _executionWrapper               = ""        // code to be wrapped around all lines
 
-  def compilerSettings = currentSettings
+  def compilerSettings       = currentSettings
+  def maxPrintString         = 800
+  def maxAutoprintCompletion = 250
 
   /** We're going to go to some trouble to initialize the compiler asynchronously.
    *  It's critical that nothing call into it until it's been initialized or we will
@@ -239,10 +237,6 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter)
   }
 
   def quietRun[T](code: String) = beQuietDuring(interpret(code))
-
-  def executionWrapper = _executionWrapper
-  def setExecutionWrapper(code: String) = _executionWrapper = code
-  def clearExecutionWrapper() = _executionWrapper = ""
 
   /** Instantiate a compiler.  Overridable. */
   protected def newCompiler(settings: Settings, reporter: Reporter): ReplGlobal = {
@@ -638,7 +632,6 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter)
 
   /** Reset this interpreter, forgetting all user-specified requests. */
   def reset() {
-    clearExecutionWrapper()
     resetClassLoader()
     resetAllCreators()
     prevRequests.clear()
@@ -857,12 +850,12 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter)
       val preamble = """
       |object %s {
       |  %s
-      |  val %s: String = %s {
+      |  val %s: String = {
       |    %s
       |    (""
       """.stripMargin.format(
         lineRep.evalName, evalResult, lineRep.printName,
-        executionWrapper, lineRep.readName + accessPath
+        lineRep.readName + accessPath
       )
 
       val postamble = """
@@ -1105,13 +1098,6 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter)
   /** Parse the ScalaSig to find type aliases */
   def aliasForType(path: String) = ByteCode.aliasForType(path)
 
-  def withoutUnwrapping(op: => Unit): Unit = {
-    val saved = unwrapStrings
-    unwrapStrings = false
-    try op
-    finally unwrapStrings = saved
-  }
-
   def symbolDefString(sym: Symbol) = {
     TypeStrings.quieter(
       afterTyper(sym.defString),
@@ -1128,9 +1114,7 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter)
 
     // old style
     beSilentDuring(parse(code)) foreach { ts =>
-      ts foreach { t =>
-        withoutUnwrapping(repldbg(asCompactString(t)))
-      }
+      ts foreach (t => repldbg(asCompactString(t)))
     }
   }
 
@@ -1257,11 +1241,6 @@ object IMain {
     }
   }
 
-  trait StrippingWriter {
-    def isStripping: Boolean
-    def stripImpl(str: String): String
-    def strip(str: String): String = if (isStripping) stripImpl(str) else str
-  }
   trait TruncatingWriter {
     def maxStringLength: Int
     def isTruncating: Boolean
@@ -1273,19 +1252,16 @@ object IMain {
   }
   abstract class StrippingTruncatingWriter(out: JPrintWriter)
           extends JPrintWriter(out)
-             with StrippingWriter
              with TruncatingWriter {
     self =>
 
-    def clean(str: String): String = truncate(strip(str))
+    def clean(str: String): String  = truncate(strip(str))
+    def strip(str: String): String  = intp.naming.unmangle(str)
     override def write(str: String) = super.write(clean(str))
   }
   class ReplStrippingWriter(intp: IMain) extends StrippingTruncatingWriter(intp.out) {
     import intp._
     def maxStringLength    = intp.maxPrintString
-    def isStripping        = intp.unwrapStrings
     def isTruncating       = reporter.truncationOK
-
-    def stripImpl(str: String): String = naming.unmangle(str)
   }
 }
