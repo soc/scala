@@ -1,6 +1,4 @@
 <antlib>
     <taskdef name="scalac"
              classname="scala.tools.ant.Scalac"/>
-    <taskdef name="scalatool"
-             classname="scala.tools.ant.ScalaTool"/>
 </antlib>

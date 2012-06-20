@@ -78,9 +78,6 @@ PROPERTIES
   <property name="dists.dir" value="${basedir}/dists"/>
   <property name="copyright.string" value="Copyright 2002-2011, LAMP/EPFL"/>
 
-  <!-- These are NOT the flags used to run SuperSabbus, but the ones written
-       into the script runners created with scala.tools.ant.ScalaTool -->
-  <property name="java.flags" value="-Xmx1024m -Xms64m -XX:MaxPermSize=192m"/>
   <property name="jvm.opts" value=""/>
 
   <!-- if ANT_OPTS is already set by the environment, it will be unaltered,
