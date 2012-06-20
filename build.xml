@@ -56,7 +56,6 @@ PROPERTIES
   <property name="lib.starr.jar" value="${lib.dir}/scala-library.jar"/>
   <property name="reflect.starr.jar" value="${lib.dir}/scala-reflect.jar"/>
   <property name="comp.starr.jar" value="${lib.dir}/scala-compiler.jar"/>
-  <property name="jline.jar" value="${lib.dir}/jline.jar"/>
   <property name="ant.jar" value="${ant.home}/lib/ant.jar"/>
   <property name="forkjoin.jar" value="${lib.dir}/forkjoin.jar"/>
   <property name="scala-xml.jar" value="${lib.dir}/scala-xml.jar"/>
@@ -131,6 +130,7 @@ INITIALISATION
   <target name="init.maven.jars" depends="init.maven.tasks">
     <artifact:dependencies pathId="dependency.classpath" filesetId="dependency.fileset">
       <dependency groupId="com.typesafe" artifactId="config" version="0.4.0"/>
+      <dependency groupId="jline" artifactId="jline" version="2.7" />
       <!-- <dependency groupId="com.typesafe.akka" artifactId="akka-actor" version="2.0.2"/> -->
       <!-- <dependency groupId="org.improving" artifactId="jvminfo" version="0.1.1" /> -->
     </artifact:dependencies>
@@ -283,7 +283,6 @@ INITIALISATION
       <pathelement location="${forkjoin.jar}"/>
       <pathelement location="${scala-xml.jar}"/>
       <pathelement location="${ant.jar}"/>
-      <pathelement location="${jline.jar}"/>
       <pathelement location="${build-asm.dir}/classes"/>
       <path refid="lib.extra"/>
       <path refid="dependency.classpath"/>
@@ -856,7 +855,6 @@ PACKED QUICK BUILD (PACK)
     <jar destfile="${build-pack.dir}/lib/scala-repl.jar" manifest="${build-pack.dir}/META-INF/MANIFEST.MF">
       <fileset dir="${quick-repl.dir}"/>
     </jar>
-    <copy file="${jline.jar}" toDir="${build-pack.dir}/lib"/>
   </target>
 
   <target name="pack.pre-bin" depends="pack.repl">

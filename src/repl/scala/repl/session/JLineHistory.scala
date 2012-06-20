@@ -18,6 +18,11 @@ trait JLineHistory extends JHistory with History {
   def add(line: CharSequence): Unit
   def replace(item: CharSequence): Unit
 
+  def set(index: Int, item: CharSequence): Unit
+  def removeFirst(): CharSequence
+  def removeLast(): CharSequence
+  def remove(i: Int): CharSequence
+
   def entries(index: Int): JListIterator[JEntry]
   def entries(): JListIterator[JEntry]
   def iterator: JIterator[JEntry]

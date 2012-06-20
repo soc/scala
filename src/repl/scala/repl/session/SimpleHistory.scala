@@ -57,4 +57,9 @@ class SimpleHistory extends JLineHistory {
   def asJavaList           = entries()
   def asStrings            = buf.toList
   def grep(s: String)      = buf.toList filter (_ contains s)
+
+  def set(index: Int, item: CharSequence): Unit = buf(index) = item
+  def removeFirst(): CharSequence               = remove(0)
+  def removeLast(): CharSequence                = remove(buf.length - 1)
+  def remove(i: Int): CharSequence              = buf.remove(i)
 }

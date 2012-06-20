@@ -5,7 +5,7 @@
 
 package scala.repl
 
-import scala.tools.jline.console.completer.ArgumentCompleter.{ ArgumentDelimiter, ArgumentList }
+import jline.console.completer.ArgumentCompleter.{ ArgumentDelimiter, ArgumentList }
 
 class JLineDelimiter extends ArgumentDelimiter {
   def toJLine(args: List[String], cursor: Int) = args match {

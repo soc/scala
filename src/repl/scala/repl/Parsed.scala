@@ -6,7 +6,7 @@
 package scala.repl
 
 import scala.tools.nsc._
-import scala.tools.jline.console.completer.ArgumentCompleter.{ ArgumentDelimiter, ArgumentList }
+import jline.console.completer.ArgumentCompleter.{ ArgumentDelimiter, ArgumentList }
 import util.returning
 
 /** One instance of a command buffer.

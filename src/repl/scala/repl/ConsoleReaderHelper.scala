@@ -5,8 +5,8 @@
 
 package scala.repl
 
-import scala.tools.jline.console.{ ConsoleReader, CursorBuffer }
-import scala.tools.jline.console.completer.CompletionHandler
+import jline.console.{ ConsoleReader, CursorBuffer }
+import jline.console.completer.CompletionHandler
 import Completion._
 
 trait ConsoleReaderHelper extends ConsoleReader {

@@ -12,8 +12,8 @@ class ReplProps {
   private def bool(name: String) = BooleanProp.keyExists(name)
   private def int(name: String) = IntProp(name)
 
-  val jlineDebug = bool("scala.tools.jline.internal.Log.debug")
-  val jlineTrace = bool("scala.tools.jline.internal.Log.trace")
+  val jlineDebug = bool("jline.internal.Log.debug")
+  val jlineTrace = bool("jline.internal.Log.trace")
 
   val info  = bool("scala.repl.info")
   val debug = bool("scala.repl.debug")

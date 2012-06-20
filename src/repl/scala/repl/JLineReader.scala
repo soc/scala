@@ -6,8 +6,8 @@
 package scala.repl
 
 import scala.tools.nsc._
-import scala.tools.jline.console.ConsoleReader
-import scala.tools.jline.console.completer._
+import jline.console.ConsoleReader
+import jline.console.completer._
 import session._
 import Completion._
 
@@ -40,7 +40,7 @@ class JLineReader(_completion: => Completion) extends InteractiveReader {
     def readOneKey(prompt: String) = {
       this.print(prompt)
       this.flush()
-      this.readVirtualKey()
+      this.readCharacter()
     }
     def eraseLine() = consoleReader.resetPromptLine("", "", 0)
     def redrawLineAndFlush(): Unit = { flush() ; drawLine() ; flush() }
