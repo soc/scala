@@ -44,7 +44,9 @@ class ILoop(in0: Option[BufferedReader], protected val out: JPrintWriter)
 
   var in: InteractiveReader = _   // the input stream from which commands come
   var settings: Settings = _
+
   lazy val intp: IMain = new ILoopInterpreter
+  lazy val power = new Power(intp, new StdReplVals(this))
 
   /** TODO -
    *  -n normalize
@@ -58,14 +60,10 @@ class ILoop(in0: Option[BufferedReader], protected val out: JPrintWriter)
   }
 
   def isAsync = !settings.Yreplsync.value
-  lazy val power = new Power(intp, new StdReplVals(this)) //(tagOfStdReplVals, classTag[StdReplVals])
   def history = in.history
 
   /** The context class loader at the time this object was created */
   protected val originalClassLoader = Thread.currentThread.getContextClassLoader
-
-  // classpath entries added via :cp
-  var addedClasspath: String = ""
 
   def savingReader[T](body: => T): T = {
     val saved = in
@@ -87,12 +85,6 @@ class ILoop(in0: Option[BufferedReader], protected val out: JPrintWriter)
     }
     override protected def parentClassLoader =
       settings.explicitParentLoader.getOrElse( classOf[ILoop].getClassLoader )
-  }
-
-  /** Create a new interpreter. */
-  def createInterpreter() {
-    if (addedClasspath != "")
-      settings.classpath append addedClasspath
   }
 
   /** print a friendly help message */
@@ -132,26 +124,6 @@ class ILoop(in0: Option[BufferedReader], protected val out: JPrintWriter)
     }
   }
 
-  /** Show the history */
-  lazy val historyCommand = new LoopCommand("history", "show the history (optional num is commands to show)") {
-    override def usage = "[num]"
-    def defaultLines = 20
-
-    def apply(line: String): Result = {
-      if (history eq NoHistory)
-        return "No history available."
-
-      val xs      = words(line)
-      val current = history.index
-      val count   = try xs.head.toInt catch { case _: Exception => defaultLines }
-      val lines   = history.asStrings takeRight count
-      val offset  = current - lines.size + 1
-
-      for ((line, index) <- lines.zipWithIndex)
-        echo("%3d  %s".format(index + offset, line))
-    }
-  }
-
   // When you know you are most likely breaking into the middle
   // of a line being typed.  This softens the blow.
   protected def echoAndRefresh(msg: String) = {
@@ -167,15 +139,6 @@ class ILoop(in0: Option[BufferedReader], protected val out: JPrintWriter)
     out.flush()
   }
 
-  /** Search the history */
-  def searchHistory(_cmdline: String) {
-    val cmdline = _cmdline.toLowerCase
-    val offset  = history.index - history.size + 1
-
-    for ((line, index) <- history.asStrings.zipWithIndex ; if line.toLowerCase contains cmdline)
-      echo("%d %s".format(index + offset, line))
-  }
-
   private var currentPrompt = Properties.shellPromptString
   def setPrompt(prompt: String) = currentPrompt = prompt
   /** Prompt to print when awaiting input */
@@ -186,25 +149,14 @@ class ILoop(in0: Option[BufferedReader], protected val out: JPrintWriter)
   /** Standard commands **/
   lazy val standardCommands = List(
     cmd("help", "[command]", "print this summary or command-specific help", helpCommand),
-    historyCommand,
-    cmd("h?", "<string>", "search the history", searchHistory),
     cmd("imports", "[name name ...]", "show import history, identifying sources of names", importsCommand),
     cmd("implicits", "[-v]", "show the implicits in scope", implicitsCommand),
     cmd("javap", "<path|class>", "disassemble a file or class name", javapCommand),
-    cmd("load", "<path>", "load and interpret a Scala file", loadCommand),
     nullary("paste", "enter paste mode: all input up to ctrl-D compiled together", pasteCommand),
     nullary("power", "enable power user mode", powerCmd),
     nullary("quit", "exit the interpreter", () => Result(false, None)),
-    nullary("reset", "reset the repl to its initial state, forgetting all session entries", resetCommand),
-    nullary("silent", "disable/enable automatic printing of results", verbosity),
-    cmd("type", "[-v] <expr>", "display the type of an expression without evaluating it", typeCommandInternal),
     nullary("warnings", "show the suppressed warnings from the most recent line which had any", warningsCommand)
   )
-
-  /** Power user commands */
-  // lazy val powerCommands: List[LoopCommand] = List(
-  //   cmd("phase", "<phase>", "set the implicit phase for power commands", phaseCommand)
-  // )
 
   private def importsCommand(line: String): Result = {
     val tokens    = words(line)
@@ -336,59 +288,9 @@ class ILoop(in0: Option[BufferedReader], protected val out: JPrintWriter)
         if (!awaitInitialized()) return false
         runThunks()
       }
-      if (line eq null) false               // assume null means EOF
-      else command(line) match {
-        case Result(false, _)   => false
-        case Result(_, Some(_)) => true
-        case _                  => true
-      }
+      (line ne null) && command(line).keepRunning
     }
-    def innerLoop() {
-      if (processLine(readOneLine()))
-        innerLoop()
-    }
-    innerLoop()
-  }
-
-  /** interpret all lines from a specified file */
-  def interpretAllFrom(file: File) {
-    savingReader {
-      file applyReader { reader =>
-        in = SimpleReader(reader, out, false)
-        echo("Loading " + file + "...")
-        loop()
-      }
-    }
-  }
-
-  def resetCommand() {
-    echo("Resetting interpreter state.")
-    if (intp.namedDefinedTerms.nonEmpty)
-      echo("Forgetting all expression results and named terms: " + intp.namedDefinedTerms.mkString(", "))
-    if (intp.definedTypes.nonEmpty)
-      echo("Forgetting defined types: " + intp.definedTypes.mkString(", "))
-
-    reset()
-  }
-  def reset() {
-    intp.reset()
-    unleashAndSetPhase()
-  }
-
-  def withFile(filename: String)(action: File => Unit) {
-    val f = File(filename)
-
-    if (f.exists) action(f)
-    else echo("That file does not exist")
-  }
-
-  def loadCommand(arg: String) = {
-    var success = false
-    withFile(arg)(f => {
-      interpretAllFrom(f)
-      success = true
-    })
-    Result(true, if (success) Some(":load " + arg) else None)
+    while (processLine(readOneLine())) { }
   }
 
   def powerCmd(): Result = {
@@ -397,26 +299,15 @@ class ILoop(in0: Option[BufferedReader], protected val out: JPrintWriter)
   }
   def enablePowerMode(isDuringInit: Boolean) = {
     replProps.power setValue true
-    unleashAndSetPhase()
-    asyncEcho(isDuringInit, power.banner)
-  }
-  private def unleashAndSetPhase() {
-    if (isReplPower) {
+    if (isReplPower)
       power.unleash()
-      // // Set the phase to "typer"
-      // intp beSilentDuring phaseCommand("typer")
-    }
+
+    asyncEcho(isDuringInit, power.banner)
   }
 
   def asyncEcho(async: Boolean, msg: => String) {
     if (async) asyncMessage(msg)
     else echo(msg)
-  }
-
-  def verbosity() = {
-    val old = intp.printResults
-    intp.printResults = !old
-    echo("Switched " + (if (old) "off" else "on") + " result printing.")
   }
 
   /** Run one command submitted by the user.  Two values are returned:
@@ -522,17 +413,6 @@ class ILoop(in0: Option[BufferedReader], protected val out: JPrintWriter)
       reallyInterpret._2
   }
 
-  // runs :load `file` on any files passed via -i
-  def loadFiles(settings: Settings) = settings match {
-    case settings: GenericRunnerSettings =>
-      for (filename <- settings.loadfiles.value) {
-        val cmd = ":load " + filename
-        command(cmd)
-        echo("")
-      }
-    case _ =>
-  }
-
   /** Tries to create a JLineReader, falling back to SimpleReader:
    *  unless settings or properties are such that it should start
    *  with SimpleReader.
@@ -550,7 +430,6 @@ class ILoop(in0: Option[BufferedReader], protected val out: JPrintWriter)
   }
   def process(settings: Settings): Boolean = savingContextLoader {
     this.settings = settings
-    createInterpreter()
 
     // sets in to some kind of reader depending on environmental cues
     in = in0 match {
@@ -574,7 +453,6 @@ class ILoop(in0: Option[BufferedReader], protected val out: JPrintWriter)
       if (autorun.isDefined) intp.quietRun(autorun.get)
     })
 
-    loadFiles(settings)
     // it is broken on startup; go ahead and exit
     if (intp.reporter.hasErrors)
       return false
@@ -594,9 +472,7 @@ class ILoop(in0: Option[BufferedReader], protected val out: JPrintWriter)
     }
     printWelcome()
 
-    try loop()
-    catch AbstractOrMissingHandler()
-    finally closeInterpreter()
+    try loop() finally closeInterpreter()
 
     true
   }
@@ -614,9 +490,6 @@ class ILoop(in0: Option[BufferedReader], protected val out: JPrintWriter)
       case help   => echoNoNL(help) ; true
     }
   }
-
-  @deprecated("Use `process` instead", "2.9.0")
-  def main(settings: Settings): Unit = process(settings)
 }
 
 object ILoop {

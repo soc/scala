@@ -83,7 +83,6 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter)
   private[repl] var totalSilence              = false     // whether to print anything
   private var _initializeComplete             = false     // compiler is initialized
   private var _isInitialized: Future[Boolean] = null      // set up initialization future
-  private var bindExceptions                  = true      // whether to bind the lastException variable
   private var _executionWrapper               = ""        // code to be wrapped around all lines
 
   def compilerSettings = currentSettings
@@ -151,13 +150,9 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter)
   // This exists mostly because using the reporter too early leads to deadlock.
   private def _initSources = List(new BatchSourceFile("<init>", "class $repl_$init { }"))
   private def _initialize() = {
-    try {
-      // [Eugene] todo. if this crashes, REPL will hang
-      new _compiler.Run() compileSources _initSources
-      _initializeComplete = true
-      true
-    }
-    catch AbstractOrMissingHandler()
+    new _compiler.Run() compileSources _initSources
+    _initializeComplete = true
+    true
   }
   private def tquoted(s: String) = "\"\"\"" + s + "\"\"\""
 
@@ -244,16 +239,6 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter)
   }
 
   def quietRun[T](code: String) = beQuietDuring(interpret(code))
-
-  /** takes AnyRef because it may be binding a Throwable or an Exceptional */
-  private def withLastExceptionLock[T](body: => T, alt: => T): T = {
-    assert(bindExceptions, "withLastExceptionLock called incorrectly.")
-    bindExceptions = false
-
-    try     beQuietDuring(body)
-    catch   logAndDiscard("withLastExceptionLock", alt)
-    finally bindExceptions = true
-  }
 
   def executionWrapper = _executionWrapper
   def setExecutionWrapper(code: String) = _executionWrapper = code
@@ -679,23 +664,13 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter)
    */
   class ReadEvalPrint(lineId: Int) {
     def this() = this(freshLineId())
+    var caught: Throwable = _
 
     val packageName = sessionNames.line + lineId
     val readName    = sessionNames.read
     val evalName    = sessionNames.eval
     val printName   = sessionNames.print
     val resultName  = sessionNames.result
-
-    def bindError(t: Throwable) = {
-      if (!bindExceptions) // avoid looping if already binding
-        throw t
-
-      val unwrapped = unwrap(t)
-      withLastExceptionLock[String]({
-        directBind[Throwable]("lastException", unwrapped) //(tagOfThrowable, classTag[Throwable])
-        util.stackTraceString(unwrapped)
-      }, util.stackTraceString(unwrapped))
-    }
 
     // TODO: split it out into a package object and a regular
     // object and we can do that much less wrapping.
@@ -720,10 +695,6 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter)
     def callEither(name: String, args: Any*): Either[Throwable, AnyRef] =
       try Right(call(name, args: _*))
       catch { case ex: Throwable => Left(ex) }
-
-    def callOpt(name: String, args: Any*): Option[AnyRef] =
-      try Some(call(name, args: _*))
-      catch { case ex: Throwable => bindError(ex) ; None }
 
     class EvalException(msg: String, cause: Throwable) extends RuntimeException(msg, cause) { }
 
@@ -956,9 +927,6 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter)
     /** String representations of same. */
     lazy val seenTypeOf = typeMap[String](tp => afterTyper(tp.toString))
 
-    // lazy val definedTypes: Map[Name, Type] = {
-    //   typeNames map (x => x -> afterTyper(resultSymbol.info.nonPrivateDecl(x).tpe)) toMap
-    // }
     lazy val definedSymbols = (
       termNames.map(x => x -> applyToResultMember(x, x => x)) ++
       typeNames.map(x => x -> compilerTypeOf(x).typeSymbol)
@@ -968,10 +936,11 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter)
 
     /** load and run the code using reflection */
     def loadAndRun: (String, Boolean) = {
-      showCodeIfDebugging(line)
-
-      try   { ("" + (lineRep call sessionNames.print), true) }
-      catch { case ex => (lineRep.bindError(ex), false) }
+      val res = try Right(lineRep call sessionNames.print) catch { case ex: Throwable => Left(ex) }
+      res match {
+        case Right(x) => ("" + x, true)
+        case Left(t)  => lineRep.caught = unwrap(t) ; (util.stackTraceString(unwrap(t)), false)
+      }
     }
 
     override def toString = "Request(line=%s, %s trees)".format(line, trees.size)
@@ -1178,37 +1147,9 @@ object IMain {
     import intp._
     import global._
 
-    // lazy val tagOfStdReplVals = staticTypeTag[scala.tools.nsc.interpreter.StdReplVals]
-
     protected def echo(msg: String) = {
       Console.out println msg
       Console.out.flush()
-    }
-
-    def wrapCommand(line: String): String = {
-      def failMsg = "Argument to :wrap must be the name of a method with signature [T](=> T): T"
-
-      words(line) match {
-        case Nil            =>
-          intp.executionWrapper match {
-            case ""   => "No execution wrapper is set."
-            case s    => "Current execution wrapper: " + s
-          }
-        case "clear" :: Nil =>
-          intp.executionWrapper match {
-            case ""   => "No execution wrapper is set."
-            case s    => intp.clearExecutionWrapper() ; "Cleared execution wrapper."
-          }
-        case wrapper :: Nil =>
-          intp.typeOfExpression(wrapper) match {
-            case PolyType(List(targ), MethodType(List(arg), restpe)) =>
-              intp setExecutionWrapper intp.pathToTerm(wrapper)
-              "Set wrapper to '" + wrapper + "'"
-            case tp =>
-              failMsg + "\nFound: <unknown>"
-          }
-        case _ => failMsg
-      }
     }
 
     def implicitsCommand(filt: Symbol => Boolean): Boolean = {
