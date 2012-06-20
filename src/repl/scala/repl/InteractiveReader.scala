@@ -1,15 +1,9 @@
 /* NSC -- new Scala compiler
  * Copyright 2005-2011 LAMP/EPFL
- * @author Stepan Koltsov
+ * @author Paul Phillips
  */
 
 package scala.repl
-
-import java.io.IOException
-import java.nio.channels.ClosedByInterruptException
-import session.History
-import InteractiveReader._
-import scala.util.Properties.isMac
 
 /** Reads lines from an input stream */
 trait InteractiveReader {
@@ -18,7 +12,7 @@ trait InteractiveReader {
   def init(): Unit
   def reset(): Unit
 
-  def history: History
+  def history: session.History
   def completion: Completion
   def eraseLine(): Unit
   def redrawLine(): Unit
@@ -35,24 +29,5 @@ trait InteractiveReader {
   protected def readOneLine(prompt: String): String
   protected def readOneKey(prompt: String): Int
 
-  def readLine(prompt: String): String =
-    // hack necessary for OSX jvm suspension because read calls are not restarted after SIGTSTP
-    if (isMac) restartSysCalls(readOneLine(prompt), reset())
-    else readOneLine(prompt)
+  def readLine(prompt: String): String = readOneLine(prompt)
 }
-
-object InteractiveReader {
-  val msgEINTR = "Interrupted system call"
-  def restartSysCalls[R](body: => R, reset: => Unit): R =
-    try body catch {
-      case e =>
-        println("Caught " + e + " / " + e.getMessage)
-        throw e
-      // case e: IOException if e.getMessage == msgEINTR => reset ; body
-    }
-
-  def apply(): InteractiveReader = SimpleReader()
-  @deprecated("Use `apply` instead.", "2.9.0")
-  def createDefault(): InteractiveReader = apply()
-}
-
