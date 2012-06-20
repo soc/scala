@@ -38,6 +38,7 @@ PROPERTIES
   <!-- Defines the repository layout -->
   <property name="lib.dir" value="${basedir}/lib"/>
   <property name="src.dir" value="${basedir}/src"/>
+  <property name="resource.dir" value="${src.dir}/resources"/>
 
   <!-- For developers: any jars placed in this dir will be added to the classpath
        of all targets and copied into quick/pack/etc builds. -->
@@ -707,31 +708,7 @@ QUICK BUILD (QUICK)
     <stopwatch name="quick.repl.timer" action="total"/>
   </target>
 
-  <target name="quick.pre-bin" depends="quick.repl">
-    <condition property="quick.bin.available">
-      <isset property="quick.comp.available"/>
-    </condition>
-  </target>
-
-  <target name="quick.bin" depends="quick.pre-bin" unless="quick.bin.available">
-    <taskdef name="quick-bin" classname="scala.tools.ant.ScalaTool" classpathref="quick.classpath"/>
-    <mkdir dir="${build-quick.dir}/bin"/>
-    <quick-bin
-      file="${build-quick.dir}/bin/scala"
-      class="scala.Repl"
-      javaFlags="${java.flags}"
-      classpathref="quick.classpath"/>
-    <quick-bin
-      file="${build-quick.dir}/bin/scalac"
-      class="scala.tools.nsc.Main"
-      javaFlags="${java.flags}"
-      classpathref="quick.classpath"/>
-    <chmod perm="ugo+rx" file="${build-quick.dir}/bin/scala"/>
-    <chmod perm="ugo+rx" file="${build-quick.dir}/bin/scalac"/>
-    <touch file="${build-quick.dir}/bin.complete" verbose="no"/>
-  </target>
-
-  <target name="quick.done" depends="quick.bin" />
+  <target name="quick.done" depends="quick.repl" />
   
   <target name="all.touch">
     <delete><fileset dir="${build.dir}" includes="**/*.complete"/></delete>
@@ -865,18 +842,8 @@ PACKED QUICK BUILD (PACK)
   </target>
 
   <target name="pack.bin" depends="pack.pre-bin" unless="pack.bin.available">
-    <taskdef name="pack-bin" classname="scala.tools.ant.ScalaTool">
-      <classpath refid="pack.classpath"/>
-    </taskdef>
-    <mkdir dir="${build-pack.dir}/bin"/>
-    <pack-bin
-      file="${build-pack.dir}/bin/scala"
-      class="scala.Repl"
-      javaFlags="${java.flags}"/>
-    <pack-bin
-      file="${build-pack.dir}/bin/scalac"
-      class="scala.tools.nsc.Main"
-      javaFlags="${java.flags}"/>
+    <copy file="${resource.dir}/runner.sh" tofile="${build-pack.dir}/bin/scala"/>
+    <copy file="${resource.dir}/runner.sh" tofile="${build-pack.dir}/bin/scalac"/>
     <chmod perm="ugo+rx" file="${build-pack.dir}/bin/scala"/>
     <chmod perm="ugo+rx" file="${build-pack.dir}/bin/scalac"/>
     <touch file="${build-pack.dir}/bin.complete" verbose="no"/>
