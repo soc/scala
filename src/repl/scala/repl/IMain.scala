@@ -188,21 +188,20 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
   } with MemberHandlers
   import memberHandlers._
 
-  /** Temporarily be quiet */
-  def beQuietDuring[T](body: => T): T = {
+  def quietly[T](body: => T): T = {
     val saved = printResults
     printResults = false
     try body
     finally printResults = saved
   }
-  def beSilentDuring[T](operation: => T): T = {
+  def silently[T](operation: => T): T = {
     val saved = totalSilence
     totalSilence = true
     try operation
     finally totalSilence = saved
   }
 
-  def quietRun[T](code: String) = beQuietDuring(interpret(code))
+  def quietRun[T](code: String) = quietly(interpret(code))
 
   /** Instantiate a compiler.  Overridable. */
   protected def newCompiler(settings: Settings, reporter: Reporter): ReplGlobal = {
@@ -357,7 +356,7 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
   }
 
   def isParseable(line: String): Boolean = {
-    beSilentDuring {
+    silently {
       try parse(line) match {
         case Some(xs) => xs.nonEmpty  // parses as-is
         case None     => true         // incomplete
@@ -587,12 +586,12 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
     quietRun("val %s = %s".format(tempName, name))
     quietRun("val %s = %s.asInstanceOf[%s]".format(name, tempName, newType))
   }
-  def quietImport(ids: String*): IR.Result = beQuietDuring(addImports(ids: _*))
+  def quietImport(ids: String*): IR.Result = quietly(addImports(ids: _*))
   def addImports(ids: String*): IR.Result =
     if (ids.isEmpty) IR.Success
     else interpret("import " + ids.mkString(", "))
 
-  def quietBind(p: NamedParam[_]): IR.Result                         = beQuietDuring(bind(p))
+  def quietBind(p: NamedParam[_]): IR.Result                         = quietly(bind(p))
   def bind(p: NamedParam[_]): IR.Result                              = bind(p.name, p.tpe, p.value)
   def bind[T: TypeTag : ClassTag](name: String, value: T): IR.Result = bind((name, value))
 
@@ -862,7 +861,7 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
         }
 
         // compile the result-extraction object
-        beQuietDuring {
+        quietly {
           savingSettings(_.nowarn.value = true) {
             lineRep compile ResultObjectSourceCode(handlers)
           }
@@ -1078,7 +1077,7 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
     def isShow    = code.lines exists (_.trim endsWith "// show")
 
     // old style
-    beSilentDuring(parse(code)) foreach { ts =>
+    silently(parse(code)) foreach { ts =>
       ts foreach (t => repldbg(asCompactString(t)))
     }
   }

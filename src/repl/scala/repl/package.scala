@@ -6,7 +6,10 @@
 package scala
 
 import language.implicitConversions
+import java.net.URL
 import scala.collection.convert._
+import scala.io.Codec
+import scala.tools.nsc.io.Streamable
 
 /** The main REPL related classes and values are as follows.
  *  In addition to standard compiler classes Global and Settings, there are:
@@ -19,7 +22,6 @@ import scala.collection.convert._
  *  InteractiveReader: how ILoop obtains input.
  *  History: an interface for session history.
  *  Completion: an interface for tab completion.
- *  Power: a repository for more advanced/experimental features.
  */
 package object repl extends ReplConfig with ReplStrings with DecorateAsJava with DecorateAsScala {
   type Global = scala.tools.nsc.Global
@@ -32,6 +34,7 @@ package object repl extends ReplConfig with ReplStrings with DecorateAsJava with
   type JPrintWriter   = java.io.PrintWriter
   type InputStream    = java.io.InputStream
   type OutputStream   = java.io.OutputStream
+  type weight         = scala.annotation.implicitWeight
 
   val IR = Results
   
@@ -40,6 +43,15 @@ package object repl extends ReplConfig with ReplStrings with DecorateAsJava with
   type ClassTag[T]                            = scala.reflect.ClassTag[T]
   type TypeTag[T]                             = ru.TypeTag[T]
   def typeOf[T: TypeTag] : ru.Type            = typeTag[T].tpe
+
+  def membersOf[T: TypeTag] : List[(ru.Symbol, ru.Type)] = {
+    val tpe = typeOf[T]
+    tpe.members.toList map (sym => (sym, sym typeSignatureIn tpe))
+  }
+  def declsOf[T: TypeTag] : List[(ru.Symbol, ru.Type)] = {
+    val tpe = typeOf[T]
+    tpe.declarations.toList map (sym => (sym, sym typeSignatureIn tpe))
+  }
 
   lazy val ru = scala.reflect.runtime.universe
   // new scala.reflect.runtime.JavaUniverse {
@@ -54,13 +66,15 @@ package object repl extends ReplConfig with ReplStrings with DecorateAsJava with
   private[repl] implicit def javaCharSeqCollectionToScala(xs: JCollection[_ <: CharSequence]): List[String] =
     xs.asScala.toList map ("" + _)
 
-  //
-  // private[repl] implicit def javaCharSeqCollectionToScala(xs: JCollection[_ <: CharSequence]): List[String] = {
-  //   import collection.JavaConverters._
-  //   xs.asScala.toList map ("" + _)
-  // }
-
   private[repl] implicit def enrichAnyRefWithTap[T](x: T) = new TapMaker(x)
   private[repl] def tracing[T](msg: String)(x: T): T = x.tapTrace(msg)
   private[repl] def debugging[T](msg: String)(x: T) = x.tapDebug(msg)
+
+  implicit class ReplInputStreamOps(in: InputStream)(implicit codec: Codec) {
+    def bytes(): Array[Byte] = Streamable.bytes(in)
+    def slurp(): String      = Streamable.slurp(in)
+  }
+  implicit class ReplUrlOps(val url: URL) extends AnyVal {
+    def slurp(implicit codec: Codec): String = Streamable.slurp(url)
+  }
 }

@@ -10,6 +10,7 @@ import scala.tools.nsc.ast.TreeDSL
 import scala.reflect.internal.util.StringOps
 import scala.reflect.{ api, base, runtime }
 import java.net.URL
+// import scala.annotation.{ implicitWeight => weight }
 
 trait ReplUniverseOps {
   val global: api.Universe
@@ -60,32 +61,34 @@ trait ReplUniverseOps {
   }
 }
 
-trait ReplGlobalOps extends ReplUniverseOps with ReplInternalInfos {
-  val intp: scala.repl.IMain
-  import global._
-
-  implicit final class ReplSymbolListOps(val syms: List[Symbol]) {
-    def sigs: List[String] = syms map (_.defString)
-    def infos: List[Type]  = syms map (_.info)
-  }
-}
-
 /** A class which the repl utilizes to expose predefined objects.
  */
-class StdReplVals(final val r: ILoop) {
-  final lazy val repl                     = r
-  final lazy val intp                     = r.intp
-  final lazy val power                    = r.power
-  final lazy val reader                   = r.in
-  final lazy val vals                     = this
-  final lazy val global: intp.global.type = intp.global
-  final lazy val completion               = reader.completion
-  final lazy val history                  = reader.history
-  final lazy val analyzer                 = global.analyzer
+class StdReplVals(val r: ILoop) {
+  lazy val repl                     = r
+  lazy val intp                     = r.intp
+  lazy val reader                   = r.in
+  lazy val vals                     = this
+  lazy val global: intp.global.type = intp.global
+  lazy val completion               = reader.completion
+  lazy val history                  = reader.history
+  lazy val analyzer                 = global.analyzer
 
-  final lazy val replenv = new {
-    val intp: StdReplVals.this.intp.type = StdReplVals.this.intp
-  } with power.Implicits with ReplGlobalOps { }
+  def context(code: String)  = analyzer.rootContext(unit(code))
+  def source(code: String)   = global.newSourceFile(code)
+  def unit(code: String)     = global.newCompilationUnit(code)
+  def trees(code: String)    = intp parse code getOrElse Nil
+  def seenTypeOf(id: String) = intp.typeOfExpression(id)
+
+  lazy val replenv = new {
+    val global: intp.global.type = intp.global
+  } with ReplUniverseOps with TagWrappers with Prettifiers {
+    @weight(-2) implicit def replPrinting[T](x: T)(implicit pretty: Prettifier[T] = Prettifier.default[T]) =
+      new SinglePrettifierClass[T](x)
+
+    @weight(-1) implicit def replMultiPrinting[T: Prettifier](xs: IterableOnce[T]): MultiPrettifierClass[T] =
+      new MultiPrettifierClass[T](xs.toSeq)
+    @weight(-1) implicit def replPrettifier[T] : Prettifier[T] = Prettifier.default[T]
+  }
 
   object treedsl extends { val global: intp.global.type = intp.global } with TreeDSL { }
 

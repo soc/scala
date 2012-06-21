@@ -60,6 +60,7 @@ class JLineReader(_completion: => Completion) extends InteractiveReader {
     // A hook for running code after the repl is done initializing.
     lazy val postInit: Unit = {
       this setBellEnabled false
+      this setExpandEvents false
       if ((history: History) ne NoHistory)
         this setHistory history
 

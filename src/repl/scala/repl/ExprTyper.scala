@@ -79,7 +79,7 @@ trait ExprTyper {
         case _ => NoSymbol
       }
     }
-    beQuietDuring(asExpr()) orElse beQuietDuring(asDefn())
+    quietly(asExpr() orElse asDefn())
   }
 
   private var typeOfExpressionDepth = 0
@@ -93,7 +93,7 @@ trait ExprTyper {
     // while letting errors through, so it is first trying it silently: if there
     // is an error, and errors are desired, then it re-evaluates non-silently
     // to induce the error message.
-    try beSilentDuring(symbolOfLine(expr).tpe) match {
+    try silently(symbolOfLine(expr).tpe) match {
       case NoType if !silent => symbolOfLine(expr).tpe // generate error
       case tpe               => tpe
     }

@@ -9,6 +9,22 @@ import scala.tools.nsc._
 import language.implicitConversions
 import util.TypeStrings
 
+trait TagWrappers {
+  // val global: api.Universe
+  // import global._
+
+  class TaggedValue[T : TypeTag : ClassTag](val value: T) {
+    def tag   = typeTag[T]
+    def ctag  = classTag[T]
+
+    override def toString = value match {
+      case null => "" + typeOf[T]
+      case x    => "%s: %s".format(x, typeOf[T])
+    }
+  }
+  implicit def newTaggedValue[T : TypeTag : ClassTag](value: T): TaggedValue[T] = new TaggedValue[T](value)
+}
+
 object NamedParam {
   def apply[T](name: String, tpe: String, value: T): NamedParam[T]    = new UntypedParam(name, tpe, value)
   def apply[T: TypeTag : ClassTag](name: String, x: T): NamedParam[T] = new TypedParam(name, x)

@@ -19,6 +19,7 @@ import util.ScalaClassLoader
 import ScalaClassLoader._
 import scala.tools.util._
 import language.{implicitConversions, existentials}
+import java.util.concurrent._
 
 /** The Scala interactive shell.  It provides a read-eval-print loop
  *  around the Interpreter class.
@@ -38,14 +39,14 @@ class ILoop(in0: Option[BufferedReader], protected val out: JPrintWriter) extend
 
   var in: InteractiveReader = _   // the input stream from which commands come
   var settings: Settings = _
-  val queuedLines = new java.util.concurrent.LinkedBlockingQueue[String]
-  val synchronousResult = new java.util.concurrent.SynchronousQueue[String]
+  val queuedLines = new LinkedBlockingQueue[String]
+  val synchronousResult = new SynchronousQueue[String]
   // code to be executed only after the interpreter is initialized
   // and the lazy val `global` can be accessed without risk of deadlock.
-  val pendingThunks = new java.util.concurrent.ConcurrentLinkedQueue[() => Unit]
+  val pendingThunks = new ConcurrentLinkedQueue[() => Unit]
 
   lazy val intp: IMain = new ILoopInterpreter
-  lazy val power = new Power(intp, new StdReplVals(this))
+  lazy val vals = new StdReplVals(this)
 
   /** Print a welcome message */
   def printWelcome() {
@@ -57,6 +58,12 @@ class ILoop(in0: Option[BufferedReader], protected val out: JPrintWriter) extend
     echo(welcomeMsg)
     replinfo("[info] started at " + new java.util.Date)
   }
+
+  def initCode = """
+import scala.repl._
+import $r.replenv._
+import treedsl.CODE._
+  """.trim
 
   protected def addThunk(body: => Unit) = pendingThunks add (() => body)
   protected def runThunks() {
@@ -107,12 +114,6 @@ class ILoop(in0: Option[BufferedReader], protected val out: JPrintWriter) extend
     val saved = in
     try body
     finally in = saved
-  }
-
-  /** Close the interpreter and set the var to null. */
-  def closeInterpreter() {
-    if (intp ne null)
-      intp.close()
   }
 
   class ILoopInterpreter extends IMain(settings, out) {
@@ -312,6 +313,8 @@ class ILoop(in0: Option[BufferedReader], protected val out: JPrintWriter) extend
 
   private object readerThread extends Thread {
     this setPriority Thread.MAX_PRIORITY
+    this setDaemon true
+
     private var running = true
     def stillRunning = running
     def stopRunning() = running = false
@@ -496,11 +499,19 @@ class ILoop(in0: Option[BufferedReader], protected val out: JPrintWriter) extend
 
     // Bind intp somewhere out of the regular namespace where
     // we can get at it in generated code.
-    addThunk(intp.quietBind("$intp" -> intp))
-    addThunk(intp.setContextClassLoader)
-    addThunk({ power.unleash() ; echoAndRefresh(power.banner) })
+    addThunk(intp.quietly {
+      intp.setContextClassLoader
+      intp.bind("$intp" -> intp)
+      // First we create the ReplVals instance and bind it to $r
+      intp.bind("$r" -> vals)
+      // Then we import everything from $r, via its true path.
+      // Later imports rely on the repl's name resolution to find $r.
+      intp interpret ("import " + intp.pathToTerm("$r") + "._")
+      // And whatever else there is to do.
+      intp interpret initCode
+    })
 
-    try loop() finally closeInterpreter()
+    try loop() finally intp.close()
     true
   }
 

@@ -64,7 +64,7 @@ trait MemberHandlers {
     def name: Name      = member.name
     def mods: Modifiers = member.mods
     def keyword         = member.keyword
-    def prettyName      = name.decode
+    def prettyName      = name.decoded
 
     override def definesImplicit = member.mods.isImplicit
     override def definesTerm: Option[TermName] = Some(name.toTermName) filter (_ => name.isTermName)
