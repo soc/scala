@@ -268,14 +268,6 @@ object Predef {
       throw new IllegalArgumentException("requirement failed: "+ message)
   }
 
-  final class Ensuring[A](val __resultOfEnsuring: A) extends AnyVal {
-    def ensuring(cond: Boolean): A = { assert(cond); __resultOfEnsuring }
-    def ensuring(cond: Boolean, msg: => Any): A = { assert(cond, msg); __resultOfEnsuring }
-    def ensuring(cond: A => Boolean): A = { assert(cond(__resultOfEnsuring)); __resultOfEnsuring }
-    def ensuring(cond: A => Boolean, msg: => Any): A = { assert(cond(__resultOfEnsuring), msg); __resultOfEnsuring }
-  }
-  @inline implicit def any2Ensuring[A](x: A): Ensuring[A] = new Ensuring(x)
-
   /** `???` can be used for marking methods that remain to be implemented.
    *  @throws  A `NotImplementedError`
    */
@@ -289,11 +281,11 @@ object Predef {
     def unapply[A, B](x: Tuple2[A, B]): Option[Tuple2[A, B]] = Some(x)
   }
 
-  final class ArrowAssoc[A](val __leftOfArrow: A) extends AnyVal {
+  @inline implicit final class ArrowAssoc[A](val __leftOfArrow: A) extends AnyVal {
     @inline def -> [B](y: B): Tuple2[A, B] = Tuple2(__leftOfArrow, y)
     @inline def asAnyRef: AnyRef = __leftOfArrow.asInstanceOf[AnyRef]
   }
-  @inline implicit def any2ArrowAssoc[A](x: A): ArrowAssoc[A] = new ArrowAssoc(x)
+  // @inline implicit def any2ArrowAssoc[A](x: A): ArrowAssoc[A] = new ArrowAssoc(x)
 
   // printing and reading -----------------------------------------------
 
