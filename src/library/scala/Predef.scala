@@ -9,13 +9,15 @@
 package scala
 
 import scala.collection.{ mutable, immutable, generic }
-import mutable.{ ArrayOps, WrappedArray }
+import scala.reflect.ClassTag
+import scala.collection.mutable.{ ArrayLike, ArrayBuilder, ArrayOps, WrappedArray }
 import immutable.{ StringOps, WrappedString }
 import generic.CanBuildFrom
 import annotation.{ elidable, implicitNotFound }
 import annotation.elidable.ASSERTION
 import language.{ implicitConversions, existentials }
-import scala.runtime.ScalaRunTime
+import scala.runtime.{ ScalaRunTime, BoxedUnit }
+import ScalaRunTime.arrayElementClass
 import annotation.{ implicitWeight => weight }
 
 /** The `Predef` object provides definitions that are accessible in all Scala
@@ -71,6 +73,138 @@ import annotation.{ implicitWeight => weight }
  *  functions to Array values. These are described in more detail in the documentation of [[scala.Array]].
  */
 object Predef {
+  import scala.collection.mutable.{ ArrayLike, ArrayBuilder, ArrayOps, WrappedArray }
+
+  /** A class of `ArrayOps` for arrays containing reference types. */
+  @inline implicit final class ofRef[T <: AnyRef](override val repr: Array[T]) extends AnyVal with ArrayOps[T] with ArrayLike[T, Array[T]] {
+    override protected[this] def thisCollection: WrappedArray[T] = new WrappedArray.ofRef[T](repr)
+    override protected[this] def toCollection(repr: Array[T]): WrappedArray[T] = new WrappedArray.ofRef[T](repr)
+    override protected[this] def newBuilder = new ArrayBuilder.ofRef[T]()(ClassTag[T](arrayElementClass(repr.getClass)))
+    override def foreach[U](f: T => U) { var i = 0 ; val len = length ; while (i < len) { f(this(i)); i += 1 } }
+
+    def length: Int = repr.length
+    def apply(index: Int): T = repr(index)
+    def update(index: Int, elem: T) { repr(index) = elem }
+  }
+
+  /** A class of `ArrayOps` for arrays containing `byte`s. */
+  @inline implicit final class ofByte(override val repr: Array[Byte]) extends AnyVal with ArrayOps[Byte] with ArrayLike[Byte, Array[Byte]] {
+
+    override protected[this] def thisCollection: WrappedArray[Byte] = new WrappedArray.ofByte(repr)
+    override protected[this] def toCollection(repr: Array[Byte]): WrappedArray[Byte] = new WrappedArray.ofByte(repr)
+    override protected[this] def newBuilder = new ArrayBuilder.ofByte
+    override def foreach[U](f: Byte => U) { var i = 0 ; val len = length ; while (i < len) { f(this(i)); i += 1 } }
+
+    def length: Int = repr.length
+    def apply(index: Int): Byte = repr(index)
+    def update(index: Int, elem: Byte) { repr(index) = elem }
+  }
+
+  /** A class of `ArrayOps` for arrays containing `short`s. */
+  @inline implicit final class ofShort(override val repr: Array[Short]) extends AnyVal with ArrayOps[Short] with ArrayLike[Short, Array[Short]] {
+
+    override protected[this] def thisCollection: WrappedArray[Short] = new WrappedArray.ofShort(repr)
+    override protected[this] def toCollection(repr: Array[Short]): WrappedArray[Short] = new WrappedArray.ofShort(repr)
+    override protected[this] def newBuilder = new ArrayBuilder.ofShort
+    override def foreach[U](f: Short => U) { var i = 0 ; val len = length ; while (i < len) { f(this(i)); i += 1 } }
+
+    def length: Int = repr.length
+    def apply(index: Int): Short = repr(index)
+    def update(index: Int, elem: Short) { repr(index) = elem }
+  }
+
+  /** A class of `ArrayOps` for arrays containing `char`s. */
+  @inline implicit final class ofChar(override val repr: Array[Char]) extends AnyVal with ArrayOps[Char] with ArrayLike[Char, Array[Char]] {
+
+    override protected[this] def thisCollection: WrappedArray[Char] = new WrappedArray.ofChar(repr)
+    override protected[this] def toCollection(repr: Array[Char]): WrappedArray[Char] = new WrappedArray.ofChar(repr)
+    override protected[this] def newBuilder = new ArrayBuilder.ofChar
+    override def foreach[U](f: Char => U) { var i = 0 ; val len = length ; while (i < len) { f(this(i)); i += 1 } }
+
+    def length: Int = repr.length
+    def apply(index: Int): Char = repr(index)
+    def update(index: Int, elem: Char) { repr(index) = elem }
+  }
+
+  /** A class of `ArrayOps` for arrays containing `int`s. */
+  @inline implicit final class ofInt(override val repr: Array[Int]) extends AnyVal with ArrayOps[Int] with ArrayLike[Int, Array[Int]] {
+
+    override protected[this] def thisCollection: WrappedArray[Int] = new WrappedArray.ofInt(repr)
+    override protected[this] def toCollection(repr: Array[Int]): WrappedArray[Int] = new WrappedArray.ofInt(repr)
+    override protected[this] def newBuilder = new ArrayBuilder.ofInt
+    override def foreach[U](f: Int => U) { var i = 0 ; val len = length ; while (i < len) { f(this(i)); i += 1 } }
+
+    def length: Int = repr.length
+    def apply(index: Int): Int = repr(index)
+    def update(index: Int, elem: Int) { repr(index) = elem }
+    def sum = thisCollection.sum
+    def max = {
+      if (repr.length == 0) thisCollection.max
+      else {
+        var max = repr(0)
+        var i = 1
+        while (i < repr.length) {
+          if (repr(i) > max)
+            max = repr(i)
+          i += 1
+        }
+        max
+      }
+    }
+  }
+
+  /** A class of `ArrayOps` for arrays containing `long`s. */
+  @inline implicit final class ofLong(override val repr: Array[Long]) extends AnyVal with ArrayOps[Long] with ArrayLike[Long, Array[Long]] {
+
+    override protected[this] def thisCollection: WrappedArray[Long] = new WrappedArray.ofLong(repr)
+    override protected[this] def toCollection(repr: Array[Long]): WrappedArray[Long] = new WrappedArray.ofLong(repr)
+    override protected[this] def newBuilder = new ArrayBuilder.ofLong
+    override def foreach[U](f: Long => U) { var i = 0 ; val len = length ; while (i < len) { f(this(i)); i += 1 } }
+
+    def length: Int = repr.length
+    def apply(index: Int): Long = repr(index)
+    def update(index: Int, elem: Long) { repr(index) = elem }
+    def sum = thisCollection.sum
+  }
+
+  /** A class of `ArrayOps` for arrays containing `float`s. */
+  @inline implicit final class ofFloat(override val repr: Array[Float]) extends AnyVal with ArrayOps[Float] with ArrayLike[Float, Array[Float]] {
+
+    override protected[this] def thisCollection: WrappedArray[Float] = new WrappedArray.ofFloat(repr)
+    override protected[this] def toCollection(repr: Array[Float]): WrappedArray[Float] = new WrappedArray.ofFloat(repr)
+    override protected[this] def newBuilder = new ArrayBuilder.ofFloat
+    override def foreach[U](f: Float => U) { var i = 0 ; val len = length ; while (i < len) { f(this(i)); i += 1 } }
+
+    def length: Int = repr.length
+    def apply(index: Int): Float = repr(index)
+    def update(index: Int, elem: Float) { repr(index) = elem }
+  }
+
+  /** A class of `ArrayOps` for arrays containing `double`s. */
+  @inline implicit final class ofDouble(override val repr: Array[Double]) extends AnyVal with ArrayOps[Double] with ArrayLike[Double, Array[Double]] {
+    override protected[this] def thisCollection: WrappedArray[Double] = new WrappedArray.ofDouble(repr)
+    override protected[this] def toCollection(repr: Array[Double]): WrappedArray[Double] = new WrappedArray.ofDouble(repr)
+    override protected[this] def newBuilder = new ArrayBuilder.ofDouble
+    override def foreach[U](f: Double => U) { var i = 0 ; val len = length ; while (i < len) { f(this(i)); i += 1 } }
+
+    def length: Int = repr.length
+    def apply(index: Int): Double = repr(index)
+    def update(index: Int, elem: Double) { repr(index) = elem }
+  }
+
+  /** A class of `ArrayOps` for arrays containing `boolean`s. */
+  @inline implicit final class ofBoolean(override val repr: Array[Boolean]) extends AnyVal with ArrayOps[Boolean] with ArrayLike[Boolean, Array[Boolean]] {
+
+    override protected[this] def thisCollection: WrappedArray[Boolean] = new WrappedArray.ofBoolean(repr)
+    override protected[this] def toCollection(repr: Array[Boolean]): WrappedArray[Boolean] = new WrappedArray.ofBoolean(repr)
+    override protected[this] def newBuilder = new ArrayBuilder.ofBoolean
+    override def foreach[U](f: Boolean => U) { var i = 0 ; val len = length ; while (i < len) { f(this(i)); i += 1 } }
+
+    def length: Int = repr.length
+    def apply(index: Int): Boolean = repr(index)
+    def update(index: Int, elem: Boolean) { repr(index) = elem }
+  }
+
   /** Former LowPriorityImplicits **/
 
   /** We prefer the java.lang.* boxed types to these wrappers in
@@ -285,7 +419,6 @@ object Predef {
     @inline def -> [B](y: B): Tuple2[A, B] = Tuple2(__leftOfArrow, y)
     @inline def asAnyRef: AnyRef = __leftOfArrow.asInstanceOf[AnyRef]
   }
-  // @inline implicit def any2ArrowAssoc[A](x: A): ArrowAssoc[A] = new ArrowAssoc(x)
 
   // printing and reading -----------------------------------------------
 
@@ -304,29 +437,18 @@ object Predef {
   implicit def arrayToCharSequence(xs: Array[Char]): CharSequence               = new runtime.ArrayCharSequence(xs, 0, xs.length)
 
   implicit def genericArrayOps[T](xs: Array[T]): ArrayOps[T] = (xs match {
-    case x: Array[AnyRef]  => refArrayOps[AnyRef](x)
-    case x: Array[Boolean] => booleanArrayOps(x)
-    case x: Array[Byte]    => byteArrayOps(x)
-    case x: Array[Char]    => charArrayOps(x)
-    case x: Array[Double]  => doubleArrayOps(x)
-    case x: Array[Float]   => floatArrayOps(x)
-    case x: Array[Int]     => intArrayOps(x)
-    case x: Array[Long]    => longArrayOps(x)
-    case x: Array[Short]   => shortArrayOps(x)
-    case x: Array[Unit]    => unitArrayOps(x)
+    case x: Array[AnyRef]  => x: ArrayOps[AnyRef]
+    case x: Array[Boolean] => x: ArrayOps[Boolean]
+    case x: Array[Byte]    => x: ArrayOps[Byte]
+    case x: Array[Char]    => x: ArrayOps[Char]
+    case x: Array[Double]  => x: ArrayOps[Double]
+    case x: Array[Float]   => x: ArrayOps[Float]
+    case x: Array[Int]     => x: ArrayOps[Int]
+    case x: Array[Long]    => x: ArrayOps[Long]
+    case x: Array[Short]   => x: ArrayOps[Short]
+    case x: Array[Unit]    => x: ArrayOps[Unit]
     case null              => null
   }).asInstanceOf[ArrayOps[T]]
-
-  implicit def booleanArrayOps(xs: Array[Boolean])    = new mutable.array.ofBoolean(xs)
-  implicit def byteArrayOps(xs: Array[Byte])          = new mutable.array.ofByte(xs)
-  implicit def charArrayOps(xs: Array[Char])          = new mutable.array.ofChar(xs)
-  implicit def doubleArrayOps(xs: Array[Double])      = new mutable.array.ofDouble(xs)
-  implicit def floatArrayOps(xs: Array[Float])        = new mutable.array.ofFloat(xs)
-  implicit def intArrayOps(xs: Array[Int])            = new mutable.array.ofInt(xs)
-  implicit def longArrayOps(xs: Array[Long])          = new mutable.array.ofLong(xs)
-  implicit def refArrayOps[T <: AnyRef](xs: Array[T]) = new mutable.array.ofRef[T](xs)
-  implicit def shortArrayOps(xs: Array[Short])        = new mutable.array.ofShort(xs)
-  def unitArrayOps(xs: Array[Unit])                   = new mutable.array.ofUnit(xs)
 
   // "Autoboxing" and "Autounboxing" ---------------------------------------------------
 

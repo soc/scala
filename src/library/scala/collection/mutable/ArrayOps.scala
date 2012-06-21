@@ -31,7 +31,8 @@ import scala.runtime.ScalaRunTime._
  *  @define mayNotTerminateInf
  *  @define willNotTerminateInf
  */
-abstract class ArrayOps[T] extends ArrayLike[T, Array[T]] {
+// abstract class 
+trait ArrayOps[T] extends Any with ArrayLike[T, Array[T]] {
 
   private def elementClass: Class[_] =
     arrayElementClass(repr.getClass)
