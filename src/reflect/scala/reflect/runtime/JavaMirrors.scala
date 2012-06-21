@@ -667,7 +667,7 @@ trait JavaMirrors extends internal.SymbolTable with api.JavaUniverse { self: Sym
         info("made Scala "+pkg)
         pkg
       } else
-        throw new ReflectError(opkg+" is not a package")
+        throw new ReflectError(""+opkg+" is not a package")
     }
 
     private def scalaSimpleName(jclazz: jClass[_]): TypeName = {

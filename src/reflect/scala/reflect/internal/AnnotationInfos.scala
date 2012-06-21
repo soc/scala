@@ -145,9 +145,9 @@ trait AnnotationInfos extends api.AnnotationInfos { self: SymbolTable =>
     }
 
     override def toString = (
-      atp +
+      "" + atp +
       (if (!args.isEmpty) args.mkString("(", ", ", ")") else "") +
-      (if (!assocs.isEmpty) (assocs map { case (x, y) => x+" = "+y } mkString ("(", ", ", ")")) else "")
+      (if (!assocs.isEmpty) (assocs map { case (x, y) => ""+x+" = "+y } mkString ("(", ", ", ")")) else "")
     )
   }
 

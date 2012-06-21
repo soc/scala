@@ -58,7 +58,7 @@ abstract class ExtensionMethods extends Transform with TypingTransformers {
     declTypeNoBridge match {
       case OverloadedType(_, alts) =>
         val index = alts indexOf imeth
-        assert(index >= 0, alts+" does not contain "+imeth)
+        assert(index >= 0, ""+alts+" does not contain "+imeth)
         def altName(index: Int) = newTermName("extension"+index+"$"+imeth.name)
         Iterator(altName(index)) ++ ((0 until alts.length).iterator filter (index != _) map altName)
       case tpe =>

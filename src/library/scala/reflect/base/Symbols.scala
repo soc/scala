@@ -2,6 +2,11 @@ package scala.reflect
 package base
 
 trait Symbols { self: Universe =>
+  // easing the transition away from any2stringadd
+  implicit def justme2stringadd(x: Symbol): scala.runtime.StringAdd = new scala.runtime.StringAdd(x)
+  implicit def justme2stringadd(x: Name): scala.runtime.StringAdd = new scala.runtime.StringAdd(x)
+  implicit def justme2stringadd(x: Tree): scala.runtime.StringAdd = new scala.runtime.StringAdd(x)
+  implicit def justme2stringadd(x: Type): scala.runtime.StringAdd = new scala.runtime.StringAdd(x)
 
   // [Eugene++ to Martin] why is Symbol >: Null, whereas all other symbol types are not nullable?
   // same question goes for Types

@@ -47,7 +47,7 @@ trait Kinds {
       }
     }
     private def kindMessage(a: Symbol, p: Symbol)(f: (String, String) => String): String =
-      f(a+qualify(a,p), p+qualify(p,a))
+      f(""+a+qualify(a,p), ""+p+qualify(p,a))
 
     // Normally it's nicer to print nothing rather than '>: Nothing <: Any' all over
     // the place, but here we need it for the message to make sense.
@@ -74,7 +74,7 @@ trait Kinds {
     )
 
     def errorMessage(targ: Type, tparam: Symbol): String = (
-        (targ+"'s type parameters do not match "+tparam+"'s expected parameters:")
+        (""+targ+"'s type parameters do not match "+tparam+"'s expected parameters:")
       + buildMessage(arity, arityMessage)
       + buildMessage(variance, varianceMessage)
       + buildMessage(strictness, strictnessMessage)

@@ -172,7 +172,7 @@ trait Importers { self: SymbolTable =>
                 val mysym = doImport(sym)
 
                 if (myscope != NoType) {
-                  assert(myowner.info.decls.lookup(myname) == NoSymbol, myname+" "+myowner.info.decl(myname)+" "+myexisting)
+                  assert(myowner.info.decls.lookup(myname) == NoSymbol, ""+myname+" "+myowner.info.decl(myname)+" "+myexisting)
                   myowner.info.decls enter mysym
                 }
 

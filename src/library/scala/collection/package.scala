@@ -111,7 +111,7 @@ package collection {
 
     def buildString(closure: (Any => Unit) => Unit): String = {
       var output = ""
-      closure(output += _ + "\n")
+      closure(output += "" + _ + "\n")
 
       output
     }

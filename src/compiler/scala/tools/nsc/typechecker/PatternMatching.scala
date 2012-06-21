@@ -1359,7 +1359,7 @@ trait PatternMatching extends Transform with TypingTransformers with ast.TreeDSL
     // case object Bottom extends Cond
 
 
-    case class AndCond(a: Cond, b: Cond) extends Cond {override def toString = a +"/\\"+ b}
+    case class AndCond(a: Cond, b: Cond) extends Cond {override def toString = "" + a +"/\\"+ b}
     case class OrCond(a: Cond, b: Cond) extends Cond  {override def toString = "("+a+") \\/ ("+ b +")"}
 
     object EqualityCond {
@@ -1622,7 +1622,7 @@ trait PatternMatching extends Transform with TypingTransformers with ast.TreeDSL
     // symbols are propositions
     case class Sym(val variable: Var, val const: Const) extends Prop {
       private[this] val id = nextSymId
-      override def toString = variable +"="+ const +"#"+ id
+      override def toString = "" + variable +"="+ const +"#"+ id
     }
     private def nextSymId = {_symId += 1; _symId}; private var _symId = 0
 
@@ -2564,7 +2564,7 @@ trait PatternMatching extends Transform with TypingTransformers with ast.TreeDSL
     def varAssignmentString(varAssignment: Map[Var, (Seq[Const], Seq[Const])]) =
       varAssignment.toSeq.sortBy(_._1.toString).map { case (v, (trues, falses)) =>
          val assignment = "== "+ (trues mkString("(", ", ", ")")) +"  != ("+ (falses mkString(", ")) +")"
-         v +"(="+ v.path +": "+ v.domainTp +") "+ assignment
+         "" + v +"(="+ v.path +": "+ v.domainTp +") "+ assignment
        }.mkString("\n")
 
     def modelString(model: Model) = varAssignmentString(modelToVarAssignment(model))

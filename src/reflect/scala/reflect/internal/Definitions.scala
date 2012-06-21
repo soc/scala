@@ -874,7 +874,7 @@ trait Definitions extends api.StandardDefinitions {
     def getModule(fullname: Name): ModuleSymbol = rootMirror.getModule(fullname)
 
     private def fatalMissingSymbol(owner: Symbol, name: Name, what: String = "member") = {
-      throw new FatalError(owner + " does not have a " + what + " " + name)
+      throw new FatalError("" + owner + " does not have a " + what + " " + name)
     }
 
 //     def getRequiredPackage(fullname: String): PackageSymbol =

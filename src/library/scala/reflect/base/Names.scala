@@ -11,7 +11,6 @@ package base
  *  `name1 == name2` implies `name1 eq name2`.
  */
 trait Names {
-
   /** The abstract type of names */
   type Name >: Null <: NameBase
   implicit val NameTag: ClassTag[Name]

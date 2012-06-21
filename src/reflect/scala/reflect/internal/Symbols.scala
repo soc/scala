@@ -2097,7 +2097,7 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
      *  (the initial Name) before falling back on id, which varies depending
      *  on exactly when a symbol is loaded.
      */
-    final def sealedSortName: String = initName + "#" + id
+    final def sealedSortName: String = "" + initName + "#" + id
 
     /** String representation of symbol's definition key word */
     final def keyString: String =

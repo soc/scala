@@ -275,7 +275,7 @@ class Lexer(rd: Reader) {
    */
   def accept(t: Token) {
     if (token == t) nextToken()
-    else error(t+" expected, but "+token+" found")
+    else error(""+t+" expected, but "+token+" found")
   }
 
   /** The current token is a delimiter consisting of given character, reads next token,

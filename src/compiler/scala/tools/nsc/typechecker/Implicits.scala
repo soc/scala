@@ -300,7 +300,7 @@ trait Implicits {
 
     def failure(what: Any, reason: String, pos: Position = this.pos): SearchResult = {
       if (settings.XlogImplicits.value)
-        reporter.echo(pos, what+" is not a valid implicit value for "+pt+" because:\n"+reason)
+        reporter.echo(pos, ""+what+" is not a valid implicit value for "+pt+" because:\n"+reason)
       SearchFailure
     }
 
@@ -844,7 +844,7 @@ trait Implicits {
                   catch {
                     case e: CyclicReference =>
                       if (printInfers) {
-                        println(i+" discarded because cyclic reference occurred")
+                        println(""+i+" discarded because cyclic reference occurred")
                         e.printStackTrace()
                       }
                       true

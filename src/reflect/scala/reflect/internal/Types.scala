@@ -2324,7 +2324,7 @@ trait Types extends api.Types { self: SymbolTable =>
       else rest
     )
     private def customToString = sym match {
-      case RepeatedParamClass => args.head + "*"
+      case RepeatedParamClass => ""+args.head + "*"
       case ByNameParamClass   => "=> " + args.head
       case _                  =>
         def targs = normalize.typeArgs
@@ -2363,7 +2363,7 @@ trait Types extends api.Types { self: SymbolTable =>
       else if (sym.isPackageClass || sym.isPackageObjectOrClass)
         sym.skipPackageObject.fullName + "."
       else if (isStable && nme.isSingletonName(sym.name))
-        tpnme.dropSingletonName(sym.name) + "."
+        "" + tpnme.dropSingletonName(sym.name) + "."
       else
         super.prefixString
     )
@@ -2848,7 +2848,7 @@ trait Types extends api.Types { self: SymbolTable =>
     override def typeArgs: List[Type] = zippedArgs map (_._2)
 
     override protected def typeVarString = (
-      zippedArgs map { case (p, a) => p.name + "=" + a } mkString (origin + "[", ", ", "]")
+      zippedArgs map { case (p, a) => "" + p.name + "=" + a } mkString ("" + origin + "[", ", ", "]")
     )
   }
 
@@ -3202,7 +3202,7 @@ trait Types extends api.Types { self: SymbolTable =>
     override def isTrivial: Boolean = isTrivial0
     private lazy val isTrivial0 = underlying.isTrivial && annotations.forall(_.isTrivial)
 
-    override def safeToString = annotations.mkString(underlying + " @", " @", "")
+    override def safeToString = annotations.mkString("" + underlying + " @", " @", "")
 
     override def filterAnnotations(p: AnnotationInfo => Boolean): Type = {
       val (yes, no) = annotations partition p
@@ -3294,7 +3294,7 @@ trait Types extends api.Types { self: SymbolTable =>
   }
 
   abstract case class ErasedValueType(sym: Symbol) extends Type {
-    override def safeToString = sym.name+"$unboxed"
+    override def safeToString = ""+sym.name+"$unboxed"
   }
 
   final class UniqueErasedValueType(sym: Symbol) extends ErasedValueType(sym) with UniqueType
@@ -4574,7 +4574,7 @@ trait Types extends api.Types { self: SymbolTable =>
       if (existentials(pid) eq null) {
         val param = params(pid)
         existentials(pid) = (
-          param.owner.newExistential(newTypeName(param.name + ".type"), param.pos, param.flags)
+          param.owner.newExistential(newTypeName("" + param.name + ".type"), param.pos, param.flags)
             setInfo singletonBounds(actuals(pid))
         )
       }
@@ -4797,7 +4797,7 @@ trait Types extends api.Types { self: SymbolTable =>
       else {
         var rebind0 = pre.findMember(sym.name, BRIDGE, 0, true) orElse {
           if (sym.isAliasType) throw missingAliasException
-          debugwarn(pre+"."+sym+" does no longer exist, phase = "+phase)
+          debugwarn(""+pre+"."+sym+" does no longer exist, phase = "+phase)
           throw new MissingTypeControl // For build manager and presentation compiler purposes
         }
         /** The two symbols have the same fully qualified name */
@@ -4928,7 +4928,7 @@ trait Types extends api.Types { self: SymbolTable =>
       case _ =>
         false
     }
-    override def toString = tp1+" <:<? "+tp2
+    override def toString = ""+tp1+" <:<? "+tp2
   }
 
 // Helper Methods  -------------------------------------------------------------

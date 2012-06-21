@@ -3750,7 +3750,7 @@ trait Typers extends Modes with Adaptations with Tags {
       def typedBind(name: Name, body: Tree) = {
         var vble = tree.symbol
         def typedBindType(name: TypeName) = {
-          assert(body == EmptyTree, context.unit + " typedBind: " + name.debugString + " " + body + " " + body.getClass)
+          assert(body == EmptyTree, "" + context.unit + " typedBind: " + name.debugString + " " + body + " " + body.getClass)
           if (vble == NoSymbol)
             vble =
               if (isFullyDefined(pt))

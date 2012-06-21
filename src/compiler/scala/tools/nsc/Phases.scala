@@ -37,7 +37,7 @@ object Phases {
       >> ("phase"   -> (_.name)) >+ "  "
       << ("id"      -> (_.id))  >+ "  "
       >> ("ms"      -> (_.value)) >+ "  "
-      << ("share"   -> (_.value.toDouble * 100 / total formatted "%.2f"))
+      << ("share"   -> ("%.2f" format _.value.toDouble * 100 / total))
     }
     def formatted = "" + table()
   }
