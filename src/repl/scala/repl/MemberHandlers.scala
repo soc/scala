@@ -92,8 +92,8 @@ trait MemberHandlers {
     def extraCodeToEvaluate(req: Request): String = ""
     def resultExtractionCode(req: Request): String = ""
 
-    private def shortName = this.getClass.toString split '.' last
-    override def toString = shortName + referencedNames.mkString(" (refs: ", ", ", ")")
+    private def shortName = this.getClass.getName split "[.$]" last
+    override def toString = "%s(%s)".format(shortName, member)  // + referencedNames.mkString(" (refs: ", ", ", ")")
   }
 
   class GenericHandler(member: Tree) extends MemberHandler(member)
@@ -174,7 +174,10 @@ trait MemberHandlers {
 
   class ImportHandler(imp: Import) extends MemberHandler(imp) {
     val Import(expr, selectors) = imp
-    def targetType: Type = intp.typeOfExpression("" + expr)
+    def targetType: Type = intp.typeOfExpression("" + expr) match {
+      case NoType   => rootMirror.getModuleIfDefined("" + expr + ".package").tpe
+      case tpe      => tpe
+    }
     override def isLegalTopLevel = true
 
     def createImportForName(name: Name): String = {

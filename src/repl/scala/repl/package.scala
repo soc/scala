@@ -43,6 +43,7 @@ package object repl extends ReplConfig with ReplStrings with DecorateAsJava with
   type ClassTag[T]                            = scala.reflect.ClassTag[T]
   type TypeTag[T]                             = ru.TypeTag[T]
   def typeOf[T: TypeTag] : ru.Type            = typeTag[T].tpe
+  def symbolOf[T: TypeTag] : ru.Symbol        = typeOf[T].typeSymbol
 
   def membersOf[T: TypeTag] : List[(ru.Symbol, ru.Type)] = {
     val tpe = typeOf[T]
@@ -52,6 +53,14 @@ package object repl extends ReplConfig with ReplStrings with DecorateAsJava with
     val tpe = typeOf[T]
     tpe.declarations.toList map (sym => (sym, sym typeSignatureIn tpe))
   }
+  def implicitsOf[T: TypeTag] : List[(ru.Symbol, ru.Type)] =
+    membersOf[T] filter { case (s, t) => s.isTerm && (s hasFlag ru.Flag.IMPLICIT) }
+
+  def implicitConversionsOf[T: TypeTag] : List[(ru.Symbol, ru.Type)] =
+    implicitsOf[T] filter (_._2 <:< typeOf[Function1[_,_]])
+
+  def implicitTermsOf[T: TypeTag] : List[(ru.Symbol, ru.Type)] =
+    implicitsOf[T] collect { case (s, t: ru.MethodType) if t.params.isEmpty => ((s, t)) }
 
   lazy val ru = scala.reflect.runtime.universe
   // new scala.reflect.runtime.JavaUniverse {
