@@ -9,11 +9,9 @@ package repl
 import scala.tools.nsc._
 import Predef.{ println => _, _ }
 import java.io.{ BufferedReader, FileReader }
-import java.util.concurrent.locks.ReentrantLock
 import session._
-import scala.util.Properties.{ jdkHome, javaVersion }
+import scala.util.Properties.{ jdkHome, javaVersion, versionString, javaVmName }
 import scala.tools.util.{ Javap }
-import scala.collection.mutable.ListBuffer
 import util.{ ClassPath, Exceptional, stringFromWriter, stringFromStream }
 import io.{ File, Directory }
 import scala.reflect.NameTransformer._
@@ -34,19 +32,40 @@ import language.{implicitConversions, existentials}
  *  @author  Lex Spoon
  *  @version 1.2
  */
-class ILoop(in0: Option[BufferedReader], protected val out: JPrintWriter)
-                extends AnyRef
-                   with LoopCommands
-                   with ILoopInit
-{
+class ILoop(in0: Option[BufferedReader], protected val out: JPrintWriter) extends LoopCommands {
   def this(in0: BufferedReader, out: JPrintWriter) = this(Some(in0), out)
   def this() = this(None, new JPrintWriter(Console.out, true))
 
   var in: InteractiveReader = _   // the input stream from which commands come
   var settings: Settings = _
+  val queuedLines = new java.util.concurrent.LinkedBlockingQueue[String]
+  val synchronousResult = new java.util.concurrent.SynchronousQueue[String]
+  // code to be executed only after the interpreter is initialized
+  // and the lazy val `global` can be accessed without risk of deadlock.
+  val pendingThunks = new java.util.concurrent.ConcurrentLinkedQueue[() => Unit]
 
   lazy val intp: IMain = new ILoopInterpreter
   lazy val power = new Power(intp, new StdReplVals(this))
+
+  /** Print a welcome message */
+  def printWelcome() {
+    val welcomeMsg =
+     """|Welcome to Scala %s (%s, Java %s).
+        |Type in expressions to have them evaluated.
+        |Type :help for more information.""" .
+    stripMargin.format(versionString, javaVmName, javaVersion)
+    echo(welcomeMsg)
+    replinfo("[info] started at " + new java.util.Date)
+  }
+
+  protected def addThunk(body: => Unit) = pendingThunks add (() => body)
+  protected def runThunks() {
+    intp.global // force lazy val to completion
+    pendingThunks.poll() match {
+      case null   => ()
+      case thunk  => thunk() ; runThunks()
+    }
+  }
 
   // Resuming after ctrl-Z; terminal is hosed.
   SIG.CONT handle {
@@ -79,7 +98,6 @@ class ILoop(in0: Option[BufferedReader], protected val out: JPrintWriter)
     intp.reporter printUntruncatedMessage msg
   }
 
-  def isAsync = !settings.Yreplsync.value
   def history = in.history
 
   /** The context class loader at the time this object was created */
@@ -173,7 +191,6 @@ class ILoop(in0: Option[BufferedReader], protected val out: JPrintWriter)
     cmd("implicits", "[-v]", "show the implicits in scope", implicitsCommand),
     cmd("javap", "<path|class>", "disassemble a file or class name", javapCommand),
     nullary("paste", "enter paste mode: all input up to ctrl-D compiled together", pasteCommand),
-    nullary("power", "enable power user mode", powerCmd),
     nullary("quit", "exit the interpreter", () => Result(false, 0)),
     nullary("warnings", "show the suppressed warnings from the most recent line which had any", warningsCommand)
   )
@@ -293,9 +310,25 @@ class ILoop(in0: Option[BufferedReader], protected val out: JPrintWriter)
   /** Available commands */
   def commands: List[LoopCommand] = standardCommands
 
-  def readLine() = {
-    out.flush()
-    in readLine prompt
+  private object readerThread extends Thread {
+    this setPriority Thread.MAX_PRIORITY
+    private var running = true
+    def stillRunning = running
+    def stopRunning() = running = false
+
+    override def run() {
+      while (stillRunning) {
+        out.flush()
+        val line = in readLine prompt
+
+        if (line == null)
+          stopRunning()
+        else {
+          queuedLines put line
+          synchronousResult.take()
+        }
+      }
+    }
   }
 
   /** The main read-eval-print loop for the repl.  It calls
@@ -303,40 +336,22 @@ class ILoop(in0: Option[BufferedReader], protected val out: JPrintWriter)
    *  command() returns false.
    */
   def loop() {
-    // return false if repl should exit
-    def processLine(line: String): Boolean = {
-      if (isAsync) {
-        if (!awaitInitialized()) return false
-        runThunks()
-      }
-      (line ne null) && (command(line) match {
-        case Result(false, _) => false
-        case Result(true, n)  => true
-          (history eq NoHistory) || (n <= 1) || {
+    while (readerThread.stillRunning) {
+      runThunks()
+      val line = queuedLines.take()
+
+      command(line) match {
+        case Result(false, _) =>
+          readerThread.stopRunning()
+        case Result(true, n)  =>
+          if ((history ne NoHistory) && (n > 1)) {
             val coalesced = history.removeRange(history.size - n, n) mkString "\n"
             history add coalesced
-            true
           }
-       })
+          synchronousResult put "ok"
+      }
     }
-    while (processLine(readLine())) { }
-  }
-
-  def powerCmd(): Result = {
-    if (isReplPower) "Already in power mode."
-    else enablePowerMode(false)
-  }
-  def enablePowerMode(isDuringInit: Boolean) = {
-    replProps.power setValue true
-    if (isReplPower)
-      power.unleash()
-
-    asyncEcho(isDuringInit, power.banner)
-  }
-
-  def asyncEcho(async: Boolean, msg: => String) {
-    if (async) asyncMessage(msg)
-    else echo(msg)
+    echo("Exiting repl loop.")
   }
 
   /** Run one command submitted by the user.  Two values are returned:
@@ -453,7 +468,6 @@ class ILoop(in0: Option[BufferedReader], protected val out: JPrintWriter)
   }
   def process(settings: Settings): Boolean = savingContextLoader {
     this.settings = settings
-
     // sets in to some kind of reader depending on environmental cues
     in = in0 match {
       case Some(reader) => SimpleReader(reader, out, true)
@@ -464,39 +478,29 @@ class ILoop(in0: Option[BufferedReader], protected val out: JPrintWriter)
           case x              => x
         }
     }
-    // Bind intp somewhere out of the regular namespace where
-    // we can get at it in generated code.
-    addThunk(intp.quietBind("$intp" -> intp))
-      // intp.quietBind(NamedParam[IMain]("$intp", intp)))
-    addThunk({
-      import scala.tools.nsc.io._
-      import Properties.userHome
-      import compat.Platform.EOL
-      val autorun = replProps.replAutorunCode.option flatMap (f => io.File(f).safeSlurp())
-      if (autorun.isDefined) intp.quietRun(autorun.get)
-    })
+
+    printWelcome()
+    readerThread.start()
+
+    // addThunk({
+    //   import scala.tools.nsc.io._
+    //   import Properties.userHome
+    //   import compat.Platform.EOL
+    //   val autorun = replProps.replAutorunCode.option flatMap (f => io.File(f).safeSlurp())
+    //   if (autorun.isDefined) intp.quietRun(autorun.get)
+    // })
 
     // it is broken on startup; go ahead and exit
     if (intp.reporter.hasErrors)
       return false
 
-    // This is about the illusion of snappiness.  We call initialize()
-    // which spins off a separate thread, then print the prompt and try
-    // our best to look ready.  The interlocking lazy vals tend to
-    // inter-deadlock, so we break the cycle with a single asynchronous
-    // message to an actor.
-    if (isAsync) {
-      intp initialize initializedCallback()
-      createAsyncListener() // listens for signal to run postInitialization
-    }
-    else {
-      intp.initializeSynchronous()
-      postInitialization()
-    }
-    printWelcome()
+    // Bind intp somewhere out of the regular namespace where
+    // we can get at it in generated code.
+    addThunk(intp.quietBind("$intp" -> intp))
+    addThunk(intp.setContextClassLoader)
+    addThunk({ power.unleash() ; echoAndRefresh(power.banner) })
 
     try loop() finally closeInterpreter()
-
     true
   }
 

@@ -78,12 +78,13 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
   private var currentSettings: Settings       = initialSettings
   private[repl] var printResults              = true      // whether to print result lines
   private[repl] var totalSilence              = false     // whether to print anything
-  private var _initializeComplete             = false     // compiler is initialized
-  private var _isInitialized: Future[Boolean] = null      // set up initialization future
 
   def compilerSettings       = currentSettings
   def maxPrintString         = 800
   def maxAutoprintCompletion = 250
+
+  private[repl] val globalLatch = new java.util.concurrent.CountDownLatch(1)
+  def isInitializeComplete = globalLatch.getCount == 0
 
   /** We're going to go to some trouble to initialize the compiler asynchronously.
    *  It's critical that nothing call into it until it's been initialized or we will
@@ -112,6 +113,7 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
     try body
     finally currentSettings = saved
   }
+
   def mostRecentLine = prevRequestList match {
     case Nil      => ""
     case req :: _ => req.originalLine
@@ -145,92 +147,11 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
   import formatting._
   import reporter.{ printMessage, withoutTruncating }
 
-  // This exists mostly because using the reporter too early leads to deadlock.
-  private def _initSources = List(new BatchSourceFile("<init>", "class $repl_$init { }"))
-  private def _initialize() = {
-    new _compiler.Run() compileSources _initSources
-    _initializeComplete = true
-    true
-  }
-  // object quoting {
-  //   val q   = "\""
-  //   val bs  = "\\"
-  //   val bs2 = bs + bs
-  //   val tq  = q + q + q
-  //   val bq  = bs + q
-  //
-  //   def double(s: String): String = (
-  //     List(bs -> bs2, q -> bq).foldLeft(s) { case (s, (f, t)) => s.replaceAllLiterally(f, t) }
-  //   )
-  //   def triple(s: String): String = (
-  //     s.replaceAllLiterally(tq,
-  //   )
-  // }
-  // private def tquoted(s: String) = {
-  //   val tquoteIndices = s.indices dropRight 2 filter (i => s.substring(i, i + 3) == tq)
-  //   if (tquoteIndices.isEmpty) double(s)
-  //   else tquoteIndices match {
-  //     case start :: end :: rest =>
-  //
-  //
-  //   val segments = s split tquote toList
-  //
-  //
-  //   segments match {
-  //     case Nil      => ""
-  //     case x :: Nil => quoted(x)
-  //
-  //
-  // private def tquoted(s: String) = {
-  //   s indexOf tquote match {
-  //     case -1                     => tquote + s + tquote
-  //     case 0 if s endsWith tquote => s
-  //     case idx                    =>
-  //       s drop (idx + 3) indexOf tquote match {
-  //         case -1   => s   // no matching quote?
-  //         case end  => (s take idx)
-  //
-  //   if (s contains "\"\"\"") {
-  //     List(
-  //       """\""" -> """\\""",
-  //       "\"" -> "\\\""
-  //     ).foldLeft(s) { case (s, (f, t)) => s.replaceAllLiterally(f, t) }
-  //   }
-  //   else "\"\"\"" + s + "\"\"\""
-  // }
-
-  // argument is a thunk to execute after init is done
-  def initialize(postInitSignal: => Unit) {
-    synchronized {
-      if (_isInitialized == null) {
-        _isInitialized = io.spawn {
-          try _initialize()
-          finally postInitSignal
-        }
-      }
-    }
-  }
-  def initializeSynchronous(): Unit = {
-    if (!isInitializeComplete) {
-      _initialize()
-      assert(global != null, global)
-    }
-  }
-  def isInitializeComplete = _initializeComplete
-
   /** the public, go through the future compiler */
   lazy val global: Global = {
-    if (isInitializeComplete) _compiler
-    else {
-      // If init hasn't been called yet you're on your own.
-      if (_isInitialized == null) {
-        repldbg("Warning: compiler accessed before init set up.  Assuming no postInit code.")
-        initialize(())
-      }
-      // blocks until it is ; false means catastrophic failure
-      if (_isInitialized.get()) _compiler
-      else null
-    }
+    io.spawn(try new _compiler.Run() finally globalLatch.countDown())
+    globalLatch.await()
+    _compiler
   }
 
   import global._
@@ -858,9 +779,8 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
     private object ObjectSourceCode extends CodeAssembler[MemberHandler] {
       def path = pathToTerm("$intp")
       def envLines = {
-        if (!isReplPower) Nil // power mode only for now
         // $intp is not bound; punt, but include the line.
-        else if (path == "$intp") List(
+        if (path == "$intp") List(
           "def $line = \"" + string2code(originalLine) + "\"",
           "def $trees = Nil"
         )

@@ -20,10 +20,6 @@ import scala.collection.convert._
  *  History: an interface for session history.
  *  Completion: an interface for tab completion.
  *  Power: a repository for more advanced/experimental features.
- *
- *  ILoop contains { in: InteractiveReader, intp: IMain, settings: Settings, power: Power }
- *  InteractiveReader contains { history: History, completion: Completion }
- *  IMain contains { global: Global }
  */
 package object repl extends ReplConfig with ReplStrings with DecorateAsJava with DecorateAsScala {
   type Global = scala.tools.nsc.Global

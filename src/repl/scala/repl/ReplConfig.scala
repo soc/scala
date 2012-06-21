@@ -61,5 +61,4 @@ trait ReplConfig {
   def isReplTrace: Boolean = replProps.trace
   def isReplDebug: Boolean = replProps.debug || isReplTrace
   def isReplInfo: Boolean  = replProps.info || isReplDebug
-  def isReplPower: Boolean = replProps.power
 }

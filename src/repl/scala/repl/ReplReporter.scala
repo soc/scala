@@ -14,7 +14,7 @@ import IMain._
 class ReplReporter(intp: IMain) extends ConsoleReporter(intp.settings, Console.in, new ReplStrippingWriter(intp)) {
   def printUntruncatedMessage(msg: String) = withoutTruncating(printMessage(msg))
 
-  override def printMessage(msg: String) {
+  override def printMessage(msg: String): Unit = {
     // Avoiding deadlock if the compiler starts logging before
     // the lazy val is complete.
     if (intp.isInitializeComplete) {
@@ -27,7 +27,7 @@ class ReplReporter(intp: IMain) extends ConsoleReporter(intp.settings, Console.i
     else Console.println("[init] " + msg)
   }
 
-  override def displayPrompt() {
+  override def displayPrompt(): Unit = {
     if (intp.totalSilence) ()
     else super.displayPrompt()
   }

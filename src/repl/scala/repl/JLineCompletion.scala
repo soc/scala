@@ -173,9 +173,7 @@ class JLineCompletion(val intp: IMain) extends Completion with CompletionOutput 
 
       def default = Some(TypeMemberCompletion(tpe))
 
-      // only rebinding vals in power mode for now.
-      if (!isReplPower) default
-      else intp runtimeClassAndTypeOfTerm id match {
+      intp runtimeClassAndTypeOfTerm id match {
         case Some((clazz, runtimeType)) =>
           val sym = intp.symbolOfTerm(id)
           if (sym.isStable) {
