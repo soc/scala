@@ -12,17 +12,6 @@ import util.stackTraceString
 trait ReplConfig {
   lazy val replProps = new ReplProps
 
-  class TapMaker[T](x: T) {
-    def tapInfo(msg: => String): T  = tap(x => replinfo(parens(x)))
-    def tapDebug(msg: => String): T = tap(x => repldbg(parens(x)))
-    def tapTrace(msg: => String): T = tap(x => repltrace(parens(x)))
-    def tap[U](f: T => U): T = {
-      f(x)
-      x
-    }
-  }
-
-  private def parens(x: Any) = "(" + x + ")"
   private def echo(msg: => String) =
     try Console println msg
     catch { case x: AssertionError => Console.println("Assertion error printing debugging output: " + x) }

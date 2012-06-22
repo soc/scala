@@ -5,8 +5,6 @@
 
 package scala.repl
 
-// import scala.tools.nsc._
-// import reporters._
 import scala.tools.nsc._
 import typechecker.Analyzer
 
@@ -24,13 +22,11 @@ trait ReplGlobal extends Global {
   } with Analyzer {
     override def newTyper(context: Context): Typer = new Typer(context) {
       override def typed(tree: Tree, mode: Int, pt: Type): Tree = {
-        val res = super.typed(tree, mode, pt)
-        tree match {
-          case Ident(name) if !tree.symbol.hasPackageFlag && !name.toString.startsWith("$") =>
+        super.typed(tree, mode, pt) tap {
+          case res @ Ident(name) if !tree.symbol.hasPackageFlag && !name.toString.startsWith("$") =>
             repldbg("typed %s: %s".format(name, res.tpe))
           case _ =>
         }
-        res
       }
     }
   }

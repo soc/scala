@@ -114,9 +114,9 @@ package object repl extends ReplConfig with ReplStrings with DecorateAsJava with
   private[repl] implicit def javaCharSeqCollectionToScala(xs: JCollection[_ <: CharSequence]): List[String] =
     xs.asScala.toList map ("" + _)
 
-  private[repl] implicit def enrichAnyRefWithTap[T](x: T) = new TapMaker(x)
-  private[repl] def tracing[T](msg: String)(x: T): T = x.tapTrace(msg)
-  private[repl] def debugging[T](msg: String)(x: T) = x.tapDebug(msg)
+  private def parens(x: Any) = "(" + x + ")"
+  private[repl] def tracing[T](msg: String)(res: T): T = res tap (x => repltrace(parens(x)))
+  private[repl] def debugging[T](msg: String)(res: T)  = res tap (x => repldbg(parens(x)))
 
   implicit class ReplInputStreamOps(in: InputStream)(implicit codec: Codec) {
     def bytes(): Array[Byte] = Streamable.bytes(in)
