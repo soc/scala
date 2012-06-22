@@ -17,6 +17,13 @@ trait MemberHandlers {
   import global._
   import naming._
 
+  def importableMembers(tp: Type) = (
+    tp.nonPrivateMembers filterNot (sym =>
+         sym.isConstructor
+      || (definitions.ObjectClass isSubClass sym.owner)
+    )
+  )
+
   private def codegenln(leadingPlus: Boolean, xs: String*): String = codegen(leadingPlus, (xs ++ Array("\n")): _*)
   private def codegenln(xs: String*): String = codegenln(true, xs: _*)
   private def codegen(leadingPlus: Boolean, xs: String*): String = {
@@ -66,7 +73,7 @@ trait MemberHandlers {
     def keyword         = member.keyword
     def prettyName      = name.decoded
 
-    override def definesImplicit = member.mods.isImplicit
+    override def definesImplicit = mods.isImplicit
     override def definesTerm: Option[TermName] = Some(name.toTermName) filter (_ => name.isTermName)
     override def definesType: Option[TypeName] = Some(name.toTypeName) filter (_ => name.isTypeName)
     override def definedSymbols = if (symbol eq NoSymbol) Nil else List(symbol)
@@ -210,15 +217,14 @@ trait MemberHandlers {
       beforePickler(individualNames map (targetType nonPrivateMember _))
 
     lazy val wildcardSymbols: List[Symbol] =
-      if (importsWildcard) beforePickler(targetType.nonPrivateMembers)
-      else Nil
+      if (importsWildcard) beforePickler(importableMembers(targetType)) else Nil
 
     /** Complete list of names imported by a wildcard */
-    lazy val wildcardNames: List[Name]   = wildcardSymbols map (_.name)
-    lazy val individualNames: List[Name] = selectorRenames filterNot (_ == nme.USCOREkw) flatMap (_.bothNames)
+    lazy val wildcardNames: List[Name]   = afterTyper(wildcardSymbols map (_.name))
+    lazy val individualNames: List[Name] = afterTyper(selectorRenames filterNot (_ == nme.USCOREkw) flatMap (_.bothNames))
 
     /** The names imported by this statement */
-    override lazy val importedNames: List[Name] = wildcardNames ++ individualNames
+    override def importedNames: List[Name] = wildcardNames ++ individualNames
     lazy val importsSymbolNamed: Set[String] = importedNames map (_.toString) toSet
 
     def importString = imp.toString

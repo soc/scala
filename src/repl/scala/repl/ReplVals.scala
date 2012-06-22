@@ -79,9 +79,7 @@ class StdReplVals(val r: ILoop) {
   def trees(code: String)    = intp parse code
   def seenTypeOf(id: String) = intp.typeOfExpression(id)
 
-  lazy val replenv = new {
-    val global: intp.global.type = intp.global
-  } with ReplUniverseOps with TagWrappers with Prettifiers {
+  class ReplEnv(val global: intp.global.type) extends ReplUniverseOps with TagWrappers with Prettifiers {
     @weight(-2) implicit def replPrinting[T](x: T)(implicit pretty: Prettifier[T] = Prettifier.default[T]) =
       new SinglePrettifierClass[T](x)
 
@@ -89,6 +87,8 @@ class StdReplVals(val r: ILoop) {
       new MultiPrettifierClass[T](xs.toSeq)
     @weight(-1) implicit def replPrettifier[T] : Prettifier[T] = Prettifier.default[T]
   }
+
+  lazy val replenv = new ReplEnv(global)
 
   object treedsl extends { val global: intp.global.type = intp.global } with TreeDSL { }
 
