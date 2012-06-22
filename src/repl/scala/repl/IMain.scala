@@ -328,11 +328,10 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
   }
 
   def recordRequest(req: Request) {
-    if (req == null || referencedNameMap == null)
+    if (req == null)
       return
 
     prevRequests += req
-    req.referencedNames foreach (x => referencedNameMap(x) = req)
     req.exposedSymbols foreach (x => requestForSymbol(x) = req)
     req.definedSymbols.values foreach (x => req.scope enter x)
     // req.definedSymbols.values foreach (sym => replScope enter sym)
@@ -1100,8 +1099,8 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
   private var executingRequest: Request = _
   private val prevRequests       = mutable.ListBuffer[Request]()
   private val requestForSymbol   = mutable.Map[Symbol, Request]()
-  private val referencedNameMap  = mutable.Map[Name, Request]()
-  private val definedNameMap     = mutable.Map[Name, Request]()
+  // private 
+  val definedNameMap     = mutable.Map[Name, Request]()
   private val directlyBoundNames = mutable.Set[Name]()
 
   def replScope = lastRequest match {
