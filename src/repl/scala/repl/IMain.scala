@@ -281,15 +281,23 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
   }
   def flatName(id: String)    = optFlatName(id) getOrElse id
   def optFlatName(id: String) = requestForIdent(id) map (_ fullFlatName id)
+  
+  def pathToName(name: Name, maxRequestId: Int): String = {
+    prevRequests.reverse filter (_.reqId <= maxRequestId) collectFirst {
+      case req if req.exposedNames contains name =>
+        req fullPath ("" + name)
+    } getOrElse name.toString
+  }
 
   def allDefinedNames = definedNameMap.keys.toList.sorted
   def pathToType(id: String): String = pathToName(newTypeName(id))
   def pathToTerm(id: String): String = pathToName(newTermName(id))
-  def pathToName(name: Name): String = {
-    if (definedNameMap contains name)
-      definedNameMap(name) fullPath name
-    else name.toString
-  }
+  def pathToName(name: Name): String = pathToName(name, Int.MaxValue)
+  // 
+  //   if (definedNameMap contains name)
+  //     definedNameMap(name) fullPath name
+  //   else name.toString
+  // }
 
   /** Most recent tree handled which wasn't wholly synthetic. */
   private def mostRecentlyHandledTree: Option[Tree] = {
@@ -655,21 +663,6 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
 
     def compile(source: String): Boolean = compileAndSaveRun("<console>", source)
 
-    /** The innermost object inside the wrapper, found by
-      * following accessPath into the outer one.
-      */
-    // def resolvePathToSymbol(accessPath: String): Symbol = {
-    //   val readRoot  = getRequiredModule(readPath)   // the outermost wrapper
-    //   (accessPath split '.').foldLeft(readRoot: Symbol) {
-    //     case (sym, "")    => sym
-    //     case (sym, name)  => afterTyper(definitions.termMember(sym, name))
-    //   }
-    // }
-    // def resolvePathToSymbol(name: String): Symbol = {
-    //   val readRoot = getRequiredModule(readPath)   // the outermost wrapper
-    //   afterTyper(definitions.termMember(readRoot, name))
-    // }
-
     /** We get a bunch of repeated warnings for reasons I haven't
      *  entirely figured out yet.  For now, squash.
      */
@@ -736,39 +729,20 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
     def definedTypeSymbol(name: String) = definedSymbols(newTypeName(name))
     def definedTermSymbol(name: String) = definedSymbols(newTermName(name))
 
-    val importLines = importsCodeNew(referencedNames.toSet)
-    importLines foreach Console.println
-    val importsPreamble = importLines map (_ + "\n") mkString
-    // val importsPreamble = importLines map ("import " + _ + "\n") mkString
-
-    /** Code to import bound names from previous lines - accessPath is code to
-      * append to objectName to access anything bound by request.
-      */
-    // val ComputedImports(importsPreamble, importsTrailer, accessPath) =
-    //   importsCode(referencedNames.toSet)
-    //
-    // {
-    //   val impnew = importsCodeNew(referencedNames.toSet)
-    //   Console.println("ComputedImports" + ((importsPreamble, importsTrailer, accessPath)))
-    //   Console.println("\nimpnew:\n  " + impnew.mkString("\n  "))
-    //   // impnew foreach println
-    // }
+    val importsPreamble = importsCode(referencedNames.toSet) map (_ + "\n") mkString
 
     /** Code to access a variable with the specified name */
     def fullPath(vname: String) = {
       val id = if (nme.isScalaReservedWord(vname)) "`%s`".format(vname) else vname
 
       lineRep.readPath + "." + id
-      // lineRep.readPath + accessPath + "." + id
     }
     /** Same as fullpath, but after it has been flattened, so:
      *  $line5.$iw.$iw.$iw.Bippy      // fullPath
      *  $line5.$iw$$iw$$iw$Bippy      // fullFlatName
      */
-    def fullFlatName(name: String) = (
+    def fullFlatName(name: String) =
       lineRep.readPath + nme.NAME_JOIN_STRING + name
-      // lineRep.readPath + accessPath.replace('.', '$') + nme.NAME_JOIN_STRING + name
-    )
 
     /** The unmangled symbol name, but supplemented with line info. */
     def disambiguated(name: Name): String = name + " (in " + lineRep + ")"
@@ -800,7 +774,6 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
         |%s%s%s
       """.stripMargin.format(lineRep.readName, envLines.map("  " + _ + ";\n").mkString, importsPreamble, indentCode(toCompute))
       val postamble = "\n}"
-      // val postamble = importsTrailer + "\n}"
       val generate = (m: MemberHandler) => m extraCodeToEvaluate Request.this
     }
 

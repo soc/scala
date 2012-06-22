@@ -217,8 +217,7 @@ trait MemberHandlers {
     override def isLegalTopLevel = true
 
     override def exportedName(prefix: String, name: Name): String = printResult("exportedName" + ((prefix, name))) {
-      Console.println("symbol is " + ((exprSymbol, imp.symbol)))
-       super.exportedName(prefix, name)
+      super.exportedName("" + expr, name)
     }
     //
     // override def exportedName(prefix: String, name: Name): String = ({
