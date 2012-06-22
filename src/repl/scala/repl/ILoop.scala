@@ -502,7 +502,7 @@ import $r.treedsl.CODE._
     addThunk(intp.quietly {
       intp.setContextClassLoader
       intp.bind("$r" -> vals)
-      intp.stickySymbols += intp.symbolOfTerm("$r")
+      // intp.stickySymbols += intp.symbolOfTerm("$r")
       intp interpret ("import %s._" format intp.pathToTerm("$r"))
       // importableMembers(typeOf[T]) foreach (initialReplScope enter _)
 

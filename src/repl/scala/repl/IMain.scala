@@ -729,10 +729,14 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
       case null   => Nil
       case r      => r.scopeEntries filterNot (other => scope exists (_.name == other.name))
     })
-    def scopeLookup(name: Name): Symbol = scope lookup name match {
-      case NoSymbol if prev ne null => prev scopeLookup name
-      case sym                      => sym
-    }
+    def scopeLookup(name: Name): Symbol = afterTyper(scopeEntries find (_.name == name) getOrElse NoSymbol)
+    // 
+    // scope lookup name match {
+    //   case NoSymbol =>
+    //   
+    //   case NoSymbol if prev ne null => prev scopeLookup name
+    //   case sym                      => sym
+    // }
     // Console.println("scopeImports for %s\n  %s".format(referencedNames.distinct, scopeImports.mkString("\n  ")))
 
     private var _originalLine: String = null
@@ -744,14 +748,14 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
     def termNames = handlers flatMap (_.definesTerm)
     def typeNames = handlers flatMap (_.definesType)
     def handlerOf(sym: Symbol): Option[MemberHandler] = handlers find (_.exposedSymbols contains sym)
-    def importFor(sym: Symbol): Option[String] = (
+    def importFor(sym: Symbol): Option[String] = afterTyper(
       // if (stickySymbols(sym))
       //   Some("import " + sym.fullName)
       // else (
         handlerOf(sym)
-          collect { case x: ImportHandler => "import %s.%s".format(x.expr, sym.name) }
+          collect { case x: ImportHandler => "import %s.%s".format(x.exprPath, sym.name) }
            orElse { Some("import %s".format(fullPath(sym.name))) }
-      )
+      // )
     )
 
     def exposedSymbols    = handlers flatMap (_.exposedSymbols)
@@ -770,6 +774,10 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
     def unshadowedImplicits = (
       scopeEntries filter (sym => sym.isImplicit && (scopeLookup(sym.name) == sym))
     )
+    val replvalImports = pathToTerm("$r") match {
+      case "$r" => Nil
+      case path => List("import " + path)
+    }
     val implicitImports = unshadowedImplicits flatMap (self importFor _)
     val nameImports = referencedNames.distinct flatMap { name =>
       printResult("scopeLookup(" + name + ")")(scopeLookup(name)) match {
@@ -777,7 +785,7 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
         case sym      => self importFor sym
       }
     }
-    val allImports = implicitImports ++ nameImports
+    val allImports = replvalImports ++ implicitImports ++ nameImports
     val accessPath = ""
     val importsPreamble = allImports.mkString("\n", "\n", "\n")
     val importsTrailer = ""
@@ -1092,7 +1100,7 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
     case req  => req.scopeEntries
   }
   
-  def importFor(sym: Symbol): Option[String] = (
+  def importFor(sym: Symbol): Option[String] = afterTyper(
     requestForSymbol get sym flatMap (_ importFor sym) orElse (
       if (sym.name.toString == pathToName(sym.name)) None
       else Some("import " + pathToName(sym.name))

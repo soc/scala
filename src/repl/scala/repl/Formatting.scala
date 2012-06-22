@@ -18,17 +18,8 @@ trait Formatting {
     if (noIndent) ""
     else prompt drop 1 map (_ => ' ')
   }
-  /** Indent some code by the width of the scala> prompt.
-   *  This way, compiler error messages read better.
+ 
+  /** Indent a few spaces so compiler error messages read better.
    */
-  def indentCode(code: String) = { code
-    // val indent = spaces(code)
-    // stringFromWriter(str =>
-    //   for (line <- code.lines) {
-    //     str print indent
-    //     str print (line + "\n")
-    //     str.flush()
-    //   }
-    // )
-  }
+  def indentCode(code: String) = code.lines.map("  " + _).mkString("\n")
 }
