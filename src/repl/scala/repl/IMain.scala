@@ -766,8 +766,8 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
       }
     }
     val allImports = implicitImports ++ nameImports
-    Console.println("ComputedImports" + ((importsPreamble, importsTrailer, accessPath)))
-    Console.println("allImports\n  " + allImports.mkString("\n  "))
+    // Console.println("ComputedImports" + ((importsPreamble, importsTrailer, accessPath)))
+    // Console.println("allImports\n  " + allImports.mkString("\n  "))
 
     /** Code to access a variable with the specified name */
     def fullPath(vname: String) = (
@@ -864,7 +864,7 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
         // extract and remember types
         seenTypeOf
         typesOfDefinedTerms
-        exposedSymbols filterNot (_.owner.isPackageObjectClass) foreach (scope enter _)
+        exposedSymbols filterNot (s => (s eq NoSymbol) || s.owner.isPackageObjectClass) foreach (scope enter _)
 
         // Assign symbols to the original trees
         // TODO - just use the new trees.

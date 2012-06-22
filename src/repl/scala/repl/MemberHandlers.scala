@@ -32,29 +32,6 @@ trait MemberHandlers {
   }
   private implicit def name2string(name: Name) = name.toString
 
-  /** A traverser that finds all mentioned identifiers, i.e. things
-   *  that need to be imported.  It might return extra names.
-   */
-  private class ImportVarsTraverser extends Traverser {
-    val importVars = new mutable.HashSet[Name]()
-
-    override def traverse(ast: Tree) = ast match {
-      case Ident(name) =>
-        // XXX this is obviously inadequate but it's going to require some effort
-        // to get right.
-        if (name.toString startsWith "x$") ()
-        else importVars += name
-      case _        => super.traverse(ast)
-    }
-  }
-  private object ImportVarsTraverser {
-    def apply(member: Tree) = {
-      val ivt = new ImportVarsTraverser()
-      ivt traverse member
-      ivt.importVars.toList
-    }
-  }
-
   def chooseHandler(member: Tree): MemberHandler = member match {
     case member: DefDef        => new DefHandler(member)
     case member: ValDef        => new ValHandler(member)
@@ -62,7 +39,7 @@ trait MemberHandlers {
     case member: ModuleDef     => new ModuleHandler(member)
     case member: ClassDef      => new ClassHandler(member)
     case member: TypeDef       => new TypeAliasHandler(member)
-    case member: Import        => /*updateReplContext(member) ; */ new ImportHandler(member)
+    case member: Import        => new ImportHandler(member)
     case member                => new GenericHandler(member)
   }
 
@@ -89,8 +66,16 @@ trait MemberHandlers {
 
     def definesTerm     = Option.empty[TermName]
     def definesType     = Option.empty[TypeName]
+    
+    private def isImportable(t: Ident) = {
+      def coarse = true // !(t.name.decoded contains "$")
+      t.symbol match {
+        case null | NoSymbol => coarse
+        case sym             => !sym.isLocal
+      }
+    }
 
-    lazy val referencedNames = ImportVarsTraverser(member)
+    lazy val referencedNames = member collect { case t @ Ident(name) if isImportable(t) => name } toSet
     def importedNames        = List[Name]()
     def definedNames         = definesTerm.toList ++ definesType.toList
     def definedOrImported    = definedNames ++ importedNames
