@@ -106,6 +106,7 @@ trait StandardNames extends base.StandardNames {
 
     val ??? : TermName
 
+    def isScalaReservedWord(word: String): Boolean
     def isConstructorName(name: Name): Boolean
     def isExceptionResultName(name: Name): Boolean
     def isImplClassName(name: Name): Boolean

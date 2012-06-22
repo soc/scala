@@ -17,6 +17,13 @@ trait MemberHandlers {
   import global._
   import naming._
 
+  def importableMembers(tp: Type) = (
+    tp.nonPrivateMembers filterNot (sym =>
+         sym.isConstructor
+      || (definitions.ObjectClass isSubClass sym.owner)
+    )
+  )
+
   private def codegenln(leadingPlus: Boolean, xs: String*): String = codegen(leadingPlus, (xs ++ Array("\n")): _*)
   private def codegenln(xs: String*): String = codegenln(true, xs: _*)
   private def codegen(leadingPlus: Boolean, xs: String*): String = {
@@ -66,7 +73,7 @@ trait MemberHandlers {
     def keyword         = member.keyword
     def prettyName      = name.decoded
 
-    override def definesImplicit = member.mods.isImplicit
+    override def definesImplicit = mods.isImplicit
     override def definesTerm: Option[TermName] = Some(name.toTermName) filter (_ => name.isTermName)
     override def definesType: Option[TypeName] = Some(name.toTypeName) filter (_ => name.isTypeName)
     override def definedSymbols = if (symbol eq NoSymbol) Nil else List(symbol)
@@ -84,10 +91,26 @@ trait MemberHandlers {
     def definesType     = Option.empty[TypeName]
 
     lazy val referencedNames = ImportVarsTraverser(member)
-    def importedNames        = List[Name]()
     def definedNames         = definesTerm.toList ++ definesType.toList
-    def definedOrImported    = definedNames ++ importedNames
+    def importedNames        = List[Name]()
+    def exposedNames         = definedNames ++ importedNames
     def definedSymbols       = List[Symbol]()
+    def importedSymbols      = List[Symbol]()
+    def exposedSymbols       = definedSymbols ++ importedSymbols
+    def implicitSymbols      = exposedSymbols filter (_.isImplicit)
+
+    def exposesName(name: Name): Boolean = exposedNames contains name
+    def exposesName(name: String): Boolean = (
+      exposesName(newTermName(name)) || exposesName(newTypeName(name))
+    )
+
+    def exportedName(prefix: String, name: Name): String = {
+      "import %s.%s".format(prefix, name)
+    }
+    // def exportedName(sym: Symbol): String = {
+    //   if (sym.isStatic
+    //   exportedName("_root_." + sym.owner.skipPackageObject.fullName, sym.name)
+    // }
 
     def extraCodeToEvaluate(req: Request): String = ""
     def resultExtractionCode(req: Request): String = ""
@@ -174,19 +197,50 @@ trait MemberHandlers {
 
   class ImportHandler(imp: Import) extends MemberHandler(imp) {
     val Import(expr, selectors) = imp
+    def exprSymbol = afterTyper(expr.symbol match {
+      case null | NoSymbol  => NoSymbol
+      case sym              => sym
+    })
+
     def targetType: Type = intp.typeOfExpression("" + expr) match {
       case NoType   => rootMirror.getModuleIfDefined("" + expr + ".package").tpe
       case tpe      => tpe
     }
+    def isExprPackage = exprSymbol.isPackage
+
+    def fullExprPath = "" + expr
+    //
+    //   if (exprSymbol.isStatic) "_root_." + exprSymbol.fullName
+    //   else "" + expr
+    // ) tap println
+
     override def isLegalTopLevel = true
 
-    def createImportForName(name: Name): String = {
-      selectors foreach {
-        case sel @ ImportSelector(old, _, `name`, _)  => return "import %s.{ %s }".format(expr, sel)
-        case _ => ()
-      }
-      "import %s.%s".format(expr, name)
+    override def exportedName(prefix: String, name: Name): String = printResult("exportedName" + ((prefix, name))) {
+      Console.println("symbol is " + ((exprSymbol, imp.symbol)))
+       super.exportedName(prefix, name)
     }
+    //
+    // override def exportedName(prefix: String, name: Name): String = ({
+    //   selectors foreach {
+    //     case sel @ ImportSelector(old, _, `name`, _) =>
+    //       if (old == name)
+    //         return "import %s.%s".format(fullExprPath, name)
+    //       else
+    //         return "import %s.{ %s => %s }".format(fullExprPath, old, name)
+    //     case _ =>
+    //   }
+    //   super.exportedName(prefix, name)
+    // }) tap println
+
+    //
+    // def createImportForName(name: Name): String = {
+    //   selectors foreach {
+    //     case sel @ ImportSelector(old, _, `name`, _)  => return "import %s.{ %s }".format(fullExprPath, sel)
+    //     case _ => ()
+    //   }
+    //   "import %s.%s".format(fullExprPath, name)
+    // }
     // TODO: Need to track these specially to honor Predef masking attempts,
     // because they must be the leading imports in the code generated for each
     // line.  We can use the same machinery as Contexts now, anyway.
@@ -200,26 +254,20 @@ trait MemberHandlers {
     /** Whether this import includes a wildcard import */
     val importsWildcard = selectorWild.nonEmpty
 
-    /** Whether anything imported is implicit .*/
-    def importsImplicit = implicitSymbols.nonEmpty
-
-    def implicitSymbols = importedSymbols filter (_.isImplicit)
-    def importedSymbols = individualSymbols ++ wildcardSymbols
+    override def importedSymbols = individualSymbols ++ wildcardSymbols
 
     lazy val individualSymbols: List[Symbol] =
       beforePickler(individualNames map (targetType nonPrivateMember _))
 
     lazy val wildcardSymbols: List[Symbol] =
-      if (importsWildcard) beforePickler(targetType.nonPrivateMembers)
-      else Nil
+      if (importsWildcard) beforePickler(importableMembers(targetType)) else Nil
 
     /** Complete list of names imported by a wildcard */
-    lazy val wildcardNames: List[Name]   = wildcardSymbols map (_.name)
-    lazy val individualNames: List[Name] = selectorRenames filterNot (_ == nme.USCOREkw) flatMap (_.bothNames)
+    lazy val wildcardNames: List[Name]   = afterTyper(wildcardSymbols map (_.name))
+    lazy val individualNames: List[Name] = afterTyper(selectorRenames filterNot (_ == nme.USCOREkw) flatMap (_.bothNames))
 
     /** The names imported by this statement */
-    override lazy val importedNames: List[Name] = wildcardNames ++ individualNames
-    lazy val importsSymbolNamed: Set[String] = importedNames map (_.toString) toSet
+    override def importedNames: List[Name] = wildcardNames ++ individualNames
 
     def importString = imp.toString
     override def resultExtractionCode(req: Request) = codegenln(importString) + "\n"

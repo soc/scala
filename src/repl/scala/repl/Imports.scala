@@ -30,8 +30,9 @@ trait Imports {
 
   /** Symbols whose contents are language-defined to be imported. */
   def languageWildcardSyms: List[Symbol] = List(JavaLangPackage, ScalaPackage, PredefModule)
-  def languageWildcards: List[Type] = languageWildcardSyms map (_.tpe)
-  def languageWildcardHandlers = languageWildcardSyms map makeWildcardImportHandler
+  def languageWildcards: List[Type]      = languageWildcardSyms map (_.tpe)
+  def languageWildcardHandlers           = languageWildcardSyms map makeWildcardImportHandler
+  def isInDefaultNamespace(name: Name)   = languageWildcards exists (_.nonPrivateMember(name) != NoSymbol)
 
   def allImportedNames = importHandlers flatMap (_.importedNames)
   def importedTerms    = onlyTerms(allImportedNames)
@@ -79,6 +80,87 @@ trait Imports {
     } filterNot (_._2.isEmpty)
   }
 
+  def importsCodeNew(wanted: Set[Name]): List[String] = afterTyper {
+
+    case class RHS(req: Request, handler: MemberHandler, sym: Symbol) {
+      def prefix = handler match {
+        case x: ImportHandler => "" + x.expr
+        case _                => req.prefix
+      }
+      override def toString = handler.exportedName(req.prefix, sym.name)
+    }
+    val importMap = mutable.Map[Name, List[RHS]]() withDefaultValue Nil
+    // val nameMap = mutable.Map[Name, RHS]()
+    val allImplicits = mutable.ListBuffer[RHS]()
+
+    for ((req, handler) <- allReqAndHandlers) {
+      handler.exposedSymbols foreach (sym => importMap(sym.name) ::= RHS(req, handler, sym))
+      allImplicits ++= (handler.implicitSymbols map (sym => RHS(req, handler, sym)))
+    }
+
+    val imps1 = wanted.toList flatMap { name =>
+      importMap(name).reverse.map(_.sym) match {
+        case Nil => None
+        case xs  => Some(importMap(name).head.prefix :: xs.map(_.name) mkString ".")
+      }
+    }
+    val imps2 = allImplicits.toList.distinct filter (importMap.values.toSet contains _)
+
+    imps1 ++ imps2 map ("import " + _)
+
+    //
+    // wanted.toList map { name =>
+    //
+    //
+    // for ((req, handler) <- allReqAndHandlers) {
+    //   beforePickler {
+    //     handler.exposedSymbols foreach (sym => nameMap(sym.name) = sym)
+    //   }
+    // }
+    //
+    //
+    //
+    //
+    //     handler.exposedSymbols filter (x => !done(x.name) && (sought(x.name) || x.isImplicit)) foreach { sym =>
+    //       // imps(i) ::= handler.exportedName(req.prefix, sym.name)
+    //       imps(i) ::= handler.exportedName(sym.owner.fullName, sym.name)
+    //       sought -= sym.name
+    //       done += sym.name
+    //     }
+    //   }
+    //
+    //
+    //
+    // val all    = allReqAndHandlers.toArray
+    // val imps   = Array.fill(all.length)(List[String]())
+    // val sought = mutable.Set[Name]() ++= wanted
+    // val done   = mutable.Set[Name]()
+    // var i      = all.length - 1
+    //
+    // while (i >= 0) {
+    //   val (req, handler) = all(i)
+    //   beforePickler {
+    //     handler.exposedSymbols filter (x => !done(x.name) && (sought(x.name) || x.isImplicit)) foreach { sym =>
+    //       // imps(i) ::= handler.exportedName(req.prefix, sym.name)
+    //       imps(i) ::= handler.exportedName(sym.owner.fullName, sym.name)
+    //       sought -= sym.name
+    //       done += sym.name
+    //     }
+    //   }
+    //   i -= 1
+    // }
+    // if (sought exists (x => !isInDefaultNamespace(x))) {
+    //   println("Not found: " + sought.mkString(", "))
+    //   all foreach { case (r, h) => println("exposed: " + h.exposedSymbols.map(_.name).mkString(", ")) }
+    // }
+    // imps.toList flatMap (_.reverse.distinct)
+    //
+    // all zip imps flatMap {
+    //   case (ReqAndHandler(req, handler), names) =>
+    //     names reverseMap req.fullPath distinct
+    // }
+  }
+
   /** Compute imports that allow definitions from previous
    *  requests to be visible in a new request.  Returns
    *  three pieces of related code:
@@ -108,7 +190,49 @@ trait Imports {
      *  should be taken.  Removes requests which cannot contribute
      *  useful imports for the specified set of wanted names.
      */
-    case class ReqAndHandler(req: Request, handler: MemberHandler) { }
+    case class ReqAndHandler(req: Request, handler: MemberHandler) {
+
+    }
+    //
+    // val all    = allReqAndHandlers map { case (r, h) => ReqAndHandler(r, h) } toArray
+    // val imps   = Array.fill(all.length)(List[Name]())
+    // val sought = mutable.Set[Name]() ++= wanted
+    // val done   = mutable.Set[Name]()
+    // var i      = all.length - 1
+    //
+    // while (i >= 0) {
+    //   val ReqAndHandler(req, handler) = all(i)
+    //   beforePickler {
+    //     handler.exposedSymbols filter (x => !done(x.name) && (sought(x.name) || x.isImplicit)) foreach { sym =>
+    //       imps(i) ::= sym.name
+    //       sought -= sym.name
+    //       done += sym.name
+    //     }
+    //   }
+    //   i -= 1
+    // }
+    // if (sought exists (x => !isInDefaultNamespace(x))) {
+    //   println("Not found: " + sought.mkString(", "))
+    //   all foreach { case ReqAndHandler(_, h) => println("exposed: " + h.exposedSymbols.map(_.name).mkString(", ")) }
+    // }
+    // val fullPaths = all zip imps flatMap {
+    //   case (ReqAndHandler(req, handler), names) =>
+    //     names reverseMap req.fullPath distinct
+    // }
+    // fullPaths foreach (x => println("import " + x))
+
+    //
+    //   names.toList foreach { name =>
+    //
+    //     if (handler exposesName
+    //
+    //   if (handler exposesN
+    //
+    //
+    // val want = wanted.toList
+    // val wantIndices = want map (name => all lastIndexWhere (_.handler.exposedNames contains name))
+    // (want, wantIndices).zipped foreach ((x, y) => println(y + ": " + x))
+    // all.zipWithIndex foreach { case (h, i) => println("%s: %s".format(i, h.handler.exposedNames.sorted.mkString(", "))) }
 
     def reqsToUse: List[ReqAndHandler] = {
       /** Loop through a list of MemberHandlers and select which ones to keep.

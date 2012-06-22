@@ -321,6 +321,7 @@ trait StdNames {
     val STAR: NameType                     = "*"
     val THIS: NameType                     = "_$this"
 
+    def isScalaReservedWord(word: String)   = keywords contains newTermName(word)
     def isConstructorName(name: Name)       = name == CONSTRUCTOR || name == MIXIN_CONSTRUCTOR
     def isExceptionResultName(name: Name)   = name startsWith EXCEPTION_RESULT_PREFIX
     def isImplClassName(name: Name)         = name endsWith IMPL_CLASS_SUFFIX

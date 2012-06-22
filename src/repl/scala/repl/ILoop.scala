@@ -205,7 +205,7 @@ import treedsl.CODE._
       case (handler, idx) =>
         val (types, terms) = handler.importedSymbols partition (_.name.isTypeName)
         val imps           = handler.implicitSymbols
-        val found          = tokens filter (handler importsSymbolNamed _)
+        val found          = tokens filter (handler exposesName _)
         val typeMsg        = if (types.isEmpty) "" else types.size + " types"
         val termMsg        = if (terms.isEmpty) "" else terms.size + " terms"
         val implicitMsg    = if (imps.isEmpty) "" else imps.size + " are implicit"
