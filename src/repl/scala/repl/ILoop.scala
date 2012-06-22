@@ -119,9 +119,6 @@ import $r.treedsl.CODE._
   class ILoopInterpreter extends IMain(settings, out) {
     outer =>
 
-    override lazy val formatting = new Formatting {
-      def prompt = ILoop.this.prompt
-    }
     override protected def parentClassLoader =
       settings.explicitParentLoader.getOrElse( classOf[ILoop].getClassLoader )
   }
@@ -177,11 +174,6 @@ import $r.treedsl.CODE._
     out print msg
     out.flush()
   }
-
-  private var currentPrompt = Properties.shellPromptString
-  def setPrompt(prompt: String) = currentPrompt = prompt
-  /** Prompt to print when awaiting input */
-  def prompt = currentPrompt
 
   import LoopCommand.{ cmd, nullary }
 
@@ -322,7 +314,7 @@ import $r.treedsl.CODE._
     override def run() {
       while (stillRunning) {
         out.flush()
-        val line = in readLine prompt
+        val line = in readLine intp.prompt
 
         if (line == null)
           stopRunning()
@@ -501,13 +493,11 @@ import $r.treedsl.CODE._
     // we can get at it in generated code.
     addThunk(intp.quietly {
       intp.setContextClassLoader
-      intp.bind("$r" -> vals)
-      // intp.stickySymbols += intp.symbolOfTerm("$r")
-      intp interpret ("import %s._" format intp.pathToTerm("$r"))
-      // importableMembers(typeOf[T]) foreach (initialReplScope enter _)
-
+      // Directly bind "$r" to the repl vals instance.
+      intp.bind[vals.type]("$r", vals)
       // Then we import everything from $r, via its true path.
       // Later imports rely on the repl's name resolution to find $r.
+      intp interpret ("import %s._" format intp.pathToTerm("$r"))
       // And whatever else there is to do.
       intp interpret initCode
     })

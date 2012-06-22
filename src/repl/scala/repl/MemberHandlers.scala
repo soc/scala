@@ -40,7 +40,7 @@ trait MemberHandlers {
     case member: ClassDef      => new ClassHandler(member)
     case member: TypeDef       => new TypeAliasHandler(member)
     case member: Import        => new ImportHandler(member)
-    case member                => new GenericHandler(member)
+    case member                => new MemberHandler(member) { }
   }
 
   sealed abstract class MemberDefHandler(override val member: MemberDef) extends MemberHandler(member) {
@@ -200,10 +200,10 @@ trait MemberHandlers {
     override def importedSymbols = individualSymbols ++ wildcardSymbols
 
     lazy val individualSymbols: List[Symbol] =
-      beforePickler(individualNames map (targetType nonPrivateMember _))
+      afterTyper(individualNames map (targetType nonPrivateMember _))
 
     lazy val wildcardSymbols: List[Symbol] =
-      if (importsWildcard) beforePickler(importableMembers(targetType)) else Nil
+      if (importsWildcard) afterTyper(importableMembers(targetType)) else Nil
 
     /** Complete list of names imported by a wildcard */
     lazy val wildcardNames: List[Name]   = afterTyper(wildcardSymbols map (_.name))

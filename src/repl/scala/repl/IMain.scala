@@ -139,12 +139,12 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
     val isDebug: Boolean = BooleanProp keyExists "scala.repl.debug"
     val isTrace: Boolean = BooleanProp keyExists "scala.repl.trace"
   }
-  lazy val formatting: Formatting = new Formatting {
-    val prompt = Properties.shellPromptString
-  }
+
+  private val defaultPrompt = Properties.shellPromptString
+  def prompt = defaultPrompt
+
   lazy val reporter: ReplReporter = new ReplReporter(this)
 
-  import formatting._
   import reporter.{ printMessage, withoutTruncating }
 
   /** the public, go through the future compiler */
@@ -410,6 +410,10 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
     }
     pos
   }
+
+  /** Indent a few spaces so compiler error messages read better.
+   */
+  private def indentCode(code: String) = code.lines.map("  " + _).mkString("\n")
 
   private def requestFromLine(line: String, synthetic: Boolean): Either[IR.Result, Request] = {
     val content = indentCode(line)
@@ -729,7 +733,9 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
       case null   => Nil
       case r      => r.scopeEntries filterNot (other => scope exists (_.name == other.name))
     })
-    def scopeLookup(name: Name): Symbol = afterTyper(scopeEntries find (_.name == name) getOrElse NoSymbol)
+    def scopeLookup(name: Name): Symbol = afterTyper {
+      scopeEntries find (_.name == name) getOrElse findMemberFromRoot(name)
+    }
     // 
     // scope lookup name match {
     //   case NoSymbol =>
@@ -778,13 +784,17 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
       case "$r" => Nil
       case path => List("import " + path)
     }
-    val implicitImports = unshadowedImplicits flatMap (self importFor _)
-    val nameImports = referencedNames.distinct flatMap { name =>
-      printResult("scopeLookup(" + name + ")")(scopeLookup(name)) match {
-        case NoSymbol => None
-        case sym      => self importFor sym
-      }
-    }
+    val implicitImports = unshadowedImplicits.toList flatMap (self importFor _) reverse
+    val nameImports     = referencedNames.distinct flatMap (name => self importFor scopeLookup(name))
+    //
+    //  flatMap { name =>
+    //   val sym = scopeLookup(name)
+    //   // Console.println("scopeLookup(" + name + ") = " + sym.fullName)
+    //   sym match {
+    //     case NoSymbol => None
+    //     case sym      => self importFor sym
+    //   }
+    // }
     val allImports = replvalImports ++ implicitImports ++ nameImports
     val accessPath = ""
     val importsPreamble = allImports.mkString("\n", "\n", "\n")
@@ -964,6 +974,13 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
       find (_.nonEmpty)
       getOrElse Nil
   )
+
+  def symbolOfPath(path: String) = {
+    (path split "[.]").toList match {
+      case Nil      => NoSymbol
+      case x :: xs  => xs.foldLeft(symbolOfTerm(x))((s, n) => s.thisType member newTermName(n))
+    }
+  }
 
   def treesForRequestId(id: Int): List[Tree] =
     requestForReqId(id).toList flatMap (_.trees)

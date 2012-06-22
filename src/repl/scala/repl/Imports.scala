@@ -53,7 +53,7 @@ trait Imports {
   }
   def wildcardTypes = languageWildcards ++ sessionWildcards
 
-  def languageSymbols        = languageWildcardSyms flatMap membersAtPickler
+  def languageSymbols        = languageWildcardSyms flatMap membersAfterTyper
   def sessionImportedSymbols = importHandlers flatMap (_.importedSymbols)
   def importedSymbols        = languageSymbols ++ sessionImportedSymbols
   def importedTermSymbols    = importedSymbols collect { case x: TermSymbol => x }
@@ -66,7 +66,7 @@ trait Imports {
   /** Tuples of (source, imported symbols) in the order they were imported.
    */
   def importedSymbolsBySource: List[(Symbol, List[Symbol])] = {
-    val lang    = languageWildcardSyms map (sym => (sym, membersAtPickler(sym)))
+    val lang    = languageWildcardSyms map (sym => (sym, membersAfterTyper(sym)))
     val session = importHandlers filter (_.targetType != NoType) map { mh =>
       (mh.targetType.typeSymbol, mh.importedSymbols)
     }
@@ -189,6 +189,5 @@ trait Imports {
   private def allReqAndHandlers =
     prevRequestList flatMap (req => req.handlers map (req -> _))
 
-  private def membersAtPickler(sym: Symbol): List[Symbol] =
-    beforePickler(sym.info.nonPrivateMembers)
+  private def membersAfterTyper(sym: Symbol): List[Symbol] = afterTyper(sym.info.nonPrivateMembers)
 }
