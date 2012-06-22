@@ -14,7 +14,7 @@ trait ExprTyper {
   val intp: IMain
 
   import intp._
-  import global.{ reporter => _, Import => _, _ }
+  import intp.global.{ reporter => _, Import => _, _ }
   import definitions.{ UnitClass }
   import syntaxAnalyzer.{ UnitParser, UnitScanner, token2name }
   import naming.freshInternalVarName
@@ -37,14 +37,22 @@ trait ExprTyper {
     def stmt(code: String)  = stmts(code).last  // guaranteed nonempty
   }
 
-  /** Parse a line into a sequence of trees. Returns None if the input is incomplete. */
-  def parse(line: String): Option[List[Tree]] = {
+  /** Parse a line into a tree.
+   *  Returns IncompleteTree if the input is incomplete.
+   *  If there is more than one tree, wrap them in a block.
+   *  If there is an error, return EmptyTree.
+   */
+  def parse(line: String): Tree = {
     var isIncomplete = false
     reporter.withIncompleteHandler((_, _) => isIncomplete = true) {
       val trees = codeParser.stmts(line)
-      if (reporter.hasErrors) Some(Nil)
-      else if (isIncomplete) None
-      else Some(trees)
+      if (reporter.hasErrors) EmptyTree
+      else if (isIncomplete) IncompleteTree
+      else trees match {
+        case Nil      => EmptyTree
+        case t :: Nil => t
+        case ts       => Block(ts.init, ts.last)
+      }
     }
   }
 

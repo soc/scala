@@ -70,7 +70,7 @@ private class ReplVirtualDirectory(out: JPrintWriter) extends VirtualDirectory("
  *  @author Lex Spoon
  */
 class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends Imports {
-  imain =>
+  self =>
 
   /** Leading with the eagerly evaluated.
    */
@@ -94,7 +94,7 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
    *  on the future.
    */
   private var _classLoader: AbstractFileClassLoader = null                              // active classloader
-  private val _compiler: Global                     = newCompiler(settings, reporter)   // our private compiler
+  private val _compiler: ReplGlobal                 = newCompiler(settings, reporter)   // our private compiler
 
   private val nextReqId = {
     var counter = 0
@@ -134,7 +134,7 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
   def this() = this(new Settings())
 
   lazy val repllog: Logger = new Logger {
-    val out: JPrintWriter = imain.out
+    val out: JPrintWriter = self.out
     val isInfo: Boolean  = BooleanProp keyExists "scala.repl.info"
     val isDebug: Boolean = BooleanProp keyExists "scala.repl.debug"
     val isTrace: Boolean = BooleanProp keyExists "scala.repl.trace"
@@ -148,7 +148,7 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
   import reporter.{ printMessage, withoutTruncating }
 
   /** the public, go through the future compiler */
-  lazy val global: Global = {
+  lazy val global: ReplGlobal = {
     io.spawn(try new _compiler.Run() finally globalLatch.countDown())
     globalLatch.await()
     _compiler
@@ -166,7 +166,7 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
   // scalac unhappiness with what look like cycles.  It has not been easy to
   // reduce, but name resolution clearly takes different paths.
   object naming extends {
-    val global: imain.global.type = imain.global
+    val global: self.global.type = self.global
   } with Naming {
     // make sure we don't overwrite their unwisely named res3 etc.
     def freshUserTermName(): TermName = {
@@ -180,11 +180,11 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
   import naming._
 
   object deconstruct extends {
-    val global: imain.global.type = imain.global
+    val global: self.global.type = self.global
   } with StructuredTypeStrings
 
   lazy val memberHandlers = new {
-    val intp: imain.type = imain
+    val intp: self.type = self
   } with MemberHandlers
   import memberHandlers._
 
@@ -355,18 +355,8 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
       printMessage(msg)
   }
 
-  def isParseable(line: String): Boolean = {
-    silently {
-      try parse(line) match {
-        case Some(xs) => xs.nonEmpty  // parses as-is
-        case None     => true         // incomplete
-      }
-      catch { case x: Exception =>    // crashed the compiler
-        replwarn("Exception in isParseable(\"" + line + "\"): " + x)
-        false
-      }
-    }
-  }
+  // IncompleteTree is "true", only EmptyTree fails
+  def isParseable(line: String) = silently(parse(line) ne EmptyTree)
 
   def compileSourcesKeepingRun(sources: SourceFile*) = {
     val run = new Run()
@@ -410,11 +400,13 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
 
   private def requestFromLine(line: String, synthetic: Boolean): Either[IR.Result, Request] = {
     val content = indentCode(line)
-    val trees = parse(content) match {
-      case None         => return Left(IR.Incomplete)
-      case Some(Nil)    => return Left(IR.Error) // parse error or empty input
-      case Some(trees)  => trees
+    val trees: List[Tree] = parse(content) match {
+      case IncompleteTree => return Left(IR.Incomplete)
+      case EmptyTree      => return Left(IR.Error) // parse error or empty input
+      case Block(xs, x)   => xs :+ x
+      case x              => x :: Nil
     }
+
     repltrace(
       trees map (t => {
         // [Eugene to Paul] previously it just said `t map ...`
@@ -594,16 +586,6 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
   def quietBind(p: NamedParam[_]): IR.Result                         = quietly(bind(p))
   def bind(p: NamedParam[_]): IR.Result                              = bind(p.name, p.tpe, p.value)
   def bind[T: TypeTag : ClassTag](name: String, value: T): IR.Result = bind((name, value))
-
-  /** Reset this interpreter, forgetting all user-specified requests. */
-  def reset() {
-    resetClassLoader()
-    resetAllCreators()
-    prevRequests.clear()
-    referencedNameMap.clear()
-    definedNameMap.clear()
-    virtualDirectory.clear()
-  }
 
   /** This instance is no longer needed, so release any resources
    *  it is using.  The reporter's output gets flushed.
@@ -992,10 +974,10 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
   }
 
   object exprTyper extends {
-    val intp: IMain.this.type = imain
+    val intp: self.type = self
   } with ExprTyper { }
 
-  def parse(line: String): Option[List[Tree]] = exprTyper.parse(line)
+  def parse(line: String) = exprTyper parse line
 
   def symbolOfLine(code: String): Symbol =
     exprTyper.symbolOfLine(code)
@@ -1075,11 +1057,8 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
      *  with "// show" and see what's going on.
      */
     def isShow    = code.lines exists (_.trim endsWith "// show")
-
     // old style
-    silently(parse(code)) foreach { ts =>
-      ts foreach (t => repldbg(asCompactString(t)))
-    }
+    silently(repldbg(asCompactString(parse(code))))
   }
 
   // debugging

@@ -16,6 +16,9 @@ import typechecker.Analyzer
 trait ReplGlobal extends Global {
   self =>
 
+  // Marker tree for incomplete input
+  case object IncompleteTree extends Tree { }
+
   override lazy val analyzer = new {
     val global: ReplGlobal.this.type = ReplGlobal.this
   } with Analyzer {

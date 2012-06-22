@@ -76,7 +76,7 @@ class StdReplVals(val r: ILoop) {
   def context(code: String)  = analyzer.rootContext(unit(code))
   def source(code: String)   = global.newSourceFile(code)
   def unit(code: String)     = global.newCompilationUnit(code)
-  def trees(code: String)    = intp parse code getOrElse Nil
+  def trees(code: String)    = intp parse code
   def seenTypeOf(id: String) = intp.typeOfExpression(id)
 
   lazy val replenv = new {

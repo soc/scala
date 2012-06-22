@@ -88,10 +88,5 @@ trait Naming {
   def freshUserVarName() = userVar()
   def freshInternalVarName() = internalVar()
 
-  def resetAllCreators() {
-    userVar.reset()
-    internalVar.reset()
-  }
-
   def mostRecentVar = userVar.mostRecent
 }
