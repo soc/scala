@@ -38,30 +38,6 @@ package object repl extends ReplConfig with ReplStrings with DecorateAsJava with
 
   val IR = Results
   
-  def classTag[T](implicit ctag: ClassTag[T]) = ctag
-  def typeTag[T](implicit ttag: TypeTag[T])   = ttag
-  type ClassTag[T]                            = scala.reflect.ClassTag[T]
-  type TypeTag[T]                             = ru.TypeTag[T]
-  def typeOf[T: TypeTag] : ru.Type            = typeTag[T].tpe
-  def symbolOf[T: TypeTag] : ru.Symbol        = typeOf[T].typeSymbol
-
-  def membersOf[T: TypeTag] : List[(ru.Symbol, ru.Type)] = {
-    val tpe = typeOf[T]
-    tpe.members.toList map (sym => (sym, sym typeSignatureIn tpe))
-  }
-  def declsOf[T: TypeTag] : List[(ru.Symbol, ru.Type)] = {
-    val tpe = typeOf[T]
-    tpe.declarations.toList map (sym => (sym, sym typeSignatureIn tpe))
-  }
-  def implicitsOf[T: TypeTag] : List[(ru.Symbol, ru.Type)] =
-    membersOf[T] filter { case (s, t) => s.isTerm && (s hasFlag ru.Flag.IMPLICIT) }
-
-  def implicitConversionsOf[T: TypeTag] : List[(ru.Symbol, ru.Type)] =
-    implicitsOf[T] filter (_._2 <:< typeOf[Function1[_,_]])
-
-  def implicitTermsOf[T: TypeTag] : List[(ru.Symbol, ru.Type)] =
-    implicitsOf[T] collect { case (s, t: ru.MethodType) if t.params.isEmpty => ((s, t)) }
-
   lazy val ru = scala.reflect.runtime.universe
   // new scala.reflect.runtime.JavaUniverse {
   //   override def missingHook(owner: Symbol, name: Name): Symbol = super.missingHook(owner, name)
@@ -70,6 +46,69 @@ package object repl extends ReplConfig with ReplStrings with DecorateAsJava with
   //   override def runtimeMirror(cl: ClassLoader): Mirror = super.runtimeMirror(cl)
   // }
   //
+  import ru._
+
+  type ClassTag[T]                            = scala.reflect.ClassTag[T]
+  type TypeTag[T]                             = ru.TypeTag[T]
+
+  def classTag[T](implicit ctag: ClassTag[T]) = ctag
+  def typeTag[T](implicit ttag: TypeTag[T])   = ttag
+  def typeOf[T: TypeTag] : ru.Type            = typeTag[T].tpe
+  def symbolOf[T: TypeTag] : ru.Symbol        = typeOf[T].typeSymbol
+
+  lazy val Function1Symbol = symbolOf[Function1[_,_]]
+  lazy val Function1Type   = typeOf[Function1[_,_]]
+
+  class ImplicitConversion(val symbol: Symbol, val tpe: Type, val from: Type, val to: Type) {
+    def matches(from0: Type, to0: Type) = (from0 <:< from) && (to <:< to0)
+
+    private def defString = (symbol: Any) match {
+      case x: scala.reflect.internal.Symbols#Symbol =>
+        implicit def fixtype[U](x: Type): U = x.asInstanceOf[U]
+        Some(x.defStringSeenAs(tpe))
+      case _ =>
+        None
+    }
+
+    override def toString = defString getOrElse {
+      "" + symbol + symbol.typeSignature
+    }
+  }
+  class ImplicitMatcher[Owner: TypeTag]() {
+    val tpe = typeOf[Owner]
+    val conversions = implicitsIn[Owner] flatMap { sym =>
+      val symtpe = sym typeSignatureIn tpe
+      for ((from, to) <- conversionTypes(symtpe)) yield
+        new ImplicitConversion(sym, symtpe, from, to)
+    }
+
+    def from[From: TypeTag] = conversions filter (typeOf[From] <:< _.from)
+    def to[To: TypeTag]     = conversions filter (_.to <:< typeOf[To])
+    def matching[T <: Function1[_, _] : TypeTag] = {
+      val f :: t :: Nil = typeOf[T].typeArguments
+      conversions filter (_.matches(f, t))
+    }
+  }
+  // If this is an implicit conversion (either a method/polytype or
+  // a value of type Function1) return the from/to types.
+  def conversionTypes(tp: Type): Option[(Type, Type)] = tp match {
+    case PolyType(_, resultType)                        => conversionTypes(resultType)
+    case MethodType(p :: Nil, restpe)                   => Some((p typeSignatureIn tp, restpe))
+    case TypeRef(_, Function1Symbol, from :: to :: Nil) => Some((from, to))
+    case _                                              => None
+  }
+
+  def membersOf[T: TypeTag] : List[ru.Symbol]   = typeOf[T].members.toList
+  def declsOf[T: TypeTag] : List[ru.Symbol]     = typeOf[T].declarations.toList
+  def implicitsIn[T: TypeTag] : List[ru.Symbol] = membersOf[T] filter (s => s.isTerm && (s hasFlag ru.Flag.IMPLICIT))
+
+  def typesOfMembersOf[T: TypeTag] : List[Type]             = membersOf[T] map (_ typeSignatureIn typeOf[T])
+  def typesOfDeclsOf[T: TypeTag] : List[Type]               = declsOf[T] map (_ typeSignatureIn typeOf[T])
+  def typesOfImplicitsIn[T: TypeTag] : List[Type]           = implicitsIn[T] map (_ typeSignatureIn typeOf[T])
+  def typesOfConversionsIn[T: TypeTag] : List[(Type, Type)] = typesOfImplicitsIn[T] flatMap conversionTypes distinct
+
+  def implicits[Owner: TypeTag] = new ImplicitMatcher[Owner]
+
   implicit def postfixOps = language.postfixOps // make all postfix ops in this package compile without warning
 
   private[repl] implicit def javaCharSeqCollectionToScala(xs: JCollection[_ <: CharSequence]): List[String] =
