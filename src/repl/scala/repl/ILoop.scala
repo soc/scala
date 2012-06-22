@@ -501,6 +501,7 @@ import treedsl.CODE._
     // we can get at it in generated code.
     addThunk(intp.quietly {
       intp.setContextClassLoader
+      // intp.global.initReplContext()
       intp.bind("$intp" -> intp)
       // First we create the ReplVals instance and bind it to $r
       intp.bind("$r" -> vals)

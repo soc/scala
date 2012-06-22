@@ -325,6 +325,11 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
 
     prevRequests += req
     req.referencedNames foreach (x => referencedNameMap(x) = req)
+    req.exposedSymbols foreach (x => requestForSymbol(x) = req)
+    req.definedSymbols.values foreach (x => req.scope enter x)
+    // req.definedSymbols.values foreach (sym => replScope enter sym)
+    // global updateReplScope req.exposedSymbols
+    // Console.println("replScope now contains: " + replScope.mkString(", "))
 
     // warning about serially defining companions.  It'd be easy
     // enough to just redefine them together but that may not always
@@ -702,28 +707,42 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
   }
 
   /** One line of code submitted by the user for interpretation */
-  // private
   class Request(val line: String, val trees: List[Tree]) {
-    val reqId = nextReqId()
-    val lineRep = new ReadEvalPrint()
+    val reqId        = nextReqId()
+    val lineRep      = new ReadEvalPrint()
+    val prev         = if (prevRequests.isEmpty) null else prevRequests.last
+    val scope: Scope = if (prev eq null) newScope else newNestedScope(prev.scope)
+
+    val handlers: List[MemberHandler] = trees map (memberHandlers chooseHandler _)
+    val definedNames                  = handlers flatMap (_.definedNames)
+    val referencedNames: List[Name]   = handlers flatMap (_.referencedNames)
+
+    def scopeEntries: Iterable[Symbol] = scope ++ (prev match {
+      case null   => Nil
+      case r      => r.scopeEntries filterNot (other => scope exists (_.name == other.name))
+    })
+    def scopeLookup(name: Name): Symbol = scope lookup name match {
+      case NoSymbol if prev ne null => prev scopeLookup name
+      case sym                      => sym
+    }
+    // Console.println("scopeImports for %s\n  %s".format(referencedNames.distinct, scopeImports.mkString("\n  ")))
 
     private var _originalLine: String = null
     def withOriginalLine(s: String): this.type = { _originalLine = s ; this }
     def originalLine = if (_originalLine == null) line else _originalLine
 
-    /** handlers for each tree in this request */
-    val handlers: List[MemberHandler] = trees map (memberHandlers chooseHandler _)
-    def defHandlers = handlers collect { case x: MemberDefHandler => x }
-
-    /** all (public) names defined by these statements */
-    val definedNames = handlers flatMap (_.definedNames)
-
-    /** list of names used by this expression */
-    val referencedNames: List[Name] = handlers flatMap (_.referencedNames)
-
     /** def and val names */
+    def defHandlers = handlers collect { case x: MemberDefHandler => x }
     def termNames = handlers flatMap (_.definesTerm)
     def typeNames = handlers flatMap (_.definesType)
+    def handlerOf(sym: Symbol): Option[MemberHandler] = handlers find (_.exposedSymbols contains sym)
+    def importFor(sym: Symbol): String = (
+      handlerOf(sym)
+          collect { case x: ImportHandler => "import %s.%s".format(x.expr, sym.name) }
+        getOrElse { "import %s".format(fullPath(sym.name)) }
+    )
+
+    def exposedSymbols    = handlers flatMap (_.exposedSymbols)
     def definedOrImported = handlers flatMap (_.definedOrImported)
     def definedSymbolList = defHandlers flatMap (_.definedSymbols)
 
@@ -735,6 +754,20 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
       */
     val ComputedImports(importsPreamble, importsTrailer, accessPath) =
       importsCode(referencedNames.toSet)
+
+    def unshadowedImplicits = (
+      scopeEntries filter (sym => sym.isImplicit && (scopeLookup(sym.name) == sym))
+    )
+    val implicitImports = unshadowedImplicits map (self importFor _)
+    val nameImports = referencedNames.distinct flatMap { name =>
+      scopeLookup(name) match {
+        case NoSymbol => None
+        case sym      => Some(self importFor sym)
+      }
+    }
+    val allImports = implicitImports ++ nameImports
+    Console.println("ComputedImports" + ((importsPreamble, importsTrailer, accessPath)))
+    Console.println("allImports\n  " + allImports.mkString("\n  "))
 
     /** Code to access a variable with the specified name */
     def fullPath(vname: String) = (
@@ -831,6 +864,7 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
         // extract and remember types
         seenTypeOf
         typesOfDefinedTerms
+        exposedSymbols filterNot (_.owner.isPackageObjectClass) foreach (scope enter _)
 
         // Assign symbols to the original trees
         // TODO - just use the new trees.
@@ -1022,9 +1056,19 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
   /** the previous requests this interpreter has processed */
   private var executingRequest: Request = _
   private val prevRequests       = mutable.ListBuffer[Request]()
+  private val requestForSymbol   = mutable.Map[Symbol, Request]()
   private val referencedNameMap  = mutable.Map[Name, Request]()
   private val definedNameMap     = mutable.Map[Name, Request]()
   private val directlyBoundNames = mutable.Set[Name]()
+
+  def replScope = (
+    if (prevRequests.isEmpty) newReplContext().scope
+    else prevRequests.last.scope
+  )
+  def importFor(sym: Symbol) = requestForSymbol get sym match {
+    case Some(req)  => req importFor sym
+    case _          => ""
+  }
 
   def allHandlers    = prevRequestList flatMap (_.handlers)
   def allDefHandlers = allHandlers collect { case x: MemberDefHandler => x }

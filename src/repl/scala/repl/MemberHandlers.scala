@@ -62,7 +62,7 @@ trait MemberHandlers {
     case member: ModuleDef     => new ModuleHandler(member)
     case member: ClassDef      => new ClassHandler(member)
     case member: TypeDef       => new TypeAliasHandler(member)
-    case member: Import        => new ImportHandler(member)
+    case member: Import        => /*updateReplContext(member) ; */ new ImportHandler(member)
     case member                => new GenericHandler(member)
   }
 
@@ -95,6 +95,8 @@ trait MemberHandlers {
     def definedNames         = definesTerm.toList ++ definesType.toList
     def definedOrImported    = definedNames ++ importedNames
     def definedSymbols       = List[Symbol]()
+    def importedSymbols      = List[Symbol]()
+    def exposedSymbols       = definedSymbols ++ importedSymbols
 
     def extraCodeToEvaluate(req: Request): String = ""
     def resultExtractionCode(req: Request): String = ""
@@ -211,7 +213,7 @@ trait MemberHandlers {
     def importsImplicit = implicitSymbols.nonEmpty
 
     def implicitSymbols = importedSymbols filter (_.isImplicit)
-    def importedSymbols = individualSymbols ++ wildcardSymbols
+    override def importedSymbols = individualSymbols ++ wildcardSymbols
 
     lazy val individualSymbols: List[Symbol] =
       beforePickler(individualNames map (targetType nonPrivateMember _))
