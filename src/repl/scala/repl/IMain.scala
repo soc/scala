@@ -285,10 +285,18 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
   def allDefinedNames = definedNameMap.keys.toList.sorted
   def pathToType(id: String): String = pathToName(newTypeName(id))
   def pathToTerm(id: String): String = pathToName(newTermName(id))
+  // def pathToName(name: Name): String = {
+  //   stickyLookup(name) match {
+  //     case sym if sym ne NoSymbol            => sym.fullName
+  //     case _ if definedNameMap contains name => definedNameMap(name) fullPath name
+  //     case _                                 => name.toString
+  //   }
+  // }
   def pathToName(name: Name): String = {
     if (definedNameMap contains name)
       definedNameMap(name) fullPath name
-    else name.toString
+    else
+      name.toString
   }
 
   /** Most recent tree handled which wasn't wholly synthetic. */
@@ -710,8 +718,8 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
   class Request(val line: String, val trees: List[Tree]) {
     val reqId        = nextReqId()
     val lineRep      = new ReadEvalPrint()
-    val prev         = if (prevRequests.isEmpty) null else prevRequests.last
-    val scope: Scope = if (prev eq null) newScope else newNestedScope(prev.scope)
+    val prev         = lastRequest
+    val scope: Scope = newNestedScope( if (prev eq null) initialReplScope else prev.scope )
 
     val handlers: List[MemberHandler] = trees map (memberHandlers chooseHandler _)
     val definedNames                  = handlers flatMap (_.definedNames)
@@ -736,10 +744,14 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
     def termNames = handlers flatMap (_.definesTerm)
     def typeNames = handlers flatMap (_.definesType)
     def handlerOf(sym: Symbol): Option[MemberHandler] = handlers find (_.exposedSymbols contains sym)
-    def importFor(sym: Symbol): String = (
-      handlerOf(sym)
+    def importFor(sym: Symbol): Option[String] = (
+      // if (stickySymbols(sym))
+      //   Some("import " + sym.fullName)
+      // else (
+        handlerOf(sym)
           collect { case x: ImportHandler => "import %s.%s".format(x.expr, sym.name) }
-        getOrElse { "import %s".format(fullPath(sym.name)) }
+           orElse { Some("import %s".format(fullPath(sym.name))) }
+      )
     )
 
     def exposedSymbols    = handlers flatMap (_.exposedSymbols)
@@ -752,20 +764,23 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
     /** Code to import bound names from previous lines - accessPath is code to
       * append to objectName to access anything bound by request.
       */
-    val ComputedImports(importsPreamble, importsTrailer, accessPath) =
-      importsCode(referencedNames.toSet)
+    // val ComputedImports(importsPreamble, importsTrailer, accessPath) =
+    //   importsCode(referencedNames.toSet)
 
     def unshadowedImplicits = (
       scopeEntries filter (sym => sym.isImplicit && (scopeLookup(sym.name) == sym))
     )
-    val implicitImports = unshadowedImplicits map (self importFor _)
+    val implicitImports = unshadowedImplicits flatMap (self importFor _)
     val nameImports = referencedNames.distinct flatMap { name =>
-      scopeLookup(name) match {
+      printResult("scopeLookup(" + name + ")")(scopeLookup(name)) match {
         case NoSymbol => None
-        case sym      => Some(self importFor sym)
+        case sym      => self importFor sym
       }
     }
     val allImports = implicitImports ++ nameImports
+    val accessPath = ""
+    val importsPreamble = allImports.mkString("\n", "\n", "\n")
+    val importsTrailer = ""
     // Console.println("ComputedImports" + ((importsPreamble, importsTrailer, accessPath)))
     // Console.println("allImports\n  " + allImports.mkString("\n  "))
 
@@ -791,24 +806,27 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
 
     /** generate the source code for the object that computes this request */
     private object ObjectSourceCode extends CodeAssembler[MemberHandler] {
-      def path = pathToTerm("$intp")
+      def path = pathToTerm("$r")
       def envLines = {
-        // $intp is not bound; punt, but include the line.
-        if (path == "$intp") List(
+        // $r is not bound; punt, but include the line.
+        if (path == "$r") List(
           "def $line = \"" + string2code(originalLine) + "\"",
+          "def $req = null",
           "def $trees = Nil"
         )
         else List(
           "def $line = \"" + string2code(originalLine) + "\"",
-          "def $req = %s.requestForReqId(%s).orNull".format(path, reqId),
+          "def $req = %s.intp.requestForReqId(%s).orNull".format(path, reqId),
           "def $trees = if ($req eq null) Nil else $req.trees".format(lineRep.readName, path, reqId)
         )
       }
 
       val preamble = """
-        |object %s {
-        |%s%s%s
-      """.stripMargin.format(lineRep.readName, envLines.map("  " + _ + ";\n").mkString, importsPreamble, indentCode(toCompute))
+        |// %s
+        |%s
+        |object $read {
+        |%s%s
+      """.stripMargin.format(new java.util.Date, importsPreamble, envLines.map("  " + _ + ";\n").mkString, indentCode(toCompute))
       val postamble = importsTrailer + "\n}"
       val generate = (m: MemberHandler) => m extraCodeToEvaluate Request.this
     }
@@ -1061,14 +1079,25 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
   private val definedNameMap     = mutable.Map[Name, Request]()
   private val directlyBoundNames = mutable.Set[Name]()
 
-  def replScope = (
-    if (prevRequests.isEmpty) newReplContext().scope
-    else prevRequests.last.scope
-  )
-  def importFor(sym: Symbol) = requestForSymbol get sym match {
-    case Some(req)  => req importFor sym
-    case _          => ""
+  def replScope = lastRequest match {
+    case null => initialReplScope
+    case req  => req.scope
   }
+  // val stickySymbols = mutable.Set[Symbol]()
+  // def stickyLookup(name: Name) = stickySymbols find (_.name == name) getOrElse NoSymbol
+  def scopeLookup(name: Name): Symbol = lastRequest scopeLookup name
+  // def scopeLookup(name: Name): Symbol = stickyLookup(name) orElse (lastRequest scopeLookup name)
+  def scopeEntries: Iterable[Symbol] = lastRequest match {
+    case null => initialReplScope
+    case req  => req.scopeEntries
+  }
+  
+  def importFor(sym: Symbol): Option[String] = (
+    requestForSymbol get sym flatMap (_ importFor sym) orElse (
+      if (sym.name.toString == pathToName(sym.name)) None
+      else Some("import " + pathToName(sym.name))
+    )
+  )
 
   def allHandlers    = prevRequestList flatMap (_.handlers)
   def allDefHandlers = allHandlers collect { case x: MemberDefHandler => x }
@@ -1100,7 +1129,10 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
     /** Secret bookcase entrance for repl debuggers: end the line
      *  with "// show" and see what's going on.
      */
-    def isShow    = code.lines exists (_.trim endsWith "// show")
+    def isShow = code.lines exists (_.trim endsWith "// show")
+    if (isShow)
+      Console.println(code)
+
     // old style
     silently(repldbg(asCompactString(parse(code))))
   }

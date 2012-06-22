@@ -31,13 +31,10 @@ trait ReplGlobal extends Global {
     }
   }
   import analyzer.{ Context, NoContext, rootContext }
-  //
-  // var replContext: Context = _
-  //
-  // def initReplContext() {
-  //   replContext = newReplContext
-  // }
-  def newReplContext() = {
+  
+  lazy val initialReplScope = newReplScope()
+
+  def newReplScope(): Scope = {
     var sc = (
       NoContext.make(
         Template(Nil, emptyValDef, Nil) setSymbol NoSymbol setType NoType,
@@ -49,53 +46,8 @@ trait ReplGlobal extends Global {
       sc = sc.makeNewImport(sym)
       sc.depth += 1
     }
-    val c = sc.make(newCompilationUnit(""), EmptyTree, sc.owner, sc.scope, sc.imports)
-    // c.setReportErrors()
-    c.implicitsEnabled = true
-    c.enrichmentEnabled = true
-    c
+    sc.scope
   }
-  // def updateReplContext(sym: Symbol) {
-  //   Console.println("updateReplContext(" + sym + ")")
-  //   replContext = replContext.makeNewImport(sym) tap (x => Console println ((x, x.scope.toList)))
-  // }
-  // def updateReplContext(imp: Import) {
-  //   Console.println("updateReplContext(" + imp + ")")
-  //   replContext = replContext.makeNewImport(imp) tap (x => Console println ((x, x.scope.toList)))
-  // }
-  // def updateReplScope(syms: Iterable[Symbol]) {
-  //   syms foreach (sym => replScope.lookupAll(sym.name) foreach (replScope unlink _))
-  //   syms foreach (replScope enter _)
-  //   replScope
-  // }
-  //
-  //
-  // def makeNewImport(sym: Symbol): Context =
-  //   makeNewImport(gen.mkWildcardImport(sym))
-  //
-  // def makeNewImport(imp: Import): Context =
-  //   make(unit, imp, owner, scope, new ImportInfo(imp, depth) :: imports)
-  //
-  // def make(tree: Tree, owner: Symbol, scope: Scope): Context =
-  //   if (tree == this.tree && owner == this.owner && scope == this.scope) this
-  //   else make0(tree, owner, scope)
-  //
-  // //
-  // def newRootScope: Scope = {
-  //   val s = newScope
-  //
-  //   mkWildcardImport
-  //
-  // lazy val replScope: Scope = {
-  //   val s = newScope
-  //
-  //
-  //   syms: Iterable[Symbol]): Scope = {
-  //   syms foreach (sym => replScope.lookupAll(sym.name) foreach (replScope unlink _))
-  //   syms foreach (replScope enter _)
-  //   replScope
-  // }
-  // def replScope = _replScope
 
   object replPhase extends SubComponent {
     val global: ReplGlobal.this.type = ReplGlobal.this

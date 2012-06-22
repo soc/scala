@@ -21,14 +21,14 @@ trait Formatting {
   /** Indent some code by the width of the scala> prompt.
    *  This way, compiler error messages read better.
    */
-  def indentCode(code: String) = {
-    val indent = spaces(code)
-    stringFromWriter(str =>
-      for (line <- code.lines) {
-        str print indent
-        str print (line + "\n")
-        str.flush()
-      }
-    )
+  def indentCode(code: String) = { code
+    // val indent = spaces(code)
+    // stringFromWriter(str =>
+    //   for (line <- code.lines) {
+    //     str print indent
+    //     str print (line + "\n")
+    //     str.flush()
+    //   }
+    // )
   }
 }

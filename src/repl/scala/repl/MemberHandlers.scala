@@ -67,12 +67,9 @@ trait MemberHandlers {
     def definesTerm     = Option.empty[TermName]
     def definesType     = Option.empty[TypeName]
     
-    private def isImportable(t: Ident) = {
-      def coarse = true // !(t.name.decoded contains "$")
-      t.symbol match {
-        case null | NoSymbol => coarse
-        case sym             => !sym.isLocal
-      }
+    private def isImportable(t: Ident) = t.symbol match {
+      case null | NoSymbol => true    // FIXME - does this happen?
+      case sym             => !sym.isLocal
     }
 
     lazy val referencedNames = member collect { case t @ Ident(name) if isImportable(t) => name } toSet
@@ -87,7 +84,7 @@ trait MemberHandlers {
     def resultExtractionCode(req: Request): String = ""
 
     private def shortName = this.getClass.getName split "[.$]" last
-    override def toString = "%s(%s)".format(shortName, member)  // + referencedNames.mkString(" (refs: ", ", ", ")")
+    override def toString = "%s(%s)".format(shortName, member)
   }
 
   class GenericHandler(member: Tree) extends MemberHandler(member)
@@ -168,18 +165,20 @@ trait MemberHandlers {
 
   class ImportHandler(imp: Import) extends MemberHandler(imp) {
     val Import(expr, selectors) = imp
-    def targetType: Type = intp.typeOfExpression("" + expr) match {
-      case NoType   => rootMirror.getModuleIfDefined("" + expr + ".package").tpe
+    def exprPath = intp.pathToTerm("" + expr)
+      
+    def targetType: Type = intp.typeOfExpression(exprPath) match {
+      case NoType   => rootMirror.getModuleIfDefined(exprPath + ".package").tpe
       case tpe      => tpe
     }
     override def isLegalTopLevel = true
 
     def createImportForName(name: Name): String = {
       selectors foreach {
-        case sel @ ImportSelector(old, _, `name`, _)  => return "import %s.{ %s }".format(expr, sel)
+        case sel @ ImportSelector(old, _, `name`, _)  => return "import %s.{ %s }".format(exprPath, sel)
         case _ => ()
       }
-      "import %s.%s".format(expr, name)
+      "import %s.%s".format(exprPath, name)
     }
     // TODO: Need to track these specially to honor Predef masking attempts,
     // because they must be the leading imports in the code generated for each

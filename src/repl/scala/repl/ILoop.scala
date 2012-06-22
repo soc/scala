@@ -62,7 +62,7 @@ class ILoop(in0: Option[BufferedReader], protected val out: JPrintWriter) extend
   def initCode = """
 import scala.repl._
 import $r.replenv._
-import treedsl.CODE._
+import $r.treedsl.CODE._
   """.trim
 
   protected def addThunk(body: => Unit) = pendingThunks add (() => body)
@@ -501,13 +501,13 @@ import treedsl.CODE._
     // we can get at it in generated code.
     addThunk(intp.quietly {
       intp.setContextClassLoader
-      // intp.global.initReplContext()
-      intp.bind("$intp" -> intp)
-      // First we create the ReplVals instance and bind it to $r
       intp.bind("$r" -> vals)
+      intp.stickySymbols += intp.symbolOfTerm("$r")
+      intp interpret ("import %s._" format intp.pathToTerm("$r"))
+      // importableMembers(typeOf[T]) foreach (initialReplScope enter _)
+
       // Then we import everything from $r, via its true path.
       // Later imports rely on the repl's name resolution to find $r.
-      intp interpret ("import " + intp.pathToTerm("$r") + "._")
       // And whatever else there is to do.
       intp interpret initCode
     })
