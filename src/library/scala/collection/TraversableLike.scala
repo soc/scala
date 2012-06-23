@@ -84,6 +84,8 @@ trait TraversableLike[+A, +Repr] extends Any
    */
   def repr: Repr = this.asInstanceOf[Repr]
 
+  final def isTraversableAgain: Boolean = true
+  
   /** The underlying collection seen as an instance of `$Coll`.
    *  By default this is implemented as the current collection object itself,
    *  but this can be overridden.
@@ -154,10 +156,6 @@ trait TraversableLike[+A, +Repr] extends Any
     b ++= that.seq
     b.result
   }
-
-  @bridge
-  def ++[B >: A, That](that: TraversableOnce[B])(implicit bf: CanBuildFrom[Repr, B, That]): That =
-    ++(that: GenTraversableOnce[B])(bf)
 
   /** As with `++`, returns a new collection containing the elements from the left operand followed by the
    *  elements from the right operand.
@@ -618,6 +616,13 @@ trait TraversableLike[+A, +Repr] extends Any
   def toTraversable: Traversable[A] = thisCollection
   def toIterator: Iterator[A] = toStream.iterator
   def toStream: Stream[A] = toBuffer.toStream
+  // Override to provide size hint.
+  override def convertTo[Col[_]](implicit cbf: CanBuildFrom[Nothing, A, Col[A @uV]]): Col[A @uV] = {
+    val b = cbf()
+    b.sizeHint(this)
+    b ++= thisCollection
+    b.result
+  }
 
   /** Converts this $coll to a string.
    *

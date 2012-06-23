@@ -1,27 +1,21 @@
-package scala.reflect
-package reify
+package scala.reflect.reify
 
-import scala.tools.nsc.Global
+import scala.reflect.makro.ReificationError
+import scala.reflect.makro.UnexpectedReificationError
 
 trait Errors {
   self: Reifier =>
 
-  import mirror._
+  import global._
   import definitions._
 
-  class ReificationError(var pos: Position, val msg: String) extends Throwable(msg)
-  class UnexpectedReificationError(val pos: Position, val msg: String, val cause: Throwable = null) extends Throwable(msg)
-
-  lazy val defaultErrorPosition: Position =
-    mirror.analyzer.openMacros.find(c => c.macroApplication.pos != NoPosition).map(_.macroApplication.pos).getOrElse(NoPosition)
+  def defaultErrorPosition = {
+    val stack = currents collect { case t: Tree if t.pos != NoPosition => t.pos }
+    stack.headOption getOrElse analyzer.enclosingMacroPosition
+  }
 
   // expected errors: these can happen if the user casually writes whatever.reify(...)
   // hence we don't crash here, but nicely report a typechecking error and bail out asap
-
-  def CannotReifyReifeeThatHasTypeLocalToReifee(tree: Tree) = {
-    val msg = "implementation restriction: cannot reify block of type %s that involves a type declared inside the block being reified. consider casting the return value to a suitable type".format(tree.tpe)
-    throw new ReificationError(tree.pos, msg)
-  }
 
   def CannotReifyType(tpe: Type) = {
     val msg = "implementation restriction: cannot reify type %s (%s)".format(tpe, tpe.kind)
@@ -33,9 +27,26 @@ trait Errors {
     throw new ReificationError(defaultErrorPosition, msg)
   }
 
-  def CannotReifyConcreteTypeTagHavingUnresolvedTypeParameters(tpe: Type) = {
-    val msg = "cannot reify ConcreteTypeTag having unresolved type parameter %s".format(tpe)
+  def CannotReifyTypeTagHavingUnresolvedTypeParameters(tpe: Type) = {
+    val msg = "cannot reify TypeTag having unresolved type parameter %s".format(tpe)
     throw new ReificationError(defaultErrorPosition, msg)
+  }
+
+  def CannotConvertManifestToTagWithoutScalaReflect(tpe: Type, manifestInScope: Tree) = {
+    val msg = s"""
+      |to create a type tag here, it is necessary to interoperate with the manifest `$manifestInScope` in scope.
+      |however manifest -> typetag conversion requires Scala reflection, which is not present on the classpath.
+      |to proceed put scala-reflect.jar on your compilation classpath and recompile.""".trim.stripMargin
+    throw new ReificationError(defaultErrorPosition, msg)
+  }
+
+  def CannotReifyRuntimeSplice(tree: Tree) = {
+    val msg = """
+      |the splice cannot be resolved statically, which means there is a cross-stage evaluation involved.
+      |cross-stage evaluations need to be invoked explicitly, so we're showing you this error.
+      |if you're sure this is not an oversight, add scala-compiler.jar to the classpath,
+      |import `scala.tools.reflect.Eval` and call `<your expr>.eval` instead.""".trim.stripMargin
+    throw new ReificationError(tree.pos, msg)
   }
 
   // unexpected errors: these can never happen under normal conditions unless there's a bug in the compiler (or in a compiler plugin or in a macro)

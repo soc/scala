@@ -66,7 +66,7 @@ abstract class AddInterfaces extends InfoTransform { self: Erasure =>
 
   private def newImplClass(iface: Symbol): Symbol = {
     val inClass   = iface.owner.isClass
-    val implName  = nme.implClassName(iface.name)
+    val implName  = tpnme.implClassName(iface.name)
     val implFlags = (iface.flags & ~(INTERFACE | lateINTERFACE)) | IMPLCLASS
 
     val impl0 = (
@@ -204,10 +204,9 @@ abstract class AddInterfaces extends InfoTransform { self: Erasure =>
 
   def transformMixinInfo(tp: Type): Type = tp match {
     case ClassInfoType(parents, decls, clazz) =>
-      if (clazz.needsImplClass) {
-        clazz setFlag lateINTERFACE
-        implClass(clazz) // generate an impl class
-      }
+      if (clazz.needsImplClass)
+        implClass(clazz setFlag lateINTERFACE) // generate an impl class
+
       val parents1 = parents match {
         case Nil      => Nil
         case hd :: tl =>
@@ -215,14 +214,12 @@ abstract class AddInterfaces extends InfoTransform { self: Erasure =>
           if (clazz.isTrait) erasedTypeRef(ObjectClass) :: tl
           else parents
       }
-      val decls1 = scopeTransform(clazz) { decls filter (sym =>
-        if (clazz.isInterface) isInterfaceMember(sym)
-        else (!sym.isType || sym.isClass))
-      }
-
-      //if (!clazz.isPackageClass) System.out.println("Decls of "+clazz+" after explicitOuter = " + decls1);//DEBUG
-      //if ((parents1 eq parents) && (decls1 eq decls)) tp
-      //else
+      val decls1 = scopeTransform(clazz)(
+        decls filter (sym =>
+          if (clazz.isInterface) isInterfaceMember(sym)
+          else sym.isClass || sym.isTerm
+        )
+      )
       ClassInfoType(parents1, decls1, clazz)
     case _ =>
       tp
@@ -242,27 +239,39 @@ abstract class AddInterfaces extends InfoTransform { self: Erasure =>
     }
   }
 
-  private def ifaceMemberDef(tree: Tree): Tree =
-    if (!tree.isDef || !isInterfaceMember(tree.symbol)) EmptyTree
-    else if (needsImplMethod(tree.symbol)) DefDef(tree.symbol, EmptyTree)
-    else tree
+  private def createMemberDef(tree: Tree, isForInterface: Boolean)(create: Tree => Tree) = {
+    val isInterfaceTree = tree.isDef && isInterfaceMember(tree.symbol)
+    if (isInterfaceTree && needsImplMethod(tree.symbol))
+      create(tree)
+    else if (isInterfaceTree == isForInterface)
+      tree
+    else
+      EmptyTree
+  }
+  private def implMemberDef(tree: Tree): Tree  = createMemberDef(tree, false)(implMethodDef)
+  private def ifaceMemberDef(tree: Tree): Tree = createMemberDef(tree, true)(t => DefDef(t.symbol, EmptyTree))
 
   private def ifaceTemplate(templ: Template): Template =
     treeCopy.Template(templ, templ.parents, emptyValDef, templ.body map ifaceMemberDef)
 
-  private def implMethodDef(tree: Tree, ifaceMethod: Symbol): Tree =
-    implMethodMap.get(ifaceMethod) match {
-      case Some(implMethod) =>
-        tree.symbol = implMethod
-        new ChangeOwnerAndReturnTraverser(ifaceMethod, implMethod)(tree)
-      case None =>
-        abort("implMethod missing for " + ifaceMethod)
-    }
+  /** Transforms the member tree containing the implementation
+   *  into a member of the impl class.
+   */
+  private def implMethodDef(tree: Tree): Tree = {
+    val impl = implMethodMap.getOrElse(tree.symbol, abort("implMethod missing for " + tree.symbol))
 
-  private def implMemberDef(tree: Tree): Tree =
-    if (!tree.isDef || !isInterfaceMember(tree.symbol)) tree
-    else if (needsImplMethod(tree.symbol)) implMethodDef(tree, tree.symbol)
-    else EmptyTree
+    val newTree = if (impl.isErroneous) tree else { // e.g. res/t687
+      // SI-5167: Ensure that the tree that we are grafting refers the parameter symbols from the
+      // new method symbol `impl`, rather than the symbols of the original method signature in
+      // the trait. `tree setSymbol impl` does *not* suffice!
+      val DefDef(_, _, _, vparamss, _, _) = tree
+      val oldSyms = vparamss.flatten.map(_.symbol)
+      val newSyms = impl.info.paramss.flatten
+      assert(oldSyms.length == newSyms.length, (oldSyms, impl, impl.info))
+      tree.substituteSymbols(oldSyms, newSyms)
+    }
+    new ChangeOwnerAndReturnTraverser(newTree.symbol, impl)(newTree setSymbol impl)
+  }
 
   /** Add mixin constructor definition
    *    def $init$(): Unit = ()
@@ -309,8 +318,7 @@ abstract class AddInterfaces extends InfoTransform { self: Erasure =>
         // body until now, because the typer knows that Any has no
         // constructor and won't accept a call to super.init.
         assert((clazz isSubClass AnyValClass) || clazz.info.parents.isEmpty, clazz)
-        val superCall = Apply(Select(Super(This(tpnme.EMPTY), tpnme.EMPTY), nme.CONSTRUCTOR), Nil)
-        Block(List(superCall), expr)
+        Block(List(Apply(gen.mkSuperSelect, Nil)), expr)
 
       case Block(stats, expr) =>
         // needs `hasSymbol` check because `supercall` could be a block (named / default args)
@@ -334,14 +342,12 @@ abstract class AddInterfaces extends InfoTransform { self: Erasure =>
         case Template(parents, self, body) =>
           val parents1 = sym.owner.info.parents map (t => TypeTree(t) setPos tree.pos)
           treeCopy.Template(tree, parents1, emptyValDef, body)
-        case This(_) =>
-          if (sym.needsImplClass) {
-            val impl = implClass(sym)
-            var owner = currentOwner
-            while (owner != sym && owner != impl) owner = owner.owner;
-            if (owner == impl) This(impl) setPos tree.pos
-            else tree
-          } else tree
+        case This(_) if sym.needsImplClass =>
+          val impl = implClass(sym)
+          var owner = currentOwner
+          while (owner != sym && owner != impl) owner = owner.owner;
+          if (owner == impl) This(impl) setPos tree.pos
+          else tree
 /* !!!
         case Super(qual, mix) =>
           val mix1 = mix

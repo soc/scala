@@ -12,6 +12,7 @@ import collection.AbstractIterator
 import collection.Iterator
 import collection.generic._
 import annotation.tailrec
+import reflect.ClassTag
 
 /** A buffer that stores elements in an unrolled linked list.
  *
@@ -36,16 +37,16 @@ import annotation.tailrec
  *  should still be avoided for such a purpose.
  *
  *  @define coll unrolled buffer
- *  @define Coll UnrolledBuffer
+ *  @define Coll `UnrolledBuffer`
  *  @author Aleksandar Prokopec
  *
  */
 @SerialVersionUID(1L)
-class UnrolledBuffer[T](implicit val manifest: ClassManifest[T])
+class UnrolledBuffer[T](implicit val tag: ClassTag[T])
 extends collection.mutable.AbstractBuffer[T]
    with collection.mutable.Buffer[T]
    with collection.mutable.BufferLike[T, UnrolledBuffer[T]]
-   with GenericClassManifestTraversableTemplate[T, UnrolledBuffer]
+   with GenericClassTagTraversableTemplate[T, UnrolledBuffer]
    with collection.mutable.Builder[T, UnrolledBuffer[T]]
    with Serializable
 {
@@ -67,7 +68,7 @@ extends collection.mutable.AbstractBuffer[T]
 
   private[collection] def calcNextLength(sz: Int) = sz
 
-  def classManifestCompanion = UnrolledBuffer
+  def classTagCompanion = UnrolledBuffer
 
   /** Concatenates the targer unrolled buffer to this unrolled buffer.
    *
@@ -179,15 +180,17 @@ extends collection.mutable.AbstractBuffer[T]
     }
   }
 
+  override def clone(): UnrolledBuffer[T] = new UnrolledBuffer[T] ++= this
+  
   override def stringPrefix = "UnrolledBuffer"
 }
 
 
-object UnrolledBuffer extends ClassManifestTraversableFactory[UnrolledBuffer] {
+object UnrolledBuffer extends ClassTagTraversableFactory[UnrolledBuffer] {
   /** $genericCanBuildFromInfo */
-  implicit def canBuildFrom[T](implicit m: ClassManifest[T]): CanBuildFrom[Coll, T, UnrolledBuffer[T]] =
+  implicit def canBuildFrom[T](implicit t: ClassTag[T]): CanBuildFrom[Coll, T, UnrolledBuffer[T]] =
     new GenericCanBuildFrom[T]
-  def newBuilder[T](implicit m: ClassManifest[T]): Builder[T, UnrolledBuffer[T]] = new UnrolledBuffer[T]
+  def newBuilder[T](implicit t: ClassTag[T]): Builder[T, UnrolledBuffer[T]] = new UnrolledBuffer[T]
 
   val waterline = 50
   val waterlineDelim = 100
@@ -195,7 +198,7 @@ object UnrolledBuffer extends ClassManifestTraversableFactory[UnrolledBuffer] {
 
   /** Unrolled buffer node.
    */
-  class Unrolled[T: ClassManifest] private[collection] (var size: Int, var array: Array[T], var next: Unrolled[T], val buff: UnrolledBuffer[T] = null) {
+  class Unrolled[T: ClassTag] private[collection] (var size: Int, var array: Array[T], var next: Unrolled[T], val buff: UnrolledBuffer[T] = null) {
     private[collection] def this() = this(0, new Array[T](unrolledlength), null, null)
     private[collection] def this(b: UnrolledBuffer[T]) = this(0, new Array[T](unrolledlength), null, b)
 

@@ -24,6 +24,7 @@ import scala.collection.GenIterable
 import scala.collection.GenTraversableOnce
 import scala.collection.GenTraversable
 import immutable.HashMapCombiner
+import reflect.{ClassTag, classTag}
 
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -155,15 +156,15 @@ extends GenIterableLike[T, Repr]
    with HasNewCombiner[T, Repr]
 {
 self: ParIterableLike[T, Repr, Sequential] =>
-  
+
   @transient
   @volatile
   private var _tasksupport = defaultTaskSupport
-  
+
   protected def initTaskSupport() {
     _tasksupport = defaultTaskSupport
   }
-  
+
   def tasksupport = {
     val ts = _tasksupport
     if (ts eq null) {
@@ -171,16 +172,36 @@ self: ParIterableLike[T, Repr, Sequential] =>
       defaultTaskSupport
     } else ts
   }
-  
+
   def tasksupport_=(ts: TaskSupport) = _tasksupport = ts
-  
+
   def seq: Sequential
 
   def repr: Repr = this.asInstanceOf[Repr]
 
+  final def isTraversableAgain = true
+
   def hasDefiniteSize = true
 
+  def isEmpty = size == 0
+
   def nonEmpty = size != 0
+
+  def head = iterator.next
+
+  def headOption = if (nonEmpty) Some(head) else None
+
+  def tail = drop(1)
+
+  def last = {
+    var lst = head
+    for (x <- this.seq) lst = x
+    lst
+  }
+
+  def lastOption = if (nonEmpty) Some(last) else None
+
+  def init = take(size - 1)
 
   /** Creates a new parallel iterator used to traverse the elements of this parallel collection.
    *  This iterator is more specific than the iterator of the returned by `iterator`, and augmented
@@ -240,7 +261,7 @@ self: ParIterableLike[T, Repr, Sequential] =>
 
   trait BuilderOps[Elem, To] {
     trait Otherwise[Cmb] {
-      def otherwise(notbody: => Unit)(implicit m: ClassManifest[Cmb]): Unit
+      def otherwise(notbody: => Unit)(implicit t: ClassTag[Cmb]): Unit
     }
 
     def ifIs[Cmb](isbody: Cmb => Unit): Otherwise[Cmb]
@@ -282,8 +303,8 @@ self: ParIterableLike[T, Repr, Sequential] =>
 
   protected implicit def builder2ops[Elem, To](cb: Builder[Elem, To]) = new BuilderOps[Elem, To] {
     def ifIs[Cmb](isbody: Cmb => Unit) = new Otherwise[Cmb] {
-      def otherwise(notbody: => Unit)(implicit m: ClassManifest[Cmb]) {
-        if (cb.getClass == m.erasure) isbody(cb.asInstanceOf[Cmb]) else notbody
+      def otherwise(notbody: => Unit)(implicit t: ClassTag[Cmb]) {
+        if (cb.getClass == t.runtimeClass) isbody(cb.asInstanceOf[Cmb]) else notbody
       }
     }
     def isCombiner = cb.isInstanceOf[Combiner[_, _]]
@@ -471,8 +492,8 @@ self: ParIterableLike[T, Repr, Sequential] =>
    *
    *  $abortsignalling
    *
-   *  @param p    a predicate used to test elements
-   *  @return     true if `p` holds for all elements, false otherwise
+   *  @param pred    a predicate used to test elements
+   *  @return        true if `p` holds for all elements, false otherwise
    */
   def forall(pred: T => Boolean): Boolean = {
     tasksupport.executeAndWaitResult(new Forall(pred, splitter assign new DefaultSignalling with VolatileAbort))
@@ -482,8 +503,8 @@ self: ParIterableLike[T, Repr, Sequential] =>
    *
    *  $abortsignalling
    *
-   *  @param p    a predicate used to test elements
-   *  @return     true if `p` holds for some element, false otherwise
+   *  @param pred    a predicate used to test elements
+   *  @return        true if `p` holds for some element, false otherwise
    */
   def exists(pred: T => Boolean): Boolean = {
     tasksupport.executeAndWaitResult(new Exists(pred, splitter assign new DefaultSignalling with VolatileAbort))
@@ -497,8 +518,8 @@ self: ParIterableLike[T, Repr, Sequential] =>
    *
    *  $abortsignalling
    *
-   *  @param p     predicate used to test the elements
-   *  @return      an option value with the element if such an element exists, or `None` otherwise
+   *  @param pred     predicate used to test the elements
+   *  @return         an option value with the element if such an element exists, or `None` otherwise
    */
   def find(pred: T => Boolean): Option[T] = {
     tasksupport.executeAndWaitResult(new Find(pred, splitter assign new DefaultSignalling with VolatileAbort))
@@ -665,7 +686,7 @@ self: ParIterableLike[T, Repr, Sequential] =>
    *  @tparam That      type of the resulting collection
    *  @param z          neutral element for the operator `op`
    *  @param op         the associative operator for the scan
-   *  @param cbf        combiner factory which provides a combiner
+   *  @param bf         $bfinfo
    *  @return           a collection containing the prefix scan of the elements in the original collection
    *
    *  @usecase def scan(z: T)(op: (T, T) => T): $Coll[T]
@@ -754,7 +775,7 @@ self: ParIterableLike[T, Repr, Sequential] =>
     cntx.setIndexFlag(Int.MaxValue)
     tasksupport.executeAndWaitResult(
       new Span(0, pred, combinerFactory, combinerFactory, splitter assign cntx) mapResult {
-        _._2.resultWithTaskSupport 
+        _._2.resultWithTaskSupport
       }
     )
   }
@@ -802,7 +823,7 @@ self: ParIterableLike[T, Repr, Sequential] =>
     def size = splitter.remaining
   }
 
-  override def toArray[U >: T: ClassManifest]: Array[U] = {
+  override def toArray[U >: T: ClassTag]: Array[U] = {
     val arr = new Array[U](size)
     copyToArray(arr)
     arr
@@ -829,6 +850,12 @@ self: ParIterableLike[T, Repr, Sequential] =>
   override def toSet[U >: T]: immutable.ParSet[U] = toParCollection[U, immutable.ParSet[U]](() => immutable.ParSet.newCombiner[U])
 
   override def toMap[K, V](implicit ev: T <:< (K, V)): immutable.ParMap[K, V] = toParMap[K, V, immutable.ParMap[K, V]](() => immutable.ParMap.newCombiner[K, V])
+
+  // TODO(@alex22): make these better
+  override def toVector: Vector[T] = seq.toVector
+
+  override def convertTo[Col[_]](implicit cbf: CanBuildFrom[Nothing, T, Col[T @uncheckedVariance]]): Col[T @uncheckedVariance] = seq.convertTo[Col]
+  
 
   /* tasks */
 

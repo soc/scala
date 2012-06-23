@@ -10,7 +10,7 @@ import symtab._
 import Flags._
 import util.TreeSet
 import scala.collection.{ mutable, immutable }
-import scala.collection.mutable.LinkedHashMap
+import scala.collection.mutable.{ LinkedHashMap, LinkedHashSet }
 
 abstract class LambdaLift extends InfoTransform {
   import global._
@@ -50,6 +50,9 @@ abstract class LambdaLift extends InfoTransform {
     /** A hashtable storing calls between functions */
     private val called = new LinkedHashMap[Symbol, SymSet]
 
+    /** Symbols that are called from an inner class. */
+    private val calledFromInner = new LinkedHashSet[Symbol]
+
     /** The set of symbols that need to be renamed. */
     private val renamable = newSymSet
 
@@ -63,9 +66,6 @@ abstract class LambdaLift extends InfoTransform {
 
     /** Buffers for lifted out classes and methods */
     private val liftedDefs = new LinkedHashMap[Symbol, List[Tree]]
-
-    /** True if we are transforming under a ReferenceToBoxed node */
-    private var isBoxedRef = false
 
     private type SymSet = TreeSet[Symbol]
 
@@ -108,34 +108,37 @@ abstract class LambdaLift extends InfoTransform {
      *  }
      */
     private def markFree(sym: Symbol, enclosure: Symbol): Boolean = {
-      debuglog("mark free: " + sym + " of " + sym.owner + " marked free in " + enclosure)
-      if (enclosure == sym.owner.logicallyEnclosingMember) true
-      else if (enclosure.isPackageClass || !markFree(sym, enclosure.skipConstructor.owner.logicallyEnclosingMember)) false
-      else {
-        val ss = symSet(free, enclosure)
-        if (!ss(sym)) {
-          ss addEntry sym
-          renamable addEntry sym
-          beforePickler {
-            // The param symbol in the MethodType should not be renamed, only the symbol in scope. This way,
-            // parameter names for named arguments are not changed. Example: without cloning the MethodType,
-            //     def closure(x: Int) = { () => x }
-            // would have the signature
-            //     closure: (x$1: Int)() => Int
-            if (sym.isParameter && sym.owner.info.paramss.exists(_ contains sym))
-              sym.owner modifyInfo (_ cloneInfo sym.owner)
+      debuglog("mark free: " + sym.fullLocationString + " marked free in " + enclosure)
+      (enclosure == sym.owner.logicallyEnclosingMember) || {
+        debuglog("%s != %s".format(enclosure, sym.owner.logicallyEnclosingMember))
+        if (enclosure.isPackageClass || !markFree(sym, enclosure.skipConstructor.owner.logicallyEnclosingMember)) false
+        else {
+          val ss = symSet(free, enclosure)
+          if (!ss(sym)) {
+            ss addEntry sym
+            renamable addEntry sym
+            beforePickler {
+              // The param symbol in the MethodType should not be renamed, only the symbol in scope. This way,
+              // parameter names for named arguments are not changed. Example: without cloning the MethodType,
+              //     def closure(x: Int) = { () => x }
+              // would have the signature
+              //     closure: (x$1: Int)() => Int
+              if (sym.isParameter && sym.owner.info.paramss.exists(_ contains sym))
+                sym.owner modifyInfo (_ cloneInfo sym.owner)
+            }
+            changedFreeVars = true
+            debuglog("" + sym + " is free in " + enclosure);
+            if (sym.isVariable) sym setFlag CAPTURED
           }
-          changedFreeVars = true
-          debuglog("" + sym + " is free in " + enclosure);
-          if (sym.isVariable) sym setFlag CAPTURED
+          !enclosure.isClass
         }
-        !enclosure.isClass
       }
     }
 
     private def markCalled(sym: Symbol, owner: Symbol) {
       debuglog("mark called: " + sym + " of " + sym.owner + " is called by " + owner)
       symSet(called, owner) addEntry sym
+      if (sym.enclClass != owner.enclClass) calledFromInner addEntry sym
     }
 
     /** The traverse function */
@@ -159,7 +162,7 @@ abstract class LambdaLift extends InfoTransform {
               // for that failure. There should be exactly one method for any given
               // entity which always gives the right answer.
               if (sym.isImplClass)
-                localImplClasses((sym.owner, nme.interfaceName(sym.name))) = sym
+                localImplClasses((sym.owner, tpnme.interfaceName(sym.name))) = sym
               else {
                 renamable addEntry sym
                 if (sym.isTrait)
@@ -212,15 +215,23 @@ abstract class LambdaLift extends InfoTransform {
 
       def renameSym(sym: Symbol) {
         val originalName = sym.name
-        val base = sym.name + nme.NAME_JOIN_STRING + (
-          if (sym.isAnonymousFunction && sym.owner.isMethod)
-            sym.owner.name + nme.NAME_JOIN_STRING
-          else ""
+        def freshen(prefix: String): Name =
+          if (originalName.isTypeName) unit.freshTypeName(prefix)
+          else unit.freshTermName(prefix)
+
+        val newName: Name = (
+          if (sym.isAnonymousFunction && sym.owner.isMethod) {
+            freshen(sym.name + nme.NAME_JOIN_STRING + sym.owner.name + nme.NAME_JOIN_STRING)
+          } else {
+            // SI-5652 If the lifted symbol is accessed from an inner class, it will be made public. (where?)
+            //         Generating a a unique name, mangled with the enclosing class name, avoids a VerifyError
+            //         in the case that a sub-class happens to lifts out a method with the *same* name.
+            val name = freshen(sym.name + nme.NAME_JOIN_STRING)
+            if (originalName.isTermName && !sym.enclClass.isImplClass && calledFromInner(sym)) nme.expandedName(name, sym.enclClass)
+            else name
+          }
         )
-        sym setName (
-          if (sym.name.isTypeName) unit.freshTypeName(base)
-          else unit.freshTermName(base)
-        )
+        sym setName newName
         debuglog("renaming in %s: %s => %s".format(sym.owner.fullLocationString, originalName, sym.name))
       }
 
@@ -229,7 +240,7 @@ abstract class LambdaLift extends InfoTransform {
       def renameTrait(traitSym: Symbol, implSym: Symbol) {
         val originalImplName = implSym.name
         renameSym(traitSym)
-        implSym setName nme.implClassName(traitSym.name)
+        implSym setName tpnme.implClassName(traitSym.name)
 
         debuglog("renaming impl class in step with %s: %s => %s".format(traitSym, originalImplName, implSym.name))
       }
@@ -273,8 +284,11 @@ abstract class LambdaLift extends InfoTransform {
         if (ps.isEmpty) searchIn(enclosure.skipConstructor.owner)
         else ps.head
       }
-      debuglog("proxy " + sym + " in " + sym.owner + " from " + currentOwner.ownerChain.mkString(" -> ") +
-          " " + sym.owner.logicallyEnclosingMember)
+      debuglog("proxy %s from %s has logical enclosure %s".format(
+        sym.debugLocationString,
+        currentOwner.debugLocationString,
+        sym.owner.logicallyEnclosingMember.debugLocationString)
+      )
 
       if (isSameOwnerEnclosure(sym)) sym
       else searchIn(currentOwner)

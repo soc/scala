@@ -11,7 +11,7 @@ package scala.collection
 /** A trait for all maps upon which operations may be
  *  implemented in parallel.
  *
- *  @define Coll GenMap
+ *  @define Coll `GenMap`
  *  @define coll general map
  *  @author Martin Odersky
  *  @author Aleksandar Prokopec
@@ -31,7 +31,7 @@ trait GenMapLike[A, +B, +Repr] extends GenIterableLike[(A, B), Repr] with Equals
 
   // This hash code must be symmetric in the contents but ought not
   // collide trivially.
-  override def hashCode() = util.MurmurHash3.mapHash(seq)
+  override def hashCode() = util.hashing.MurmurHash3.mapHash(seq)
 
   /**  Returns the value associated with a key, or a default value if the key is not contained in the map.
    *   @param   key      the key.
@@ -42,7 +42,6 @@ trait GenMapLike[A, +B, +Repr] extends GenIterableLike[(A, B), Repr] with Equals
    *            otherwise the result of the `default` computation.
    *   @usecase def getOrElse(key: A, default: => B): B
    *     @inheritdoc
-   *     @tparam  B        the result type of the default computation.
    */
   def getOrElse[B1 >: B](key: A, default: => B1): B1
 

@@ -8,13 +8,17 @@
 
 package scala.collection
 
+import scala.reflect.ClassTag
+import scala.collection.generic.CanBuildFrom
+import scala.annotation.unchecked.{ uncheckedVariance => uV }
+
 /** A template trait for all traversable-once objects which may be
  *  traversed in parallel.
  *
  *  Methods in this trait are either abstract or can be implemented in terms
  *  of other methods.
  *
- *  @define Coll GenTraversableOnce
+ *  @define Coll `GenTraversableOnce`
  *  @define coll collection or iterator
  *  @define possiblyparinfo
  *  This trait may possibly have operations implemented in parallel.
@@ -312,7 +316,7 @@ trait GenTraversableOnce[+A] extends Any {
    *
    *   @param   num  an implicit parameter defining a set of numeric operations
    *                 which includes the `+` operator to be used in forming the sum.
-   *   @tparam  B    the result type of the `+` operator.
+   *   @tparam  A1   the result type of the `+` operator.
    *   @return       the sum of all elements of this $coll with respect to the `+` operator in `num`.
    *
    *   @usecase def sum: A
@@ -330,7 +334,7 @@ trait GenTraversableOnce[+A] extends Any {
    *
    *   @param   num  an implicit parameter defining a set of numeric operations
    *                 which includes the `*` operator to be used in forming the product.
-   *   @tparam  B    the result type of the `*` operator.
+   *   @tparam  A1   the result type of the `*` operator.
    *   @return       the product of all elements of this $coll with respect to the `*` operator in `num`.
    *
    *   @usecase def product: A
@@ -345,8 +349,8 @@ trait GenTraversableOnce[+A] extends Any {
 
   /** Finds the smallest element.
    *
-   *  @param    cmp   An ordering to be used for comparing elements.
-   *  @tparam   B     The type over which the ordering is defined.
+   *  @param    ord   An ordering to be used for comparing elements.
+   *  @tparam   A1    The type over which the ordering is defined.
    *  @return   the smallest element of this $coll with respect to the ordering `cmp`.
    *
    *  @usecase def min: A
@@ -358,8 +362,8 @@ trait GenTraversableOnce[+A] extends Any {
 
   /** Finds the largest element.
    *
-   *  @param    cmp   An ordering to be used for comparing elements.
-   *  @tparam   B     The type over which the ordering is defined.
+   *  @param    ord   An ordering to be used for comparing elements.
+   *  @tparam   A1    The type over which the ordering is defined.
    *  @return   the largest element of this $coll with respect to the ordering `cmp`.
    *
    *  @usecase def max: A
@@ -382,9 +386,9 @@ trait GenTraversableOnce[+A] extends Any {
    *  $mayNotTerminateInf
    *  $orderDependent
    *
-   *  @param p    the predicate used to test elements.
-   *  @return     an option value containing the first element in the $coll
-   *              that satisfies `p`, or `None` if none exists.
+   *  @param pred    the predicate used to test elements.
+   *  @return        an option value containing the first element in the $coll
+   *                 that satisfies `p`, or `None` if none exists.
    */
   def find(pred: A => Boolean): Option[A]
 
@@ -459,9 +463,9 @@ trait GenTraversableOnce[+A] extends Any {
 
   /** Converts this $coll to an array.
    *
-   *  @tparam B the type of the elements of the array. A `ClassManifest` for
-   *            this type must be available.
-   *  @return   an array containing all elements of this $coll.
+   *  @tparam A1 the type of the elements of the array. An `ClassTag` for
+   *             this type must be available.
+   *  @return    an array containing all elements of this $coll.
    *
    *  @usecase def toArray: Array[A]
    *    @inheritdoc
@@ -469,9 +473,9 @@ trait GenTraversableOnce[+A] extends Any {
    *    $willNotTerminateInf
    *
    *    @return  an array containing all elements of this $coll.
-   *             A `ClassManifest` must be available for the element type of this $coll.
+   *             An `ClassTag` must be available for the element type of this $coll.
    */
-  def toArray[A1 >: A: ClassManifest]: Array[A1]
+  def toArray[A1 >: A: ClassTag]: Array[A1]
 
   /** Converts this $coll to a list.
    *  $willNotTerminateInf
@@ -550,4 +554,21 @@ trait GenTraversableOnce[+A] extends Any {
    *               containing all key/value pairs of type `(T, U)` of this $coll.
    */
   def toMap[K, V](implicit ev: A <:< (K, V)): GenMap[K, V]
+
+  /** Converts this $coll to a Vector.
+   *  $willNotTerminateInf
+   *  @return a vector containing all elements of this $coll.
+   */
+  def toVector: Vector[A]
+
+  /** Converts this $coll into another by copying all elements.
+   *  @tparam Col  The collection type to build.
+   *  @return a new collection containing all elements of this $coll.
+   *  
+   *  @usecase def convertTo[Col[_]]: Col[A]
+   *    @inheritdoc
+   *    $willNotTerminateInf
+   *    @return a new collection containing all elements of this $coll.
+   */
+  def convertTo[Col[_]](implicit cbf: CanBuildFrom[Nothing, A, Col[A @uV]]): Col[A @uV]
 }

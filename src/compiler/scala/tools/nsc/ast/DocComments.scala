@@ -7,8 +7,8 @@ package scala.tools.nsc
 package ast
 
 import symtab._
-import reporters.{Reporter => NscReporter}
-import util.{Position, NoPosition}
+import reporters._
+import scala.reflect.internal.util.{Position, NoPosition}
 import util.DocStrings._
 import scala.reflect.internal.Chars._
 import scala.collection.mutable
@@ -20,8 +20,6 @@ import scala.collection.mutable
 trait DocComments { self: Global =>
 
   var cookedDocComments = Map[Symbol, String]()
-
-  def reporter: NscReporter
 
   /** The raw doc comment map */
   val docComments = mutable.HashMap[Symbol, DocComment]()
@@ -385,7 +383,7 @@ trait DocComments { self: Global =>
   }
 
   // !!! todo: inherit from Comment?
-  case class DocComment(raw: String, pos: Position = NoPosition) {
+  case class DocComment(raw: String, pos: Position = NoPosition, codePos: Position = NoPosition) {
 
     /** Returns:
      *   template: the doc comment minus all @define and @usecase sections
@@ -414,7 +412,7 @@ trait DocComments { self: Global =>
       val comment      = "/** " + raw.substring(commentStart, end) + "*/"
       val commentPos   = subPos(commentStart, end)
 
-      UseCase(DocComment(comment, commentPos), code, codePos)
+      UseCase(DocComment(comment, commentPos, codePos), code, codePos)
     }
 
     private def subPos(start: Int, end: Int) =
@@ -460,10 +458,21 @@ trait DocComments { self: Global =>
           case site :: sites1 => select(site.thisType, name, findIn(sites1))
         }
         val (classes, pkgs) = site.ownerChain.span(!_.isPackageClass)
-        findIn(classes ::: List(pkgs.head, definitions.RootClass))
+        findIn(classes ::: List(pkgs.head, rootMirror.RootClass))
       }
 
-      def getType(str: String): Type = {
+      def getType(_str: String, variable: String): Type = {
+        /*
+         * work around the backticks issue suggested by Simon in
+         * https://groups.google.com/forum/?hl=en&fromgroups#!topic/scala-internals/z7s1CCRCz74
+         * ideally, we'd have a removeWikiSyntax method in the CommentFactory to completely eliminate the wiki markup
+         */
+        val str =
+          if (_str.length >= 2 && _str.startsWith("`") && _str.endsWith("`"))
+            _str.substring(1, _str.length - 2)
+          else
+            _str
+
         def getParts(start: Int): List[String] = {
           val end = skipIdent(str, start)
           if (end == start) List()
@@ -473,7 +482,11 @@ trait DocComments { self: Global =>
           }
         }
         val parts = getParts(0)
-        assert(parts.nonEmpty, "parts is empty '" + str + "' in site " + site)
+        if (parts.isEmpty) {
+          reporter.error(comment.codePos, "Incorrect variable expansion for " + variable + " in use case. Does the " +
+                             "variable expand to wiki syntax when documenting " + site + "?")
+          return ErrorType
+        }
         val partnames = (parts.init map newTermName) :+ newTypeName(parts.last)
         val (start, rest) = parts match {
           case "this" :: _      => (site.thisType, partnames.tail)
@@ -492,10 +505,10 @@ trait DocComments { self: Global =>
         for (alias <- aliases) yield
           lookupVariable(alias.name.toString.substring(1), site) match {
             case Some(repl) =>
-              val tpe = getType(repl.trim)
+              val tpe = getType(repl.trim, alias.name.toString)
               if (tpe != NoType) tpe
               else {
-                val alias1 = alias.cloneSymbol(definitions.RootClass, alias.rawflags, newTypeName(repl))
+                val alias1 = alias.cloneSymbol(rootMirror.RootClass, alias.rawflags, newTypeName(repl))
                 typeRef(NoPrefix, alias1, Nil)
               }
             case None =>

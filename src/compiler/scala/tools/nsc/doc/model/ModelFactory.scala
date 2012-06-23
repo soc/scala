@@ -20,7 +20,8 @@ class ModelFactory(val global: Global, val settings: doc.Settings) {
   thisFactory: ModelFactory with ModelFactoryImplicitSupport with CommentFactory with TreeFactory =>
 
   import global._
-  import definitions.{ ObjectClass, RootPackage, EmptyPackage, NothingClass, AnyClass, AnyValClass, AnyRefClass }
+  import definitions.{ ObjectClass, NothingClass, AnyClass, AnyValClass, AnyRefClass }
+  import rootMirror.{ RootPackage, EmptyPackage }
 
   private var droppedPackages = 0
   def templatesCount = templatesCache.size - droppedPackages
@@ -42,7 +43,7 @@ class ModelFactory(val global: Global, val settings: doc.Settings) {
     memberSym.isOmittablePrefix || (closestPackage(memberSym) == closestPackage(templateSym))
   }
 
-  private lazy val noSubclassCache = Set(AnyClass, AnyRefClass, ObjectClass)
+  private lazy val noSubclassCache = Set[Symbol](AnyClass, AnyRefClass, ObjectClass)
 
   /**  */
   def makeModel: Option[Universe] = {
@@ -231,9 +232,10 @@ class ModelFactory(val global: Global, val settings: doc.Settings) {
         Some(makeType(RefinedType(tps, EmptyScope), inTpl))
       }
     }
-    val linearization: List[(TemplateEntity, TypeEntity)] = {
-      sym.ancestors map { ancestor =>
-        val typeEntity = makeType(sym.info.baseType(ancestor), this)
+
+    protected def linearizationFromSymbol(symbol: Symbol) = {
+      symbol.ancestors map { ancestor =>
+        val typeEntity = makeType(symbol.info.baseType(ancestor), this)
         val tmplEntity = makeTemplate(ancestor) match {
           case tmpl: DocTemplateImpl  => tmpl registerSubClass this ; tmpl
           case tmpl                   => tmpl
@@ -242,6 +244,7 @@ class ModelFactory(val global: Global, val settings: doc.Settings) {
       }
     }
 
+    val linearization = linearizationFromSymbol(sym)
     def linearizationTemplates = linearization map { _._1 }
     def linearizationTypes = linearization map { _._2 }
 
@@ -282,6 +285,12 @@ class ModelFactory(val global: Global, val settings: doc.Settings) {
   abstract class PackageImpl(sym: Symbol, inTpl: => PackageImpl) extends DocTemplateImpl(sym, inTpl) with Package {
     override def inTemplate = inTpl
     override def toRoot: List[PackageImpl] = this :: inTpl.toRoot
+    override val linearization = {
+      val symbol = sym.info.members.find {
+        s => s.isPackageObject
+      } getOrElse sym
+      linearizationFromSymbol(symbol)
+    }
     val packages = members collect { case p: Package => p }
   }
 
@@ -331,7 +340,7 @@ class ModelFactory(val global: Global, val settings: doc.Settings) {
 
   /** */
   def normalizeTemplate(aSym: Symbol): Symbol = aSym match {
-    case null | EmptyPackage | NoSymbol =>
+    case null | rootMirror.EmptyPackage | NoSymbol =>
       normalizeTemplate(RootPackage)
     case ObjectClass =>
       normalizeTemplate(AnyRefClass)
@@ -675,7 +684,7 @@ class ModelFactory(val global: Global, val settings: doc.Settings) {
           }
         /* Refined types */
         case RefinedType(parents, defs) =>
-          val ignoreParents = Set(AnyClass, ObjectClass)
+          val ignoreParents = Set[Symbol](AnyClass, ObjectClass)
           val filtParents = parents filterNot (x => ignoreParents(x.typeSymbol)) match {
             case Nil    => parents
             case ps     => ps

@@ -26,7 +26,7 @@ import scala.collection.parallel.CHECK_RATE
 import scala.collection.mutable.ArraySeq
 import scala.collection.mutable.Builder
 import scala.collection.GenTraversableOnce
-
+import scala.reflect.ClassTag
 
 
 
@@ -49,7 +49,7 @@ import scala.collection.GenTraversableOnce
  *  @see  [[http://docs.scala-lang.org/overviews/parallel-collections/concrete-parallel-collections.html#parallel_array Scala's Parallel Collections Library overview]]
  *  section on `ParArray` for more information.
  *
- *  @define Coll ParArray
+ *  @define Coll `ParArray`
  *  @define coll parallel array
  *
  */
@@ -676,7 +676,7 @@ self =>
 
   private def readObject(in: java.io.ObjectInputStream) {
     in.defaultReadObject
-    
+
     // get raw array from arrayseq
     array = arrayseq.array.asInstanceOf[Array[Any]]
   }
@@ -685,7 +685,7 @@ self =>
 
 
 /** $factoryInfo
- *  @define Coll mutable.ParArray
+ *  @define Coll `mutable.ParArray`
  *  @define coll parallel array
  */
 object ParArray extends ParFactory[ParArray] {
@@ -706,7 +706,7 @@ object ParArray extends ParFactory[ParArray] {
     case _ => new ParArray[T](new ExposedArraySeq[T](runtime.ScalaRunTime.toObjectArray(arr), sz))
   }
 
-  def createFromCopy[T <: AnyRef : ClassManifest](arr: Array[T]): ParArray[T] = {
+  def createFromCopy[T <: AnyRef : ClassTag](arr: Array[T]): ParArray[T] = {
     val newarr = new Array[T](arr.length)
     Array.copy(arr, 0, newarr, 0, arr.length)
     handoff(newarr)

@@ -4,6 +4,7 @@ import annotation.unchecked
 import Lexer._
 import java.io.Writer
 import language.implicitConversions
+import reflect.ClassTag
 
 /** An abstract class for writing and reading Scala objects to and
  *  from a legible representation. The presesentation follows the following grammar:
@@ -416,7 +417,7 @@ object Pickler {
     iterPickler[T] .wrapped { Vector() ++ _ } { _.iterator } .labelled ("scala.Vector")
 
   /** A pickler for array values */
-  implicit def array[T : ClassManifest : Pickler]: Pickler[Array[T]] =
+  implicit def array[T : ClassTag : Pickler]: Pickler[Array[T]] =
     iterPickler[T] .wrapped { _.toArray} { _.iterator } .labelled ("scala.Array")
 }
 

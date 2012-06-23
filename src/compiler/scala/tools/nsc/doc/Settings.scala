@@ -155,7 +155,10 @@ class Settings(error: String => Unit) extends scala.tools.nsc.Settings(error) {
       ("<root>.scala.package.Fractional"    -> ((tparam: String) => tparam + " is a fractional numeric class, such as Float or Double")) +
       ("<root>.scala.reflect.Manifest"      -> ((tparam: String) => tparam + " is accompanied by a Manifest, which is a runtime representation of its type that survives erasure")) +
       ("<root>.scala.reflect.ClassManifest" -> ((tparam: String) => tparam + " is accompanied by a ClassManifest, which is a runtime representation of its type that survives erasure")) +
-      ("<root>.scala.reflect.OptManifest"   -> ((tparam: String) => tparam + " is accompanied by an OptManifest, which can be either a runtime representation of its type or the NoManifest, which means the runtime type is not available"))
+      ("<root>.scala.reflect.OptManifest"   -> ((tparam: String) => tparam + " is accompanied by an OptManifest, which can be either a runtime representation of its type or the NoManifest, which means the runtime type is not available")) +
+      ("<root>.scala.reflect.ClassTag"      -> ((tparam: String) => tparam + " is accompanied by a ClassTag, which is a runtime representation of its type that survives erasure")) +
+      ("<root>.scala.reflect.AbsTypeTag"    -> ((tparam: String) => tparam + " is accompanied by an AbsTypeTag, which is a runtime representation of its type that survives erasure")) +
+      ("<root>.scala.reflect.TypeTag"       -> ((tparam: String) => tparam + " is accompanied by a TypeTag, which is a runtime representation of its type that survives erasure"))
 
     /**
      * Set of classes to exclude from index and diagrams

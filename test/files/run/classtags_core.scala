@@ -1,3 +1,5 @@
+import scala.reflect.{ClassTag, classTag}
+
 object Test extends App {
   println(implicitly[ClassTag[Byte]] eq ClassTag.Byte)
   println(implicitly[ClassTag[Byte]])
@@ -21,12 +23,10 @@ object Test extends App {
   println(implicitly[ClassTag[Any]])
   println(implicitly[ClassTag[Object]] eq ClassTag.Object)
   println(implicitly[ClassTag[Object]])
-  println(implicitly[ClassTag[AnyVal]] eq ClassTag.AnyVal)
-  println(implicitly[ClassTag[AnyVal]])
-  println(implicitly[ClassTag[AnyRef]] eq ClassTag.AnyRef)
-  println(implicitly[ClassTag[AnyRef]])
   println(implicitly[ClassTag[Null]] eq ClassTag.Null)
   println(implicitly[ClassTag[Null]])
   println(implicitly[ClassTag[Nothing]] eq ClassTag.Nothing)
   println(implicitly[ClassTag[Nothing]])
+  println(implicitly[ClassTag[String]] eq ClassTag.String)
+  println(implicitly[ClassTag[String]])
 }

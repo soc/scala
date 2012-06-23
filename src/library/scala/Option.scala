@@ -83,7 +83,7 @@ object Option {
  *  @define p `p`
  *  @define f `f`
  *  @define coll option
- *  @define Coll Option
+ *  @define Coll `Option`
  *  @define orderDependent
  *  @define orderDependentFold
  *  @define mayNotTerminateInf
@@ -146,7 +146,7 @@ sealed abstract class Option[+A] extends Product with Serializable {
 
   /** Returns the result of applying $f to this $option's
    *  value if the $option is nonempty.  Otherwise, evaluates
-   *  expression $ifEmpty.
+   *  expression `ifEmpty`.
    *
    *  @note This is equivalent to `$option map f getOrElse ifEmpty`.
    *

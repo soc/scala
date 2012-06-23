@@ -12,7 +12,6 @@ import mutable.{ ListBuffer, ArraySeq }
 import immutable.{ List, Range }
 import generic._
 import parallel.ParSeq
-import annotation.bridge
 import scala.math.Ordering
 
 /** A template trait for sequences of type `Seq[A]`
@@ -46,7 +45,7 @@ import scala.math.Ordering
  *  @version 1.0, 16/07/2003
  *  @since   2.8
  *
- *  @define Coll Seq
+ *  @define Coll `Seq`
  *  @define coll sequence
  *  @define thatinfo the class of the returned collection. Where possible, `That` is
  *    the same class as the current collection class `Repr`, but this
@@ -296,9 +295,6 @@ trait SeqLike[+A, +Repr] extends Any with IterableLike[A, Repr] with GenSeqLike[
     !j.hasNext
   }
 
-  @bridge
-  def startsWith[B](that: Seq[B], offset: Int): Boolean = startsWith(that: GenSeq[B], offset)
-
   def endsWith[B](that: GenSeq[B]): Boolean = {
     val i = this.iterator.drop(length - that.length)
     val j = that.iterator
@@ -309,10 +305,6 @@ trait SeqLike[+A, +Repr] extends Any with IterableLike[A, Repr] with GenSeqLike[
     !j.hasNext
   }
 
-  @bridge
-  def endsWith[B](that: Seq[B]): Boolean = endsWith(that: GenSeq[B])
-
-
   /** Finds first index where this $coll contains a given sequence as a slice.
    *  $mayNotTerminateInf
    *  @param  that    the sequence to test
@@ -320,9 +312,6 @@ trait SeqLike[+A, +Repr] extends Any with IterableLike[A, Repr] with GenSeqLike[
    *           match the elements of sequence `that`, or `-1` of no such subsequence exists.
    */
   def indexOfSlice[B >: A](that: GenSeq[B]): Int = indexOfSlice(that, 0)
-
-  @bridge
-  def indexOfSlice[B >: A](that: Seq[B]): Int = indexOfSlice(that: GenSeq[B])
 
   /** Finds first index after or at a start index where this $coll contains a given sequence as a slice.
    *  $mayNotTerminateInf
@@ -354,9 +343,6 @@ trait SeqLike[+A, +Repr] extends Any with IterableLike[A, Repr] with GenSeqLike[
       -1
     }
 
-  @bridge
-  def indexOfSlice[B >: A](that: Seq[B], from: Int): Int = indexOfSlice(that: GenSeq[B], from)
-
   /** Finds last index where this $coll contains a given sequence as a slice.
    *  $willNotTerminateInf
    *  @param  that    the sequence to test
@@ -364,9 +350,6 @@ trait SeqLike[+A, +Repr] extends Any with IterableLike[A, Repr] with GenSeqLike[
    *           match the elements of sequence `that`, or `-1` of no such subsequence exists.
    */
   def lastIndexOfSlice[B >: A](that: GenSeq[B]): Int = lastIndexOfSlice(that, length)
-
-  @bridge
-  def lastIndexOfSlice[B >: A](that: Seq[B]): Int = lastIndexOfSlice(that: GenSeq[B])
 
   /** Finds last index before or at a given end index where this $coll contains a given sequence as a slice.
    *  @param  that    the sequence to test
@@ -385,9 +368,6 @@ trait SeqLike[+A, +Repr] extends Any with IterableLike[A, Repr] with GenSeqLike[
     else SeqLike.kmpSearch(thisCollection, 0, clippedL+tl, that.seq, 0, tl, false)
   }
 
-  @bridge
-  def lastIndexOfSlice[B >: A](that: Seq[B], end: Int): Int = lastIndexOfSlice(that: GenSeq[B], end)
-
   /** Tests whether this $coll contains a given sequence as a slice.
    *  $mayNotTerminateInf
    *  @param  that    the sequence to test
@@ -396,15 +376,12 @@ trait SeqLike[+A, +Repr] extends Any with IterableLike[A, Repr] with GenSeqLike[
    */
   def containsSlice[B](that: GenSeq[B]): Boolean = indexOfSlice(that) != -1
 
-  @bridge
-  def containsSlice[B](that: Seq[B]): Boolean = containsSlice(that: GenSeq[B])
-
   /** Tests whether this $coll contains a given value as an element.
    *  $mayNotTerminateInf
    *
    *  @param elem  the element to test.
-   *  @return     `true` if this $coll has an element that is
-   *               is equal (wrt `==`) to `elem`, `false` otherwise.
+   *  @return     `true` if this $coll has an element that is equal (as
+   *              determined by `==`) to `elem`, `false` otherwise.
    */
   def contains(elem: Any): Boolean = exists (_ == elem)
 
@@ -436,8 +413,6 @@ trait SeqLike[+A, +Repr] extends Any with IterableLike[A, Repr] with GenSeqLike[
    *
    *  @param that   the sequence of elements to remove
    *  @tparam B     the element type of the returned $coll.
-   *  @tparam That  $thatinfo
-   *  @param bf     $bfinfo
    *  @return       a new collection of type `That` which contains all elements of this $coll
    *                except some of occurrences of elements that also appear in `that`.
    *                If an element value `x` appears
@@ -463,15 +438,10 @@ trait SeqLike[+A, +Repr] extends Any with IterableLike[A, Repr] with GenSeqLike[
     b.result
   }
 
-  @bridge
-  def diff[B >: A](that: Seq[B]): Repr = diff(that: GenSeq[B])
-
   /** Computes the multiset intersection between this $coll and another sequence.
    *
    *  @param that   the sequence of elements to intersect with.
    *  @tparam B     the element type of the returned $coll.
-   *  @tparam That  $thatinfo
-   *  @param bf     $bfinfo
    *  @return       a new collection of type `That` which contains all elements of this $coll
    *                which also appear in `that`.
    *                If an element value `x` appears
@@ -498,9 +468,6 @@ trait SeqLike[+A, +Repr] extends Any with IterableLike[A, Repr] with GenSeqLike[
       }
     b.result
   }
-
-  @bridge
-  def intersect[B >: A](that: Seq[B]): Repr = intersect(that: GenSeq[B])
 
   private def occCounts[B](sq: Seq[B]): mutable.Map[B, Int] = {
     val occ = new mutable.HashMap[B, Int] { override def default(k: B) = 0 }
@@ -533,10 +500,6 @@ trait SeqLike[+A, +Repr] extends Any with IterableLike[A, Repr] with GenSeqLike[
     b ++= toCollection(rest).view drop replaced
     b.result
   }
-
-  @bridge
-  def patch[B >: A, That](from: Int, patch: Seq[B], replaced: Int)(implicit bf: CanBuildFrom[Repr, B, That]): That =
-    this.patch(from, patch: GenSeq[B], replaced)(bf)
 
   def updated[B >: A, That](index: Int, elem: B)(implicit bf: CanBuildFrom[Repr, B, That]): That = {
     val b = bf(repr)
@@ -583,15 +546,11 @@ trait SeqLike[+A, +Repr] extends Any with IterableLike[A, Repr] with GenSeqLike[
     !i.hasNext && !j.hasNext
   }
 
-  @bridge
-  def corresponds[B](that: Seq[B])(p: (A,B) => Boolean): Boolean =
-    corresponds(that: GenSeq[B])(p)
-
   /** Sorts this $coll according to a comparison function.
    *  $willNotTerminateInf
    *
-   *  The sort is stable. That is, elements that are equal wrt `lt` appear in the
-   *  same order in the sorted sequence as in the original.
+   *  The sort is stable. That is, elements that are equal (as determined by
+   *  `lt`) appear in the same order in the sorted sequence as in the original.
    *
    *  @param  lt  the comparison function which tests whether
    *              its first argument precedes its second argument in
@@ -607,7 +566,7 @@ trait SeqLike[+A, +Repr] extends Any with IterableLike[A, Repr] with GenSeqLike[
 
   /** Sorts this $Coll according to the Ordering which results from transforming
    *  an implicitly given Ordering with a transformation function.
-   *  @see scala.math.Ordering
+   *  @see [[scala.math.Ordering]]
    *  $willNotTerminateInf
    *  @param   f the transformation function mapping elements
    *           to some other domain `B`.
@@ -629,10 +588,10 @@ trait SeqLike[+A, +Repr] extends Any with IterableLike[A, Repr] with GenSeqLike[
 
   /** Sorts this $coll according to an Ordering.
    *
-   *  The sort is stable. That is, elements that are equal wrt `lt` appear in the
-   *  same order in the sorted sequence as in the original.
+   *  The sort is stable. That is, elements that are equal (as determined by
+   *  `lt`) appear in the same order in the sorted sequence as in the original.
    *
-   *  @see scala.math.Ordering
+   *  @see [[scala.math.Ordering]]
    *
    *  @param  ord the ordering to be used to compare elements.
    *  @return     a $coll consisting of the elements of this $coll
@@ -893,7 +852,7 @@ object SeqLike {
   /** Finds a particular index at which one sequence occurs in another sequence.
    *  Like `indexOf`, but finds the latest occurrence rather than earliest.
    *
-   *  @see  SeqLike#indexOf
+   *  @see  [[scala.collection.SeqLike], method `indexOf`
    */
   def lastIndexOf[B](
     source: Seq[B], sourceOffset: Int, sourceCount: Int,

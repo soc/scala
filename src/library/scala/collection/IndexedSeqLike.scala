@@ -26,7 +26,7 @@ import scala.annotation.tailrec
  *  access and length computation. They are defined in terms of abstract methods
  *  `apply` for indexing and `length`.
  *
- *  Indexed sequences do not add any new methods wrt `Seq`, but promise
+ *  Indexed sequences do not add any new methods to `Seq`, but promise
  *  efficient implementations of random access patterns.
  *
  *  @tparam A    the element type of the $coll
@@ -41,7 +41,7 @@ trait IndexedSeqLike[+A, +Repr] extends Any with SeqLike[A, Repr] {
   self =>
 
   def seq: IndexedSeq[A]
-  override def hashCode() = util.MurmurHash3.seqHash(seq)  // TODO - can we get faster via "indexedSeqHash" ?
+  override def hashCode() = util.hashing.MurmurHash3.seqHash(seq)  // TODO - can we get faster via "indexedSeqHash" ?
 
   override protected[this] def thisCollection: IndexedSeq[A] = this.asInstanceOf[IndexedSeq[A]]
   override protected[this] def toCollection(repr: Repr): IndexedSeq[A] = repr.asInstanceOf[IndexedSeq[A]]

@@ -9,7 +9,6 @@
 package scala.collection
 
 import generic._
-import annotation.bridge
 
 /** A template trait for all sequences which may be traversed
  *  in parallel.
@@ -228,9 +227,6 @@ trait GenSeqLike[+A, +Repr] extends Any with GenIterableLike[A, Repr] with Equal
    */
   def startsWith[B](that: GenSeq[B]): Boolean = startsWith(that, 0)
 
-  @bridge
-  def startsWith[B](that: Seq[B]): Boolean = startsWith(that: GenSeq[B])
-
   /** Tests whether this $coll contains the given sequence at a given index.
    *
    * '''Note''': If the both the receiver object `this` and the argument
@@ -413,16 +409,10 @@ trait GenSeqLike[+A, +Repr] extends Any with GenIterableLike[A, Repr] with Equal
    */
   def union[B >: A, That](that: GenSeq[B])(implicit bf: CanBuildFrom[Repr, B, That]): That = this ++ that
 
-  @bridge
-  def union[B >: A, That](that: Seq[B])(implicit bf: CanBuildFrom[Repr, B, That]): That =
-    union(that: GenSeq[B])(bf)
-
   /** Computes the multiset difference between this $coll and another sequence.
    *
    *  @param that   the sequence of elements to remove
    *  @tparam B     the element type of the returned $coll.
-   *  @tparam That  $thatinfo
-   *  @param bf     $bfinfo
    *  @return       a new collection of type `That` which contains all elements of this $coll
    *                except some of occurrences of elements that also appear in `that`.
    *                If an element value `x` appears
@@ -446,8 +436,6 @@ trait GenSeqLike[+A, +Repr] extends Any with GenIterableLike[A, Repr] with Equal
    *
    *  @param that   the sequence of elements to intersect with.
    *  @tparam B     the element type of the returned $coll.
-   *  @tparam That  $thatinfo
-   *  @param bf     $bfinfo
    *  @return       a new collection of type `That` which contains all elements of this $coll
    *                which also appear in `that`.
    *                If an element value `x` appears
@@ -477,7 +465,7 @@ trait GenSeqLike[+A, +Repr] extends Any with GenIterableLike[A, Repr] with Equal
   /** Hashcodes for $Coll produce a value from the hashcodes of all the
    *  elements of the $coll.
    */
-  override def hashCode() = util.MurmurHash3.seqHash(seq)
+  override def hashCode() = util.hashing.MurmurHash3.seqHash(seq)
 
   /** The equals method for arbitrary sequences. Compares this sequence to
    *  some other object.

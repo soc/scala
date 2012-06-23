@@ -115,10 +115,11 @@ trait Trees extends reflect.internal.Trees { self: Global =>
         // convert (implicit ... ) to ()(implicit ... ) if its the only parameter section
         if (vparamss1.isEmpty || !vparamss1.head.isEmpty && vparamss1.head.head.mods.isImplicit)
           vparamss1 = List() :: vparamss1;
-        val superRef: Tree = atPos(superPos) {
-          Select(Super(This(tpnme.EMPTY), tpnme.EMPTY), nme.CONSTRUCTOR)
-        }
-        val superCall = (superRef /: argss) (Apply)
+        val superRef: Tree = atPos(superPos)(gen.mkSuperSelect)
+        def mkApply(fun: Tree, args: List[Tree]) = Apply(fun, args)
+        val superCall = (superRef /: argss) (mkApply)
+        // [Eugene++] no longer compiles after I moved the `Apply` case class into scala.reflect.internal
+        // val superCall = (superRef /: argss) (Apply)
         List(
           atPos(wrappingPos(superPos, lvdefs ::: argss.flatten)) (
             DefDef(constrMods, nme.CONSTRUCTOR, List(), vparamss1, TypeTree(), Block(lvdefs ::: List(superCall), Literal(Constant())))))
@@ -195,7 +196,7 @@ trait Trees extends reflect.internal.Trees { self: Global =>
     def SelectFromArray(tree: Tree, qualifier: Tree, selector: Name, erasure: Type) =
       new SelectFromArray(qualifier, selector, erasure).copyAttrs(tree)
     def InjectDerivedValue(tree: Tree, arg: Tree) =
-      new InjectDerivedValue(arg)
+      new InjectDerivedValue(arg).copyAttrs(tree)
     def TypeTreeWithDeferredRefCheck(tree: Tree) = tree match {
       case dc@TypeTreeWithDeferredRefCheck() => new TypeTreeWithDeferredRefCheck()(dc.check).copyAttrs(tree)
     }
@@ -234,6 +235,11 @@ trait Trees extends reflect.internal.Trees { self: Global =>
     }
   }
 
+  // used when a phase is disabled
+  object noopTransformer extends Transformer {
+    override def transformUnit(unit: CompilationUnit): Unit = {}
+  }
+
   override protected def xtransform(transformer: super.Transformer, tree: Tree): Tree = tree match {
     case DocDef(comment, definition) =>
       transformer.treeCopy.DocDef(tree, comment, transformer.transform(definition))
@@ -259,9 +265,9 @@ trait Trees extends reflect.internal.Trees { self: Global =>
 //  def resetAllAttrs[A<:Tree](x:A): A = { new ResetAttrsTraverser().traverse(x); x }
 //  def resetLocalAttrs[A<:Tree](x:A): A = { new ResetLocalAttrsTraverser().traverse(x); x }
 
-  def resetAllAttrs[A <: Tree](x: A, leaveAlone: Tree => Boolean = null): A = new ResetAttrs(false, leaveAlone).transform(x)
-  def resetLocalAttrs[A <: Tree](x: A, leaveAlone: Tree => Boolean = null): A = new ResetAttrs(true, leaveAlone).transform(x)
-  def resetLocalAttrsKeepLabels[A<:Tree](x: A, leaveAlone: Tree => Boolean = null): A = new ResetAttrs(true, leaveAlone, true).transform(x)
+  def resetAllAttrs(x: Tree, leaveAlone: Tree => Boolean = null): Tree = new ResetAttrs(false, leaveAlone).transform(x)
+  def resetLocalAttrs(x: Tree, leaveAlone: Tree => Boolean = null): Tree = new ResetAttrs(true, leaveAlone).transform(x)
+  def resetLocalAttrsKeepLabels(x: Tree, leaveAlone: Tree => Boolean = null): Tree = new ResetAttrs(true, leaveAlone, true).transform(x)
 
   /** A transformer which resets symbol and tpe fields of all nodes in a given tree,
    *  with special treatment of:
@@ -321,13 +327,14 @@ trait Trees extends reflect.internal.Trees { self: Global =>
           super.transform {
             tree match {
               case tpt: TypeTree =>
-                if (tpt.original != null) {
+                if (tpt.original != null)
                   transform(tpt.original)
-                } else {
-                  if (tpt.tpe != null && (tpt.wasEmpty || (tpt.tpe exists (tp => locals contains tp.typeSymbol))))
-                    tpt.tpe = null
-                  tree
+                else if (tpt.tpe != null && (tpt.wasEmpty || (tpt.tpe exists (tp => locals contains tp.typeSymbol)))) {
+                  val dupl = tpt.duplicate
+                  dupl.tpe = null
+                  dupl
                 }
+                else tree
               case TypeApply(fn, args) if args map transform exists (_.isEmpty) =>
                 transform(fn)
               case This(_) if tree.symbol != null && tree.symbol.isPackageClass =>
@@ -335,16 +342,17 @@ trait Trees extends reflect.internal.Trees { self: Global =>
               case EmptyTree =>
                 tree
               case _ =>
+                val dupl = tree.duplicate
                 if (tree.hasSymbol && (!localOnly || (locals contains tree.symbol)) && !(keepLabels && tree.symbol.isLabel))
-                  tree.symbol = NoSymbol
-                tree.tpe = null
-                tree
+                  dupl.symbol = NoSymbol
+                dupl.tpe = null
+                dupl
             }
           }
       }
     }
 
-    def transform[T <: Tree](x: T): T = {
+    def transform(x: Tree): Tree = {
       if (localOnly)
       new MarkLocals().traverse(x)
 
@@ -354,9 +362,7 @@ trait Trees extends reflect.internal.Trees { self: Global =>
         trace("locals (%d total): %n".format(orderedLocals.size))(msg)
       }
 
-      val x1 = new Transformer().transform(x)
-      assert(x.getClass isInstance x1, x1.getClass)
-      x1.asInstanceOf[T]
+      new Transformer().transform(x)
     }
   }
 

@@ -7,7 +7,9 @@ package typechecker
 
 import symtab.Flags._
 import scala.collection.{ mutable, immutable }
-import scala.tools.util.StringOps.{ ojoin }
+import scala.reflect.internal.util.StringOps.{ ojoin }
+import scala.reflect.ClassTag
+import scala.reflect.runtime.{ universe => ru }
 import language.higherKinds
 
 /** Logic related to method synthesis which involves cooperation between
@@ -21,50 +23,58 @@ trait MethodSynthesis {
   import CODE._
 
   object synthesisUtil {
-    type M[T]  = Manifest[T]
-    type CM[T] = ClassManifest[T]
+    type TT[T]  = ru.TypeTag[T]
+    type CT[T] = ClassTag[T]
 
     def ValOrDefDef(sym: Symbol, body: Tree) =
       if (sym.isLazy) ValDef(sym, body)
       else DefDef(sym, body)
 
-    def applyTypeInternal(manifests: List[M[_]]): Type = {
-      // [Eugene to Paul] needs review!!
-      val symbols = manifests map manifestToSymbol
+    def applyTypeInternal(tags: List[TT[_]]): Type = {
+      // [Eugene++ to Paul] needs review!!
+      val symbols = tags map compilerSymbolFromTag
       val container :: args = symbols
       val tparams = container.typeConstructor.typeParams
 
       // Conservative at present - if manifests were more usable this could do a lot more.
-      require(symbols forall (_ ne NoSymbol), "Must find all manifests: " + symbols)
+      // [Eugene to Paul] all right, they are now. what do you have in mind?
+      require(symbols forall (_ ne NoSymbol), "Must find all tags: " + symbols)
       require(container.owner.isPackageClass, "Container must be a top-level class in a package: " + container)
       require(tparams.size == args.size, "Arguments must match type constructor arity: " + tparams + ", " + args)
 
       appliedType(container, args map (_.tpe): _*)
     }
 
-    def companionType[T](implicit m: M[T]) =
-      getRequiredModule(m.erasure.getName).tpe
+    def companionType[T](implicit ct: CT[T]) =
+      rootMirror.getRequiredModule(ct.runtimeClass.getName).tpe
 
     // Use these like `applyType[List, Int]` or `applyType[Map, Int, String]`
-    def applyType[CC](implicit m1: M[CC]): Type =
-      applyTypeInternal(List(m1))
+    def applyType[CC](implicit t1: TT[CC]): Type =
+      applyTypeInternal(List(t1))
 
-    def applyType[CC[X1], X1](implicit m1: M[CC[_]], m2: M[X1]): Type =
-      applyTypeInternal(List(m1, m2))
+    def applyType[CC[X1], X1](implicit t1: TT[CC[_]], t2: TT[X1]): Type =
+      applyTypeInternal(List[TT[_]](t1, t2))
 
-    def applyType[CC[X1, X2], X1, X2](implicit m1: M[CC[_,_]], m2: M[X1], m3: M[X2]): Type =
-      applyTypeInternal(List(m1, m2, m3))
+    def applyType[CC[X1, X2], X1, X2](implicit t1: TT[CC[_,_]], t2: TT[X1], t3: TT[X2]): Type =
+    // [Eugene++] without an explicit type annotation for List, we get this:
+    // [scalacfork] C:\Projects\KeplerUnderRefactoring\src\compiler\scala\tools\nsc\typechecker\MethodSynthesis.scala:59: error: no type parameters for method apply: (xs: A*)List[A] in object List exist so that it can be applied to arguments (scala.tools.nsc.typechecker.MethodSynthesis.synthesisUtil.TT[CC[_, _]], scala.tools.nsc.typechecker.MethodSynthesis.synthesisUtil.TT[X1], scala.tools.nsc.typechecker.MethodSynthesis.synthesisUtil.TT[X2])
+    // [scalacfork]  --- because ---
+    // [scalacfork] undetermined type
+    // [scalacfork]       applyTypeInternal(List(t1, t2, t3))
+      applyTypeInternal(List[TT[_]](t1, t2, t3))
 
-    def applyType[CC[X1, X2, X3], X1, X2, X3](implicit m1: M[CC[_,_,_]], m2: M[X1], m3: M[X2], m4: M[X3]): Type =
-      applyTypeInternal(List(m1, m2, m3, m4))
+    def applyType[CC[X1, X2, X3], X1, X2, X3](implicit t1: TT[CC[_,_,_]], t2: TT[X1], t3: TT[X2], t4: TT[X3]): Type =
+      applyTypeInternal(List[TT[_]](t1, t2, t3, t4))
 
-    def newMethodType[F](owner: Symbol)(implicit m: Manifest[F]): Type = {
-      val fnSymbol = manifestToSymbol(m)
-      assert(fnSymbol isSubClass FunctionClass(m.tpe.typeArguments.size - 1), (owner, m))
-      // [Eugene to Paul] needs review!!
+    // [Martin->Eugene]  !!! reinstantiate when typeables are in.
+    // [Eugene++->Martin] now this compiles, will soon check it out
+    def newMethodType[F](owner: Symbol)(implicit t: TT[F]): Type = {
+      val fnSymbol = compilerSymbolFromTag(t)
+      assert(fnSymbol isSubClass FunctionClass(t.tpe.typeArguments.size - 1), (owner, t))
+      // [Eugene++ to Paul] needs review!!
       // val symbols = m.typeArguments map (m => manifestToSymbol(m))
       // val formals = symbols.init map (_.typeConstructor)
-      val formals = manifestToType(m).typeArguments
+      val formals = compilerTypeFromTag(t).typeArguments
       val params  = owner newSyntheticValueParams formals
       MethodType(params, formals.last)
     }
@@ -232,11 +242,16 @@ trait MethodSynthesis {
         // TODO: need to shuffle annotations between wrapper and class.
         val wrapper = ImplicitClassWrapper(cd)
         val meth = wrapper.derivedSym
-        val mdef = context.unit.synthetics(meth)
-        context.unit.synthetics -= meth
-        meth setAnnotations deriveAnnotations(annotations, MethodTargetClass, false)
-        cd.symbol setAnnotations deriveAnnotations(annotations, ClassTargetClass, true)
-        List(cd, mdef)
+        context.unit.synthetics get meth match {
+          case Some(mdef) =>
+            context.unit.synthetics -= meth
+            meth setAnnotations deriveAnnotations(annotations, MethodTargetClass, false)
+            cd.symbol setAnnotations deriveAnnotations(annotations, ClassTargetClass, true)
+            List(cd, mdef)
+          case _ =>
+            // Shouldn't happen, but let's give ourselves a reasonable error when it does
+            abort("No synthetics for " + meth + ": synthetics contains " + context.unit.synthetics.keys.mkString(", "))
+        }
       case _ =>
         List(stat)
       }
@@ -246,13 +261,12 @@ trait MethodSynthesis {
       else List(Getter(vd))
     )
     def beanAccessors(vd: ValDef): List[DerivedFromValDef] = {
+      val setter = if (vd.mods.isMutable) List(BeanSetter(vd)) else Nil
       if (forMSIL) Nil
-      else if (vd.symbol hasAnnotation BeanPropertyAttr) {
-        if (vd.mods.isMutable) List(BeanGetter(vd), BeanSetter(vd))
-        else List(BeanGetter(vd))
-      }
+      else if (vd.symbol hasAnnotation BeanPropertyAttr)
+        BeanGetter(vd) :: setter
       else if (vd.symbol hasAnnotation BooleanBeanPropertyAttr)
-        List(BooleanBeanGetter(vd))
+        BooleanBeanGetter(vd) :: setter
       else Nil
     }
     def allValDefDerived(vd: ValDef) = {
@@ -372,7 +386,9 @@ trait MethodSynthesis {
       def completer(sym: Symbol): Type = ??? // not needed
       def createAndEnterSymbol(): Symbol = enterSyntheticSym(derivedTree)
       def derivedSym: Symbol = {
-        val result = enclClass.info decl name
+        // Only methods will do! Don't want to pick up any stray
+        // companion objects of the same name.
+        val result = enclClass.info decl name suchThat (_.isMethod)
         assert(result != NoSymbol, "not found: "+name+" in "+enclClass+" "+enclClass.info.decls)
         result
       }

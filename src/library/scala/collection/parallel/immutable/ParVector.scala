@@ -37,7 +37,7 @@ import immutable.VectorIterator
  *  @see  [[http://docs.scala-lang.org/overviews/parallel-collections/concrete-parallel-collections.html#parallel_vector Scala's Parallel Collections Library overview]]
  *  section on `ParVector` for more information.
  *
- *  @define Coll immutable.ParVector
+ *  @define Coll `immutable.ParVector`
  *  @define coll immutable parallel vector
  */
 class ParVector[+T](private[this] val vector: Vector[T])
@@ -61,6 +61,8 @@ extends ParSeq[T]
   }
 
   override def seq: Vector[T] = vector
+
+  override def toVector: Vector[T] = vector
 
   class ParVectorIterator(_start: Int, _end: Int) extends VectorIterator[T](_start, _end) with SeqSplitter[T] {
     def remaining: Int = remainingElementCount
@@ -86,7 +88,7 @@ extends ParSeq[T]
 
 
 /** $factoryInfo
- *  @define Coll immutable.ParVector
+ *  @define Coll `immutable.ParVector`
  *  @define coll immutable parallel vector
  */
 object ParVector extends ParFactory[ParVector] {

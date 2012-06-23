@@ -1,6 +1,9 @@
-import scala.reflect.mirror._
+import scala.reflect.runtime.universe._
+import scala.reflect.runtime.{universe => ru}
+import scala.reflect.runtime.{currentMirror => cm}
+import scala.tools.reflect.ToolBox
 
-class ann(bar: List[String]) extends StaticAnnotation
+class ann(bar: List[String]) extends annotation.StaticAnnotation
 
 object Test extends App {
   // test 1: reify
@@ -16,7 +19,7 @@ object Test extends App {
   println(tree.toString)
 
   // test 2: import and typecheck
-  val toolbox = mkToolBox()
+  val toolbox = cm.mkToolBox()
   val ttree = toolbox.typeCheck(tree)
   println(ttree.toString)
 

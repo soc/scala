@@ -12,7 +12,8 @@ package scala.collection
 package mutable
 
 import generic._
-import scala.reflect.ClassManifest
+import scala.reflect.ClassTag
+import scala.runtime.ScalaRunTime
 
 /** A builder class for arrays.
  *
@@ -30,13 +31,12 @@ object ArrayBuilder {
 
   /** Creates a new arraybuilder of type `T`.
    *
-   *  @tparam T     type of the elements for the array builder, with a `ClassManifest` context bound.
+   *  @tparam T     type of the elements for the array builder, with a `ClassTag` context bound.
    *  @return       a new empty array builder.
    */
-  def make[T: ClassManifest](): ArrayBuilder[T] = {
-    val manifest = implicitly[ClassManifest[T]]
-    val erasure = manifest.erasure
-    erasure match {
+  def make[T: ClassTag](): ArrayBuilder[T] = {
+    val tag = implicitly[ClassTag[T]]
+    tag.runtimeClass match {
       case java.lang.Byte.TYPE      => new ArrayBuilder.ofByte().asInstanceOf[ArrayBuilder[T]]
       case java.lang.Short.TYPE     => new ArrayBuilder.ofShort().asInstanceOf[ArrayBuilder[T]]
       case java.lang.Character.TYPE => new ArrayBuilder.ofChar().asInstanceOf[ArrayBuilder[T]]
@@ -46,15 +46,15 @@ object ArrayBuilder {
       case java.lang.Double.TYPE    => new ArrayBuilder.ofDouble().asInstanceOf[ArrayBuilder[T]]
       case java.lang.Boolean.TYPE   => new ArrayBuilder.ofBoolean().asInstanceOf[ArrayBuilder[T]]
       case java.lang.Void.TYPE      => new ArrayBuilder.ofUnit().asInstanceOf[ArrayBuilder[T]]
-      case _                        => new ArrayBuilder.ofRef[T with AnyRef]()(manifest.asInstanceOf[ClassManifest[T with AnyRef]]).asInstanceOf[ArrayBuilder[T]]
+      case _                        => new ArrayBuilder.ofRef[T with AnyRef]()(tag.asInstanceOf[ClassTag[T with AnyRef]]).asInstanceOf[ArrayBuilder[T]]
     }
   }
 
   /** A class for array builders for arrays of reference types.
    *
-   *  @tparam T     type of elements for the array builder, subtype of `AnyRef` with a `ClassManifest` context bound.
+   *  @tparam T     type of elements for the array builder, subtype of `AnyRef` with a `ClassTag` context bound.
    */
-  class ofRef[T <: AnyRef : ClassManifest] extends ArrayBuilder[T] {
+  class ofRef[T <: AnyRef : ClassTag] extends ArrayBuilder[T] {
 
     private var elems: Array[T] = _
     private var capacity: Int = 0

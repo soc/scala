@@ -10,9 +10,11 @@ import java.lang.{ reflect => r }
 import r.TypeVariable
 import scala.reflect.NameTransformer
 import NameTransformer._
-import scala.reflect.{mirror => rm}
+import scala.reflect.runtime.{universe => ru}
+import scala.reflect.{ClassTag, classTag}
 import typechecker.DestructureTypes
-import scala.tools.util.StringOps.ojoin
+import scala.reflect.internal.util.StringOps.ojoin
+import language.implicitConversions
 
 /** A more principled system for turning types into strings.
  */
@@ -192,8 +194,8 @@ trait TypeStrings {
       else enclClass.getName + "." + (name stripPrefix enclPre)
     )
   }
-  def scalaName(m: ClassManifest[_]): String = scalaName(m.erasure)
-  def anyClass(x: Any): JClass               = if (x == null) null else x.getClass
+  def scalaName(ct: ClassTag[_]): String = scalaName(ct.runtimeClass)
+  def anyClass(x: Any): JClass          = if (x == null) null else x.getClass
 
   private def brackets(tps: String*): String =
     if (tps.isEmpty) ""
@@ -209,25 +211,27 @@ trait TypeStrings {
     brackets(clazz.getTypeParameters map tvarString: _*)
   }
 
-  private def tparamString[T: Manifest] : String = {
-    // [Eugene to Paul] needs review!!
-    def typeArguments: List[rm.Type] = manifest[T].tpe.typeArguments
-    def typeVariables: List[java.lang.Class[_]] = typeArguments map (targ => rm.typeToClass(targ))
+  private def tparamString[T: ru.TypeTag] : String = {
+    // [Eugene++ to Paul] needs review!!
+    def typeArguments: List[ru.Type] = ru.typeOf[T].typeArguments
+    // [Eugene++] todo. need to use not the `rootMirror`, but a mirror with the REPL's classloader
+    // how do I get to it? acquiring context classloader seems unreliable because of multithreading
+    def typeVariables: List[java.lang.Class[_]] = typeArguments map (targ => ru.rootMirror.runtimeClass(targ))
     brackets(typeArguments map (jc => tvarString(List(jc))): _*)
   }
 
   /** Going for an overabundance of caution right now.  Later these types
-   *  can be a lot more precise, but right now the manifests have a habit of
+   *  can be a lot more precise, but right now the tags have a habit of
    *  introducing material which is not syntactically valid as scala source.
    *  When this happens it breaks the repl.  It would be nice if we mandated
-   *  that manifest toString methods (or some other method, since it's bad
+   *  that tag toString methods (or some other method, since it's bad
    *  practice to rely on toString for correctness) generated the VALID string
    *  representation of the type.
    */
-  def fromTypedValue[T: Manifest](x: T): String = fromManifest[T]
-  def fromValue(value: Any): String             = if (value == null) "Null" else fromClazz(anyClass(value))
-  def fromClazz(clazz: JClass): String          = scalaName(clazz) + tparamString(clazz)
-  def fromManifest[T: Manifest] : String        = scalaName(manifest[T].erasure) + tparamString[T]
+  def fromTypedValue[T: ru.TypeTag : ClassTag](x: T): String = fromTag[T]
+  def fromValue(value: Any): String                          = if (value == null) "Null" else fromClazz(anyClass(value))
+  def fromClazz(clazz: JClass): String                       = scalaName(clazz) + tparamString(clazz)
+  def fromTag[T: ru.TypeTag : ClassTag] : String             = scalaName(classTag[T].runtimeClass) + tparamString[T]
 
   /** Reducing fully qualified noise for some common packages.
    */

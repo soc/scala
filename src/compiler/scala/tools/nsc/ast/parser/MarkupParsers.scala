@@ -9,7 +9,8 @@ package ast.parser
 import scala.collection.mutable
 import mutable.{ Buffer, ArrayBuffer, ListBuffer }
 import scala.util.control.ControlThrowable
-import scala.tools.nsc.util.{SourceFile,CharArrayReader}
+import scala.tools.nsc.util.CharArrayReader
+import scala.reflect.internal.util.SourceFile
 import scala.xml.{ Text, TextBuffer }
 import scala.xml.parsing.MarkupParserCommon
 import scala.xml.Utility.{ isNameStart, isNameChar, isSpace }
@@ -397,7 +398,7 @@ trait MarkupParsers {
 
     /** xScalaPatterns  ::= patterns
      */
-    def xScalaPatterns: List[Tree] = escapeToScala(parser.seqPatterns(), "pattern")
+    def xScalaPatterns: List[Tree] = escapeToScala(parser.xmlSeqPatterns(), "pattern")
 
     def reportSyntaxError(pos: Int, str: String) = parser.syntaxError(pos, str)
     def reportSyntaxError(str: String) {

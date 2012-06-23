@@ -15,18 +15,27 @@ trait AnyValReps {
 
     case class Op(val op : String, val doc : String)
     
-    private def companionCoercions(tos: String*) = {
+    private def companionCoercions(tos: AnyValRep*) = {
       tos.toList map (to =>
-        """implicit def %s2%s(x: %s): %s = x.to%s""".format(javaEquiv, to, name, to.capitalize, to.capitalize)
+        """implicit def @javaequiv@2%s(x: @name@): %s = x.to%s""".format(to.javaEquiv, to.name, to.name)
       )
     }
-    def implicitCoercions: List[String] = javaEquiv match {
-      case "byte"           => companionCoercions("short", "int", "long", "float", "double")
-      case "short" | "char" => companionCoercions("int", "long", "float", "double")
-      case "int"            => companionCoercions("long", "float", "double")
-      case "long"           => companionCoercions("float", "double")
-      case "float"          => companionCoercions("double")
-      case _                => Nil
+    def coercionCommentExtra = ""
+    def coercionComment = """
+  /** Language mandated coercions from @name@ to "wider" types.%s
+   */""".format(coercionCommentExtra)
+    
+    def implicitCoercions: List[String] = {
+      val coercions = this match {
+        case B     => companionCoercions(S, I, L, F, D)
+        case S | C => companionCoercions(I, L, F, D)
+        case I     => companionCoercions(L, F, D)
+        case L     => companionCoercions(F, D)
+        case F     => companionCoercions(D)
+        case _     => Nil
+      }
+      if (coercions.isEmpty) Nil
+      else coercionComment :: coercions
     }
 
     def isCardinal: Boolean = isIntegerType(this)
@@ -168,13 +177,13 @@ trait AnyValReps {
       case (res, lines) =>
         val xs = lines map {
           case ""   => ""
-          case s    => interpolate(s) + " = " + stub
+          case s    => interpolate(s)
         }
         res ++ xs
     }
     def objectLines = {
       val comp = if (isCardinal) cardinalCompanion else floatingCompanion
-      ((comp + allCompanions).trim.lines map interpolate).toList ++ implicitCoercions
+      (comp + allCompanions + "\n" + nonUnitCompanions).trim.lines.toList ++ implicitCoercions map interpolate
     }
 
     /** Makes a set of binary operations based on the given set of ops, args, and resultFn.
@@ -196,7 +205,7 @@ trait AnyValReps {
     def classLines: List[String]
     def objectLines: List[String]
     def commonClassLines = List(
-      "override def getClass(): Class[@name@]"
+      "override def getClass(): Class[@name@] = null"
     )
 
     def lcname = name.toLowerCase
@@ -238,8 +247,9 @@ trait AnyValReps {
     def classDoc  = interpolate(classDocTemplate)
     def objectDoc = ""
     def mkImports = ""
-    def mkClass   = assemble("final class", "private", "AnyVal", classLines) + "\n"
-    def mkObject  = assemble("object", "", "AnyValCompanion", objectLines) + "\n"
+    
+    def mkClass       = assemble("final abstract class " + name + " private extends AnyVal", classLines)
+    def mkObject      = assemble("object " + name + " extends AnyValCompanion", objectLines)
     def make()    = List[String](
       headerTemplate,
       mkImports,
@@ -249,11 +259,10 @@ trait AnyValReps {
       mkObject
     ) mkString ""
 
-    def assemble(what: String, ctor: String, parent: String, lines: List[String]): String = {
-      val decl = "%s %s %s extends %s ".format(what, name, ctor, parent)
-      val body = if (lines.isEmpty) "{ }\n\n" else lines map indent mkString ("{\n", "\n", "\n}\n")
+    def assemble(decl: String, lines: List[String]): String = {
+      val body = if (lines.isEmpty) " { }\n\n" else lines map indent mkString (" {\n", "\n", "\n}\n")
 
-      decl + body
+      decl + body + "\n"
     }
     override def toString = name
   }
@@ -272,6 +281,8 @@ trait AnyValTemplates {
 %s
 package scala
 
+import language.implicitConversions
+
 """.trim.format(timestampString) + "\n\n")
 
   def classDocTemplate = ("""
@@ -285,7 +296,6 @@ package scala
 """.trim + "\n")
 
   def timestampString = "// DO NOT EDIT, CHANGES WILL BE LOST.\n"
-  def stub            = """sys.error("stub")"""
 
   def allCompanions = """
 /** Transform a value type into a boxed reference type.
@@ -309,6 +319,8 @@ def unbox(x: java.lang.Object): @name@ = @unboxImpl@
  */
 override def toString = "object scala.@name@"
 """
+
+  def nonUnitCompanions = ""  // todo
 
   def cardinalCompanion = """
 /** The smallest value representable as a @name@.
@@ -362,7 +374,7 @@ class AnyVals extends AnyValReps with AnyValTemplates {
  *
  * @return the negated expression
  */
-def unary_! : Boolean = sys.error("stub")
+def unary_! : Boolean
 
 /**
   * Compares two Boolean expressions and returns `true` if they evaluate to the same value.
@@ -371,7 +383,7 @@ def unary_! : Boolean = sys.error("stub")
   *  - `a` and `b` are `true` or
   *  - `a` and `b` are `false`.
   */
-def ==(x: Boolean): Boolean = sys.error("stub")
+def ==(x: Boolean): Boolean
 
 /**
   * Compares two Boolean expressions and returns `true` if they evaluate to a different value.
@@ -380,7 +392,7 @@ def ==(x: Boolean): Boolean = sys.error("stub")
   *  - `a` is `true` and `b` is `false` or
   *  - `a` is `false` and `b` is `true`.
   */
-def !=(x: Boolean): Boolean = sys.error("stub")
+def !=(x: Boolean): Boolean
 
 /**
   * Compares two Boolean expressions and returns `true` if one or both of them evaluate to true.
@@ -394,7 +406,7 @@ def !=(x: Boolean): Boolean = sys.error("stub")
   *       behaves as if it was declared as `def ||(x: => Boolean): Boolean`.
   *       If `a` evaluates to `true`, `true` is returned without evaluating `b`.
   */
-def ||(x: Boolean): Boolean = sys.error("stub")
+def ||(x: Boolean): Boolean
 
 /**
   * Compares two Boolean expressions and returns `true` if both of them evaluate to true.
@@ -406,11 +418,11 @@ def ||(x: Boolean): Boolean = sys.error("stub")
   *       behaves as if it was declared as `def &&(x: => Boolean): Boolean`.
   *       If `a` evaluates to `false`, `false` is returned without evaluating `b`.
   */
-def &&(x: Boolean): Boolean = sys.error("stub")
+def &&(x: Boolean): Boolean
 
 // Compiler won't build with these seemingly more accurate signatures
-// def ||(x: => Boolean): Boolean = sys.error("stub")
-// def &&(x: => Boolean): Boolean = sys.error("stub")
+// def ||(x: => Boolean): Boolean
+// def &&(x: => Boolean): Boolean
 
 /**
   * Compares two Boolean expressions and returns `true` if one or both of them evaluate to true.
@@ -422,7 +434,7 @@ def &&(x: Boolean): Boolean = sys.error("stub")
   *
   * @note This method evaluates both `a` and `b`, even if the result is already determined after evaluating `a`.
   */
-def |(x: Boolean): Boolean  = sys.error("stub")
+def |(x: Boolean): Boolean
 
 /**
   * Compares two Boolean expressions and returns `true` if both of them evaluate to true.
@@ -432,7 +444,7 @@ def |(x: Boolean): Boolean  = sys.error("stub")
   *
   * @note This method evaluates both `a` and `b`, even if the result is already determined after evaluating `a`.
   */
-def &(x: Boolean): Boolean  = sys.error("stub")
+def &(x: Boolean): Boolean
 
 /**
   * Compares two Boolean expressions and returns `true` if they evaluate to a different value.
@@ -441,12 +453,12 @@ def &(x: Boolean): Boolean  = sys.error("stub")
   *  - `a` is `true` and `b` is `false` or
   *  - `a` is `false` and `b` is `true`.
   */
-def ^(x: Boolean): Boolean  = sys.error("stub")
+def ^(x: Boolean): Boolean
 
-override def getClass(): Class[Boolean] = sys.error("stub")
+override def getClass(): Class[Boolean] = null
     """.trim.lines.toList
 
-    def objectLines = interpolate(allCompanions).lines.toList
+    def objectLines = interpolate(allCompanions + "\n" + nonUnitCompanions).lines.toList
   }
   object U extends AnyValRep("Unit", None, "void") {
     override def classDoc = """
@@ -457,7 +469,7 @@ override def getClass(): Class[Boolean] = sys.error("stub")
  */
 """
     def classLines  = List(
-      """override def getClass(): Class[Unit] = sys.error("stub")"""
+      """override def getClass(): Class[Unit] = null"""
     )
     def objectLines = interpolate(allCompanions).lines.toList
 

@@ -65,6 +65,7 @@ abstract class SelectiveCPSTransform extends PluginComponent with
 
 
   class CPSTransformer(unit: CompilationUnit) extends TypingTransformer(unit) {
+    private val patmatTransformer = patmat.newTransformer(unit)
 
     override def transform(tree: Tree): Tree = {
       if (!cpsEnabled) return tree
@@ -212,7 +213,7 @@ abstract class SelectiveCPSTransform extends PluginComponent with
           val catch2 = localTyper.typedCases(List(catchIfDefined), ThrowableClass.tpe, targettp)
           //typedCases(tree, catches, ThrowableClass.tpe, pt)
 
-          localTyper.typed(Block(List(funDef), treeCopy.Try(tree, treeCopy.Block(block1, stms, expr2), catch2, finalizer1)))
+          patmatTransformer.transform(localTyper.typed(Block(List(funDef), treeCopy.Try(tree, treeCopy.Block(block1, stms, expr2), catch2, finalizer1))))
 
 
 /*
@@ -346,7 +347,7 @@ abstract class SelectiveCPSTransform extends PluginComponent with
                   //   val <lhs> = ctx.getTrivialValue; ...    <--- TODO: try/catch ??? don't bother for the moment...
                   // else
                   //   ctx.flatMap { <lhs> => ... }
-                  val ctxSym = currentOwner.newValue(vd.symbol.name append cpsNames.shiftSuffix).setInfo(rhs1.tpe)
+                  val ctxSym = currentOwner.newValue(newTermName("" + vd.symbol.name + cpsNames.shiftSuffix)).setInfo(rhs1.tpe)
                   val ctxDef = localTyper.typed(ValDef(ctxSym, rhs1))
                   def ctxRef = localTyper.typed(Ident(ctxSym))
                   val argSym = currentOwner.newValue(vd.symbol.name).setInfo(tpe)

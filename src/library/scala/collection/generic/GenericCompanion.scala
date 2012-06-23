@@ -16,11 +16,11 @@ import language.higherKinds
  *  represent an unconstrained higher-kinded type. Typically
  *  such classes inherit from trait `GenericTraversableTemplate`.
  *  @tparam  CC   The type constructor representing the collection class.
- *  @see GenericTraversableTemplate
+ *  @see [[scala.collection.generic.GenericTraversableTemplate]]
  *  @author Martin Odersky
  *  @since 2.8
  *  @define coll  collection
- *  @define Coll  CC
+ *  @define Coll  `CC`
  */
 abstract class GenericCompanion[+CC[X] <: GenTraversable[X]] {
   /** The underlying collection type with unknown element type */

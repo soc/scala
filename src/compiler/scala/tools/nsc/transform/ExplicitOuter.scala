@@ -149,7 +149,7 @@ abstract class ExplicitOuter extends InfoTransform
       if (sym.owner.isTrait && ((sym hasFlag (ACCESSOR | SUPERACCESSOR)) || sym.isModule)) { // 5
         sym.makeNotPrivate(sym.owner)
       }
-      if (sym.owner.isTrait) sym setNotFlag PROTECTED // 6
+      if (sym.owner.isTrait && sym.isProtected) sym setFlag notPROTECTED // 6
       if (sym.isClassConstructor && isInner(sym.owner)) { // 1
         val p = sym.newValueParameter(innerClassConstructorParamName, sym.pos)
                    .setInfo(sym.owner.outerClass.thisType)
@@ -385,7 +385,7 @@ abstract class ExplicitOuter extends InfoTransform
         method setInfo new MethodType(params, BooleanClass.tpe)
 
         localTyper typed {
-          DEF(method) === guard.changeOwner(currentOwner -> method).substTreeSyms(vs zip params: _*)
+          DEF(method) === guard.changeOwner(currentOwner -> method).substituteSymbols(vs, params)
         }
       }
 
@@ -410,18 +410,15 @@ abstract class ExplicitOuter extends InfoTransform
           (CASE(transform(strippedPat)) IF gdcall) ==> transform(body)
         }
 
-      def isUncheckedAnnotation(tpe: Type) = tpe hasAnnotation UncheckedClass
-      def isSwitchAnnotation(tpe: Type) = tpe hasAnnotation SwitchClass
-
       val (checkExhaustive, requireSwitch) = nselector match {
         case Typed(nselector1, tpt) =>
-          val unchecked = isUncheckedAnnotation(tpt.tpe)
+          val unchecked = treeInfo.isUncheckedAnnotation(tpt.tpe)
           if (unchecked)
             nselector = nselector1
 
           // Don't require a tableswitch if there are 1-2 casedefs
           // since the matcher intentionally emits an if-then-else.
-          (!unchecked, isSwitchAnnotation(tpt.tpe) && ncases.size > 2)
+          (!unchecked, treeInfo.isSwitchAnnotation(tpt.tpe) && ncases.size > 2)
         case _  =>
           (true, false)
       }
@@ -448,8 +445,8 @@ abstract class ExplicitOuter extends InfoTransform
     override def transform(tree: Tree): Tree = {
       val sym = tree.symbol
       if (sym != null && sym.isType) { //(9)
-        sym setNotFlag PRIVATE
-        sym setNotFlag PROTECTED
+        if (sym.isPrivate) sym setFlag notPRIVATE
+        if (sym.isProtected) sym setFlag notPROTECTED
       }
       tree match {
         case Template(parents, self, decls) =>

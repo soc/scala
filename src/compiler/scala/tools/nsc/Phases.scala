@@ -6,7 +6,7 @@
 package scala.tools.nsc
 
 import symtab.Flags
-import util.TableDef
+import reflect.internal.util.TableDef
 import language.postfixOps
 
 object Phases {
@@ -14,7 +14,7 @@ object Phases {
 
   /** A class for tracking something about each phase.
    */
-  class Model[T: Manifest] {
+  class Model[T] {
     case class Cell(ph: Phase, value: T) {
       def name = ph.name
       def id = ph.id

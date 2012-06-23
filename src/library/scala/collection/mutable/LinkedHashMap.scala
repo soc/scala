@@ -14,7 +14,7 @@ package mutable
 import generic._
 
 /** $factoryInfo
- *  @define Coll LinkedHashMap
+ *  @define Coll `LinkedHashMap`
  *  @define coll linked hash map
  */
 object LinkedHashMap extends MutableMapFactory[LinkedHashMap] {
@@ -28,7 +28,7 @@ object LinkedHashMap extends MutableMapFactory[LinkedHashMap] {
  *  @tparam A    the type of the keys contained in this hash map.
  *  @tparam B    the type of the values assigned to keys in this hash map.
  *
- *  @define Coll LinkedHashMap
+ *  @define Coll `LinkedHashMap`
  *  @define coll linked hash map
  *  @define thatinfo the class of the returned collection. In the standard library configuration,
  *    `That` is always `LinkedHashMap[A, B]` if the elements contained in the resulting collection are
@@ -49,7 +49,8 @@ class LinkedHashMap[A, B] extends AbstractMap[A, B]
                              with Map[A, B]
                              with MapLike[A, B, LinkedHashMap[A, B]]
                              with HashTable[A, LinkedEntry[A, B]]
-                             with Serializable {
+                             with Serializable
+{
 
   override def empty = LinkedHashMap.empty[A, B]
   override def size = tableSize
@@ -107,7 +108,25 @@ class LinkedHashMap[A, B] extends AbstractMap[A, B]
       if (hasNext) { val res = (cur.key, cur.value); cur = cur.later; res }
       else Iterator.empty.next
   }
+  
+  protected class FilteredKeys(p: A => Boolean) extends super.FilteredKeys(p) {
+    override def empty = LinkedHashMap.empty
+  }
+  
+  override def filterKeys(p: A => Boolean): scala.collection.Map[A, B] = new FilteredKeys(p)
 
+  protected class MappedValues[C](f: B => C) extends super.MappedValues[C](f) {
+    override def empty = LinkedHashMap.empty
+  }
+  
+  override def mapValues[C](f: B => C): scala.collection.Map[A, C] = new MappedValues(f)
+  
+  protected class DefaultKeySet extends super.DefaultKeySet {
+    override def empty = LinkedHashSet.empty
+  }
+  
+  override def keySet: scala.collection.Set[A] = new DefaultKeySet
+  
   override def keysIterator: Iterator[A] = new AbstractIterator[A] {
     private var cur = firstEntry
     def hasNext = cur ne null
@@ -128,6 +147,14 @@ class LinkedHashMap[A, B] extends AbstractMap[A, B]
     var cur = firstEntry
     while (cur ne null) {
       f((cur.key, cur.value))
+      cur = cur.later
+    }
+  }
+
+  protected override def foreachEntry[C](f: Entry => C) {
+    var cur = firstEntry
+    while (cur ne null) {
+      f(cur)
       cur = cur.later
     }
   }

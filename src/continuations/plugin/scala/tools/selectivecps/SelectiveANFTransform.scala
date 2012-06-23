@@ -9,6 +9,8 @@ import scala.tools.nsc.plugins._
 
 import scala.tools.nsc.ast._
 
+import scala.collection.mutable.ListBuffer
+
 /**
  * In methods marked @cps, explicitly name results of calls to other @cps methods
  */
@@ -46,10 +48,20 @@ abstract class SelectiveANFTransform extends PluginComponent with Transform with
         // this would cause infinite recursion. But we could remove the
         // ValDef case here.
 
-        case dd @ DefDef(mods, name, tparams, vparamss, tpt, rhs) =>
+        case dd @ DefDef(mods, name, tparams, vparamss, tpt, rhs0) =>
           debuglog("transforming " + dd.symbol)
 
           atOwner(dd.symbol) {
+            val tailReturns = ListBuffer[Tree]()
+            val rhs = removeTailReturn(rhs0, tailReturns)
+            // throw an error if there is a Return tree which is not in tail position
+            rhs0 foreach {
+              case r @ Return(_) =>
+                if (!tailReturns.contains(r))
+                  unit.error(r.pos, "return expressions in CPS code must be in tail position")
+              case _ => /* do nothing */
+            }
+            
             val rhs1 = transExpr(rhs, None, getExternalAnswerTypeAnn(tpt.tpe))
 
             debuglog("result "+rhs1)
@@ -110,8 +122,7 @@ abstract class SelectiveANFTransform extends PluginComponent with Transform with
                 transExpr(body, None, ext)
             }
 
-            debuglog("anf result "+body1)
-            debuglog("result is of type "+body1.tpe)
+            debuglog("anf result "+body1+"\nresult is of type "+body1.tpe)
 
             treeCopy.Function(ff, transformValDefs(vparams), body1)
           }
@@ -142,7 +153,6 @@ abstract class SelectiveANFTransform extends PluginComponent with Transform with
           transExpr(tree, None, None)
 
         case _ =>
-
           if (hasAnswerTypeAnn(tree.tpe)) {
             if (!cpsAllowed)
               unit.error(tree.pos, "cps code not allowed here / " + tree.getClass + " / " + tree)
@@ -154,7 +164,6 @@ abstract class SelectiveANFTransform extends PluginComponent with Transform with
           super.transform(tree)
       }
     }
-
 
     def transExpr(tree: Tree, cpsA: CPSInfo, cpsR: CPSInfo): Tree = {
       transTailValue(tree, cpsA, cpsR) match {
@@ -241,6 +250,8 @@ abstract class SelectiveANFTransform extends PluginComponent with Transform with
         // where D$idef = def L$i(..) = {L$i.body; L${i+1}(..)}
 
         case ldef @ LabelDef(name, params, rhs) =>
+          // println("trans LABELDEF "+(name, params, tree.tpe, hasAnswerTypeAnn(tree.tpe)))
+          // TODO why does the labeldef's type have a cpsMinus annotation, whereas the rhs does not? (BYVALmode missing/too much somewhere?)
           if (hasAnswerTypeAnn(tree.tpe)) {
             // currentOwner.newMethod(name, tree.pos, Flags.SYNTHETIC) setInfo ldef.symbol.info
             val sym    = ldef.symbol resetFlag Flags.LABEL
@@ -355,7 +366,20 @@ abstract class SelectiveANFTransform extends PluginComponent with Transform with
                 List(expr)
               )
             )
-            return ((stms, call))
+            // This is today's sick/meaningless heuristic for spotting breakdown so
+            // we don't proceed until stack traces start draping themselves over everything.
+            // If there are wildcard types in the tree and B == Nothing, something went wrong.
+            // (I thought WildcardTypes would be enough, but nope.  'reset0 { 0 }' has them.)
+            //
+            // Code as simple as    reset((_: String).length)
+            // will crash meaninglessly without this check.  See SI-3718.
+            //
+            // TODO - obviously this should be done earlier, differently, or with
+            // a more skilled hand.  Most likely, all three.
+            if ((b.typeSymbol eq NothingClass) && call.tpe.exists(_ eq WildcardType))
+              unit.error(tree.pos, "cannot cps-transform malformed (possibly in shift/reset placement) expression")
+            else
+              return ((stms, call))
           }
           catch {
             case ex:TypeError =>
@@ -456,10 +480,11 @@ abstract class SelectiveANFTransform extends PluginComponent with Transform with
 
       val (anfStats, anfExpr) = rec(stms, cpsA, List())
       // println("\nanf-block:\n"+ ((stms :+ expr) mkString ("{", "\n", "}")) +"\nBECAME\n"+ ((anfStats :+ anfExpr) mkString ("{", "\n", "}")))
-
+      // println("synth case? "+ (anfStats map (t => (t, t.isDef, gen.hasSynthCaseSymbol(t)))))
       // SUPER UGLY HACK: handle virtpatmat-style matches, whose labels have already been turned into DefDefs
       if (anfStats.nonEmpty && (anfStats forall (t => !t.isDef || gen.hasSynthCaseSymbol(t)))) {
         val (prologue, rest) = (anfStats :+ anfExpr) span (s => !s.isInstanceOf[DefDef]) // find first case
+        // println("rest: "+ rest)
         // val (defs, calls) = rest partition (_.isInstanceOf[DefDef])
         if (rest nonEmpty){
           // the filter drops the ()'s emitted when transValue encountered a LabelDef

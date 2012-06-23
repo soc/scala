@@ -821,7 +821,7 @@ abstract class GenICode extends SubComponent  {
               ctx2
 
             case _ =>
-              abort("Cannot instantiate " + tpt + "of kind: " + generatedType)
+              abort("Cannot instantiate " + tpt + " of kind: " + generatedType)
           }
 
         case Apply(fun @ _, List(expr)) if (definitions.isBox(fun.symbol)) =>
@@ -1208,7 +1208,7 @@ abstract class GenICode extends SubComponent  {
         if (!tree.symbol.isPackageClass) tree.symbol
         else tree.symbol.info.member(nme.PACKAGE) match {
           case NoSymbol => assert(false, "Cannot use package as value: " + tree) ; NoSymbol
-          case s        => Console.err.println("Bug: found package class where package object expected.  Converting.") ; s.moduleClass
+          case s        => debugwarn("Bug: found package class where package object expected.  Converting.") ; s.moduleClass
         }
       )
       debuglog("LOAD_MODULE from %s: %s".format(tree.shortClass, sym))
@@ -2225,7 +2225,7 @@ abstract class GenICode extends SubComponent  {
        * jumps to the given basic block.
        */
       def patch(code: Code) {
-        val map = toPatch map (i => (i -> patch(i))) toMap;
+        val map = mapFrom(toPatch)(patch)
         code.blocks foreach (_ subst map)
       }
 

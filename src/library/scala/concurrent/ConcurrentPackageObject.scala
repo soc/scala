@@ -8,10 +8,9 @@
 
 package scala.concurrent
 
-import java.util.concurrent.{ Executors, ExecutorService, ThreadFactory }
+import java.util.concurrent.{ Executors, Executor, ThreadFactory }
 import scala.concurrent.forkjoin.{ ForkJoinPool, ForkJoinWorkerThread }
 import scala.concurrent.util.Duration
-import ConcurrentPackageObject._
 import language.implicitConversions
 
 
@@ -20,9 +19,9 @@ import language.implicitConversions
 abstract class ConcurrentPackageObject {
   /** A global execution environment for executing lightweight tasks.
    */
-  lazy val defaultExecutionContext = new impl.ExecutionContextImpl(null)
+  lazy val defaultExecutionContext: ExecutionContext with Executor = impl.ExecutionContextImpl.fromExecutor(null: Executor)
 
-  private val currentExecutionContext = new ThreadLocal[ExecutionContext]
+  val currentExecutionContext = new ThreadLocal[ExecutionContext]
   
   val handledFutureException: PartialFunction[Throwable, Throwable] = {
     case t: Throwable if isFutureThrowable(t) => t
@@ -36,19 +35,6 @@ abstract class ConcurrentPackageObject {
     case _                                      => true
   }
 
-  private[concurrent] def resolveEither[T](source: Either[Throwable, T]): Either[Throwable, T] = source match {
-    case Left(t) => resolver(t)
-    case _       => source
-  }
-
-  private[concurrent] def resolver[T](throwable: Throwable): Either[Throwable, T] = throwable match {
-    case t: scala.runtime.NonLocalReturnControl[_] => Right(t.value.asInstanceOf[T])
-    case t: scala.util.control.ControlThrowable    => Left(new ExecutionException("Boxed ControlThrowable", t))
-    case t: InterruptedException                   => Left(new ExecutionException("Boxed InterruptedException", t))
-    case e: Error                                  => Left(new ExecutionException("Boxed Error", e))
-    case t                                         => Left(t)
-  }
-  
   /* concurrency constructs */
 
   /** Starts an asynchronous computation and returns a `Future` object with the result of that computation.
@@ -82,7 +68,7 @@ abstract class ConcurrentPackageObject {
    *  - TimeoutException - in the case that the blockable object timed out
    */
   def blocking[T](body: =>T): T =
-    blocking(impl.Future.body2awaitable(body), Duration.fromNanos(0))
+    blocking(impl.Future.body2awaitable(body), Duration.Inf)
 
   /** Blocks on an awaitable object.
    *
@@ -93,26 +79,12 @@ abstract class ConcurrentPackageObject {
    *  - InterruptedException - in the case that a wait within the blockable object was interrupted
    *  - TimeoutException - in the case that the blockable object timed out
    */
-  def blocking[T](awaitable: Awaitable[T], atMost: Duration): T =
+  def blocking[T](awaitable: Awaitable[T], atMost: Duration): T = {
     currentExecutionContext.get match {
-      case null => Await.result(awaitable, atMost)
+      case null => awaitable.result(atMost)(Await.canAwaitEvidence)
       case ec => ec.internalBlockingCall(awaitable, atMost)
     }
+  }
 
   @inline implicit final def int2durationops(x: Int): DurationOps = new DurationOps(x)
-}
-
-private[concurrent] object ConcurrentPackageObject {
-  // TODO, docs, return type
-  // Note that having this in the package object led to failures when
-  // compiling a subset of sources; it seems that the wildcard is not
-  // properly handled, and you get messages like "type _$1 defined twice".
-  // This is consistent with other package object breakdowns.
-  // private val resolverFunction: PartialFunction[Throwable, Either[Throwable, _]] = {
-  //   case t: scala.runtime.NonLocalReturnControl[_] => Right(t.value)
-  //   case t: scala.util.control.ControlThrowable    => Left(new ExecutionException("Boxed ControlThrowable", t))
-  //   case t: InterruptedException                   => Left(new ExecutionException("Boxed InterruptedException", t))
-  //   case e: Error                                  => Left(new ExecutionException("Boxed Error", e))
-  //   case t                                         => Left(t)
-  // }
 }

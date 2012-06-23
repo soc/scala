@@ -165,7 +165,7 @@ self =>
 
   /** The implementation class of the set returned by `keySet`.
    */
-  protected class DefaultKeySet extends AbstractSet[A] with Set[A] {
+  protected class DefaultKeySet extends AbstractSet[A] with Set[A] with Serializable {
     def contains(key : A) = self.contains(key)
     def iterator = keysIterator
     def + (elem: A): Set[A] = (Set[A]() ++ this + elem).asInstanceOf[Set[A]] // !!! concrete overrides abstract problem
@@ -200,7 +200,7 @@ self =>
 
   /** The implementation class of the iterable returned by `values`.
    */
-  protected class DefaultValuesIterable extends AbstractIterable[B] with Iterable[B] {
+  protected class DefaultValuesIterable extends AbstractIterable[B] with Iterable[B] with Serializable {
     def iterator = valuesIterator
     override def size = self.size
     override def foreach[C](f: B => C) = self.valuesIterator foreach f
@@ -227,30 +227,34 @@ self =>
   def default(key: A): B =
     throw new NoSuchElementException("key not found: " + key)
 
-  /** Filters this map by retaining only keys satisfying a predicate.
-   *  @param  p   the predicate used to test keys
-   *  @return an immutable map consisting only of those key value pairs of this map where the key satisfies
-   *          the predicate `p`. The resulting map wraps the original map without copying any elements.
-   */
-  def filterKeys(p: A => Boolean): Map[A, B] = new AbstractMap[A, B] with DefaultMap[A, B] {
+  protected class FilteredKeys(p: A => Boolean) extends AbstractMap[A, B] with DefaultMap[A, B] {
     override def foreach[C](f: ((A, B)) => C): Unit = for (kv <- self) if (p(kv._1)) f(kv)
     def iterator = self.iterator.filter(kv => p(kv._1))
     override def contains(key: A) = self.contains(key) && p(key)
     def get(key: A) = if (!p(key)) None else self.get(key)
   }
-
-  /** Transforms this map by applying a function to every retrieved value.
-   *  @param  f   the function used to transform values of this map.
-   *  @return a map view which maps every key of this map
-   *          to `f(this(key))`. The resulting map wraps the original map without copying any elements.
+  
+  /** Filters this map by retaining only keys satisfying a predicate.
+   *  @param  p   the predicate used to test keys
+   *  @return an immutable map consisting only of those key value pairs of this map where the key satisfies
+   *          the predicate `p`. The resulting map wraps the original map without copying any elements.
    */
-  def mapValues[C](f: B => C): Map[A, C] = new AbstractMap[A, C] with DefaultMap[A, C] {
+  def filterKeys(p: A => Boolean): Map[A, B] = new FilteredKeys(p)
+
+  protected class MappedValues[C](f: B => C) extends AbstractMap[A, C] with DefaultMap[A, C] {
     override def foreach[D](g: ((A, C)) => D): Unit = for ((k, v) <- self) g((k, f(v)))
     def iterator = for ((k, v) <- self.iterator) yield (k, f(v))
     override def size = self.size
     override def contains(key: A) = self.contains(key)
     def get(key: A) = self.get(key).map(f)
   }
+  
+  /** Transforms this map by applying a function to every retrieved value.
+   *  @param  f   the function used to transform values of this map.
+   *  @return a map view which maps every key of this map
+   *          to `f(this(key))`. The resulting map wraps the original map without copying any elements.
+   */
+  def mapValues[C](f: B => C): Map[A, C] = new MappedValues(f)
 
   // The following 5 operations (updated, two times +, two times ++) should really be
   // generic, returning This[B]. We need better covariance support to express that though.
@@ -280,14 +284,14 @@ self =>
    *
    *  @usecase  def + (kvs: (A, B)*): Map[A, B]
    *    @inheritdoc
-   *    @param    the key/value pairs
+   *    @param    kvs the key/value pairs
    */
   def + [B1 >: B] (kv1: (A, B1), kv2: (A, B1), kvs: (A, B1) *): Map[A, B1] =
     this + kv1 + kv2 ++ kvs
 
   /** Adds all key/value pairs in a traversable collection to this map, returning a new map.
    *
-   *  @param    kvs the collection containing the added key/value pairs
+   *  @param    xs  the collection containing the added key/value pairs
    *  @tparam   B1  the type of the added values
    *  @return   a new map with the given bindings added to this map
    *
@@ -296,9 +300,6 @@ self =>
    */
   def ++[B1 >: B](xs: GenTraversableOnce[(A, B1)]): Map[A, B1] =
     ((repr: Map[A, B1]) /: xs.seq) (_ + _)
-
-  @bridge
-  def ++[B1 >: B](xs: TraversableOnce[(A, B1)]): Map[A, B1] = ++(xs: GenTraversableOnce[(A, B1)])
 
   /** Returns a new map with all key/value pairs for which the predicate
    *  `p` returns `true`.

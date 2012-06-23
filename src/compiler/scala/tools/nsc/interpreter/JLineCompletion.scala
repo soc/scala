@@ -16,7 +16,8 @@ import collection.mutable.ListBuffer
 class JLineCompletion(val intp: IMain) extends Completion with CompletionOutput {
   val global: intp.global.type = intp.global
   import global._
-  import definitions.{ PredefModule, RootClass, AnyClass, AnyRefClass, ScalaPackage, JavaLangPackage, getModuleIfDefined }
+  import definitions.{ PredefModule, AnyClass, AnyRefClass, ScalaPackage, JavaLangPackage }
+  import rootMirror.{ RootClass, getModuleIfDefined }
   type ExecResult = Any
   import intp.{ debugging }
 
@@ -279,24 +280,6 @@ class JLineCompletion(val intp: IMain) extends Completion with CompletionOutput 
     if (parsed.isEmpty) xs map ("." + _) else xs
   }
 
-  // chasing down results which won't parse
-  // This used to work fine, now it reports a type error before any
-  // exception gets to us. See SI-5657.  Don't have time to deal with
-  // it, so disabling everything.
-  def execute(line: String): Option[ExecResult] = {
-    return None // disabled
-
-    val parsed = Parsed(line)
-    def noDotOrSlash = line forall (ch => ch != '.' && ch != '/')
-
-    if (noDotOrSlash) None  // we defer all unqualified ids to the repl.
-    else {
-      (ids executionFor parsed) orElse
-      (rootClass executionFor parsed) orElse
-      (FileCompletion executionFor line)
-    }
-  }
-
   // generic interface for querying (e.g. interpreter loop, testing)
   def completions(buf: String): List[String] =
     topLevelFor(Parsed.dotted(buf + ".", buf.length + 1))
@@ -360,15 +343,9 @@ class JLineCompletion(val intp: IMain) extends Completion with CompletionOutput 
         if (!looksLikeInvocation(buf)) None
         else tryCompletion(Parsed.dotted(buf drop 1, cursor), lastResultFor)
 
-      def regularCompletion = tryCompletion(mkDotted, topLevelFor)
-      def fileCompletion    =
-        if (!looksLikePath(buf)) None
-        else tryCompletion(mkUndelimited, FileCompletion completionsFor _.buffer)
-
       def tryAll = (
                   lastResultCompletion
-           orElse regularCompletion
-           orElse fileCompletion
+           orElse tryCompletion(mkDotted, topLevelFor)
         getOrElse Candidates(cursor, Nil)
       )
 

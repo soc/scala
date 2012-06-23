@@ -102,8 +102,6 @@ class ListSet[A] extends AbstractSet[A]
     if (xs.isEmpty) this
     else (new ListSet.ListSetBuilder(this) ++= xs.seq).result
 
-  @bridge def ++(xs: TraversableOnce[A]): ListSet[A] = ++(xs: GenTraversableOnce[A]): ListSet[A]
-
   private[ListSet] def unchecked_+(e: A): ListSet[A] = new Node(e)
   private[ListSet] def unchecked_outer: ListSet[A] =
     throw new NoSuchElementException("Empty ListSet has no outer pointer")
@@ -159,7 +157,7 @@ class ListSet[A] extends AbstractSet[A]
 
     /** Checks if this set contains element `elem`.
      *
-     *  @param  elem    the element to check for membership.
+     *  @param  e       the element to check for membership.
      *  @return `'''true'''`, iff `elem` is contained in this set.
      */
     override def contains(e: A) = containsInternal(this, e)

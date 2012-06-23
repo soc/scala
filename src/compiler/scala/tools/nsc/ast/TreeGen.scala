@@ -177,6 +177,22 @@ abstract class TreeGen extends reflect.internal.TreeGen with TreeDSL {
   def mkSysErrorCall(message: String): Tree =
     mkMethodCall(Sys_error, List(Literal(Constant(message))))
 
+  /** A creator for a call to a scala.reflect.Manifest or ClassManifest factory method.
+   *
+   *  @param    full          full or partial manifest (target will be Manifest or ClassManifest)
+   *  @param    constructor   name of the factory method (e.g. "classType")
+   *  @param    tparg         the type argument
+   *  @param    args          value arguments
+   *  @return   the tree
+   */
+  def mkManifestFactoryCall(full: Boolean, constructor: String, tparg: Type, args: List[Tree]): Tree =
+    mkMethodCall(
+      if (full) FullManifestModule else PartialManifestModule,
+      newTermName(constructor),
+      List(tparg),
+      args
+    )
+
   /** Make a synchronized block on 'monitor'. */
   def mkSynchronized(monitor: Tree, body: Tree): Tree =
     Apply(Select(monitor, Object_synchronized), List(body))
@@ -192,6 +208,7 @@ abstract class TreeGen extends reflect.internal.TreeGen with TreeDSL {
       else AppliedTypeTree(Ident(clazz), targs map TypeTree)
     ))
   }
+  def mkSuperSelect = Select(Super(This(tpnme.EMPTY), tpnme.EMPTY), nme.CONSTRUCTOR)
 
   def wildcardStar(tree: Tree) =
     atPos(tree.pos) { Typed(tree, Ident(tpnme.WILDCARD_STAR)) }
@@ -220,7 +237,7 @@ abstract class TreeGen extends reflect.internal.TreeGen with TreeDSL {
     mkMethodCall(
       PredefModule,
       wrapArrayMethodName(elemtp),
-      if (isScalaValueType(elemtp)) Nil else List(elemtp),
+      if (isPrimitiveValueType(elemtp)) Nil else List(elemtp),
       List(tree)
     )
   }
@@ -245,7 +262,7 @@ abstract class TreeGen extends reflect.internal.TreeGen with TreeDSL {
    *  elem type elemtp to expected type pt.
    */
   def mkCastArray(tree: Tree, elemtp: Type, pt: Type) =
-    if (elemtp.typeSymbol == AnyClass && isScalaValueType(tree.tpe.typeArgs.head))
+    if (elemtp.typeSymbol == AnyClass && isPrimitiveValueType(tree.tpe.typeArgs.head))
       mkCast(mkRuntimeCall(nme.toObjectArray, List(tree)), pt)
     else
       mkCast(tree, pt)
@@ -336,23 +353,19 @@ abstract class TreeGen extends reflect.internal.TreeGen with TreeDSL {
     else Block(prefix, containing) setPos (prefix.head.pos union containing.pos)
   }
 
-  /** Return a double-checked locking idiom around the syncBody tree. It guards with `cond` and
+  /** Return the synchronized part of the double-checked locking idiom around the syncBody tree. It guards with `cond` and
    *  synchronizez on `clazz.this`. Additional statements can be included after initialization,
    *  (outside the synchronized block).
    *
    *  The idiom works only if the condition is using a volatile field.
    *  @see http://www.cs.umd.edu/~pugh/java/memoryModel/DoubleCheckedLocking.html
    */
-  def mkDoubleCheckedLocking(clazz: Symbol, cond: Tree, syncBody: List[Tree], stats: List[Tree]): Tree =
-    mkDoubleCheckedLocking(mkAttributedThis(clazz), cond, syncBody, stats)
-
-  def mkDoubleCheckedLocking(attrThis: Tree, cond: Tree, syncBody: List[Tree], stats: List[Tree]): Tree = {
-    If(cond,
-       Block(
-         mkSynchronized(
-           attrThis,
-           If(cond, Block(syncBody: _*), EmptyTree)) ::
-         stats: _*),
-       EmptyTree)
-  }
+  def mkSynchronizedCheck(clazz: Symbol, cond: Tree, syncBody: List[Tree], stats: List[Tree]): Tree =
+    mkSynchronizedCheck(mkAttributedThis(clazz), cond, syncBody, stats)
+    
+  def mkSynchronizedCheck(attrThis: Tree, cond: Tree, syncBody: List[Tree], stats: List[Tree]): Tree = 
+    Block(mkSynchronized(
+      attrThis,
+      If(cond, Block(syncBody: _*), EmptyTree)) ::
+      stats: _*)
 }

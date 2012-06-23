@@ -7,7 +7,7 @@ package scala.tools.nsc
 package matching
 
 import transform.ExplicitOuter
-import ast.{ TreePrinters, Trees }
+import ast.{ Printers, Trees }
 import java.io.{ StringWriter, PrintWriter }
 import annotation.elidable
 import language.postfixOps
@@ -31,7 +31,7 @@ trait MatchSupport extends ast.TreeDSL { self: ParallelMatching =>
   object Types {
     import definitions._
 
-    val subrangeTypes = Set(ByteClass, ShortClass, CharClass, IntClass)
+    val subrangeTypes = Set[Symbol](ByteClass, ShortClass, CharClass, IntClass)
 
     implicit class RichType(undecodedTpe: Type) {
       def tpe = decodedEqualsType(undecodedTpe)

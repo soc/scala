@@ -33,9 +33,6 @@ abstract class Document {
   /**
    * Format this document on `writer` and try to set line
    * breaks so that the result fits in `width` columns.
-   *
-   * @param width  ...
-   * @param writer ...
    */
   def format(width: Int, writer: Writer) {
     type FmtState = (Int, Boolean, Document)
@@ -91,6 +88,8 @@ abstract class Document {
       case (i, b, DocGroup(d)) :: z =>
         val fitsFlat = fits(width - k, (i, false, d) :: z)
         fmt(k, (i, !fitsFlat, d) :: z)
+      case _ =>
+        ()
     }
 
     fmt(0, (0, false, DocGroup(this)) :: Nil)

@@ -9,100 +9,71 @@ package runtime
 trait Reifiers {
   self: Context =>
 
-  import mirror._
+  val global: universe.type = universe
+  import universe._
   import definitions._
 
-  lazy val reflectMirrorPrefix: Tree = {
-    // [Eugene] how do I typecheck this without undergoing this tiresome (and, in general, incorrect) procedure?
-    val prefix: Tree = Select(Select(Ident(definitions.ScalaPackage), newTermName("reflect")), newTermName("mirror"))
-    val prefixTpe = typeCheck(TypeApply(Select(prefix, newTermName("asInstanceOf")), List(SingletonTypeTree(prefix)))).tpe
-    typeCheck(prefix) setType prefixTpe
+  lazy val basisUniverse: Tree = gen.mkBasisUniverseRef
+
+  lazy val runtimeUniverse: Tree = gen.mkRuntimeUniverseRef
+
+  def reifyTree(universe: Tree, mirror: Tree, tree: Tree): Tree = {
+    val result = scala.reflect.reify.`package`.reifyTree(self.universe)(callsiteTyper, universe, mirror, tree)
+    logFreeVars(enclosingPosition, result)
+    result
   }
 
-  def reifyTree(prefix: Tree, tree: Tree): Tree =
-    reifyTopLevel(prefix, tree)
-
-  def reifyType(prefix: Tree, tpe: Type, dontSpliceAtTopLevel: Boolean = false, requireConcreteTypeTag: Boolean = false): Tree =
-    reifyTopLevel(prefix, tpe, dontSpliceAtTopLevel, requireConcreteTypeTag)
-
-  def reifyErasure(tpe: Type): Tree = {
-    val positionBearer = enclosingMacros.find(c => c.macroApplication.pos != NoPosition).map(_.macroApplication).getOrElse(EmptyTree).asInstanceOf[Tree]
-    val typetagInScope = callsiteTyper.context.withMacrosDisabled(callsiteTyper.resolveTypeTag(positionBearer, singleType(Reflect_mirror.owner.thisPrefix, Reflect_mirror), tpe, full = true))
-    def typetagIsSynthetic(tree: Tree) = tree.isInstanceOf[Block] || (tree exists (sub => sub.symbol == TypeTagModule || sub.symbol == ConcreteTypeTagModule))
-    typetagInScope match {
-      case success if !success.isEmpty && !typetagIsSynthetic(success) =>
-        val factory = TypeApply(Select(Ident(ClassTagModule), nme.apply), List(TypeTree(tpe)))
-        Apply(factory, List(typetagInScope))
-      case _ =>
-        if (tpe.typeSymbol == ArrayClass) {
-          val componentTpe = tpe.typeArguments(0)
-          val componentTag = callsiteTyper.resolveClassTag(positionBearer, componentTpe)
-          Select(componentTag, nme.wrap)
-        } else {
-          // [Eugene] what's the intended behavior? there's no spec on ClassManifests
-          // for example, should we ban Array[T] or should we tag them with Array[AnyRef]?
-          // if its the latter, what should be the result of tagging Array[T] where T <: Int?
-          if (tpe.isSpliceable) throw new ReificationError(enclosingPosition, "tpe %s is an unresolved spliceable type".format(tpe))
-          // [Eugene] imho this logic should be moved into `erasure`
-          var erasure = tpe match {
-            case tpe if tpe.typeSymbol.isDerivedValueClass => tpe // [Eugene to Martin] is this correct?
-            case ConstantType(value) => tpe.widen.erasure
-            case _ => {
-              // [Eugene] magikz. needs review
-              var result = tpe.erasure.normalize // necessary to deal with erasures of HK types, typeConstructor won't work
-              result = result match {
-                case PolyType(undets, underlying) => existentialAbstraction(undets, underlying) // we don't want undets in the result
-                case _ => result
-              }
-              result
-            }
-          }
-          val factory = TypeApply(Select(Ident(ClassTagModule), nme.apply), List(TypeTree(tpe)))
-          Apply(factory, List(TypeApply(Select(Ident(PredefModule), nme.classOf), List(TypeTree(erasure)))))
-        }
-    }
- }
-
-  def unreifyTree(tree: Tree): Tree =
-    Select(tree, definitions.ExprEval)
-
-  def reifyTopLevel(prefix: Tree, reifee: Any, dontSpliceAtTopLevel: Boolean = false, requireConcreteTypeTag: Boolean = false): Tree = {
-    // [Eugene] the plumbing is not very pretty, but anyways factoring out the reifier seems like a necessary step to me
-    import scala.reflect.reify._
-    val reifier = mkReifier(mirror)(callsiteTyper, prefix, reifee, dontSpliceAtTopLevel, requireConcreteTypeTag)
-
-    try {
-      val result = reifier.reified
-      logFreeVars(enclosingPosition, result)
-      result
-    } catch {
-      case ex: reifier.ReificationError =>
-//        // this is a "soft" exception - it will normally be caught by the macro
-//        // consequently, we need to log the stack trace here, so that it doesn't get lost
-//        if (settings.Yreifydebug.value) {
-//          val message = new java.io.StringWriter()
-//          ex.printStackTrace(new java.io.PrintWriter(message))
-//          println(scala.compat.Platform.EOL + message)
-//        }
-        val xlated = new ReificationError(ex.pos, ex.msg)
-        xlated.setStackTrace(ex.getStackTrace)
-        throw xlated
-      case ex: reifier.UnexpectedReificationError =>
-        val xlated = new UnexpectedReificationError(ex.pos, ex.msg, ex.cause)
-        xlated.setStackTrace(ex.getStackTrace)
-        throw xlated
-    }
+  def reifyType(universe: Tree, mirror: Tree, tpe: Type, concrete: Boolean = false): Tree = {
+    val result = scala.reflect.reify.`package`.reifyType(self.universe)(callsiteTyper, universe, mirror, tpe, concrete)
+    logFreeVars(enclosingPosition, result)
+    result
   }
 
-  class ReificationError(var pos: Position, val msg: String) extends Throwable(msg)
+  def reifyRuntimeClass(tpe: Type, concrete: Boolean = true): Tree =
+    scala.reflect.reify.`package`.reifyRuntimeClass(universe)(callsiteTyper, tpe, concrete = concrete)
 
-  object ReificationError extends ReificationErrorExtractor {
-    def unapply(error: ReificationError): Option[(Position, String)] = Some((error.pos, error.msg))
+  def reifyEnclosingRuntimeClass: Tree =
+    scala.reflect.reify.`package`.reifyEnclosingRuntimeClass(universe)(callsiteTyper)
+
+  def unreifyTree(tree: Tree): Tree = {
+    assert(ExprSplice != NoSymbol)
+    Select(tree, ExprSplice)
   }
 
-  class UnexpectedReificationError(val pos: Position, val msg: String, val cause: Throwable = null) extends Throwable(msg, cause)
+  // fixme: if I put utils here, then "global" from utils' early initialization syntax
+  // and "global" that comes from here conflict with each other when incrementally compiling
+  // the problem is that both are pickled with the same owner - trait Reifiers
+  // and this upsets the compiler, so that oftentimes it throws assertion failures
+  // Martin knows the details
+  //
+  // object utils extends {
+  //   val global: self.global.type = self.global
+  //   val typer: global.analyzer.Typer = self.callsiteTyper
+  // } with scala.reflect.reify.utils.Utils
+  // import utils._
 
-  object UnexpectedReificationError extends UnexpectedReificationErrorExtractor {
-    def unapply(error: UnexpectedReificationError): Option[(Position, String, Throwable)] = Some((error.pos, error.msg, error.cause))
+  private def logFreeVars(position: Position, reification: Tree): Unit = {
+    object utils extends {
+      val global: self.global.type = self.global
+      val typer: global.analyzer.Typer = self.callsiteTyper
+    } with scala.reflect.reify.utils.Utils
+    import utils._
+
+    def logFreeVars(symtab: SymbolTable): Unit =
+      // logging free vars only when they are untyped prevents avalanches of duplicate messages
+      symtab.syms map (sym => symtab.symDef(sym)) foreach {
+        case FreeTermDef(_, _, binding, _, origin) if universe.settings.logFreeTerms.value && binding.tpe == null =>
+          reporter.echo(position, "free term: %s %s".format(showRaw(binding), origin))
+        case FreeTypeDef(_, _, binding, _, origin) if universe.settings.logFreeTypes.value && binding.tpe == null =>
+          reporter.echo(position, "free type: %s %s".format(showRaw(binding), origin))
+        case _ =>
+          // do nothing
+      }
+
+    if (universe.settings.logFreeTerms.value || universe.settings.logFreeTypes.value)
+      reification match {
+        case ReifiedTree(_, _, symtab, _, _, _, _) => logFreeVars(symtab)
+        case ReifiedType(_, _, symtab, _, _, _) => logFreeVars(symtab)
+      }
   }
 }

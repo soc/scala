@@ -13,6 +13,7 @@ import generic._
 import mutable.Builder
 import scala.util.matching.Regex
 import scala.math.ScalaNumber
+import reflect.ClassTag
 
 /** A companion object for the `StringLike` containing some constants.
  *  @since 2.8
@@ -33,7 +34,7 @@ import StringLike._
  *  @tparam Repr   The type of the actual collection inheriting `StringLike`.
  *
  *  @since 2.8
- *  @define Coll String
+ *  @define Coll `String`
  *  @define coll string
  *  @define orderDependent
  *  @define orderDependentFold
@@ -239,7 +240,7 @@ self =>
     else
       throw new IllegalArgumentException("For input string: \"null\"")
 
-  override def toArray[B >: Char : ClassManifest]: Array[B] =
+  override def toArray[B >: Char : ClassTag]: Array[B] =
     toString.toCharArray.asInstanceOf[Array[B]]
 
   private def unwrapArg(arg: Any): AnyRef = arg match {
@@ -274,7 +275,7 @@ self =>
    *    `scala.BigDecimal`) are unwrapped to pass a type which `Formatter`
    *    understands.
    *
-   *  @param locale an instance of `java.util.Locale`
+   *  @param l    an instance of `java.util.Locale`
    *  @param args the arguments used to instantiating the pattern.
    *  @throws `java.lang.IllegalArgumentException`
    */

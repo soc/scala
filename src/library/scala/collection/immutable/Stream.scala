@@ -177,7 +177,7 @@ import language.implicitConversions
  *  section on `Streams` for more information.
 
  *  @define naturalsEx def naturalsFrom(i: Int): Stream[Int] = i #:: naturalsFrom(i + 1)
- *  @define Coll Stream
+ *  @define Coll `Stream`
  *  @define coll stream
  *  @define orderDependent
  *  @define orderDependentFold
@@ -716,8 +716,8 @@ self =>
   /** A substream starting at index `from` and extending up to (but not including)
    *  index `until`.  This returns a `Stream` that is lazily evaluated.
    *
-   * @param start   The index of the first element of the returned subsequence
-   * @param end     The index of the element following the returned subsequence
+   * @param from    The index of the first element of the returned subsequence
+   * @param until   The index of the element following the returned subsequence
    * @return A new string containing the elements requested from `start` until
    * `end`.
    *
@@ -805,9 +805,9 @@ self =>
     these
   }
 
-  /** Builds a new stream from this stream in which any duplicates (wrt to ==)
-   * have been removed.  Among duplicate elements, only the first one is
-   * retained in the resulting `Stream`.
+  /** Builds a new stream from this stream in which any duplicates (as
+   * determined by `==`) have been removed. Among duplicate elements, only the
+   * first one is retained in the resulting `Stream`.
    *
    * @return A new `Stream` representing the result of applying distinctness to
    * the original `Stream`.
