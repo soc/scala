@@ -12,6 +12,15 @@ import scala.reflect.{ api, base, runtime }
 import java.net.URL
 // import scala.annotation.{ implicitWeight => weight }
 
+class ReplEnv[T <: ReplGlobal](val global: T) extends ReplUniverseOps with TagWrappers with Prettifiers with TreeDSL {
+  @weight(-2) implicit def replPrinting[T](x: T)(implicit pretty: Prettifier[T] = Prettifier.default[T]) =
+    new SinglePrettifierClass[T](x)
+
+  @weight(-1) implicit def replMultiPrinting[T: Prettifier](xs: IterableOnce[T]): MultiPrettifierClass[T] =
+    new MultiPrettifierClass[T](xs.toSeq)
+  @weight(-1) implicit def replPrettifier[T] : Prettifier[T] = Prettifier.default[T]
+}
+
 trait ReplUniverseOps {
   val global: api.Universe
   import global._
@@ -79,18 +88,7 @@ class StdReplVals(val r: ILoop) {
   def trees(code: String)    = intp parse code
   def seenTypeOf(id: String) = intp.typeOfExpression(id)
 
-  class ReplEnv(val global: intp.global.type) extends ReplUniverseOps with TagWrappers with Prettifiers {
-    @weight(-2) implicit def replPrinting[T](x: T)(implicit pretty: Prettifier[T] = Prettifier.default[T]) =
-      new SinglePrettifierClass[T](x)
-
-    @weight(-1) implicit def replMultiPrinting[T: Prettifier](xs: IterableOnce[T]): MultiPrettifierClass[T] =
-      new MultiPrettifierClass[T](xs.toSeq)
-    @weight(-1) implicit def replPrettifier[T] : Prettifier[T] = Prettifier.default[T]
-  }
-
-  lazy val replenv = new ReplEnv(global)
-
-  object treedsl extends { val global: intp.global.type = intp.global } with TreeDSL { }
+  lazy val replenv = new ReplEnv[intp.global.type](global)
 
   def lastRequest = intp.lastRequest
 }

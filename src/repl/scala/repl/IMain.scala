@@ -114,9 +114,9 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
     finally currentSettings = saved
   }
 
-  def mostRecentLine = prevRequestList match {
-    case Nil      => ""
-    case req :: _ => req.originalLine
+  def mostRecentLine = lastRequest match {
+    case null   => ""
+    case req    => req.originalLine
   }
   def rerunWith(names: String*) = {
     savingSettings((ss: Settings) => {
@@ -301,7 +301,7 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
 
   /** Most recent tree handled which wasn't wholly synthetic. */
   private def mostRecentlyHandledTree: Option[Tree] = {
-    prevRequests.reverse foreach { req =>
+    requestChain foreach { req =>
       req.handlers.reverse foreach {
         case x: MemberDefHandler if x.definesValue && !isInternalTermName(x.name) => return Some(x.member)
         case _ => ()
@@ -331,7 +331,8 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
     if (req == null)
       return
 
-    prevRequests += req
+    completedRequest = req
+    executingRequest = null
     req.exposedSymbols foreach (x => requestForSymbol(x) = req)
     req.definedSymbols.values foreach (x => req.scope enter x)
     // req.definedSymbols.values foreach (sym => replScope enter sym)
@@ -391,10 +392,8 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
 
   /** Build a request from the user. `trees` is `line` after being parsed.
    */
-  private def buildRequest(line: String, trees: List[Tree]): Request = {
-    executingRequest = new Request(line, trees)
-    executingRequest
-  }
+  private def buildRequest(line: String, trees: List[Tree]): Request =
+    new Request(line, trees, lastRequest) tap (executingRequest = _)
 
   private def safePos(t: Tree, alt: Int): Int =
     try t.pos.startOrPoint
@@ -576,14 +575,6 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
         interpret(line)
     }
   }
-  def directBind(name: String, boundType: String, value: Any): IR.Result = {
-    val result = bind(name, boundType, value)
-    if (result == IR.Success)
-      directlyBoundNames += newTermName(name)
-    result
-  }
-  def directBind(p: NamedParam[_]): IR.Result                                 = directBind(p.name, p.tpe, p.value)
-  def directBind[T: TypeTag : ClassTag](name: String, value: T): IR.Result = directBind((name, value))
 
   def rebind(p: NamedParam[_]): IR.Result = {
     val name     = p.name
@@ -718,15 +709,14 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
   }
 
   /** One line of code submitted by the user for interpretation */
-  class Request(val line: String, val trees: List[Tree]) {
+  class Request(val line: String, val trees: List[Tree], val prev: Request) {
     val reqId        = nextReqId()
     val lineRep      = new ReadEvalPrint()
-    val prev         = lastRequest
     val scope: Scope = newNestedScope( if (prev eq null) initialReplScope else prev.scope )
 
     val handlers: List[MemberHandler] = trees map (memberHandlers chooseHandler _)
     val definedNames                  = handlers flatMap (_.definedNames)
-    val referencedNames: List[Name]   = handlers flatMap (_.referencedNames)
+    val referencedNames: List[Name]   = handlers flatMap (_.referencedNames) distinct
 
     def scopeEntries: Iterable[Symbol] = scope ++ (prev match {
       case null   => Nil
@@ -735,14 +725,24 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
     def scopeLookup(name: Name): Symbol = afterTyper {
       scopeEntries find (_.name == name) getOrElse findMemberFromRoot(name)
     }
-    // 
-    // scope lookup name match {
-    //   case NoSymbol =>
-    //   
-    //   case NoSymbol if prev ne null => prev scopeLookup name
-    //   case sym                      => sym
-    // }
-    // Console.println("scopeImports for %s\n  %s".format(referencedNames.distinct, scopeImports.mkString("\n  ")))
+    def prevChain: List[Request] = this :: (
+      if (prev eq null) Nil
+      else prev.prevChain
+    )
+    def handlersUntilNow = prevChain flatMap (_.handlers)
+    // def implicitImports: List[String] = (
+    //   for (h <- handlersUntilNow ; s <- h.importedSymbols ; if s.isImplicit && scopeLookup(s.name) == s) yield {
+    //     h match {
+    //       case x: ImportHandler => 
+    //         Some("import " + pathToName(s.name))
+    //       
+    //         // Some(x.createImportForName(s.name))
+    //       case _                => None
+    //     }
+    //   }
+    // ).flatten
+
+    def nameImports = referencedNames map scopeLookup filterNot (_ eq NoSymbol) map ("import " + _.fullName.toString)
 
     private var _originalLine: String = null
     def withOriginalLine(s: String): this.type = { _originalLine = s ; this }
@@ -753,15 +753,15 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
     def termNames = handlers flatMap (_.definesTerm)
     def typeNames = handlers flatMap (_.definesType)
     def handlerOf(sym: Symbol): Option[MemberHandler] = handlers find (_.exposedSymbols contains sym)
-    def importFor(sym: Symbol): Option[String] = afterTyper(
-      // if (stickySymbols(sym))
-      //   Some("import " + sym.fullName)
-      // else (
-        handlerOf(sym)
-          collect { case x: ImportHandler => "import %s.%s".format(x.exprPath, sym.name) }
-           orElse { Some("import %s".format(fullPath(sym.name))) }
-      // )
-    )
+    // def importFor(sym: Symbol): Option[String] = afterTyper(
+    //   // if (stickySymbols(sym))
+    //   //   Some("import " + sym.fullName)
+    //   // else (
+    //     handlerOf(sym)
+    //       collect { case x: ImportHandler => "import %s.%s".format(x.exprPath, sym.name) }
+    //        orElse { Some("import %s".format(fullPath(sym.name))) }
+    //   // )
+    // )
 
     def exposedSymbols    = handlers flatMap (_.exposedSymbols)
     def definedOrImported = handlers flatMap (_.definedOrImported)
@@ -775,7 +775,7 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
       */
     // val ComputedImports(importsPreamble, importsTrailer, accessPath) =
     //   importsCode(referencedNames.toSet)
-
+    // 
     def unshadowedImplicits = (
       scopeEntries filter (sym => sym.isImplicit && (scopeLookup(sym.name) == sym))
     )
@@ -783,8 +783,9 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
       case "$r" => Nil
       case path => List("import " + path)
     }
-    val implicitImports = unshadowedImplicits.toList flatMap (self importFor _) reverse
-    val nameImports     = referencedNames.distinct flatMap (name => self importFor scopeLookup(name))
+    def implicitImports = unshadowedImplicits.toList flatMap (self importFor _) reverse
+    // val implicits = implicitImports
+    // val nameImports     = referencedNames.distinct flatMap (name => self importFor scopeLookup(name))
     //
     //  flatMap { name =>
     //   val sym = scopeLookup(name)
@@ -968,7 +969,7 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
     })
 
   def lastWarnings: List[(global.Position, String)] = (
-    prevRequests.reverseIterator
+    requestChain
        map (_.lineRep.lastWarnings)
       find (_.nonEmpty)
       getOrElse Nil
@@ -984,9 +985,13 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
   def treesForRequestId(id: Int): List[Tree] =
     requestForReqId(id).toList flatMap (_.trees)
 
+  // def reqAndHandlerOf(sym: Symbol): Option[(Request, MemberHandler)] = {
+    
+  // }
+
   def requestForReqId(id: Int): Option[Request] =
     if (executingRequest != null && executingRequest.reqId == id) Some(executingRequest)
-    else prevRequests find (_.reqId == id)
+    else requestChain find (_.reqId == id)
 
   def requestForName(name: Name): Option[Request] = {
     assert(definedNameMap != null, "definedNameMap is null")
@@ -997,7 +1002,7 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
     requestForName(newTermName(line)) orElse requestForName(newTypeName(line))
 
   def requestHistoryForName(name: Name): List[Request] =
-    prevRequests.toList.reverse filter (_.definedNames contains name)
+    requestChain filter (_.definedNames contains name)
 
   def definitionForName(name: Name): Option[MemberHandler] =
     requestForName(name) flatMap { req =>
@@ -1066,11 +1071,8 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
 
   def definedTerms      = onlyTerms(allDefinedNames) filterNot isInternalTermName
   def definedTypes      = onlyTypes(allDefinedNames)
-  def definedSymbols    = prevRequestList.flatMap(_.definedSymbols.values).toSet[Symbol]
-  def definedSymbolList = prevRequestList flatMap (_.definedSymbolList) filterNot (s => isInternalTermName(s.name))
-
-  // Terms with user-given names (i.e. not res0 and not synthetic)
-  def namedDefinedTerms = definedTerms filterNot (x => isUserVarName("" + x) || directlyBoundNames(x))
+  def definedSymbols    = requestChain.flatMap(_.definedSymbols.values).toSet[Symbol]
+  def definedSymbolList = requestChain flatMap (_.definedSymbolList) filterNot (s => isInternalTermName(s.name))
 
   private def findName(name: Name) = definedSymbols find (_.name == name) getOrElse NoSymbol
 
@@ -1095,13 +1097,14 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
   def classSymbols  = allDefSymbols collect { case x: ClassSymbol => x }
   def methodSymbols = allDefSymbols collect { case x: MethodSymbol => x }
 
-  /** the previous requests this interpreter has processed */
-  private var executingRequest: Request = _
-  private val prevRequests       = mutable.ListBuffer[Request]()
   private val requestForSymbol   = mutable.Map[Symbol, Request]()
-  // private 
   val definedNameMap     = mutable.Map[Name, Request]()
-  private val directlyBoundNames = mutable.Set[Name]()
+
+  private var executingRequest: Request = _
+  private var completedRequest: Request = _
+
+  def lastRequest  = completedRequest
+  def requestChain = if (lastRequest eq null) Nil else lastRequest.prevChain
 
   def replScope = lastRequest match {
     case null => initialReplScope
@@ -1115,24 +1118,21 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
     case null => initialReplScope
     case req  => req.scopeEntries
   }
-  
-  def importFor(sym: Symbol): Option[String] = afterTyper(
-    requestForSymbol get sym flatMap (_ importFor sym) orElse (
-      if (sym.name.toString == pathToName(sym.name)) None
-      else Some("import " + pathToName(sym.name))
-    )
-  )
+  // 
+  // def importFor(sym: Symbol): Option[String] = afterTyper(
+  //   requestForSymbol get sym flatMap (_ importFor sym) orElse (
+  //     if (sym.name.toString == pathToName(sym.name)) None
+  //     else Some("import " + pathToName(sym.name))
+  //   )
+  // )
 
-  def allHandlers    = prevRequestList flatMap (_.handlers)
+  def allHandlers    = requestChain.reverse flatMap (_.handlers)
   def allDefHandlers = allHandlers collect { case x: MemberDefHandler => x }
   def allDefSymbols  = allDefHandlers map (_.symbol) filter (_ ne NoSymbol)
 
-  def lastRequest         = if (prevRequests.isEmpty) null else prevRequests.last
-  def prevRequestList     = prevRequests.toList
-  def allSeenTypes        = prevRequestList flatMap (_.seenTypeOf.values.toList) distinct
+  def allSeenTypes        = requestChain flatMap (_.seenTypeOf.values.toList) distinct
   def allImplicits        = allHandlers filter (_.definesImplicit) flatMap (_.definedNames)
   def importHandlers      = allHandlers collect { case x: ImportHandler => x }
-
   def visibleTermNames: List[Name] = definedTerms ++ importedTerms distinct
 
   /** Another entry point for tab-completion, ids in scope */

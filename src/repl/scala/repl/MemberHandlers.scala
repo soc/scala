@@ -166,7 +166,11 @@ trait MemberHandlers {
   class ImportHandler(imp: Import) extends MemberHandler(imp) {
     val Import(expr, selectors) = imp
     def exprPath = intp.pathToTerm("" + expr)
-      
+    
+    private def packageObjectMembers = (
+      if (targetSymbol.isPackage) importableMembers(targetType member nme.PACKAGEkw tpe) else Nil
+    )
+    def targetSymbol = targetType.typeSymbol
     def targetType: Type = intp.typeOfExpression(exprPath) match {
       case NoType   => rootMirror.getModuleIfDefined(exprPath + ".package").tpe
       case tpe      => tpe
@@ -202,8 +206,12 @@ trait MemberHandlers {
     lazy val individualSymbols: List[Symbol] =
       afterTyper(individualNames map (targetType nonPrivateMember _))
 
-    lazy val wildcardSymbols: List[Symbol] =
-      if (importsWildcard) afterTyper(importableMembers(targetType)) else Nil
+    lazy val wildcardSymbols: List[Symbol] = afterTyper {
+      if (importsWildcard)
+        importableMembers(targetType) ++ packageObjectMembers
+      else
+        Nil
+    }
 
     /** Complete list of names imported by a wildcard */
     lazy val wildcardNames: List[Name]   = afterTyper(wildcardSymbols map (_.name))

@@ -62,8 +62,8 @@ class ILoop(in0: Option[BufferedReader], protected val out: JPrintWriter) extend
   def initCode = """
 import scala.repl._
 import $r.replenv._
-import $r.treedsl.CODE._
-  """.trim
+import $r.replenv.CODE._
+  """.trim.lines.toList
 
   protected def addThunk(body: => Unit) = pendingThunks add (() => body)
   protected def runThunks() {
@@ -499,7 +499,8 @@ import $r.treedsl.CODE._
       // Later imports rely on the repl's name resolution to find $r.
       intp interpret ("import %s._" format intp.pathToTerm("$r"))
       // And whatever else there is to do.
-      intp interpret initCode
+      initCode foreach (intp interpret _)
+      // intp interpret initCode
     })
 
     try loop() finally intp.close()
