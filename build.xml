@@ -192,7 +192,7 @@ PROPERTIES
   <property file="${basedir}/build.number"/>
 
   <!-- Additional command line arguments for scalac. They are added to all build targets -->
-  <property name="scalac.args" value=""/>
+  <property name="scalac.args" value="-Xmacro-fallback-classpath ${lib-extra.dir}/expecty-scalac.jar:${lib-extra.dir}/expecty-0.2.1-SNAPSHOT.jar"/>
   <property name="javac.args" value=""/>
 
   <!-- Sets location of pre-compiled libraries -->
@@ -420,10 +420,10 @@ INITIALISATION
 
     <path id="lib.extra">
       <!-- needs ant 1.7.1 -->
-      <!-- <fileset dir="${lib-extra.dir}" erroronmissingdir="false"> -->
-      <fileset dir="${lib-extra.dir}">
+      <fileset dir="${lib-extra.dir}" erroronmissingdir="false"/>
+      <!-- <fileset dir="${lib-extra.dir}">
         <include name="**/*.jar"/>
-      </fileset>
+      </fileset> -->
     </path>
 
     <!-- Libraries only used for STARR -->
@@ -433,6 +433,7 @@ INITIALISATION
         <include name="forkjoin.jar"/>
         <include name="msil.jar"/>
       </fileset>
+      <path refid="lib.extra"/>
     </path>
     <!-- Auxiliary libs placed on every classpath. -->
     <path id="aux.libs">
@@ -459,6 +460,7 @@ INITIALISATION
       <pathelement location="${lib.starr.jar}"/>
       <pathelement location="${reflect.starr.jar}"/>
       <pathelement location="${comp.starr.jar}"/>
+      <path refid="lib.extra"/>
       <path refid="aux.libs"/>
       <path refid="starr.dep.libs"/>
     </path>
