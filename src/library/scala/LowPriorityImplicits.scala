@@ -14,6 +14,11 @@ import immutable.WrappedString
 import generic.CanBuildFrom
 import language.implicitConversions
 
+object Expecty {
+  final val assert  = new org.expecty.Expecty()
+  final val require = new org.expecty.Expecty()
+}
+
 /** The `LowPriorityImplicits` class provides implicit values that
  *  are valid in all Scala compilation units without explicit qualification,
  *  but that are partially overridden by higher-priority conversions in object
