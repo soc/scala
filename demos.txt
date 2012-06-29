@@ -1,0 +1,40 @@
+
+https://issues.scala-lang.org/browse/SI-5969
+
+uncaught exception during compilation: java.lang.AssertionError
+java.lang.AssertionError:
+
+assert(fn.tpe != null, tree)
+       |  |   |
+       g  |   false
+          null
+
+
+https://issues.scala-lang.org/browse/SI-3425
+
+java.lang.AssertionError:
+
+assert(pt eq pt.normalize, tree +" : "+ debugString(pt) +" ~>"+ debugString(pt.normalize))
+       |  |  |  |
+       A  |  A  A
+          false
+
+
+https://issues.scala-lang.org/browse/SI-5789
+
+java.lang.AssertionError:
+
+assert(mixinClass.isImplClass, "Not an impl class:" +
+       |          |
+       |          false
+       class Function0$class
+
+
+https://issues.scala-lang.org/browse/SI-4704
+
+java.lang.AssertionError:
+
+assert(!siteWithinImplClass, currentOwner.enclClass)
+       ||
+       |true
+       false
