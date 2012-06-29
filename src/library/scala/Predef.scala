@@ -142,33 +142,33 @@ object Predef extends LowPriorityImplicits {
   def format(text: String, xs: Any*) = augmentString(text).format(xs: _*)
 
   // errors and asserts -------------------------------------------------
-
-  /** Tests an expression, throwing an `AssertionError` if false.
-   *  Calls to this method will not be generated if `-Xelide-below`
-   *  is at least `ASSERTION`.
-   *
-   *  @see elidable
-   *  @param assertion   the expression to test
-   */
-  @elidable(ASSERTION)
-  def assert(assertion: Boolean) {
-    if (!assertion)
-      throw new java.lang.AssertionError("assertion failed")
-  }
-
-  /** Tests an expression, throwing an `AssertionError` if false.
-   *  Calls to this method will not be generated if `-Xelide-below`
-   *  is at least `ASSERTION`.
-   *
-   *  @see elidable
-   *  @param assertion   the expression to test
-   *  @param message     a String to include in the failure message
-   */
-  @elidable(ASSERTION) @inline
-  final def assert(assertion: Boolean, message: => Any) {
-    if (!assertion)
-      throw new java.lang.AssertionError("assertion failed: "+ message)
-  }
+  //
+  // /** Tests an expression, throwing an `AssertionError` if false.
+  //  *  Calls to this method will not be generated if `-Xelide-below`
+  //  *  is at least `ASSERTION`.
+  //  *
+  //  *  @see elidable
+  //  *  @param assertion   the expression to test
+  //  */
+  // @elidable(ASSERTION)
+  // def assert(assertion: Boolean) {
+  //   if (!assertion)
+  //     throw new java.lang.AssertionError("assertion failed")
+  // }
+  //
+  // /** Tests an expression, throwing an `AssertionError` if false.
+  //  *  Calls to this method will not be generated if `-Xelide-below`
+  //  *  is at least `ASSERTION`.
+  //  *
+  //  *  @see elidable
+  //  *  @param assertion   the expression to test
+  //  *  @param message     a String to include in the failure message
+  //  */
+  // @elidable(ASSERTION) @inline
+  // final def assert(assertion: Boolean, message: => Any) {
+  //   if (!assertion)
+  //     throw new java.lang.AssertionError("assertion failed: "+ message)
+  // }
 
   /** Tests an expression, throwing an `AssertionError` if false.
    *  This method differs from assert only in the intent expressed:
@@ -200,29 +200,29 @@ object Predef extends LowPriorityImplicits {
     if (!assumption)
       throw new java.lang.AssertionError("assumption failed: "+ message)
   }
-
-  /** Tests an expression, throwing an `IllegalArgumentException` if false.
-   *  This method is similar to `assert`, but blames the caller of the method
-   *  for violating the condition.
-   *
-   *  @param requirement   the expression to test
-   */
-  def require(requirement: Boolean) {
-    if (!requirement)
-      throw new IllegalArgumentException("requirement failed")
-  }
-
-  /** Tests an expression, throwing an `IllegalArgumentException` if false.
-   *  This method is similar to `assert`, but blames the caller of the method
-   *  for violating the condition.
-   *
-   *  @param requirement   the expression to test
-   *  @param message       a String to include in the failure message
-   */
-  @inline final def require(requirement: Boolean, message: => Any) {
-    if (!requirement)
-      throw new IllegalArgumentException("requirement failed: "+ message)
-  }
+  //
+  // /** Tests an expression, throwing an `IllegalArgumentException` if false.
+  //  *  This method is similar to `assert`, but blames the caller of the method
+  //  *  for violating the condition.
+  //  *
+  //  *  @param requirement   the expression to test
+  //  */
+  // def require(requirement: Boolean) {
+  //   if (!requirement)
+  //     throw new IllegalArgumentException("requirement failed")
+  // }
+  //
+  // /** Tests an expression, throwing an `IllegalArgumentException` if false.
+  //  *  This method is similar to `assert`, but blames the caller of the method
+  //  *  for violating the condition.
+  //  *
+  //  *  @param requirement   the expression to test
+  //  *  @param message       a String to include in the failure message
+  //  */
+  // @inline final def require(requirement: Boolean, message: => Any) {
+  //   if (!requirement)
+  //     throw new IllegalArgumentException("requirement failed: "+ message)
+  // }
 
   final class Ensuring[A](val __resultOfEnsuring: A) extends AnyVal {
     // `__resultOfEnsuring` must be a public val to allow inlining.

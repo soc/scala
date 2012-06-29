@@ -274,6 +274,7 @@ INITIALISATION
   <!-- Resolve maven dependencies -->
   <target name="init.maven.jars" depends="init.maven.tasks">
     <artifact:dependencies pathId="dependency.classpath" filesetId="dependency.fileset">
+      <dependency groupId="org.expecty" artifactId="expecty" version="0.2.1-SNAPSHOT"/>
       <dependency groupId="com.typesafe" artifactId="config" version="0.4.0"/>
     </artifact:dependencies>
   </target>
@@ -633,6 +634,7 @@ LOCAL REFERENCE BUILD (LOCKER)
         <compilerarg line="${javac.args} -XDignore.symbol.file"/>
         <classpath>
           <path refid="forkjoin.classpath"/>
+          <path refid="lib.extra"/>
           <pathelement location="${build-locker.dir}/classes/library"/>
         </classpath>
     </javac>
@@ -650,6 +652,7 @@ LOCAL REFERENCE BUILD (LOCKER)
       <compilationpath>
         <pathelement location="${build-locker.dir}/classes/library"/>
         <path refid="forkjoin.classpath"/>
+        <path refid="lib.extra"/>
       </compilationpath>
     </scalacfork>
     <propertyfile file="${build-locker.dir}/classes/library/library.properties">

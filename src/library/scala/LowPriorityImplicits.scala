@@ -23,6 +23,9 @@ import language.implicitConversions
  *  @since 2.8
  */
 class LowPriorityImplicits {
+  final val assert  = new org.expecty.Expecty()
+  final val require = new org.expecty.Expecty()
+
   /** We prefer the java.lang.* boxed types to these wrappers in
    *  any potential conflicts.  Conflicts do exist because the wrappers
    *  need to implement ScalaNumber in order to have a symmetric equals
