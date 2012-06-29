@@ -68,7 +68,7 @@ import language.{implicitConversions, existentials}
  *  Short value to a Long value as required, and to add additional higher-order
  *  functions to Array values. These are described in more detail in the documentation of [[scala.Array]].
  */
-object Predef extends LowPriorityImplicits with scala.Expecty {
+object Predef extends LowPriorityImplicits with scala.runtime.Expecty {
   /**
    * Retrieve the runtime representation of a class type. `classOf[T]` is equivalent to
    * the class literal `T.class` in Java.
