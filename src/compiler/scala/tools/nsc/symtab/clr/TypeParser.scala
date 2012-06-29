@@ -122,13 +122,13 @@ abstract class TypeParser {
 
     {
       val t4c = clrTypes.types.get(clazz)
-      assert(t4c == None || t4c == Some(typ))
+      Predef.assert(t4c == None || t4c == Some(typ))
     }
     clrTypes.types(clazz) = typ
 
     {
       val c4t = clrTypes.sym2type.get(typ)
-      assert(c4t == None || c4t == Some(clazz))
+      Predef.assert(c4t == None || c4t == Some(clazz))
     }
     clrTypes.sym2type(typ) = clazz
 

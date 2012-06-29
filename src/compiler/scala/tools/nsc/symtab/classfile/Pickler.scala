@@ -438,7 +438,7 @@ abstract class Pickler extends SubComponent {
     }
 
     private def putChildren(sym: Symbol, children: List[Symbol]) {
-      assert(putEntry((sym, children)))
+      Predef.assert(putEntry((sym, children)))
       children foreach putSymbol
     }
 

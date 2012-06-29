@@ -1,0 +1,17 @@
+locker.comp:
+[scalacfork] Compiling 398 files to /scala/trunk/build/locker/classes/compiler
+[scalacfork] /scala/trunk/src/compiler/scala/tools/nsc/backend/icode/GenICode.scala:484: error: type mismatch;
+[scalacfork]  found   : GenICode.this.global.icodes.global.Symbol
+[scalacfork]  required: scala.tools.nsc.symtab.SymbolLoaders{val global: GenICode.this.global.type}#clrTypes.type#global.Symbol
+[scalacfork]       assert(loaders.clrTypes.isNonEnumValuetype(clssym), clssym)
+[scalacfork]                                                  ^
+[scalacfork] /scala/trunk/src/compiler/scala/tools/nsc/symtab/classfile/Pickler.scala:441: error: inferred type arguments [scala.type] do not conform to method recordValue's type parameter bounds [U]
+[scalacfork]       assert(putEntry((sym, children)))
+[scalacfork]             ^
+[scalacfork] /scala/trunk/src/compiler/scala/tools/nsc/symtab/clr/TypeParser.scala:125: error: inferred type arguments [scala.type] do not conform to method recordValue's type parameter bounds [U]
+[scalacfork]       assert(t4c == None || t4c == Some(typ))
+[scalacfork]             ^
+[scalacfork] /scala/trunk/src/compiler/scala/tools/nsc/symtab/clr/TypeParser.scala:131: error: inferred type arguments [scala.type] do not conform to method recordValue's type parameter bounds [U]
+[scalacfork]       assert(c4t == None || c4t == Some(clazz))
+[scalacfork]             ^
+[scalacfork] four errors found

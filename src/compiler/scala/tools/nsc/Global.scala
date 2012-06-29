@@ -227,22 +227,39 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
     if (opt.fatalWarnings) globalError(msg)
     else reporter.warning(NoPosition, msg)
 
+  final val assert  = new org.expecty.Expecty()
+  final val require = new org.expecty.Expecty()
+
   // Getting in front of Predef's asserts to supplement with more info.
   // This has the happy side effect of masking the one argument forms
   // of assert and require (but for now I've reproduced them here,
   // because there are a million to fix.)
-  @inline final def assert(assertion: Boolean, message: => Any) {
-    Predef.assert(assertion, supplementErrorMessage("" + message))
-  }
-  @inline final def assert(assertion: Boolean) {
-    assert(assertion, "")
-  }
-  @inline final def require(requirement: Boolean, message: => Any) {
-    Predef.require(requirement, supplementErrorMessage("" + message))
-  }
-  @inline final def require(requirement: Boolean) {
-    require(requirement, "")
-  }
+  // @inline final def assert(assertion: Boolean, message: => Any) {
+  //   Predef.assert(assertion, supplementErrorMessage("" + message))
+  // }
+  // @inline final def assert(assertion: Boolean) {
+  //   assert(assertion, "")
+  // }
+  // @inline final def require(requirement: Boolean, message: => Any) {
+  //   Predef.require(requirement, supplementErrorMessage("" + message))
+  // }
+  // @inline final def require(requirement: Boolean) {
+  //   require(requirement, "")
+  // }
+  //
+  // @inline final def assert(assertion: Boolean, message: => Any) {
+  //   Predef.assert(assertion, supplementErrorMessage("" + message))
+  // }
+  // @inline final def assert(assertion: Boolean) {
+  //   assert(assertion, "")
+  // }
+  // @inline final def require(requirement: Boolean, message: => Any) {
+  //   Predef.require(requirement, supplementErrorMessage("" + message))
+  // }
+  // @inline final def require(requirement: Boolean) {
+  //   require(requirement, "")
+  // }
+  //
 
   // Needs to call error to make sure the compile fails.
   override def abort(msg: String): Nothing = {
