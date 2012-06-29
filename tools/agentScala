@@ -1,0 +1,5 @@
+#!/usr/local/bin/bash
+#
+
+JAVA_OPTS="-javaagent:agent.jar=hi,mom" scala -i $*
+# JAVA_OPTS="-javaagent:agent.jar=hi,mom" scala -i work/agentStartup.scala $*

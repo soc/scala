@@ -6,7 +6,8 @@
 package scala.tools.nsc
 package interpreter
 
-import scala.tools.jline.console.completer.ArgumentCompleter.{ ArgumentDelimiter, ArgumentList }
+import jline.ArgumentCompletor.{ ArgumentDelimiter, ArgumentList }
+import scala.tools.util.StringOps.onull
 import util.returning
 
 /** One instance of a command buffer.

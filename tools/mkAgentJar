@@ -1,0 +1,9 @@
+#!/bin/sh
+#
+
+rm -rf agentbuild
+scala scala.tools.util.JVMAgent > agent-manifest.txt
+mkdir -p agentbuild/scala/tools/util
+cp build/quick/classes/compiler/scala/tools/util/JVMAgent* agentbuild/scala/tools/util/
+jar cvfm agent.jar agent-manifest.txt -C agentbuild/ .
+rm -rf agentbuild agent-manifest.txt

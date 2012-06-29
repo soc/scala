@@ -8,8 +8,7 @@ package util
 
 import java.lang.{ ClassLoader => JClassLoader }
 import java.lang.reflect.{ Constructor, Modifier, Method }
-import java.io.{ File => JFile }
-import java.net.{ URLClassLoader => JURLClassLoader }
+import scala.collection.{ mutable, immutable }
 import java.net.URL
 import scala.reflect.runtime.ReflectionUtils.unwrapHandler
 import ScalaClassLoader._
@@ -17,14 +16,15 @@ import scala.util.control.Exception.{ catching }
 import scala.language.implicitConversions
 import scala.reflect.{ ClassTag, classTag }
 
-trait HasClassPath {
-  def classPathURLs: Seq[URL]
-}
+trait ScalaClassLoader extends JavaClassLoader {
+  /** Override to see classloader activity traced */
+  protected def trace: Boolean = false
+  protected lazy val classLoaderUniqueId = "Cl#" + System.identityHashCode(this)
+  protected def classLoaderLog(msg: => String) {
+    if (trace)
+      Console.err.println("[" + classLoaderUniqueId + "] " + msg)
+  }
 
-/** A wrapper around java.lang.ClassLoader to lower the annoyance
- *  of java reflection.
- */
-trait ScalaClassLoader extends JClassLoader {
   /** Executing an action with this classloader as context classloader */
   def asContext[T](action: => T): T = {
     val saved = contextLoader
@@ -43,16 +43,25 @@ trait ScalaClassLoader extends JClassLoader {
       Class.forName(path, initialize, this).asInstanceOf[Class[T]]
 
   /** Create an instance of a class with this classloader */
-  def create(path: String): AnyRef =
-    tryToInitializeClass[AnyRef](path) map (_.newInstance()) orNull
+  def create(path: String): AnyRef = {
+    tryToInitializeClass(path) match {
+      case Some(clazz)    => clazz.newInstance()
+      case None           => null
+    }
+  }
+
+  def classWasRedefined(clazz: Class[_], bytes: Array[Byte]): Unit = ()
 
   def constructorsOf[T <: AnyRef : ClassTag]: List[Constructor[T]] =
     classTag[T].runtimeClass.getConstructors.toList map (_.asInstanceOf[Constructor[T]])
 
   /** The actual bytes for a class file, or an empty array if it can't be found. */
-  def classBytes(className: String): Array[Byte] = classAsStream(className) match {
-    case null   => Array()
-    case stream => io.Streamable.bytes(stream)
+  def getBytesForClass(s: String): Array[Byte] = {
+    val name = s.replaceAll("""\.""", "/") + ".class"
+    val url = this.getResource(name)
+
+    if (url == null) Array()
+    else new io.Streamable.Bytes { def inputStream() = url.openStream } . toByteArray()
   }
 
   /** An InputStream representing the given class name, or null if not found. */
@@ -104,7 +113,7 @@ object ScalaClassLoader {
   def contextChain  = loaderChain(contextLoader)
 
   def pathToErasure[T: ClassTag]   = pathToClass(classTag[T].runtimeClass)
-  def pathToClass(clazz: Class[_]) = clazz.getName.replace('.', JFile.separatorChar) + ".class"
+  def pathToClass(clazz: Class[_])    = clazz.getName.replace('.', JFile.separatorChar) + ".class"
   def locate[T: ClassTag]          = contextLoader getResource pathToErasure[T]
 
   /** Tries to guess the classpath by type matching the context classloader

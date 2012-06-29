@@ -5,7 +5,11 @@
 package scala.tools.nsc
 package interpreter
 
-import scala.tools.nsc.io.{ File, AbstractFile }
+import java.lang.{ ClassLoader => JavaClassLoader }
+import java.lang.instrument.{ Instrumentation, ClassDefinition }
+import scala.collection.{ mutable, immutable }
+import scala.tools.nsc.io.AbstractFile
+import scala.tools.util.JVMAgent
 import util.ScalaClassLoader
 import java.net.URL
 import scala.collection.{ mutable, immutable }
@@ -15,15 +19,12 @@ import scala.collection.{ mutable, immutable }
  *
  * @author Lex Spoon
  */
-class AbstractFileClassLoader(val root: AbstractFile, parent: ClassLoader)
-    extends ClassLoader(parent)
+class AbstractFileClassLoader(root: AbstractFile, parent: JavaClassLoader)
+    extends JavaClassLoader(parent)
     with ScalaClassLoader
 {
-  protected def classNameToPath(name: String): String =
-    if (name endsWith ".class") name
-    else name.replace('.', '/') + ".class"
-
-  protected def findAbstractFile(name: String): AbstractFile = {
+  override def getBytesForClass(name: String): Array[Byte] = {
+    def onull[T](x: T): T = if (x == null) throw new ClassNotFoundException(name) else x
     var file: AbstractFile = root
     val pathParts          = classNameToPath(name) split '/'
 
@@ -39,55 +40,40 @@ class AbstractFileClassLoader(val root: AbstractFile, parent: ClassLoader)
     }
   }
 
-  protected def dirNameToPath(name: String): String =
-    name.replace('.', '/')
+  protected def inst: Instrumentation = JVMAgent.inst
 
-  protected def findAbstractDir(name: String): AbstractFile = {
-    var file: AbstractFile = root
-    val pathParts          = dirNameToPath(name) split '/'
-
-    for (dirPart <- pathParts) {
-      file = file.lookupName(dirPart, true)
-      if (file == null)
-        return null
-    }
-
-    return file
+  final def redefineClass(clazz: Class[_], bytes: Array[Byte]): Unit = {
+    val newDef = new ClassDefinition(clazz, bytes)
+    inst.redefineClasses(newDef)
+    classWasRedefined(clazz, bytes)
   }
 
-  override def getResourceAsStream(name: String) = findAbstractFile(name) match {
-    case null => super.getResourceAsStream(name)
-    case file => file.input
-  }
-  override def classBytes(name: String): Array[Byte] = findAbstractFile(name) match {
-    case null => super.classBytes(name)
-    case file => file.toByteArray
-  }
-  override def findClass(name: String): JClass = {
-    val bytes = classBytes(name)
-    if (bytes.length == 0)
-      throw new ClassNotFoundException(name)
-    else
-      defineClass(name, bytes, 0, bytes.length)
+  def recordClass(name: String, bytes: Array[Byte]): Unit = ()
+}
+
+
+class RedefiningClassLoader(root: AbstractFile, parent: JavaClassLoader) extends AbstractFileClassLoader(root, parent) {
+  val classes = new mutable.HashMap[String, Array[Byte]]
+  import classes.{ get, getOrElse }
+
+  def redefineClass(name: String, bytes: Array[Byte]): Unit =
+    redefineClass(tryToLoadClass(name).get, bytes)
+
+  override def recordClass(name: String, bytes: Array[Byte]): Unit = {
+    println("recordClass(%s, %s) where formerly we had %s bytes".format(name, bytes.size, classes.getOrElse(name, Array()).size))
+
+    if (classes contains name) redefineClass(name, bytes)
+    else classes(name) = bytes
   }
 
-  private val packages = mutable.Map[String, Package]()
+  override def getBytesForClass(name: String): Array[Byte] =
+    getOrElse(name, super.getBytesForClass(name))
 
-  override def definePackage(name: String, specTitle: String, specVersion: String, specVendor: String, implTitle: String, implVersion: String, implVendor: String, sealBase: URL): Package = {
-    throw new UnsupportedOperationException()
+  override def findClass(name: String): Class[_] = get(name) match {
+    case Some(xs) => defineClass(name, xs, 0, xs.length)
+    case _        => super.findClass(name)
   }
-
-  override def getPackage(name: String): Package = {
-    findAbstractDir(name) match {
-      case null => super.getPackage(name)
-      case file => packages.getOrElseUpdate(name, {
-        val ctor = classOf[Package].getDeclaredConstructor(classOf[String], classOf[String], classOf[String], classOf[String], classOf[String], classOf[String], classOf[String], classOf[URL], classOf[ClassLoader])
-        ctor.setAccessible(true)
-        ctor.newInstance(name, null, null, null, null, null, null, null, this)
-      })
-    }
+  override def classWasRedefined(clazz: Class[_], bytes: Array[Byte]): Unit = {
+    classes(clazz.getName()) = bytes
   }
-
-  override def getPackages(): Array[Package] =
-    root.iterator.filter(_.isDirectory).map(dir => getPackage(dir.name)).toArray
 }
