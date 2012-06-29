@@ -68,7 +68,7 @@ import language.{implicitConversions, existentials}
  *  Short value to a Long value as required, and to add additional higher-order
  *  functions to Array values. These are described in more detail in the documentation of [[scala.Array]].
  */
-object Predef extends LowPriorityImplicits {
+object Predef extends LowPriorityImplicits with scala.Expecty {
   /**
    * Retrieve the runtime representation of a class type. `classOf[T]` is equivalent to
    * the class literal `T.class` in Java.
@@ -150,25 +150,25 @@ object Predef extends LowPriorityImplicits {
    *  @see elidable
    *  @param assertion   the expression to test
    */
-  @elidable(ASSERTION)
-  def assert(assertion: Boolean) {
-    if (!assertion)
-      throw new java.lang.AssertionError("assertion failed")
-  }
-
-  /** Tests an expression, throwing an `AssertionError` if false.
-   *  Calls to this method will not be generated if `-Xelide-below`
-   *  is at least `ASSERTION`.
-   *
-   *  @see elidable
-   *  @param assertion   the expression to test
-   *  @param message     a String to include in the failure message
-   */
-  @elidable(ASSERTION) @inline
-  final def assert(assertion: Boolean, message: => Any) {
-    if (!assertion)
-      throw new java.lang.AssertionError("assertion failed: "+ message)
-  }
+  // @elidable(ASSERTION)
+  // def assert(assertion: Boolean) {
+  //   if (!assertion)
+  //     throw new java.lang.AssertionError("assertion failed")
+  // }
+  //
+  // /** Tests an expression, throwing an `AssertionError` if false.
+  //  *  Calls to this method will not be generated if `-Xelide-below`
+  //  *  is at least `ASSERTION`.
+  //  *
+  //  *  @see elidable
+  //  *  @param assertion   the expression to test
+  //  *  @param message     a String to include in the failure message
+  //  */
+  // @elidable(ASSERTION) @inline
+  // final def assert(assertion: Boolean, message: => Any) {
+  //   if (!assertion)
+  //     throw new java.lang.AssertionError("assertion failed: "+ message)
+  // }
 
   /** Tests an expression, throwing an `AssertionError` if false.
    *  This method differs from assert only in the intent expressed:
@@ -200,35 +200,40 @@ object Predef extends LowPriorityImplicits {
     if (!assumption)
       throw new java.lang.AssertionError("assumption failed: "+ message)
   }
-
-  /** Tests an expression, throwing an `IllegalArgumentException` if false.
-   *  This method is similar to `assert`, but blames the caller of the method
-   *  for violating the condition.
-   *
-   *  @param requirement   the expression to test
-   */
-  def require(requirement: Boolean) {
-    if (!requirement)
-      throw new IllegalArgumentException("requirement failed")
-  }
-
-  /** Tests an expression, throwing an `IllegalArgumentException` if false.
-   *  This method is similar to `assert`, but blames the caller of the method
-   *  for violating the condition.
-   *
-   *  @param requirement   the expression to test
-   *  @param message       a String to include in the failure message
-   */
-  @inline final def require(requirement: Boolean, message: => Any) {
-    if (!requirement)
-      throw new IllegalArgumentException("requirement failed: "+ message)
-  }
+  //
+  // /** Tests an expression, throwing an `IllegalArgumentException` if false.
+  //  *  This method is similar to `assert`, but blames the caller of the method
+  //  *  for violating the condition.
+  //  *
+  //  *  @param requirement   the expression to test
+  //  */
+  // def require(requirement: Boolean) {
+  //   if (!requirement)
+  //     throw new IllegalArgumentException("requirement failed")
+  // }
+  //
+  // /** Tests an expression, throwing an `IllegalArgumentException` if false.
+  //  *  This method is similar to `assert`, but blames the caller of the method
+  //  *  for violating the condition.
+  //  *
+  //  *  @param requirement   the expression to test
+  //  *  @param message       a String to include in the failure message
+  //  */
+  // @inline final def require(requirement: Boolean, message: => Any) {
+  //   if (!requirement)
+  //     throw new IllegalArgumentException("requirement failed: "+ message)
+  // }
 
   final class Ensuring[A](val __resultOfEnsuring: A) extends AnyVal {
     // `__resultOfEnsuring` must be a public val to allow inlining.
     // See comments in ArrowAssoc for more.
     @deprecated("Use `__resultOfEnsuring` instead", "2.10.0")
     def x = __resultOfEnsuring
+
+    def assert(requirement: Boolean): Unit = ()
+    def assert(requirement: Boolean, message: => Any): Unit = ()
+    def require(requirement: Boolean): Unit = ()
+    def require(requirement: Boolean, message: => Any): Unit = ()
 
     def ensuring(cond: Boolean): A = { assert(cond); __resultOfEnsuring }
     def ensuring(cond: Boolean, msg: => Any): A = { assert(cond, msg); __resultOfEnsuring }

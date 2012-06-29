@@ -950,6 +950,7 @@ PACKED LOCKER BUILD (PALO)
         <pathelement location="${build-palo.dir}/lib/scala-reflect.jar"/>
         <pathelement location="${build-palo.dir}/lib/scala-compiler.jar"/>
         <pathelement location="${build-palo.dir}/lib/jline.jar"/>
+        <path refid="lib.extra"/>
       </classpath>
     </taskdef>
     <mkdir dir="${build-palo.dir}/bin"/>
@@ -1604,6 +1605,7 @@ PACKED QUICK BUILD (PACK)
         <pathelement location="${build-pack.dir}/lib/scala-reflect.jar"/>
         <pathelement location="${build-pack.dir}/lib/scala-compiler.jar"/>
         <pathelement location="${build-pack.dir}/lib/jline.jar"/>
+        <path refid="lib.extra"/>
       </classpath>
     </taskdef>
     <mkdir dir="${build-pack.dir}/bin"/>
