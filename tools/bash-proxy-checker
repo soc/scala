@@ -1,0 +1,49 @@
+#!/bin/bash
+#
+
+BASE=./src/library/scala/collection
+cd $BASE
+
+# Disables globbing to avoid quoting hell.
+function globFiles () {
+  set -f
+  args="$@"
+  glob=$(echo *$@*scala | tr -s ' ' '*')
+  files=$(find . -name $glob -print)
+  set +f
+
+  echo $files
+}
+
+function findDefs () {
+  args=$@
+  # echo Files: $args
+  # ack -ho 'def \w+' $@ | sort -u
+  ack -ho '(?<!private )def \w+' $@ | sed 's/^....//' | sort -u
+}
+
+function traversable () {
+  findDefs ./TraversableLike.scala ./TraversableOnce.scala
+}
+function iterable () {
+  findDefs ./TraversableLike.scala ./TraversableOnce.scala ./IterableLike.scala
+}
+function seq () {
+  findDefs ./TraversableLike.scala ./TraversableOnce.scala ./IterableLike.scala ./SeqLike.scala
+}
+
+function forwarder () {
+  findDefs $(globFiles Forwarder.)
+}
+function proxy () {
+  findDefs $(globFiles Proxy.)
+}
+function view () {
+  findDefs $(globFiles View.)
+}
+
+echo in traversable but not forwarder:
+comm -2 -3 <(traversable) <(findDefs $(globFiles Trav Forwarder.))
+#
+# echo defs in seq but not forwarder:
+# comm -2 -3 <(seq) <(forwarder)
