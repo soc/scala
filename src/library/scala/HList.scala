@@ -15,7 +15,7 @@ sealed trait HNil extends HList {
 }
 object HNil extends HNil { }
 
-sealed case class HCons[H, T <: HList](head : H, tail : T) extends HList {
+final case class HCons[H, T <: HList](head : H, tail : T) extends HList {
   type Wrap[M[_]] = M[H] :+: T#Wrap[M]
   def :+: [G](g: G): G :+: H :+: T = HCons(g, this)
 
