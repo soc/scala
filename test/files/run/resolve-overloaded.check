@@ -1,0 +1,262 @@
+
+class Test1 {
+  // 4 alternatives for f
+  def f(s: String): Unit
+  def f[T](x: T,y: T,z: T): Unit
+  def f[T, U](s: String,y: (T, U)): Unit
+  def f(x: Int)(y: Int): Unit
+}
+
+// Resolutions
+f(String)                                                          (s: String)Unit
+f[String](String, String, String)                                  [T](x: T, y: T, z: T)Unit
+f[String, String](String, (String, String))                        [T, U](s: String, y: (T, U))Unit
+f(Int)                                                             (x: Int)(y: Int)Unit
+f(Double)                                                          <notype>
+f[String](String, String, java.lang.Object)                        <notype>
+f[String, String](String, (java.lang.Object, java.lang.Object))    <notype>
+f(Any)                                                             <notype>
+
+class Test2 {
+  // 13 alternatives for f
+  def f(): Unit
+  def f(x1: C1): Unit
+  def f(x2: C2): Unit
+  def f(x3: C3): Unit
+  def f(x1: C1,x2: C1): Unit
+  def f(x1: C1,x2: C2): Unit
+  def f(x1: C1,x2: C3): Unit
+  def f(x1: C2,x2: C1): Unit
+  def f(x1: C2,x2: C2): Unit
+  def f(x1: C2,x2: C3): Unit
+  def f(x1: C3,x2: C1): Unit
+  def f(x1: C3,x2: C2): Unit
+  def f(x1: C3,x2: C3): Unit
+}
+
+// Resolutions
+f()          ()Unit
+f(C1)        (x1: C1)Unit
+f(C2)        (x2: C2)Unit
+f(C3)        (x3: C3)Unit
+f(C1, C1)    (x1: C1, x2: C1)Unit
+f(C1, C2)    <notype>
+f(C1, C3)    <notype>
+f(C2, C1)    <notype>
+f(C2, C2)    <notype>
+f(C2, C3)    <notype>
+f(C3, C1)    <notype>
+f(C3, C2)    <notype>
+f(C3, C3)    <notype>
+
+class Test3 {
+  // 3 alternatives for f
+  def f(x1: C1,x2: C3): Unit
+  def f(x1: C2,x2: C2): Unit
+  def f(x1: C3,x2: C1): Unit
+}
+
+// Resolutions
+f(C1, C1)    <notype>
+f(C1, C2)    <notype>
+f(C1, C3)    (x1: C1, x2: C3)Unit
+f(C2, C1)    <notype>
+f(C2, C2)    (x1: C2, x2: C2)Unit
+f(C2, C3)    <notype>
+f(C3, C1)    (x1: C3, x2: C1)Unit
+f(C3, C2)    <notype>
+f(C3, C3)    <notype>
+
+class A1 {
+  // 2 alternatives for f
+  def f(x: List[Int]): Unit
+  def f[T](x: T): Unit
+}
+
+// Resolutions
+f(List[Int])                             (x: List[Int])Unit
+f(java.lang.Object)                      <notype>
+f[List[Int]](List[Int])                  [T](x: T)Unit
+f[java.lang.Object](java.lang.Object)    [T](x: T)Unit
+
+class A3 {
+  // 3 alternatives for f
+  def f(x: C3,y: C2): Unit
+  def f(x: C2,y: C3): Unit
+  def f[T1 <: C1, T2 <: C1](x: T1,y: T2): Unit
+}
+
+// Resolutions
+f(C1, C1)            <notype>
+f(C1, C2)            <notype>
+f(C1, C3)            <notype>
+f(C2, C1)            <notype>
+f(C2, C2)            <notype>
+f(C2, C3)            (x: C2, y: C3)Unit
+f(C3, C1)            <notype>
+f(C3, C2)            (x: C3, y: C2)Unit
+f(C3, C3)            <notype>
+f[C1](C1, C1)        <notype>
+f[C1, C2](C1, C2)    [T1 <: C1, T2 <: C1](x: T1, y: T2)Unit
+f[C2, C2](C2, C2)    [T1 <: C1, T2 <: C1](x: T1, y: T2)Unit
+f[C3, C3](C3, C3)    [T1 <: C1, T2 <: C1](x: T1, y: T2)Unit
+
+class A3 {
+  // 3 alternatives for g
+  def g(x: C3,y: C2): Unit
+  def g(x: C2,y: C3): Unit
+  def g[T1 <: C2, T2 <: C2](x: T1,y: T2): Unit
+}
+
+// Resolutions
+g(C1, C1)            <notype>
+g(C1, C2)            <notype>
+g(C1, C3)            <notype>
+g(C2, C1)            <notype>
+g(C2, C2)            <notype>
+g(C2, C3)            (x: C2, y: C3)Unit
+g(C3, C1)            <notype>
+g(C3, C2)            (x: C3, y: C2)Unit
+g(C3, C3)            <notype>
+g[C1](C1, C1)        <notype>
+g[C1, C2](C1, C2)    [T1 <: C2, T2 <: C2](x: T1, y: T2)Unit
+g[C2, C2](C2, C2)    [T1 <: C2, T2 <: C2](x: T1, y: T2)Unit
+g[C3, C3](C3, C3)    [T1 <: C2, T2 <: C2](x: T1, y: T2)Unit
+
+class Varargs {
+  // 6 alternatives for f
+  def f(x1: C1*): Unit
+  def f(x1: C2): Unit
+  def f(x1: C3): Unit
+  def f(x1: C1,x2: C1): Unit
+  def f(x1: C2,x2: C2*): Unit
+  def f(x1: C3,x2: C3): Unit
+}
+
+// Resolutions
+f()          (x1: C1*)Unit
+f(C1)        (x1: C1*)Unit
+f(C2)        (x1: C2)Unit
+f(C3)        (x1: C3)Unit
+f(C1, C1)    (x1: C1, x2: C1)Unit
+f(C1, C2)    (x1: C1, x2: C1)Unit
+f(C1, C3)    (x1: C1, x2: C1)Unit
+f(C2, C1)    (x1: C1, x2: C1)Unit
+f(C2, C2)    <notype>
+f(C2, C3)    <notype>
+f(C3, C1)    (x1: C1, x2: C1)Unit
+f(C3, C2)    <notype>
+f(C3, C3)    <notype>
+
+class Varargs {
+  // 3 alternatives for g
+  def g(x1: => C1): Unit
+  def g(x1: C1*): Unit
+  def g(x1: C1): Unit
+}
+
+// Resolutions
+g()          (x1: C1*)Unit
+g(C1)        (x1: C1)Unit
+g(C2)        (x1: C1)Unit
+g(C3)        (x1: C1)Unit
+g(C1, C1)    (x1: C1*)Unit
+g(C1, C2)    <notype>
+g(C1, C3)    <notype>
+g(C2, C1)    <notype>
+g(C2, C2)    (x1: C1*)Unit
+g(C2, C3)    <notype>
+g(C3, C1)    <notype>
+g(C3, C2)    <notype>
+g(C3, C3)    (x1: C1*)Unit
+
+class Varargs {
+  // 3 alternatives for h
+  def h(x1: C1,x2: => C3): Unit
+  def h(x1: C2,x2: C2*): Unit
+  def h(x1: C3,x2: C1): Unit
+}
+
+// Resolutions
+h()          <notype>
+h(C1)        <notype>
+h(C2)        (x1: C2, x2: C2*)Unit
+h(C3)        (x1: C2, x2: C2*)Unit
+h(C1, C1)    <notype>
+h(C1, C2)    <notype>
+h(C1, C3)    (x1: C1, x2: => C3)Unit
+h(C2, C1)    <notype>
+h(C2, C2)    (x1: C2, x2: C2*)Unit
+h(C2, C3)    <notype>
+h(C3, C1)    (x1: C3, x2: C1)Unit
+h(C3, C2)    <notype>
+h(C3, C3)    <notype>
+
+class V3 {
+  // 6 alternatives for f
+  def f(x1: C1,x2: C1): Unit
+  def f(x1: C2,x2: C2*): Unit
+  def f(x1: C3,x2: C3): Unit
+  def f(x1: C1*): Unit
+  def f(x1: C2): Unit
+  def f(x1: C3): Unit
+}
+
+// Resolutions
+f()          (x1: C1*)Unit
+f(C1)        (x1: C1*)Unit
+f(C2)        (x1: C2)Unit
+f(C3)        (x1: C3)Unit
+f(C1, C1)    (x1: C1, x2: C1)Unit
+f(C1, C2)    (x1: C1, x2: C1)Unit
+f(C1, C3)    (x1: C1, x2: C1)Unit
+f(C2, C1)    (x1: C1, x2: C1)Unit
+f(C2, C2)    <notype>
+f(C2, C3)    <notype>
+f(C3, C1)    (x1: C1, x2: C1)Unit
+f(C3, C2)    <notype>
+f(C3, C3)    <notype>
+
+class Varargs {
+  // 3 alternatives for h2
+  def h2[T](x1: C1,x2: => T): Unit
+  def h2[T](x1: C1,x2: T*): Unit
+  def h2[T](x1: C1,x2: T): Unit
+}
+
+// Resolutions
+h2[C1]()          <notype>
+h2[C1](C1)        [T](x1: C1, x2: T*)Unit
+h2[C2](C2)        [T](x1: C1, x2: T*)Unit
+h2[C3](C3)        [T](x1: C1, x2: T*)Unit
+h2[C1](C1, C1)    <notype>
+h2[C1](C1, C2)    <notype>
+h2[C1](C1, C3)    <notype>
+h2[C1](C2, C1)    <notype>
+h2[C2](C2, C2)    <notype>
+h2[C2](C2, C3)    <notype>
+h2[C1](C3, C1)    <notype>
+h2[C2](C3, C2)    <notype>
+h2[C3](C3, C3)    <notype>
+
+class Varargs {
+  // 3 alternatives for h3
+  def h3[T <: C1](x1: T,x2: => T): Unit
+  def h3[T <: C1](x1: T,x2: T*): Unit
+  def h3[T >: C2 <: C1](x1: T,x2: T): Unit
+}
+
+// Resolutions
+h3[C1]()          <notype>
+h3[C1](C1)        [T <: C1](x1: T, x2: T*)Unit
+h3[C2](C2)        [T <: C1](x1: T, x2: T*)Unit
+h3[C3](C3)        [T <: C1](x1: T, x2: T*)Unit
+h3[C1](C1, C1)    <notype>
+h3[C1](C1, C2)    <notype>
+h3[C1](C1, C3)    <notype>
+h3[C1](C2, C1)    <notype>
+h3[C2](C2, C2)    <notype>
+h3[C2](C2, C3)    <notype>
+h3[C1](C3, C1)    <notype>
+h3[C2](C3, C2)    <notype>
+h3[C3](C3, C3)    <notype>
