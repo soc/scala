@@ -1391,7 +1391,7 @@ trait Infer extends Checkable {
        *  This is the case if the scrutinee has no unresolved type arguments
        *  and is a "final type", meaning final + invariant in all type parameters.
        */
-      if (pt.isFinalType && ptparams.isEmpty && !ptMatchesPattp) {
+      if (ptparams.isEmpty && !ptMatchesPattp && (pt.isFinalType || !isIntersectionPlausiblyInhabited(pt, pattp))) {
         IncompatibleScrutineeTypeError(tree0, pattp, pt)
         return ErrorType
       }

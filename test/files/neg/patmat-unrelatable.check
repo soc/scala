@@ -1,0 +1,33 @@
+patmat-unrelatable.scala:7: error: scrutinee is incompatible with pattern type;
+ found   : bar.MInt.type
+ required: bar.M[String]
+    def f = (new M[String]("")) match { case _: MInt.type => 1 ; case _ => 2 }
+                                                    ^
+patmat-unrelatable.scala:8: error: scrutinee is incompatible with pattern type;
+ found   : bar.M[Int]
+ required: bar.M[String]
+    def g = (new M[String]("")) match { case ExMInt() => 1 ; case _ => 2 }
+                                                   ^
+patmat-unrelatable.scala:19: error: scrutinee is incompatible with pattern type;
+ found   : baz.MInt.type
+ required: baz.M[String]
+    def f = (new M[String]("")) match { case _: MInt.type => 1 ; case _ => 2 }
+                                                    ^
+patmat-unrelatable.scala:20: error: scrutinee is incompatible with pattern type;
+ found   : baz.M[Int]
+ required: baz.M[String]
+    def g = (new M[String]("")) match { case ExMInt() => 1 ; case _ => 2 }
+                                                   ^
+patmat-unrelatable.scala:21: error: pattern type is incompatible with expected type;
+ found   : baz.M[Int]
+ required: baz.M[Any]
+Note: Int <: Any, but class M is invariant in type A.
+You may wish to define A as +A instead. (SLS 4.5)
+    def h = (new M[Any]("")) match { case ExMInt() => 1 ; case _ => 2 }
+                                                ^
+patmat-unrelatable.scala:36: error: scrutinee is incompatible with pattern type;
+ found   : List[String]
+ required: List[Int]
+    def g(xs: List[Int]) = xs match { case _: List[String] => 1 ; case _ => 2 } // fail
+                                              ^
+6 errors found

@@ -3605,6 +3605,37 @@ trait Types extends api.Types { self: SymbolTable =>
     case _          => refinedType(tps, commonOwner(tps))
   }
 
+  def isIntersectionPlausiblyInhabited(tp1: Type, tp2: Type): Boolean = {
+    def check(tp1: Type, tp2: Type): Boolean = {
+      def assumeOk(s: Symbol) = s.isTypeParameterOrSkolem || s.isTrait || s.isAbstractType
+      def compareAtBase(base: Symbol) = (tp1.baseType(base), tp2.baseType(base)) match {
+        case (NoType, _) => true
+        case (_, NoType) => true
+        case (bt1, bt2)  => (bt1.typeArgs, bt2.typeArgs).zipped forall isIntersectionPlausiblyInhabited
+      }
+      def isSub(t1: Type, t2: Type) = t1.typeSymbol isSubClass t2.typeSymbol
+      def canRelate = isSub(tp1, tp2) || isSub(tp2, tp1)
+
+      (    assumeOk(tp1.typeSymbol)
+        || assumeOk(tp2.typeSymbol)
+        || (tp1 =:= tp2)
+        || (canRelate && (tp2.baseClasses filterNot assumeOk forall compareAtBase))
+      )
+    }
+    def expand(t: Type): List[Type] = t match {
+      case RefinedType(parents, _)  => parents flatMap expand
+      case t                        => List(t)
+    }
+
+    logResult(s"inhabited(${tp1.typeSymbol.fullLocationString}, ${tp2.typeSymbol.fullLocationString})")(
+      expand(tp1) forall (x1 =>
+        expand(tp2) forall (x2 =>
+          check(x1.typeOfThis, x2.typeOfThis)
+        )
+      )
+    )
+  }
+
 /**** This implementation to merge parents was checked in in commented-out
       form and has languished unaltered for five years.  I think we should
       use it or lose it.
