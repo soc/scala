@@ -1,19 +1,21 @@
-patmat-unrelatable.scala:7: error: scrutinee is incompatible with pattern type;
- found   : bar.MInt.type
- required: bar.M[String]
+patmat-unrelatable.scala:7: warning: The intersection of bar.M[String] and bar.MInt.type may be uninhabited.
     def f = (new M[String]("")) match { case _: MInt.type => 1 ; case _ => 2 }
                                                     ^
-patmat-unrelatable.scala:8: error: scrutinee is incompatible with pattern type;
- found   : bar.M[Int]
- required: bar.M[String]
+patmat-unrelatable.scala:8: warning: The intersection of bar.M[String] and bar.M[Int] may be uninhabited.
     def g = (new M[String]("")) match { case ExMInt() => 1 ; case _ => 2 }
                                                    ^
-patmat-unrelatable.scala:19: error: scrutinee is incompatible with pattern type;
+patmat-unrelatable.scala:19: warning: The intersection of baz.M[String] and baz.MInt.type may be uninhabited.
+    def f = (new M[String]("")) match { case _: MInt.type => 1 ; case _ => 2 }
+                                                    ^
+patmat-unrelatable.scala:19: error: pattern type is incompatible with expected type;
  found   : baz.MInt.type
  required: baz.M[String]
     def f = (new M[String]("")) match { case _: MInt.type => 1 ; case _ => 2 }
                                                     ^
-patmat-unrelatable.scala:20: error: scrutinee is incompatible with pattern type;
+patmat-unrelatable.scala:20: warning: The intersection of baz.M[String] and baz.M[Int] may be uninhabited.
+    def g = (new M[String]("")) match { case ExMInt() => 1 ; case _ => 2 }
+                                                   ^
+patmat-unrelatable.scala:20: error: pattern type is incompatible with expected type;
  found   : baz.M[Int]
  required: baz.M[String]
     def g = (new M[String]("")) match { case ExMInt() => 1 ; case _ => 2 }
@@ -25,9 +27,8 @@ Note: Int <: Any, but class M is invariant in type A.
 You may wish to define A as +A instead. (SLS 4.5)
     def h = (new M[Any]("")) match { case ExMInt() => 1 ; case _ => 2 }
                                                 ^
-patmat-unrelatable.scala:36: error: scrutinee is incompatible with pattern type;
- found   : List[String]
- required: List[Int]
+patmat-unrelatable.scala:36: warning: The intersection of List[Int] and List[String] may be uninhabited.
     def g(xs: List[Int]) = xs match { case _: List[String] => 1 ; case _ => 2 } // fail
                                               ^
-6 errors found
+5 warnings found
+three errors found
