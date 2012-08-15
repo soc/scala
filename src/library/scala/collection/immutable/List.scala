@@ -336,6 +336,13 @@ case object Nil extends List[Nothing] {
   }
 }
 
+object stats_:: {
+  var alloc = 0
+  scala.sys addShutdownHook {
+    println(s"$alloc :: allocations.")
+  }
+}
+
 /** A non empty list characterized by a head and a tail.
  *  @param hd   the first element of the list
  *  @param tl   the list containing the remaining elements of this list after the first one.
@@ -346,6 +353,8 @@ case object Nil extends List[Nothing] {
  */
 @SerialVersionUID(0L - 8476791151983527571L)
 final case class ::[B](private var hd: B, private[scala] var tl: List[B]) extends List[B] {
+  stats_::.alloc += 1
+
   override def head : B = hd
   override def tail : List[B] = tl
   override def isEmpty: Boolean = false
@@ -395,6 +404,7 @@ final case class ::[B](private var hd: B, private[scala] var tl: List[B]) extend
  *  @define Coll `List`
  */
 object List extends SeqFactory[List] {
+  private val listApply = Origins("listApply")
 
   import scala.collection.{Iterable, Seq, IndexedSeq}
 
@@ -406,7 +416,7 @@ object List extends SeqFactory[List] {
 
   override def empty[A]: List[A] = Nil
 
-  override def apply[A](xs: A*): List[A] = xs.toList
+  override def apply[A](xs: A*): List[A] = listApply(xs.toList)
 
   /** Create a sorted list with element values `v,,>n+1,, = step(v,,n,,)`
    * where `v,,0,, = start` and elements are in the range between `start`
