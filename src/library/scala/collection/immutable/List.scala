@@ -416,7 +416,8 @@ object List extends SeqFactory[List] {
 
   override def empty[A]: List[A] = Nil
 
-  override def apply[A](xs: A*): List[A] = listApply(xs.toList)
+  override def apply[A](xs: A*): List[A] = xs.toList
+  // override def apply[A](xs: A*): List[A] = listApply(xs.toList)
 
   /** Create a sorted list with element values `v,,>n+1,, = step(v,,n,,)`
    * where `v,,0,, = start` and elements are in the range between `start`
