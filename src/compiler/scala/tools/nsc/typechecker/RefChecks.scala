@@ -1375,6 +1375,12 @@ abstract class RefChecks extends InfoTransform with reflect.internal.transform.R
           sym.fullLocationString, sym.migrationVersion.get, sym.migrationMessage.get)
         )
     }
+    
+    private def checkAnnotationTarget(sym: Symbol, pos: Position) = {
+      for (
+        annotation <- sym.getAnnotations
+      ) yield ???
+    }
 
     private def lessAccessible(otherSym: Symbol, memberSym: Symbol): Boolean = (
          (otherSym != NoSymbol)

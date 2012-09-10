@@ -965,6 +965,18 @@ trait Definitions extends api.StandardDefinitions {
     lazy val MethodTargetClass          = requiredClass[meta.companionMethod]    // TODO: module, moduleClass? package, packageObject?
     lazy val LanguageFeatureAnnot       = requiredClass[meta.languageFeature]
 
+    // Target-annotations
+    lazy val AnnotationTargetClass      = requiredClass[java.lang.annotation.Target]
+    lazy val ElementTypeClass           = requiredClass[java.lang.annotation.ElementType]
+//    lazy val AnnotationTypeTargetAnnot  = requiredModule[java.lang.annotation.ElementType.ANNOTATION_TYPE]
+//    lazy val ConstructorTargetAnnot     = requiredClass[java.lang.annotation.ElementType.CONSTRUCTOR]
+//    lazy val FieldTargetAnnot           = requiredClass[java.lang.annotation.ElementType.FIELD]
+//    lazy val LocalVariableTargetAnnot   = requiredClass[java.lang.annotation.ElementType.LOCAL_VARIABLE]
+//    lazy val MethodVariableTargetAnnot  = requiredClass[java.lang.annotation.ElementType.METHOD]
+//    lazy val ParameterTargetAnnot       = requiredClass[java.lang.annotation.ElementType.PARAMETER]
+//    lazy val PackageTargetAnnot         = requiredClass[java.lang.annotation.ElementType.PACKAGE]
+//    lazy val TypeTargetAnnot            = requiredClass[java.lang.annotation.ElementType.TYPE]
+
     // Language features
     lazy val languageFeatureModule      = getRequiredModule("scala.languageFeature")
     lazy val experimentalModule         = getMemberModule(languageFeatureModule, nme.experimental)
