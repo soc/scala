@@ -1,5 +1,5 @@
 /* NSC -- new Scala compiler
- * Copyright 2005-2011 LAMP/EPFL
+ * Copyright 2005-2012 LAMP/EPFL
  * @author Martin Odersky
  */
 
@@ -9,7 +9,7 @@ package transform
 import scala.collection.mutable
 import symtab.Flags._
 import util.HashSet
-import annotation.tailrec
+import scala.annotation.tailrec
 
 /** A class that yields a kind of iterator (`Cursor`),
  *  which yields all pairs of overriding/overridden symbols
@@ -31,11 +31,11 @@ abstract class OverridingPairs {
     private val self = base.thisType
 
     /** Symbols to exclude: Here these are constructors, private locals,
-     *  and bridges. But it may be refined in subclasses.
+     *  and hidden symbols, including bridges. But it may be refined in subclasses.
      *
      */
     protected def exclude(sym: Symbol): Boolean =
-      sym.isConstructor || sym.isPrivateLocal || sym.hasFlag(BRIDGE)
+      sym.isConstructor || sym.isPrivateLocal || sym.isArtifact
 
     /** The parents of base (may also be refined).
      */

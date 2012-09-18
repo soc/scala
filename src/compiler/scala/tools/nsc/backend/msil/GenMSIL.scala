@@ -1,5 +1,5 @@
 /* NSC -- new scala compiler
- * Copyright 2005-2011 LAMP/EPFL
+ * Copyright 2005-2012 LAMP/EPFL
  * @author Nikolay Mihaylov
  */
 
@@ -15,7 +15,7 @@ import scala.tools.nsc.symtab._
 import ch.epfl.lamp.compiler.msil.{Type => MsilType, _}
 import ch.epfl.lamp.compiler.msil.emit._
 import ch.epfl.lamp.compiler.msil.util.PECustomMod
-import language.postfixOps
+import scala.language.postfixOps
 
 abstract class GenMSIL extends SubComponent {
   import global._
@@ -1126,7 +1126,7 @@ abstract class GenMSIL extends SubComponent {
               }
 
               // method: implicit view(FunctionX[PType0, PType1, ...,PTypeN, ResType]):DelegateType
-              val (isDelegateView, paramType, resType) = beforeTyper {
+              val (isDelegateView, paramType, resType) = enteringTyper {
                 msym.tpe match {
                   case MethodType(params, resultType)
                   if (params.length == 1 && msym.name == nme.view_) =>
@@ -1955,7 +1955,7 @@ abstract class GenMSIL extends SubComponent {
     } // createClassMembers0
 
     private def isTopLevelModule(sym: Symbol): Boolean =
-      beforeRefchecks {
+      enteringRefchecks {
         sym.isModuleClass && !sym.isImplClass && !sym.isNestedClass
       }
 

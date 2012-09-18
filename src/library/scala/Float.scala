@@ -10,7 +10,7 @@
 
 package scala
 
-import language.implicitConversions
+import scala.language.implicitConversions
 
 /** `Float`, a 32-bit IEEE-754 floating point number (equivalent to Java's `float` primitive type) is a
  *  subtype of [[scala.AnyVal]]. Instances of `Float` are not
@@ -369,9 +369,6 @@ object Float extends AnyValCompanion {
   final val NaN              = java.lang.Float.NaN
   final val PositiveInfinity = java.lang.Float.POSITIVE_INFINITY
   final val NegativeInfinity = java.lang.Float.NEGATIVE_INFINITY
-
-  @deprecated("use Float.MinPositiveValue instead", "2.9.0")
-  final val Epsilon  = MinPositiveValue
 
   /** The negative number with the greatest (finite) absolute value which is representable
    *  by a Float.  Note that it differs from [[java.lang.Float.MIN_VALUE]], which

@@ -1,5 +1,5 @@
 /* NSC -- new Scala compiler
- * Copyright 2005-2011 LAMP/EPFL
+ * Copyright 2005-2012 LAMP/EPFL
  * @author  Martin Odersky
  */
 
@@ -7,13 +7,13 @@ package scala.tools.nsc
 
 import java.io.{ File, FileOutputStream, PrintWriter, IOException, FileNotFoundException }
 import java.nio.charset.{ Charset, CharsetDecoder, IllegalCharsetNameException, UnsupportedCharsetException }
-import compat.Platform.currentTime
+import scala.compat.Platform.currentTime
 import scala.tools.util.PathResolver
 import scala.collection.{ mutable, immutable }
 import io.{ SourceReader, AbstractFile, Path }
 import reporters.{ Reporter, ConsoleReporter }
 import util.{ Exceptional, ClassPath, MergedClassPath, StatisticsInfo, ScalaClassLoader, returning }
-import scala.reflect.internal.util.{ NoPosition, SourceFile, NoSourceFile, BatchSourceFile, ScriptSourceFile }
+import scala.reflect.internal.util.{ NoPosition, OffsetPosition, SourceFile, NoSourceFile, BatchSourceFile, ScriptSourceFile }
 import scala.reflect.internal.pickling.{ PickleBuffer, PickleFormat }
 import symtab.{ Flags, SymbolTable, SymbolLoaders, SymbolTrackers }
 import symtab.classfile.Pickler
@@ -28,8 +28,8 @@ import backend.{ ScalaPrimitives, Platform, MSILPlatform, JavaPlatform }
 import backend.jvm.{GenJVM, GenASM}
 import backend.opt.{ Inliners, InlineExceptionHandlers, ClosureElimination, DeadCodeElimination }
 import backend.icode.analysis._
-import language.postfixOps
-import reflect.internal.StdAttachments
+import scala.language.postfixOps
+import scala.reflect.internal.StdAttachments
 import scala.reflect.ClassTag
 
 class Global(var currentSettings: Settings, var reporter: Reporter)
@@ -41,8 +41,6 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
     with Printers
     with DocComments
     with Positions { self =>
-
-  // [Eugene++] would love to find better homes for the new things dumped into Global
 
   // the mirror --------------------------------------------------
 
@@ -61,26 +59,19 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
   }
   def RootClass: ClassSymbol = rootMirror.RootClass
   def EmptyPackageClass: ClassSymbol = rootMirror.EmptyPackageClass
-  // [Eugene++] this little inconvenience gives us precise types for Expr.mirror and TypeTag.mirror
-  // by the way, is it possible to define variant type members?
-
-  override def settings = currentSettings
 
   import definitions.findNamedMember
   def findMemberFromRoot(fullName: Name): Symbol = rootMirror.findMemberFromRoot(fullName)
 
   // alternate constructors ------------------------------------------
 
+  override def settings = currentSettings
+
   def this(reporter: Reporter) =
     this(new Settings(err => reporter.error(null, err)), reporter)
 
   def this(settings: Settings) =
     this(settings, new ConsoleReporter(settings))
-
-  // fulfilling requirements
-  // Renamed AbstractFile to AbstractFileType for backward compatibility:
-  // it is difficult for sbt to work around the ambiguity errors which result.
-  type AbstractFileType = scala.tools.nsc.io.AbstractFile
 
   def mkAttributedQualifier(tpe: Type, termSym: Symbol): Tree = gen.mkAttributedQualifier(tpe, termSym)
 
@@ -104,11 +95,23 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
   /** Generate ASTs */
   type TreeGen = scala.tools.nsc.ast.TreeGen
 
+  /** Tree generation, usually based on existing symbols. */
   override object gen extends {
     val global: Global.this.type = Global.this
   } with TreeGen {
     def mkAttributedCast(tree: Tree, pt: Type): Tree =
       typer.typed(mkCast(tree, pt))
+  }
+
+  /** Trees fresh from the oven, mostly for use by the parser. */
+  object treeBuilder extends {
+    val global: Global.this.type = Global.this
+  } with TreeBuilder {
+    def freshName(prefix: String): Name               = freshTermName(prefix)
+    def freshTermName(prefix: String): TermName       = currentUnit.freshTermName(prefix)
+    def freshTypeName(prefix: String): TypeName       = currentUnit.freshTypeName(prefix)
+    def o2p(offset: Int): Position                    = new OffsetPosition(currentUnit.source, offset)
+    def r2p(start: Int, mid: Int, end: Int): Position = rangePos(currentUnit.source, start, mid, end)
   }
 
   /** Fold constants */
@@ -168,7 +171,7 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
         if (lastPrintedSource == source)
           println(": tree is unchanged since " + lastPrintedPhase)
         else {
-          lastPrintedPhase = phase.prev // since we're running inside "afterPhase"
+          lastPrintedPhase = phase.prev // since we're running inside "exitingPhase"
           lastPrintedSource = source
           println("")
           println(source)
@@ -219,10 +222,10 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
 
   // not deprecated yet, but a method called "error" imported into
   // nearly every trait really must go.  For now using globalError.
-  def error(msg: String)       = globalError(msg)
-  def globalError(msg: String) = reporter.error(NoPosition, msg)
-  def inform(msg: String)      = reporter.echo(msg)
-  def warning(msg: String)     =
+  def error(msg: String)                = globalError(msg)
+  def inform(msg: String)               = reporter.echo(msg)
+  override def globalError(msg: String) = reporter.error(NoPosition, msg)
+  override def warning(msg: String)     =
     if (settings.fatalWarnings.value) globalError(msg)
     else reporter.warning(NoPosition, msg)
 
@@ -274,9 +277,8 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
     log("Running operation '%s' after every phase.\n".format(msg) + describeAfterEveryPhase(op))
   }
 
-  def shouldLogAtThisPhase = (
-       (settings.log.isSetByUser)
-    && ((settings.log containsPhase globalPhase) || (settings.log containsPhase phase))
+  override def shouldLogAtThisPhase = settings.log.isSetByUser && (
+    (settings.log containsPhase globalPhase) || (settings.log containsPhase phase)
   )
   // Over 200 closure objects are eliminated by inlining this.
   @inline final def log(msg: => AnyRef) {
@@ -782,7 +784,7 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
    */
   def afterEachPhase[T](op: => T): List[(Phase, T)] = {
     phaseDescriptors.map(_.ownPhase).filterNot(_ eq NoPhase).foldLeft(List[(Phase, T)]()) { (res, ph) =>
-      val value = afterPhase(ph)(op)
+      val value = exitingPhase(ph)(op)
       if (res.nonEmpty && res.head._2 == value) res
       else ((ph, value)) :: res
     } reverse
@@ -827,8 +829,6 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
   /** Is given package class a system package class that cannot be invalidated?
    */
   private def isSystemPackageClass(pkg: Symbol) =
-    // [Eugene++ to Martin] please, verify
-// was:    pkg == definitions.RootClass ||
     pkg == RootClass ||
     pkg == definitions.ScalaPackageClass || {
       val pkgname = pkg.fullName
@@ -891,12 +891,10 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
             else new MergedClassPath(elems, classPath.context)
           val oldEntries = mkClassPath(subst.keys)
           val newEntries = mkClassPath(subst.values)
-          // [Eugene++ to Martin] please, verify
-// was:          reSync(definitions.RootClass, Some(classPath), Some(oldEntries), Some(newEntries), invalidated, failed)
           reSync(RootClass, Some(classPath), Some(oldEntries), Some(newEntries), invalidated, failed)
         }
     }
-    def show(msg: String, syms: collection.Traversable[Symbol]) =
+    def show(msg: String, syms: scala.collection.Traversable[Symbol]) =
       if (syms.nonEmpty)
         informProgress(s"$msg: ${syms map (_.fullName) mkString ","}")
     show("invalidated packages", invalidated)
@@ -952,8 +950,6 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
       invalidateOrRemove(root)
     } else {
       if (classesFound) {
-        // [Eugene++ to Martin] please, verify
-// was:        if (root.isRoot) invalidateOrRemove(definitions.EmptyPackageClass)
         if (root.isRoot) invalidateOrRemove(EmptyPackageClass)
         else failed += root
       }
@@ -1051,26 +1047,26 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
   def currentSource: SourceFile    = if (currentUnit.exists) currentUnit.source else lastSeenSourceFile
 
   // TODO - trim these to the absolute minimum.
-  @inline final def afterErasure[T](op: => T): T        = afterPhase(currentRun.erasurePhase)(op)
-  @inline final def afterExplicitOuter[T](op: => T): T  = afterPhase(currentRun.explicitouterPhase)(op)
-  @inline final def afterFlatten[T](op: => T): T        = afterPhase(currentRun.flattenPhase)(op)
-  @inline final def afterIcode[T](op: => T): T          = afterPhase(currentRun.icodePhase)(op)
-  @inline final def afterMixin[T](op: => T): T          = afterPhase(currentRun.mixinPhase)(op)
-  @inline final def afterPickler[T](op: => T): T        = afterPhase(currentRun.picklerPhase)(op)
-  @inline final def afterRefchecks[T](op: => T): T      = afterPhase(currentRun.refchecksPhase)(op)
-  @inline final def afterSpecialize[T](op: => T): T     = afterPhase(currentRun.specializePhase)(op)
-  @inline final def afterTyper[T](op: => T): T          = afterPhase(currentRun.typerPhase)(op)
-  @inline final def afterUncurry[T](op: => T): T        = afterPhase(currentRun.uncurryPhase)(op)
-  @inline final def beforeErasure[T](op: => T): T       = beforePhase(currentRun.erasurePhase)(op)
-  @inline final def beforeExplicitOuter[T](op: => T): T = beforePhase(currentRun.explicitouterPhase)(op)
-  @inline final def beforeFlatten[T](op: => T): T       = beforePhase(currentRun.flattenPhase)(op)
-  @inline final def beforeIcode[T](op: => T): T         = beforePhase(currentRun.icodePhase)(op)
-  @inline final def beforeMixin[T](op: => T): T         = beforePhase(currentRun.mixinPhase)(op)
-  @inline final def beforePickler[T](op: => T): T       = beforePhase(currentRun.picklerPhase)(op)
-  @inline final def beforeRefchecks[T](op: => T): T     = beforePhase(currentRun.refchecksPhase)(op)
-  @inline final def beforeSpecialize[T](op: => T): T    = beforePhase(currentRun.specializePhase)(op)
-  @inline final def beforeTyper[T](op: => T): T         = beforePhase(currentRun.typerPhase)(op)
-  @inline final def beforeUncurry[T](op: => T): T       = beforePhase(currentRun.uncurryPhase)(op)
+  @inline final def exitingErasure[T](op: => T): T        = exitingPhase(currentRun.erasurePhase)(op)
+  @inline final def exitingExplicitOuter[T](op: => T): T  = exitingPhase(currentRun.explicitouterPhase)(op)
+  @inline final def exitingFlatten[T](op: => T): T        = exitingPhase(currentRun.flattenPhase)(op)
+  @inline final def exitingIcode[T](op: => T): T          = exitingPhase(currentRun.icodePhase)(op)
+  @inline final def exitingMixin[T](op: => T): T          = exitingPhase(currentRun.mixinPhase)(op)
+  @inline final def exitingPickler[T](op: => T): T        = exitingPhase(currentRun.picklerPhase)(op)
+  @inline final def exitingRefchecks[T](op: => T): T      = exitingPhase(currentRun.refchecksPhase)(op)
+  @inline final def exitingSpecialize[T](op: => T): T     = exitingPhase(currentRun.specializePhase)(op)
+  @inline final def exitingTyper[T](op: => T): T          = exitingPhase(currentRun.typerPhase)(op)
+  @inline final def exitingUncurry[T](op: => T): T        = exitingPhase(currentRun.uncurryPhase)(op)
+  @inline final def enteringErasure[T](op: => T): T       = enteringPhase(currentRun.erasurePhase)(op)
+  @inline final def enteringExplicitOuter[T](op: => T): T = enteringPhase(currentRun.explicitouterPhase)(op)
+  @inline final def enteringFlatten[T](op: => T): T       = enteringPhase(currentRun.flattenPhase)(op)
+  @inline final def enteringIcode[T](op: => T): T         = enteringPhase(currentRun.icodePhase)(op)
+  @inline final def enteringMixin[T](op: => T): T         = enteringPhase(currentRun.mixinPhase)(op)
+  @inline final def enteringPickler[T](op: => T): T       = enteringPhase(currentRun.picklerPhase)(op)
+  @inline final def enteringRefchecks[T](op: => T): T     = enteringPhase(currentRun.refchecksPhase)(op)
+  @inline final def enteringSpecialize[T](op: => T): T    = enteringPhase(currentRun.specializePhase)(op)
+  @inline final def enteringTyper[T](op: => T): T         = enteringPhase(currentRun.typerPhase)(op)
+  @inline final def enteringUncurry[T](op: => T): T       = enteringPhase(currentRun.uncurryPhase)(op)
 
   def explainContext(c: analyzer.Context): String = (
     if (c == null) "" else (
@@ -1109,7 +1105,7 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
 
     val info1 = formatExplain(
       "while compiling"    -> currentSource.path,
-      "during phase"       -> ( if (globalPhase eq phase) phase else "global=%s, atPhase=%s".format(globalPhase, phase) ),
+      "during phase"       -> ( if (globalPhase eq phase) phase else "global=%s, enteringPhase=%s".format(globalPhase, phase) ),
       "library version"    -> scala.util.Properties.versionString,
       "compiler version"   -> Properties.versionString,
       "reconstructed args" -> settings.recreateArgs.mkString(" ")
@@ -1184,8 +1180,8 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
 
     var reportedFeature = Set[Symbol]()
 
-    /** A flag whether macro expansions failed */
-    var macroExpansionFailed = false
+    /** Has any macro expansion used a fallback during this run? */
+    var seenMacroExpansionsFallingBack = false
 
     /** To be initialized from firstPhase. */
     private var terminalPhase: Phase = NoPhase
@@ -1401,6 +1397,8 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
       settings.userSetSettings filter (_.isDeprecated) foreach { s =>
         unit.deprecationWarning(NoPosition, s.name + " is deprecated: " + s.deprecationMessage.get)
       }
+      if (settings.target.value.contains("jvm-1.5"))
+        unit.deprecationWarning(NoPosition, settings.target.name + ":" + settings.target.value + " is deprecated: use target for Java 1.6 or above.")
     }
 
     /* An iterator returning all the units being compiled in this run */
@@ -1469,7 +1467,7 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
       lazy val trackers = currentRun.units.toList map (x => SymbolTracker(x))
       def snapshot() = {
         inform("\n[[symbol layout at end of " + phase + "]]")
-        afterPhase(phase) {
+        exitingPhase(phase) {
           trackers foreach { t =>
             t.snapshot()
             inform(t.show("Heading from " + phase.prev.name + " to " + phase.name))
@@ -1479,6 +1477,9 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
     }
 
     def reportCompileErrors() {
+      if (!reporter.hasErrors && reporter.hasWarnings && settings.fatalWarnings.value)
+        globalError("No warnings can be incurred under -Xfatal-warnings.")
+
       if (reporter.hasErrors) {
         for ((sym, file) <- symSource.iterator) {
           sym.reset(new loaders.SourcefileLoader(file))
@@ -1489,7 +1490,7 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
       else {
         allConditionalWarnings foreach (_.summarize)
 
-        if (macroExpansionFailed)
+        if (seenMacroExpansionsFallingBack)
           warning("some macros could not be expanded and code fell back to overridden methods;"+
                   "\nrecompiling with generated classfiles on the classpath might help.")
         // todo: migrationWarnings
@@ -1498,8 +1499,7 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
 
     /** Compile list of source files */
     def compileSources(_sources: List[SourceFile]) {
-      val depSources = dependencyAnalysis calculateFiles _sources.distinct
-      val sources    = coreClassesFirst(depSources)
+      val sources = dependencyAnalysis calculateFiles _sources.distinct
       // there is a problem already, e.g. a plugin was passed a bad option
       if (reporter.hasErrors)
         return
@@ -1605,7 +1605,7 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
 
       // Reset project
       if (!stopPhase("namer")) {
-        atPhase(namerPhase) {
+        enteringPhase(namerPhase) {
           resetProjectClasses(RootClass)
         }
       }
@@ -1645,7 +1645,7 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
       if (firstPhase ne null) { // we might get here during initialization, is a source is newer than the binary
         val maxId = math.max(globalPhase.id, typerPhase.id)
         firstPhase.iterator takeWhile (_.id < maxId) foreach (ph =>
-          atPhase(ph)(ph.asInstanceOf[GlobalPhase] applyPhase unit))
+          enteringPhase(ph)(ph.asInstanceOf[GlobalPhase] applyPhase unit))
         refreshProgress
       }
     }
@@ -1654,56 +1654,16 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
      *  is needed for?)
      */
     private def resetPackageClass(pclazz: Symbol) {
-      atPhase(firstPhase) {
-        pclazz.setInfo(atPhase(typerPhase)(pclazz.info))
+      enteringPhase(firstPhase) {
+        pclazz.setInfo(enteringPhase(typerPhase)(pclazz.info))
       }
       if (!pclazz.isRoot) resetPackageClass(pclazz.owner)
-    }
-
-    /**
-     * Re-orders the source files to
-     *  1. This Space Intentionally Left Blank
-     *  2. LowPriorityImplicits / EmbeddedControls (i.e. parents of Predef)
-     *  3. the rest
-     *
-     * 1 is to avoid cyclic reference errors.
-     * 2 is due to the following. When completing "Predef" (*), typedIdent is called
-     * for its parents (e.g. "LowPriorityImplicits"). typedIdent checks whether
-     * the symbol reallyExists, which tests if the type of the symbol after running
-     * its completer is != NoType.
-     * If the "namer" phase has not yet run for "LowPriorityImplicits", the symbol
-     * has a SourcefileLoader as type. Calling "doComplete" on it does nothing at
-     * all, because the source file is part of the files to be compiled anyway.
-     * So the "reallyExists" test will return "false".
-     * Only after the namer, the symbol has a lazy type which actually computes
-     * the info, and "reallyExists" behaves as expected.
-     * So we need to make sure that the "namer" phase is run on predef's parents
-     * before running it on predef.
-     *
-     * (*) Predef is completed early when calling "mkAttributedRef" during the
-     *   addition of "import Predef._" to sourcefiles. So this situation can't
-     *   happen for user classes.
-     *
-     */
-    private def coreClassesFirst(files: List[SourceFile]) = {
-      val goLast = 4
-      def rank(f: SourceFile) = {
-        if (f.file.container.name != "scala") goLast
-        else f.file.name match {
-          case "LowPriorityImplicits.scala"   => 2
-          case "StandardEmbeddings.scala"     => 2
-          case "EmbeddedControls.scala"       => 2
-          case "Predef.scala"                 => 3 /* Predef.scala before Any.scala, etc. */
-          case _                              => goLast
-        }
-      }
-      files sortBy rank
     }
   } // class Run
 
   def printAllUnits() {
     print("[[syntax trees at end of %25s]]".format(phase))
-    afterPhase(phase)(currentRun.units foreach { unit =>
+    exitingPhase(phase)(currentRun.units foreach { unit =>
       nodePrinters showUnit unit
     })
   }
@@ -1712,7 +1672,7 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
    */
   def showDef(fullName: Name, declsOnly: Boolean, ph: Phase) = {
     val boringOwners = Set[Symbol](definitions.AnyClass, definitions.AnyRefClass, definitions.ObjectClass)
-    def phased[T](body: => T): T = afterPhase(ph)(body)
+    def phased[T](body: => T): T = exitingPhase(ph)(body)
     def boringMember(sym: Symbol) = boringOwners(sym.owner)
     def symString(sym: Symbol) = if (sym.isTerm) sym.defString else sym.toString
 

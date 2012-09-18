@@ -1,5 +1,5 @@
 /* NSC -- new Scala compiler
- * Copyright 2005-2011 LAMP/EPFL
+ * Copyright 2005-2012 LAMP/EPFL
  * @author  Martin Odersky
  */
 
@@ -25,10 +25,10 @@ import scala.util.control.Exception.{ ultimately }
 import IMain._
 import java.util.concurrent.Future
 import typechecker.Analyzer
-import language.implicitConversions
+import scala.language.implicitConversions
 import scala.reflect.runtime.{ universe => ru }
 import scala.reflect.{ ClassTag, classTag }
-import scala.tools.reflect.StdTags._
+import scala.tools.reflect.StdRuntimeTags._
 
 /** directory to save .class files to */
 private class ReplVirtualDirectory(out: JPrintWriter) extends VirtualDirectory("(memory)", None) {
@@ -108,27 +108,19 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
     else new PathResolver(settings).result.asURLs  // the compiler's classpath
   )
   def settings = currentSettings
-  def savingSettings[T](fn: Settings => Unit)(body: => T): T = {
-    val saved = currentSettings
-    currentSettings = saved.copy()
-    fn(currentSettings)
-    try body
-    finally currentSettings = saved
-  }
   def mostRecentLine = prevRequestList match {
     case Nil      => ""
     case req :: _ => req.originalLine
   }
-  def rerunWith(names: String*) = {
-    savingSettings((ss: Settings) => {
-      import ss._
-      names flatMap lookupSetting foreach {
-        case s: BooleanSetting => s.value = true
-        case _                 => ()
-      }
-    })(interpret(mostRecentLine))
+  // Run the code body with the given boolean settings flipped to true.
+  def withoutWarnings[T](body: => T): T = beQuietDuring {
+    val saved = settings.nowarn.value
+    if (!saved)
+      settings.nowarn.value = true
+
+    try body
+    finally if (!saved) settings.nowarn.value = false
   }
-  def rerunForWarnings = rerunWith("-deprecation", "-unchecked", "-Xlint")
 
   /** construct an interpreter that reports to Console */
   def this(settings: Settings) = this(settings, new NewLinePrintWriter(new ConsoleWriter, true))
@@ -153,7 +145,7 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
   private def _initSources = List(new BatchSourceFile("<init>", "class $repl_$init { }"))
   private def _initialize() = {
     try {
-      // [Eugene] todo. if this crashes, REPL will hang
+      // todo. if this crashes, REPL will hang
       new _compiler.Run() compileSources _initSources
       _initializeComplete = true
       true
@@ -395,8 +387,7 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
       newSym <- req.definedSymbols get name
       oldSym <- oldReq.definedSymbols get name.companionName
     } {
-      replwarn("warning: previously defined %s is not a companion to %s.".format(
-        stripString("" + oldSym), stripString("" + newSym)))
+      exitingTyper(replwarn(s"warning: previously defined $oldSym is not a companion to $newSym."))
       replwarn("Companions must be defined together; you may wish to use :paste mode for this.")
     }
 
@@ -699,6 +690,10 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
   class ReadEvalPrint(lineId: Int) {
     def this() = this(freshLineId())
 
+    private var lastRun: Run = _
+    private var evalCaught: Option[Throwable] = None
+    private var conditionalWarnings: List[ConditionalWarning] = Nil
+
     val packageName = sessionNames.line + lineId
     val readName    = sessionNames.read
     val evalName    = sessionNames.eval
@@ -754,7 +749,6 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
       catch { case ex: Throwable => evalError(path, unwrap(ex)) }
     }
 
-    var evalCaught: Option[Throwable] = None
     lazy val evalClass = load(evalPath)
     lazy val evalValue = callEither(resultName) match {
       case Left(ex)      => evalCaught = Some(ex) ; None
@@ -770,33 +764,31 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
       val readRoot  = getRequiredModule(readPath)   // the outermost wrapper
       (accessPath split '.').foldLeft(readRoot: Symbol) {
         case (sym, "")    => sym
-        case (sym, name)  => afterTyper(termMember(sym, name))
+        case (sym, name)  => exitingTyper(termMember(sym, name))
       }
     }
     /** We get a bunch of repeated warnings for reasons I haven't
      *  entirely figured out yet.  For now, squash.
      */
-    private def removeDupWarnings(xs: List[(Position, String)]): List[(Position, String)] = {
-      if (xs.isEmpty)
-        return Nil
-
-      val ((pos, msg)) :: rest = xs
-      val filtered = rest filter { case (pos0, msg0) =>
-        (msg != msg0) || (pos.lineContent.trim != pos0.lineContent.trim) || {
-          // same messages and same line content after whitespace removal
-          // but we want to let through multiple warnings on the same line
-          // from the same run.  The untrimmed line will be the same since
-          // there's no whitespace indenting blowing it.
-          (pos.lineContent == pos0.lineContent)
-        }
+    private def updateRecentWarnings(run: Run) {
+      def loop(xs: List[(Position, String)]): List[(Position, String)] = xs match {
+        case Nil                  => Nil
+        case ((pos, msg)) :: rest =>
+          val filtered = rest filter { case (pos0, msg0) =>
+            (msg != msg0) || (pos.lineContent.trim != pos0.lineContent.trim) || {
+              // same messages and same line content after whitespace removal
+              // but we want to let through multiple warnings on the same line
+              // from the same run.  The untrimmed line will be the same since
+              // there's no whitespace indenting blowing it.
+              (pos.lineContent == pos0.lineContent)
+            }
+          }
+          ((pos, msg)) :: loop(filtered)
       }
-      ((pos, msg)) :: removeDupWarnings(filtered)
+      val warnings = loop(run.allConditionalWarnings flatMap (_.warnings))
+      if (warnings.nonEmpty)
+        mostRecentWarnings = warnings
     }
-    def lastWarnings: List[(Position, String)] = (
-      if (lastRun == null) Nil
-      else removeDupWarnings(lastRun.allConditionalWarnings flatMap (_.warnings))
-    )
-    private var lastRun: Run = _
     private def evalMethod(name: String) = evalClass.getMethods filter (_.getName == name) match {
       case Array(method) => method
       case xs            => sys.error("Internal error: eval object " + evalClass + ", " + xs.mkString("\n", "\n", ""))
@@ -804,6 +796,7 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
     private def compileAndSaveRun(label: String, code: String) = {
       showCodeIfDebugging(code)
       val (success, run) = compileSourcesKeepingRun(new BatchSourceFile(label, packaged(code)))
+      updateRecentWarnings(run)
       lastRun = run
       success
     }
@@ -953,16 +946,12 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
         }
 
         // compile the result-extraction object
-        beQuietDuring {
-          savingSettings(_.nowarn.value = true) {
-            lineRep compile ResultObjectSourceCode(handlers)
-          }
-        }
+        withoutWarnings(lineRep compile ResultObjectSourceCode(handlers))
       }
     }
 
     lazy val resultSymbol = lineRep.resolvePathToSymbol(accessPath)
-    def applyToResultMember[T](name: Name, f: Symbol => T) = afterTyper(f(resultSymbol.info.nonPrivateDecl(name)))
+    def applyToResultMember[T](name: Name, f: Symbol => T) = exitingTyper(f(resultSymbol.info.nonPrivateDecl(name)))
 
     /* typeOf lookup with encoding */
     def lookupTypeOf(name: Name) = typeOf.getOrElse(name, typeOf(global.encode(name.toString)))
@@ -974,10 +963,10 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
     /** Types of variables defined by this request. */
     lazy val compilerTypeOf = typeMap[Type](x => x) withDefaultValue NoType
     /** String representations of same. */
-    lazy val typeOf         = typeMap[String](tp => afterTyper(tp.toString))
+    lazy val typeOf         = typeMap[String](tp => exitingTyper(tp.toString))
 
     // lazy val definedTypes: Map[Name, Type] = {
-    //   typeNames map (x => x -> afterTyper(resultSymbol.info.nonPrivateDecl(x).tpe)) toMap
+    //   typeNames map (x => x -> exitingTyper(resultSymbol.info.nonPrivateDecl(x).tpe)) toMap
     // }
     lazy val definedSymbols = (
       termNames.map(x => x -> applyToResultMember(x, x => x)) ++
@@ -1008,12 +997,8 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
       case _                        => naming.mostRecentVar
     })
 
-  def lastWarnings: List[(global.Position, String)] = (
-    prevRequests.reverseIterator
-       map (_.lineRep.lastWarnings)
-      find (_.nonEmpty)
-      getOrElse Nil
-  )
+  private var mostRecentWarnings: List[(global.Position, String)] = Nil
+  def lastWarnings = mostRecentWarnings
 
   def treesForRequestId(id: Int): List[Tree] =
     requestForReqId(id).toList flatMap (_.trees)
@@ -1074,7 +1059,7 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
       else NoType
     }
   }
-  def cleanMemberDecl(owner: Symbol, member: Name): Type = afterTyper {
+  def cleanMemberDecl(owner: Symbol, member: Name): Type = exitingTyper {
     normalizeNonPublic {
       owner.info.nonPrivateDecl(member).tpe match {
         case NullaryMethodType(tp) => tp
@@ -1163,7 +1148,7 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
 
   def symbolDefString(sym: Symbol) = {
     TypeStrings.quieter(
-      afterTyper(sym.defString),
+      exitingTyper(sym.defString),
       sym.owner.name + ".this.",
       sym.owner.fullName + "."
     )

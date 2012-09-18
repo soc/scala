@@ -1,5 +1,5 @@
 /* NSC -- new Scala compiler
- * Copyright 2007-2011 LAMP/EPFL
+ * Copyright 2007-2012 LAMP/EPFL
  * @author  David Bernard, Manohar Jonnalagedda
  */
 
@@ -10,8 +10,8 @@ package html
 import model._
 import comment._
 
-import xml.{XML, NodeSeq}
-import xml.dtd.{DocType, PublicID}
+import scala.xml.{XML, NodeSeq}
+import scala.xml.dtd.{DocType, PublicID}
 import scala.collection._
 import java.io.Writer
 
@@ -87,7 +87,7 @@ abstract class HtmlPage extends Page { thisPage =>
     case Title(in, _) => <h6>{ inlineToHtml(in) }</h6>
     case Paragraph(in) => <p>{ inlineToHtml(in) }</p>
     case Code(data) =>
-      <pre>{ SyntaxHigh(data) }</pre> //<pre>{ xml.Text(data) }</pre>
+      <pre>{ SyntaxHigh(data) }</pre> //<pre>{ scala.xml.Text(data) }</pre>
     case UnorderedList(items) =>
       <ul>{ listItemsToHtml(items) }</ul>
     case OrderedList(items, listStyle) =>
@@ -119,20 +119,33 @@ abstract class HtmlPage extends Page { thisPage =>
     case Subscript(in) => <sub>{ inlineToHtml(in) }</sub>
     case Link(raw, title) => <a href={ raw }>{ inlineToHtml(title) }</a>
     case Monospace(in) => <code>{ inlineToHtml(in) }</code>
-    case Text(text) => xml.Text(text)
+    case Text(text) => scala.xml.Text(text)
     case Summary(in) => inlineToHtml(in)
-    case HtmlTag(tag) => xml.Unparsed(tag)
-    case EntityLink(target, template) => template() match {
-      case Some(tpl) =>
-        templateToHtml(tpl)
-      case None =>
-        xml.Text(target)
-    }
+    case HtmlTag(tag) => scala.xml.Unparsed(tag)
+    case EntityLink(target, link) => linkToHtml(target, link, true)
+  }
+
+  def linkToHtml(text: Inline, link: LinkTo, hasLinks: Boolean) = link match {
+    case LinkToTpl(dtpl) =>
+      if (hasLinks)
+        <a href={ relativeLinkTo(dtpl) } class="extype" name={ dtpl.qualifiedName }>{ inlineToHtml(text) }</a>
+      else
+        <span class="extype" name={ dtpl.qualifiedName }>{ inlineToHtml(text) }</span>
+    case LinkToMember(mbr, inTpl) =>
+      if (hasLinks)
+        <a href={ relativeLinkTo(inTpl) + "#" + mbr.signature } class="extmbr" name={ mbr.qualifiedName }>{ inlineToHtml(text) }</a>
+      else
+        <span class="extmbr" name={ mbr.qualifiedName }>{ inlineToHtml(text) }</span>
+    case Tooltip(tooltip) =>
+      <span class="extype" name={ tooltip }>{ inlineToHtml(text) }</span>
+    // TODO: add case LinkToExternal here
+    case NoLink =>
+      inlineToHtml(text)
   }
 
   def typeToHtml(tpes: List[model.TypeEntity], hasLinks: Boolean): NodeSeq = tpes match {
     case Nil =>
-      sys.error("Internal Scaladoc error")
+      NodeSeq.Empty
     case List(tpe) =>
       typeToHtml(tpe, hasLinks)
     case tpe :: rest =>
@@ -145,28 +158,22 @@ abstract class HtmlPage extends Page { thisPage =>
       if (starts.isEmpty && (inPos == string.length))
         NodeSeq.Empty
       else if (starts.isEmpty)
-        xml.Text(string.slice(inPos, string.length))
+        scala.xml.Text(string.slice(inPos, string.length))
       else if (inPos == starts.head)
         toLinksIn(inPos, starts)
       else {
-        xml.Text(string.slice(inPos, starts.head)) ++ toLinksIn(starts.head, starts)
+        scala.xml.Text(string.slice(inPos, starts.head)) ++ toLinksIn(starts.head, starts)
       }
     }
     def toLinksIn(inPos: Int, starts: List[Int]): NodeSeq = {
-      val (tpl, width) = tpe.refEntity(inPos)
-      (tpl match {
-        case dtpl:DocTemplateEntity if hasLinks =>
-          <a href={ relativeLinkTo(dtpl) } class="extype" name={ dtpl.qualifiedName }>{
-            string.slice(inPos, inPos + width)
-          }</a>
-        case tpl =>
-          <span class="extype" name={ tpl.qualifiedName }>{ string.slice(inPos, inPos + width) }</span>
-      }) ++ toLinksOut(inPos + width, starts.tail)
+      val (link, width) = tpe.refEntity(inPos)
+      val text = comment.Text(string.slice(inPos, inPos + width))
+      linkToHtml(text, link, hasLinks) ++ toLinksOut(inPos + width, starts.tail)
     }
     if (hasLinks)
       toLinksOut(0, tpe.refEntity.keySet.toList)
     else
-      xml.Text(string)
+      scala.xml.Text(string)
   }
 
   def typesToHtml(tpess: List[model.TypeEntity], hasLinks: Boolean, sep: NodeSeq): NodeSeq = tpess match {
@@ -185,10 +192,10 @@ abstract class HtmlPage extends Page { thisPage =>
       if (hasPage(dTpl)) {
         <a href={ relativeLinkTo(dTpl) } class="extype" name={ dTpl.qualifiedName }>{ if (name eq null) dTpl.name else name }</a>
       } else {
-        xml.Text(if (name eq null) dTpl.name else name)
+        scala.xml.Text(if (name eq null) dTpl.name else name)
       }
     case ndTpl: NoDocTemplate =>
-      xml.Text(if (name eq null) ndTpl.name else name)
+      scala.xml.Text(if (name eq null) ndTpl.name else name)
   }
 
   /** Returns the HTML code that represents the templates in `tpls` as a list of hyperlinked names. */
@@ -204,10 +211,12 @@ abstract class HtmlPage extends Page { thisPage =>
     else if (ety.isTrait) "trait_big.png"
     else if (ety.isClass && !ety.companion.isEmpty && ety.companion.get.visibility.isPublic && ety.companion.get.inSource != None) "class_to_object_big.png"
     else if (ety.isClass) "class_big.png"
+    else if ((ety.isAbstractType || ety.isAliasType) && !ety.companion.isEmpty && ety.companion.get.visibility.isPublic && ety.companion.get.inSource != None) "type_to_object_big.png"
+    else if ((ety.isAbstractType || ety.isAliasType)) "type_big.png"
     else if (ety.isObject && !ety.companion.isEmpty && ety.companion.get.visibility.isPublic && ety.companion.get.inSource != None && ety.companion.get.isClass) "object_to_class_big.png"
     else if (ety.isObject && !ety.companion.isEmpty && ety.companion.get.visibility.isPublic && ety.companion.get.inSource != None && ety.companion.get.isTrait) "object_to_trait_big.png"
+    else if (ety.isObject && !ety.companion.isEmpty && ety.companion.get.visibility.isPublic && ety.companion.get.inSource != None && (ety.companion.get.isAbstractType || ety.companion.get.isAliasType)) "object_to_trait_big.png"
     else if (ety.isObject) "object_big.png"
     else if (ety.isPackage) "package_big.png"
     else "class_big.png"  // FIXME: an entity *should* fall into one of the above categories, but AnyRef is somehow not
-
 }

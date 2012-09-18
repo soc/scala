@@ -1,5 +1,5 @@
 /* NSC -- new Scala compiler
- * Copyright 2005-2011 LAMP/EPFL
+ * Copyright 2005-2012 LAMP/EPFL
  * @author  Martin Odersky
  */
 
@@ -512,7 +512,7 @@ abstract class Pickler extends SubComponent {
     private def writeName(name: Name) {
       ensureCapacity(name.length * 3)
       val utfBytes = Codec toUTF8 name.toString
-      compat.Platform.arraycopy(utfBytes, 0, bytes, writeIndex, utfBytes.length)
+      scala.compat.Platform.arraycopy(utfBytes, 0, bytes, writeIndex, utfBytes.length)
       writeIndex += utfBytes.length
     }
 

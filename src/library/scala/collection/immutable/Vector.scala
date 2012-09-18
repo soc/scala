@@ -10,17 +10,17 @@ package scala.collection
 package immutable
 
 import scala.annotation.unchecked.uncheckedVariance
-import compat.Platform
+import scala.compat.Platform
 import scala.collection.generic._
 import scala.collection.mutable.Builder
 import scala.collection.parallel.immutable.ParVector
 
 /** Companion object to the Vector class
  */
-object Vector extends SeqFactory[Vector] {
-  @inline implicit def canBuildFrom[A]: CanBuildFrom[Coll, A, Vector[A]] =
-    ReusableCBF.asInstanceOf[CanBuildFrom[Coll, A, Vector[A]]]
+object Vector extends IndexedSeqFactory[Vector] {
   def newBuilder[A]: Builder[A, Vector[A]] = new VectorBuilder[A]
+  implicit def canBuildFrom[A]: CanBuildFrom[Coll, A, Vector[A]] =
+    ReusableCBF.asInstanceOf[GenericCanBuildFrom[A]]
   private[immutable] val NIL = new Vector[Nothing](0, 0, 0)
   @inline override def empty[A]: Vector[A] = NIL
 }
@@ -140,20 +140,17 @@ override def companion: GenericCompanion[Vector] = Vector
 
   // SeqLike api
 
-  @inline override def updated[B >: A, That](index: Int, elem: B)(implicit bf: CanBuildFrom[Vector[A], B, That]): That = {
-    // just ignore bf
-    updateAt(index, elem).asInstanceOf[That]
-  }
+  @inline override def updated[B >: A, That](index: Int, elem: B)(implicit bf: CanBuildFrom[Vector[A], B, That]): That =
+    if (bf eq IndexedSeq.ReusableCBF) updateAt(index, elem).asInstanceOf[That] // just ignore bf
+    else super.updated(index, elem)(bf)
 
-  @inline override def +:[B >: A, That](elem: B)(implicit bf: CanBuildFrom[Vector[A], B, That]): That = {
-    // just ignore bf
-    appendFront(elem).asInstanceOf[That]
-  }
+  @inline override def +:[B >: A, That](elem: B)(implicit bf: CanBuildFrom[Vector[A], B, That]): That =
+    if (bf eq IndexedSeq.ReusableCBF) appendFront(elem).asInstanceOf[That] // just ignore bf
+    else super.+:(elem)(bf)
 
-  @inline override def :+[B >: A, That](elem: B)(implicit bf: CanBuildFrom[Vector[A], B, That]): That = {
-    // just ignore bf
-    appendBack(elem).asInstanceOf[That]
-  }
+  @inline override def :+[B >: A, That](elem: B)(implicit bf: CanBuildFrom[Vector[A], B, That]): That =
+    if (bf eq IndexedSeq.ReusableCBF) appendBack(elem).asInstanceOf[That] // just ignore bf
+    else super.:+(elem)(bf)
 
   override def take(n: Int): Vector[A] = {
     if (n <= 0)

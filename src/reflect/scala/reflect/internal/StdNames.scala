@@ -1,5 +1,5 @@
 /* NSC -- new Scala compiler
- * Copyright 2005-2011 LAMP/EPFL
+ * Copyright 2005-2012 LAMP/EPFL
  * @author  Martin Odersky
  */
 
@@ -8,8 +8,8 @@ package internal
 
 import java.security.MessageDigest
 import Chars.isOperatorPart
-import annotation.switch
-import language.implicitConversions
+import scala.annotation.switch
+import scala.language.implicitConversions
 import scala.collection.immutable
 import scala.io.Codec
 
@@ -131,7 +131,7 @@ trait StdNames {
     final val Seq: NameType        = "Seq"
     final val Symbol: NameType     = "Symbol"
     final val ClassTag: NameType   = "ClassTag"
-    final val AbsTypeTag: NameType = "AbsTypeTag"
+    final val WeakTypeTag: NameType = "WeakTypeTag"
     final val TypeTag : NameType   = "TypeTag"
     final val Expr: NameType       = "Expr"
     final val String: NameType     = "String"
@@ -246,6 +246,7 @@ trait StdNames {
     final val BeanPropertyAnnot: NameType = "BeanProperty"
     final val BooleanBeanPropertyAnnot: NameType = "BooleanBeanProperty"
     final val bridgeAnnot: NameType = "bridge"
+    final val staticAnnot: NameType = "static"
 
     // Classfile Attributes
     final val AnnotationDefaultATTR: NameType      = "AnnotationDefault"
@@ -297,7 +298,7 @@ trait StdNames {
     val WHILE_PREFIX                  = "while$"
 
     // Compiler internal names
-    val ANYNAME: NameType                  = "<anyname>"
+    val ANYname: NameType                  = "<anyname>"
     val CONSTRUCTOR: NameType              = "<init>"
     val EQEQ_LOCAL_VAR: NameType           = "eqEqTemp$"
     val FAKE_LOCAL_THIS: NameType          = "this$"
@@ -615,7 +616,6 @@ trait StdNames {
     val apply: NameType                = "apply"
     val applyDynamic: NameType         = "applyDynamic"
     val applyDynamicNamed: NameType    = "applyDynamicNamed"
-    val applyImpl: NameType            = "applyImpl"
     val applyOrElse: NameType          = "applyOrElse"
     val args : NameType                = "args"
     val argv : NameType                = "argv"
@@ -627,14 +627,13 @@ trait StdNames {
     val array_length : NameType        = "array_length"
     val array_update : NameType        = "array_update"
     val arraycopy: NameType            = "arraycopy"
-    val asTermSymbol: NameType         = "asTermSymbol"
-    val asModuleSymbol: NameType       = "asModuleSymbol"
-    val asMethodSymbol: NameType       = "asMethodSymbol"
-    val asTypeSymbol: NameType         = "asTypeSymbol"
-    val asClassSymbol: NameType        = "asClassSymbol"
+    val asTerm: NameType               = "asTerm"
+    val asModule: NameType             = "asModule"
+    val asMethod: NameType             = "asMethod"
+    val asType: NameType               = "asType"
+    val asClass: NameType              = "asClass"
     val asInstanceOf_ : NameType       = "asInstanceOf"
     val asInstanceOf_Ob : NameType     = "$asInstanceOf"
-    val asTypeConstructor: NameType    = "asTypeConstructor"
     val assert_ : NameType             = "assert"
     val assume_ : NameType             = "assume"
     val basis : NameType               = "basis"
@@ -705,14 +704,13 @@ trait StdNames {
     val manifestToTypeTag: NameType    = "manifestToTypeTag"
     val map: NameType                  = "map"
     val materializeClassTag: NameType  = "materializeClassTag"
-    val materializeAbsTypeTag: NameType = "materializeAbsTypeTag"
+    val materializeWeakTypeTag: NameType = "materializeWeakTypeTag"
     val materializeTypeTag: NameType   = "materializeTypeTag"
     val mirror : NameType              = "mirror"
     val moduleClass : NameType         = "moduleClass"
     val name: NameType                 = "name"
     val ne: NameType                   = "ne"
     val newArray: NameType             = "newArray"
-    val newFreeExistential: NameType   = "newFreeExistential"
     val newFreeTerm: NameType          = "newFreeTerm"
     val newFreeType: NameType          = "newFreeType"
     val newNestedSymbol: NameType      = "newNestedSymbol"
@@ -754,6 +752,7 @@ trait StdNames {
     val splice: NameType               = "splice"
     val staticClass : NameType         = "staticClass"
     val staticModule : NameType        = "staticModule"
+    val staticPackage : NameType       = "staticPackage"
     val synchronized_ : NameType       = "synchronized"
     val tail: NameType                 = "tail"
     val `then` : NameType              = "then"
@@ -765,6 +764,7 @@ trait StdNames {
     val toObjectArray : NameType       = "toObjectArray"
     val toSeq: NameType                = "toSeq"
     val toString_ : NameType           = if (forMSIL) "ToString" else "toString"
+    val toTypeConstructor: NameType    = "toTypeConstructor"
     val tpe : NameType                 = "tpe"
     val tree : NameType                = "tree"
     val true_ : NameType               = "true"
@@ -936,6 +936,12 @@ trait StdNames {
       case _          => NO_NAME
     }
 
+    def primitiveMethodName(name: Name): TermName =
+      primitiveInfixMethodName(name) match {
+        case NO_NAME => primitivePostfixMethodName(name)
+        case name => name
+      }
+
     /** Translate a String into a list of simple TypeNames and TermNames.
      *  In all segments before the last, type/term is determined by whether
      *  the following separator char is '.' or '#'.  In the last segment,
@@ -1001,8 +1007,6 @@ trait StdNames {
 
   val javanme = nme.javaKeywords
 
-  // [Eugene++ to Martin] had to move a lot of stuff from here to TermNames to satisfy the contract
-  // why do we even have stuff in object nme? cf. object tpnme
   object nme extends TermNames {
 
     def isModuleVarName(name: Name): Boolean =

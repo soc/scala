@@ -6,10 +6,11 @@
 **                          |/                                          **
 \*                                                                      */
 
-package scala.actors
+package scala.actors.migration
 
 import scala.concurrent.util.Duration
 import java.util.concurrent.TimeUnit
+import scala.language.implicitConversions
 
 case class Timeout(duration: Duration) {
   def this(timeout: Long) = this(Duration(timeout, TimeUnit.MILLISECONDS))

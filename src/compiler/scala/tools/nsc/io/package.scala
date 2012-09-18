@@ -1,5 +1,5 @@
 /* NSC -- new Scala compiler
- * Copyright 2005-2011 LAMP/EPFL
+ * Copyright 2005-2012 LAMP/EPFL
  * @author Paul Phillips
  */
 
@@ -8,7 +8,7 @@ package scala.tools.nsc
 import java.util.concurrent.{ Future, Callable }
 import java.util.{ Timer, TimerTask }
 import java.util.jar.{ Attributes }
-import language.implicitConversions
+import scala.language.implicitConversions
 
 package object io {
   implicit def postfixOps = language.postfixOps // make all postfix ops in this package compile without warning

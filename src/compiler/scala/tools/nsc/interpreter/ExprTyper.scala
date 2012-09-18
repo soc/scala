@@ -1,5 +1,5 @@
 /* NSC -- new Scala compiler
- * Copyright 2005-2011 LAMP/EPFL
+ * Copyright 2005-2012 LAMP/EPFL
  * @author  Paul Phillips
  */
 
@@ -37,7 +37,7 @@ trait ExprTyper {
   }
 
   /** Parse a line into a sequence of trees. Returns None if the input is incomplete. */
-  def parse(line: String): Option[List[Tree]] = {
+  def parse(line: String): Option[List[Tree]] = debugging(s"""parse("$line")""")  {
     var isIncomplete = false
     reporter.withIncompleteHandler((_, _) => isIncomplete = true) {
       val trees = codeParser.stmts(line)
@@ -63,7 +63,7 @@ trait ExprTyper {
         case IR.Success =>
           val sym0 = symbolOfTerm(name)
           // drop NullaryMethodType
-          val sym = sym0.cloneSymbol setInfo afterTyper(sym0.info.finalResultType)
+          val sym = sym0.cloneSymbol setInfo exitingTyper(sym0.info.finalResultType)
           if (sym.info.typeSymbol eq UnitClass) NoSymbol
           else sym
         case _          => NoSymbol

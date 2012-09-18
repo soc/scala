@@ -1,5 +1,5 @@
 /* NSC -- new Scala compiler
- * Copyright 2005-2011 LAMP/EPFL
+ * Copyright 2005-2012 LAMP/EPFL
  * @author  Martin Odersky
  */
 
@@ -420,9 +420,9 @@ abstract class ClassfileParser {
     var sym: Symbol = rootMirror.RootClass
 
     // was "at flatten.prev"
-    beforeFlatten {
+    enteringFlatten {
       for (part0 <- parts; if !(part0 == ""); part = newTermName(part0)) {
-        val sym1 = beforeIcode {
+        val sym1 = enteringIcode {
           sym.linkedClassOfClass.info
           sym.info.decl(part.encode)
         }//.suchThat(module == _.isModule)
@@ -869,10 +869,10 @@ abstract class ClassfileParser {
           }
           else in.skip(attrLen)
         case tpnme.SyntheticATTR =>
-          sym.setFlag(SYNTHETIC | HIDDEN)
+          sym.setFlag(SYNTHETIC | ARTIFACT)
           in.skip(attrLen)
         case tpnme.BridgeATTR =>
-          sym.setFlag(BRIDGE)
+          sym.setFlag(BRIDGE | ARTIFACT)
           in.skip(attrLen)
         case tpnme.DeprecatedATTR =>
           val arg = Literal(Constant("see corresponding Javadoc for more information."))
@@ -1164,7 +1164,7 @@ abstract class ClassfileParser {
       originalName + " in " + outerName + "(" + externalName +")"
   }
 
-  object innerClasses extends collection.mutable.HashMap[Name, InnerClassEntry] {
+  object innerClasses extends scala.collection.mutable.HashMap[Name, InnerClassEntry] {
     /** Return the Symbol of the top level class enclosing `name`,
      *  or 'name's symbol if no entry found for `name`.
      */
@@ -1203,7 +1203,7 @@ abstract class ClassfileParser {
               // if loading during initialization of `definitions` typerPhase is not yet set.
               // in that case we simply load the member at the current phase
               if (currentRun.typerPhase != null)
-                beforeTyper(getMember(sym, innerName.toTypeName))
+                enteringTyper(getMember(sym, innerName.toTypeName))
               else
                 getMember(sym, innerName.toTypeName)
 

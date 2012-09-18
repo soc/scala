@@ -1,5 +1,5 @@
 /* NSC -- new Scala compiler
- * Copyright 2005-2011 LAMP/EPFL
+ * Copyright 2005-2012 LAMP/EPFL
  * @author  Martin Odersky
  */
 
@@ -192,6 +192,10 @@ trait Namers extends MethodSynthesis {
       if (!allowsOverload(sym)) {
         val prev = scope.lookupEntry(sym.name)
         if ((prev ne null) && prev.owner == scope && conflict(sym, prev.sym)) {
+          if (sym.isSynthetic || prev.sym.isSynthetic) {
+            handleSyntheticNameConflict(sym, prev.sym)
+            handleSyntheticNameConflict(prev.sym, sym)
+          }
           DoubleDefError(sym, prev.sym)
           sym setInfo ErrorType
           scope unlink prev.sym // let them co-exist...
@@ -200,6 +204,14 @@ trait Namers extends MethodSynthesis {
         }
       }
       scope enter sym
+    }
+
+    /** Logic to handle name conflicts of synthetically generated symbols
+     *  We handle right now: t6227
+     */
+    def handleSyntheticNameConflict(sym1: Symbol, sym2: Symbol) = {
+      if (sym1.isImplicit && sym1.isMethod && sym2.isModule && sym2.companionClass.isCaseClass)
+        validate(sym2.companionClass)
     }
 
     def enterSym(tree: Tree): Context = {
@@ -347,10 +359,39 @@ trait Namers extends MethodSynthesis {
       }
     }
 
+    /** Given a ClassDef or ModuleDef, verifies there isn't a companion which
+     *  has been defined in a separate file.
+     */
+    private def validateCompanionDefs(tree: ImplDef) {
+      val sym = tree.symbol
+      if (sym eq NoSymbol) return
+
+      val ctx    = if (context.owner.isPackageObjectClass) context.outer else context
+      val module = if (sym.isModule) sym else ctx.scope lookup tree.name.toTermName
+      val clazz  = if (sym.isClass) sym else ctx.scope lookup tree.name.toTypeName
+      val fails  = (
+           module.isModule
+        && clazz.isClass
+        && !module.isSynthetic
+        && !clazz.isSynthetic
+        && (clazz.sourceFile ne null)
+        && (module.sourceFile ne null)
+        && !(module isCoDefinedWith clazz)
+      )
+      if (fails) {
+        context.unit.error(tree.pos, (
+            s"Companions '$clazz' and '$module' must be defined in same file:\n"
+          + s"  Found in ${clazz.sourceFile.canonicalPath} and ${module.sourceFile.canonicalPath}")
+        )
+      }
+    }
+
     def enterModuleDef(tree: ModuleDef) = {
       val sym = enterModuleSymbol(tree)
       sym.moduleClass setInfo namerOf(sym).moduleClassTypeCompleter(tree)
       sym setInfo completerOf(tree)
+      validateCompanionDefs(tree)
+      sym
     }
 
     /** Enter a module symbol. The tree parameter can be either
@@ -455,7 +496,6 @@ trait Namers extends MethodSynthesis {
             // for Java code importing Scala objects
             if (!nme.isModuleName(from) || isValid(nme.stripModuleSuffix(from))) {
               typer.TyperErrorGen.NotAMemberError(tree, expr, from)
-              typer.infer.setError(tree)
             }
           }
           // Setting the position at the import means that if there is
@@ -556,7 +596,7 @@ trait Namers extends MethodSynthesis {
       // via "x$lzy" as can be seen in test #3927.
       val sym = (
         if (owner.isClass) createFieldSymbol(tree)
-        else owner.newValue(tree.name append nme.LAZY_LOCAL, tree.pos, tree.mods.flags & ~IMPLICIT)
+        else owner.newValue(tree.name append nme.LAZY_LOCAL, tree.pos, (tree.mods.flags | ARTIFACT) & ~IMPLICIT)
       )
       enterValSymbol(tree, sym setFlag MUTABLE setLazyAccessor lazyAccessor)
     }
@@ -577,7 +617,7 @@ trait Namers extends MethodSynthesis {
       case DefDef(_, nme.CONSTRUCTOR, _, _, _, _) =>
         assignAndEnterFinishedSymbol(tree)
       case DefDef(mods, name, tparams, _, _, _) =>
-        val bridgeFlag = if (mods hasAnnotationNamed tpnme.bridgeAnnot) BRIDGE else 0
+        val bridgeFlag = if (mods hasAnnotationNamed tpnme.bridgeAnnot) BRIDGE | ARTIFACT else 0
         val sym = assignAndEnterSymbol(tree) setFlag bridgeFlag
 
         if (name == nme.copy && sym.isSynthetic)
@@ -623,6 +663,7 @@ trait Namers extends MethodSynthesis {
         }
         else context.unit.error(tree.pos, "implicit classes must accept exactly one primary constructor parameter")
       }
+      validateCompanionDefs(tree)
     }
 
     // this logic is needed in case typer was interrupted half
@@ -687,7 +728,7 @@ trait Namers extends MethodSynthesis {
       // }
     }
 
-    def moduleClassTypeCompleter(tree: Tree) = {
+    def moduleClassTypeCompleter(tree: ModuleDef) = {
       mkTypeCompleter(tree) { sym =>
         val moduleSymbol = tree.symbol
         assert(moduleSymbol.moduleClass == sym, moduleSymbol.moduleClass)
@@ -973,7 +1014,7 @@ trait Namers extends MethodSynthesis {
       // Add a () parameter section if this overrides some method with () parameters.
       if (clazz.isClass && vparamss.isEmpty && overriddenSymbol.alternatives.exists(
         _.info.isInstanceOf[MethodType])) {
-        vparamSymss = List(List())
+        vparamSymss = ListOfNil
       }
       mforeach(vparamss) { vparam =>
         if (vparam.tpt.isEmpty) {
@@ -983,11 +1024,15 @@ trait Namers extends MethodSynthesis {
       }
       addDefaultGetters(meth, vparamss, tparams, overriddenSymbol)
 
+      // fast track macros, i.e. macros defined inside the compiler, are hardcoded
+      // hence we make use of that and let them have whatever right-hand side they need
+      // (either "macro ???" as they used to or just "???" to maximally simplify their compilation)
+      if (fastTrack contains ddef.symbol) ddef.symbol setFlag MACRO
+
       // macro defs need to be typechecked in advance
       // because @macroImpl annotation only gets assigned during typechecking
-      // otherwise we might find ourselves in the situation when we specified -Xmacro-fallback-classpath
-      // but macros still don't expand
-      // that might happen because macro def doesn't have its link a macro impl yet
+      // otherwise macro defs wouldn't be able to robustly coexist with their clients
+      // because a client could be typechecked before a macro def that it uses
       if (ddef.symbol.isTermMacro) {
         val pt = resultPt.substSym(tparamSyms, tparams map (_.symbol))
         typer.computeMacroDefType(ddef, pt)
@@ -1028,7 +1073,7 @@ trait Namers extends MethodSynthesis {
       var baseParamss = (vparamss, overridden.tpe.paramss) match {
         // match empty and missing parameter list
         case (Nil, List(Nil)) => Nil
-        case (List(Nil), Nil) => List(Nil)
+        case (List(Nil), Nil) => ListOfNil
         case (_, paramss)     => paramss
       }
       assert(
@@ -1214,8 +1259,8 @@ trait Namers extends MethodSynthesis {
         if (!annotated.isInitialized) tree match {
           case defn: MemberDef =>
             val ainfos = defn.mods.annotations filterNot (_ eq null) map { ann =>
-              // need to be lazy, #1782
-              AnnotationInfo lazily (typer typedAnnotation ann)
+              // need to be lazy, #1782. enteringTyper to allow inferView in annotation args, SI-5892.
+              AnnotationInfo lazily enteringTyper(typer typedAnnotation ann)
             }
             if (ainfos.nonEmpty) {
               annotated setAnnotations ainfos
@@ -1386,6 +1431,7 @@ trait Namers extends MethodSynthesis {
           fail(ImplicitAtToplevel)
       }
       if (sym.isClass) {
+        checkNoConflict(IMPLICIT, CASE)
         if (sym.isAnyOverride && !sym.hasFlag(TRAIT))
           fail(OverrideClass)
       } else {
@@ -1528,18 +1574,11 @@ trait Namers extends MethodSynthesis {
    *  call this method?
    */
   def companionSymbolOf(original: Symbol, ctx: Context): Symbol = {
-    try {
-      original.companionSymbol orElse {
-        ctx.lookup(original.name.companionName, original.owner).suchThat(sym =>
-          (original.isTerm || sym.hasModuleFlag) &&
-          (sym isCoDefinedWith original)
-        )
-      }
-    }
-    catch {
-      case e: InvalidCompanions =>
-        ctx.unit.error(original.pos, e.getMessage)
-        NoSymbol
+    original.companionSymbol orElse {
+      ctx.lookup(original.name.companionName, original.owner).suchThat(sym =>
+        (original.isTerm || sym.hasModuleFlag) &&
+        (sym isCoDefinedWith original)
+      )
     }
   }
 }

@@ -1,6 +1,15 @@
 {
   val $u: ru.type = ru;
-  val $m: $u.Mirror = ru.rootMirror;
+  val $m: $u.Mirror = ru.runtimeMirror({
+  final class $anon extends scala.AnyRef {
+    def <init>(): anonymous class $anon = {
+      $anon.super.<init>();
+      ()
+    };
+    ()
+  };
+  new $anon()
+}.getClass().getClassLoader());
   $u.Expr.apply[Int(2)]($m, {
     final class $treecreator1 extends TreeCreator {
       def <init>(): $treecreator1 = {
@@ -8,11 +17,6 @@
         ()
       };
       def apply[U <: scala.reflect.base.Universe with Singleton]($m$untyped: scala.reflect.base.MirrorOf[U]): U#Tree = {
-        val $u: scala.reflect.api.Universe = $m$untyped.universe.asInstanceOf[scala.reflect.api.Universe];
-        val $m: $u.Mirror = $m$untyped.asInstanceOf[$u.Mirror];
-        $treecreator1.this.applyImpl[$u.type]($m).asInstanceOf[U#Tree]
-      };
-      private def applyImpl[U <: scala.reflect.api.Universe with Singleton]($m$untyped: scala.reflect.base.MirrorOf[U]): scala.reflect.base.Universe#Tree = {
         val $u: U = $m$untyped.universe;
         val $m: $u.Mirror = $m$untyped.asInstanceOf[$u.Mirror];
         $u.Literal.apply($u.Constant.apply(2))

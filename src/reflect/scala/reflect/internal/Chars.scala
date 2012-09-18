@@ -1,13 +1,13 @@
 /* NSC -- new Scala compiler
- * Copyright 2006-2011 LAMP/EPFL
+ * Copyright 2006-2012 LAMP/EPFL
  * @author  Martin Odersky
  */
 package scala.reflect
 package internal
 
-import annotation.{ tailrec, switch }
+import scala.annotation.{ tailrec, switch }
 import java.lang.{ Character => JCharacter }
-import language.postfixOps
+import scala.language.postfixOps
 
 /** Contains constants and classifier methods for characters */
 trait Chars {

@@ -1,5 +1,5 @@
 /* NSC -- new Scala compiler
- * Copyright 2005-2011 LAMP/EPFL
+ * Copyright 2005-2012 LAMP/EPFL
  * @author  Iulian Dragos
  */
 
@@ -18,7 +18,7 @@ import JAccessFlags._
 import JObjectType.{ JAVA_LANG_STRING, JAVA_LANG_OBJECT }
 import java.util.jar.{ JarEntry, JarOutputStream }
 import scala.tools.nsc.io.AbstractFile
-import language.postfixOps
+import scala.language.postfixOps
 
 /** This class ...
  *
@@ -38,7 +38,7 @@ abstract class GenJVM extends SubComponent with GenJVMUtil with GenAndroid with 
   override def newPhase(p: Phase): Phase = new JvmPhase(p)
 
   private def outputDirectory(sym: Symbol): AbstractFile =
-    settings.outputDirs outputDirFor beforeFlatten(sym.sourceFile)
+    settings.outputDirs outputDirFor enteringFlatten(sym.sourceFile)
 
   private def getFile(base: AbstractFile, clsName: String, suffix: String): AbstractFile = {
     var dir = base
@@ -85,7 +85,7 @@ abstract class GenJVM extends SubComponent with GenJVMUtil with GenAndroid with 
       // succeed or warn that it isn't.
       hasApproximate && {
         // Before erasure so we can identify generic mains.
-        beforeErasure {
+        enteringErasure {
           val companion     = sym.linkedClassOfClass
           val companionMain = companion.tpe.member(nme.main)
 
@@ -122,8 +122,10 @@ abstract class GenJVM extends SubComponent with GenJVMUtil with GenAndroid with 
         inform("[running phase " + name + " on icode]")
 
       if (settings.Xdce.value)
-        for ((sym, cls) <- icodes.classes if inliner.isClosureClass(sym) && !deadCode.liveClosures(sym))
+        for ((sym, cls) <- icodes.classes if inliner.isClosureClass(sym) && !deadCode.liveClosures(sym)) {
+          log(s"Optimizer eliminated ${sym.fullNameString}")
           icodes.classes -= sym
+        }
 
       // For predictably ordered error messages.
       val sortedClasses = classes.values.toList sortBy ("" + _.symbol.fullName)
@@ -316,7 +318,7 @@ abstract class GenJVM extends SubComponent with GenJVMUtil with GenAndroid with 
        * of inner class all until root class.
        */
       def collectInnerClass(s: Symbol): Unit = {
-        // TODO: some beforeFlatten { ... } which accounts for
+        // TODO: some enteringFlatten { ... } which accounts for
         // being nested in parameterized classes (if we're going to selectively flatten.)
         val x = innerClassSymbolFor(s)
         if(x ne NoSymbol) {
@@ -446,7 +448,7 @@ abstract class GenJVM extends SubComponent with GenJVMUtil with GenAndroid with 
 
         // it must be a top level class (name contains no $s)
         def isCandidateForForwarders(sym: Symbol): Boolean =
-          afterPickler {
+          exitingPickler {
             !(sym.name.toString contains '$') && sym.hasModuleFlag && !sym.isImplClass && !sym.isNestedClass
           }
 
@@ -728,20 +730,20 @@ abstract class GenJVM extends SubComponent with GenJVMUtil with GenAndroid with 
       // generic information could disappear as a consequence of a seemingly
       // unrelated change.
          settings.Ynogenericsig.value
-      || sym.isHidden
+      || sym.isArtifact
       || sym.isLiftedMethod
       || sym.isBridge
       || (sym.ownerChain exists (_.isImplClass))
     )
     def addGenericSignature(jmember: JMember, sym: Symbol, owner: Symbol) {
       if (needsGenericSignature(sym)) {
-        val memberTpe = beforeErasure(owner.thisType.memberInfo(sym))
+        val memberTpe = enteringErasure(owner.thisType.memberInfo(sym))
 
         erasure.javaSig(sym, memberTpe) foreach { sig =>
           // This seems useful enough in the general case.
           log(sig)
           if (checkSignatures) {
-            val normalizedTpe = beforeErasure(erasure.prepareSigMap(memberTpe))
+            val normalizedTpe = enteringErasure(erasure.prepareSigMap(memberTpe))
             val bytecodeTpe = owner.thisType.memberInfo(sym)
             if (!sym.isType && !sym.isConstructor && !(erasure.erasure(sym)(normalizedTpe) =:= bytecodeTpe)) {
               clasz.cunit.warning(sym.pos,
@@ -757,7 +759,7 @@ abstract class GenJVM extends SubComponent with GenJVMUtil with GenAndroid with 
           }
           val index = jmember.getConstantPool.addUtf8(sig).toShort
           if (settings.verbose.value && settings.debug.value)
-            beforeErasure(println("add generic sig "+sym+":"+sym.info+" ==> "+sig+" @ "+index))
+            enteringErasure(println("add generic sig "+sym+":"+sym.info+" ==> "+sig+" @ "+index))
 
           val buf = ByteBuffer.allocate(2)
           buf putShort index
@@ -833,7 +835,7 @@ abstract class GenJVM extends SubComponent with GenJVMUtil with GenAndroid with 
           innerSym.rawname + innerSym.moduleSuffix
 
       // add inner classes which might not have been referenced yet
-      afterErasure {
+      exitingErasure {
         for (sym <- List(clasz.symbol, clasz.symbol.linkedClassOfClass); m <- sym.info.decls.map(innerClassSymbolFor) if m.isClass)
           innerClassBuffer += m
       }
@@ -1021,6 +1023,8 @@ abstract class GenJVM extends SubComponent with GenJVMUtil with GenAndroid with 
 
        	  method = m
        	  jmethod = clinitMethod
+
+          computeLocalVarsIndex(m)
        	  genCode(m)
        	case None =>
           legacyStaticInitializer(cls, clinit)
@@ -1129,7 +1133,9 @@ abstract class GenJVM extends SubComponent with GenJVMUtil with GenAndroid with 
           log("No forwarder for " + m + " due to conflict with " + linkedClass.info.member(m.name))
         else {
           log("Adding static forwarder for '%s' from %s to '%s'".format(m, className, moduleClass))
-          addForwarder(jclass, moduleClass, m)
+          if (m.isAccessor && m.accessed.hasStaticAnnotation) {
+            log("@static: accessor " + m + ", accessed: " + m.accessed)
+          } else addForwarder(jclass, moduleClass, m)
         }
       }
     }
@@ -1818,7 +1824,7 @@ abstract class GenJVM extends SubComponent with GenJVMUtil with GenAndroid with 
      *  Synthetic locals are skipped. All variables are method-scoped.
      */
     private def genLocalVariableTable(m: IMethod, jcode: JCode) {
-      val vars = m.locals filterNot (_.sym.isSynthetic)
+      val vars = m.locals filterNot (_.sym.isArtifact)
       if (vars.isEmpty) return
 
       val pool = jclass.getConstantPool
@@ -1963,7 +1969,7 @@ abstract class GenJVM extends SubComponent with GenJVMUtil with GenAndroid with 
     // Nested objects won't receive ACC_FINAL in order to allow for their overriding.
 
     val finalFlag = (
-         (sym.hasFlag(Flags.FINAL) || isTopLevelModule(sym))
+         (((sym.rawflags & Flags.FINAL) != 0) || isTopLevelModule(sym))
       && !sym.enclClass.isInterface
       && !sym.isClassConstructor
       && !sym.isMutable   // lazy vals and vars both
@@ -1980,7 +1986,7 @@ abstract class GenJVM extends SubComponent with GenJVMUtil with GenAndroid with 
       if (finalFlag && !sym.hasAbstractFlag) ACC_FINAL else 0,
       if (sym.isStaticMember) ACC_STATIC else 0,
       if (sym.isBridge) ACC_BRIDGE | ACC_SYNTHETIC else 0,
-      if (sym.isHidden) ACC_SYNTHETIC else 0,
+      if (sym.isArtifact) ACC_SYNTHETIC else 0,
       if (sym.isClass && !sym.isInterface) ACC_SUPER else 0,
       if (sym.isVarargsMethod) ACC_VARARGS else 0,
       if (sym.hasFlag(Flags.SYNCHRONIZED)) JAVA_ACC_SYNCHRONIZED else 0
@@ -1995,7 +2001,7 @@ abstract class GenJVM extends SubComponent with GenJVMUtil with GenAndroid with 
   )
 
   def isTopLevelModule(sym: Symbol): Boolean =
-    afterPickler { sym.isModuleClass && !sym.isImplClass && !sym.isNestedClass }
+    exitingPickler { sym.isModuleClass && !sym.isImplClass && !sym.isNestedClass }
 
   def isStaticModule(sym: Symbol): Boolean = {
     sym.isModuleClass && !sym.isImplClass && !sym.isLifted

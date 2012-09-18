@@ -1,5 +1,5 @@
 /* NSC -- new Scala compiler
- * Copyright 2005-2011 LAMP/EPFL
+ * Copyright 2005-2012 LAMP/EPFL
  * @author Paul Phillips
  */
 
@@ -10,7 +10,7 @@ import java.net.{ URI, URL }
 import java.io.{ BufferedInputStream, InputStream, PrintStream }
 import java.io.{ BufferedReader, InputStreamReader, Closeable => JCloseable }
 import scala.io.{ Codec, BufferedSource, Source }
-import collection.mutable.ArrayBuffer
+import scala.collection.mutable.ArrayBuffer
 import Path.fail
 
 /** Traits for objects which can be represented as Streams.
@@ -112,7 +112,7 @@ object Streamable {
     finally stream.close()
 
   def bytes(is: => InputStream): Array[Byte] =
-    new Bytes { def inputStream() = is } toByteArray
+    (new Bytes { def inputStream() = is }).toByteArray
 
   def slurp(is: => InputStream)(implicit codec: Codec): String =
     new Chars { def inputStream() = is } slurp codec

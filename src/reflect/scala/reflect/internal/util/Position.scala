@@ -1,14 +1,14 @@
 /* NSC -- new Scala compiler
- * Copyright 2005-2011 LAMP/EPFL
+ * Copyright 2005-2012 LAMP/EPFL
  * @author  Martin Odersky
  *
  */
 
 package scala.reflect.internal.util
 
-import reflect.ClassTag
-import reflect.base.Attachments
-import reflect.api.PositionApi
+import scala.reflect.ClassTag
+import scala.reflect.base.Attachments
+import scala.reflect.api.PositionApi
 
 object Position {
   val tabInc = 8
