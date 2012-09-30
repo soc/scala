@@ -402,6 +402,19 @@ abstract class Erasure extends AddInterfaces
       new overridingPairs.Cursor(root) {
         override def parents              = List(root.info.firstParent)
         override def exclude(sym: Symbol) = !sym.isMethod || sym.isPrivate || super.exclude(sym)
+        override def matches(sym1: Symbol, sym2: Symbol) = sym1.isType || {
+          val info1 = site.memberType(sym1)
+          val info2 = site.memberType(sym2)
+
+          (info1 matches info2) || {
+            info1.params.nonEmpty && info2.params.nonEmpty && {
+              val ptpe1 = elementType(ArrayClass, info1.params.last.tpe)
+              val ptpe2 = elementType(ArrayClass, info2.params.last.tpe)
+
+              ptpe1 <:< ptpe2
+            }
+          }
+        }
       }
     }
 
