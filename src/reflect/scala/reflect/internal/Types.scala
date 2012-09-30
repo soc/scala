@@ -3605,37 +3605,6 @@ trait Types extends api.Types { self: SymbolTable =>
     case _          => refinedType(tps, commonOwner(tps))
   }
 
-  def isIntersectionPlausiblyInhabited(tp1: Type, tp2: Type): Boolean = {
-    def check(tp1: Type, tp2: Type): Boolean = {
-      def assumeOk(s: Symbol) = s.isTypeParameterOrSkolem || s.isTrait || s.isAbstractType
-      def compareAtBase(base: Symbol) = (tp1.baseType(base), tp2.baseType(base)) match {
-        case (NoType, _) => true
-        case (_, NoType) => true
-        case (bt1, bt2)  => (bt1.typeArgs, bt2.typeArgs).zipped forall isIntersectionPlausiblyInhabited
-      }
-      def isSub(t1: Type, t2: Type) = t1.typeSymbol isSubClass t2.typeSymbol
-      def canRelate = isSub(tp1, tp2) || isSub(tp2, tp1)
-
-      (    assumeOk(tp1.typeSymbol)
-        || assumeOk(tp2.typeSymbol)
-        || (tp1 =:= tp2)
-        || (canRelate && (tp2.baseClasses filterNot assumeOk forall compareAtBase))
-      )
-    }
-    def expand(t: Type): List[Type] = t match {
-      case RefinedType(parents, _)  => parents flatMap expand
-      case t                        => List(t)
-    }
-
-    logResult(s"inhabited(${tp1.typeSymbol.fullLocationString}, ${tp2.typeSymbol.fullLocationString})")(
-      expand(tp1) forall (x1 =>
-        expand(tp2) forall (x2 =>
-          check(x1.typeOfThis, x2.typeOfThis)
-        )
-      )
-    )
-  }
-
 /**** This implementation to merge parents was checked in in commented-out
       form and has languished unaltered for five years.  I think we should
       use it or lose it.
@@ -5213,45 +5182,6 @@ trait Types extends api.Types { self: SymbolTable =>
 
   private def typeDepth(tps: List[Type]): Int = maxDepth(tps, typeDepth)
   private def baseTypeSeqDepth(tps: List[Type]): Int = maxDepth(tps, _.baseTypeSeqDepth)
-
-  /** Is intersection of given types populated? That is,
-   *  for all types tp1, tp2 in intersection
-   *    for all common base classes bc of tp1 and tp2
-   *      let bt1, bt2 be the base types of tp1, tp2 relative to class bc
-   *      Then:
-   *        bt1 and bt2 have the same prefix, and
-   *        any corresponding non-variant type arguments of bt1 and bt2 are the same
-   */
-  def isPopulated(tp1: Type, tp2: Type): Boolean = {
-    def isConsistent(tp1: Type, tp2: Type): Boolean = (tp1, tp2) match {
-      case (TypeRef(pre1, sym1, args1), TypeRef(pre2, sym2, args2)) =>
-        assert(sym1 == sym2)
-        pre1 =:= pre2 &&
-        forall3(args1, args2, sym1.typeParams) { (arg1, arg2, tparam) =>
-            //if (tparam.variance == 0 && !(arg1 =:= arg2)) Console.println("inconsistent: "+arg1+"!="+arg2)//DEBUG
-          if (tparam.variance == 0) arg1 =:= arg2
-          else if (arg1.isInstanceOf[TypeVar])
-            // if left-hand argument is a typevar, make it compatible with variance
-            // this is for more precise pattern matching
-            // todo: work this in the spec of this method
-            // also: think what happens if there are embedded typevars?
-            if (tparam.variance < 0) arg1 <:< arg2 else arg2 <:< arg1
-          else true
-        }
-      case (et: ExistentialType, _) =>
-        et.withTypeVars(isConsistent(_, tp2))
-      case (_, et: ExistentialType) =>
-        et.withTypeVars(isConsistent(tp1, _))
-    }
-
-    def check(tp1: Type, tp2: Type) =
-      if (tp1.typeSymbol.isClass && tp1.typeSymbol.hasFlag(FINAL))
-        tp1 <:< tp2 || isNumericValueClass(tp1.typeSymbol) && isNumericValueClass(tp2.typeSymbol)
-      else tp1.baseClasses forall (bc =>
-        tp2.baseTypeIndex(bc) < 0 || isConsistent(tp1.baseType(bc), tp2.baseType(bc)))
-
-    check(tp1, tp2)/* && check(tp2, tp1)*/ // need to investgate why this can't be made symmetric -- neg/gadts1 fails, and run/existials also.
-  }
 
   /** Does a pattern of type `patType` need an outer test when executed against
    *  selector type `selType` in context defined by `currentOwner`?

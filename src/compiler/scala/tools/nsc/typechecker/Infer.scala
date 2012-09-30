@@ -1391,18 +1391,13 @@ trait Infer extends Checkable {
        *  This is the case if the scrutinee has no unresolved type arguments
        *  and is a "final type", meaning final + invariant in all type parameters.
        */
-      if (ptparams.isEmpty && !ptMatchesPattp) {
-        if (pt.isFinalType) {
-          IncompatibleScrutineeTypeError(tree0, pattp, pt)
-          return ErrorType
-        }
-        else if (!isIntersectionPlausiblyInhabited(pt, pattp)) {
-          context.unit.warning(tree0.pos,
-            s"The intersection of $pt and $pattp may be uninhabited.")
-        }
-      }
+      // if (isImpossibleMatch(pt, pattp)) {
+      //   IncompatibleScrutineeTypeError(tree0, pattp, pt)
+      //   return ErrorType
+      // }
+      if (!checkCheckable(tree0, pattp, pt, inPattern = true, canRemedy))
+        return ErrorType
 
-      checkCheckable(tree0, pattp, pt, inPattern = true, canRemedy)
       if (pattp <:< pt) ()
       else {
         debuglog("free type params (1) = " + tpparams)
