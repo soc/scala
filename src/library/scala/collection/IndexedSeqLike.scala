@@ -92,7 +92,7 @@ trait IndexedSeqLike[+A, +Repr] extends Any with SeqLike[A, Repr] {
 
   /* Overridden for efficiency */
   override def toBuffer[A1 >: A]: mutable.Buffer[A1] = {
-    val result = new mutable.ArrayBuffer[A1](size)
+    val result = new mutable.ArrayBuffer[AnyRef](size).asInstanceOf[mutable.ArrayBuffer[A1]]
     copyToBuffer(result)
     result
   }

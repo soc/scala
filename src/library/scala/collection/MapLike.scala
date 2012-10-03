@@ -322,7 +322,7 @@ self =>
   /* Overridden for efficiency. */
   override def toSeq: Seq[(A, B)] = toBuffer[(A, B)]
   override def toBuffer[C >: (A, B)]: mutable.Buffer[C] = {
-    val result = new mutable.ArrayBuffer[C](size)
+    val result = new mutable.ArrayBuffer[AnyRef](size).asInstanceOf[mutable.ArrayBuffer[C]]
     copyToBuffer(result)
     result
   }

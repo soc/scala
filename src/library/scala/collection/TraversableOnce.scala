@@ -248,7 +248,8 @@ trait TraversableOnce[+A] extends Any with GenTraversableOnce[A] {
 
   def toIndexedSeq: immutable.IndexedSeq[A] = to[immutable.IndexedSeq]
 
-  def toBuffer[B >: A]: mutable.Buffer[B] = to[ArrayBuffer].asInstanceOf[mutable.Buffer[B]]
+  def toBuffer[B >: A]: mutable.Buffer[B] =
+    (new ArrayBuffer[AnyRef].asInstanceOf[ArrayBuffer[B]] ++= seq).asInstanceOf[mutable.Buffer[B]]
 
   def toSet[B >: A]: immutable.Set[B] = to[immutable.Set].asInstanceOf[immutable.Set[B]]
 
@@ -380,7 +381,7 @@ object TraversableOnce {
     def bufferToColl[B](buff: ArrayBuffer[B]): Coll[B]
     def traversableToColl[B](t: GenTraversable[B]): Coll[B]
 
-    def newIterator: Builder[A, Coll[A]] = new ArrayBuffer[A] mapResult bufferToColl
+    def newIterator: Builder[A, Coll[A]] = new ArrayBuffer[AnyRef].asInstanceOf[ArrayBuffer[A]] mapResult bufferToColl
 
     /** Creates a new builder on request of a collection.
      *  @param from  the collection requesting the builder to be created.

@@ -12,6 +12,7 @@ package scala.collection
 package mutable
 
 import generic._
+import scala.reflect.ClassTag
 import parallel.mutable.ParArray
 
 /** An implementation of the `Buffer` class using an array to
@@ -44,10 +45,11 @@ import parallel.mutable.ParArray
  *  @define willNotTerminateInf
  */
 @SerialVersionUID(1529165946227428979L)
-class ArrayBuffer[A](override protected val initialSize: Int)
+class ArrayBuffer[A](override protected val initialSize: Int)(implicit val tag: ClassTag[A])
   extends AbstractBuffer[A]
      with Buffer[A]
-     with GenericTraversableTemplate[A, ArrayBuffer]
+     with GenericClassTagTraversableTemplate[A, ArrayBuffer]
+     //with GenericTraversableTemplate[A, ArrayBuffer]
      with BufferLike[A, ArrayBuffer[A]]
      with IndexedSeqOptimized[A, ArrayBuffer[A]]
      with Builder[A, ArrayBuffer[A]]
@@ -55,11 +57,12 @@ class ArrayBuffer[A](override protected val initialSize: Int)
      with CustomParallelizable[A, ParArray[A]]
      with Serializable {
 
-  override def companion: GenericCompanion[ArrayBuffer] = ArrayBuffer
-
+  //override def companion: GenericCompanion[ArrayBuffer] = ArrayBuffer
+  def classTagCompanion: GenericClassTagCompanion[ArrayBuffer] = ArrayBuffer
+  
   import scala.collection.Traversable
 
-  def this() = this(16)
+  def this()(implicit tag: ClassTag[A]) = this(16)(tag)
 
   def clear() { reduceToSize(0) }
 
@@ -183,9 +186,11 @@ class ArrayBuffer[A](override protected val initialSize: Int)
  *  @define coll array buffer
  *  @define Coll `ArrayBuffer`
  */
-object ArrayBuffer extends SeqFactory[ArrayBuffer] {
+object ArrayBuffer extends ClassTagTraversableFactory[ArrayBuffer] {
+  def unapplySeq[A](x: ArrayBuffer[A]): Some[ArrayBuffer[A]] = Some(x)
+
   /** $genericCanBuildFromInfo */
-  implicit def canBuildFrom[A]: CanBuildFrom[Coll, A, ArrayBuffer[A]] = ReusableCBF.asInstanceOf[GenericCanBuildFrom[A]]
-  def newBuilder[A]: Builder[A, ArrayBuffer[A]] = new ArrayBuffer[A]
+  implicit def canBuildFrom[A](implicit t: ClassTag[A]): CanBuildFrom[Coll, A, ArrayBuffer[A]] = new GenericCanBuildFrom[A]
+  def newBuilder[A](implicit t: ClassTag[A]): Builder[A, ArrayBuffer[A]] = new ArrayBuffer[A]
 }
 

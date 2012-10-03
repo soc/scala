@@ -154,7 +154,7 @@ trait SeqLike[+A, +Repr] extends Any with IterableLike[A, Repr] with GenSeqLike[
       if (!hasNext)
         Iterator.empty.next
 
-      val forcedElms = new mutable.ArrayBuffer[A](elms.size) ++= elms
+      val forcedElms = (new mutable.ArrayBuffer[AnyRef](elms.size)).asInstanceOf[mutable.ArrayBuffer[A]] ++= elms
       val result = (self.newBuilder ++= forcedElms).result
       var i = idxs.length - 2
       while(i >= 0 && idxs(i) >= idxs(i+1))

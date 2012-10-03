@@ -81,7 +81,7 @@ self =>
   /* Overridden for efficiency. */
   override def toSeq: Seq[A] = toBuffer[A]
   override def toBuffer[A1 >: A]: mutable.Buffer[A1] = {
-    val result = new mutable.ArrayBuffer[A1](size)
+    val result = new mutable.ArrayBuffer[AnyRef](size).asInstanceOf[mutable.ArrayBuffer[A1]]
     copyToBuffer(result)
     result
   }
