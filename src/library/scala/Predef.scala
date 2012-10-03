@@ -393,7 +393,8 @@ object Predef extends LowPriorityImplicits {
 
   @inline implicit def any2stringfmt(x: Any) = new runtime.StringFormat(x)
   @inline implicit def augmentString(x: String): StringOps = new StringOps(x)
-  implicit def any2stringadd(x: Any) = new runtime.StringAdd(x)
+  // implicit def any2stringadd(x: Any) = new runtime.StringAdd(x)
+  implicit def any2Macrostringadd(x: Any): MacroStringAdd = runtime.MacroStringAdd(String.valueOf(x))
   implicit def unaugmentString(x: StringOps): String = x.repr
 
   @deprecated("Use `StringCanBuildFrom`", "2.10.0")
