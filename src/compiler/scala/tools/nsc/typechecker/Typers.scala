@@ -3352,27 +3352,24 @@ trait Typers extends Modes with Adaptations with Tags {
       doTypedUnapply(app, classTagExtractor, classTagExtractor, args, PATTERNmode, pt)
     }
 
-    // if there's a ClassTag that allows us to turn the unchecked type test for `pt` into a checked type test
-    // return the corresponding extractor (an instance of ClassTag[`pt`])
-    def extractorForUncheckedType(pos: Position, pt: Type): Option[Tree] = if (settings.XoldPatmat.value || isPastTyper) None else {
-      // only look at top-level type, can't (reliably) do anything about unchecked type args (in general)
-      pt.normalize.typeConstructor match {
-        // if at least one of the types in an intersection is checkable, use the checkable ones
-        // this avoids problems as in run/matchonseq.scala, where the expected type is `Coll with scala.collection.SeqLike`
-        // Coll is an abstract type, but SeqLike of course is not
-        case RefinedType(ps, _) if ps.length > 1 && (ps exists infer.isCheckable) =>
-          None
-
-        case ptCheckable if infer isUncheckable ptCheckable =>
-          val classTagExtractor = resolveClassTag(pos, ptCheckable)
-
-          if (classTagExtractor != EmptyTree && unapplyMember(classTagExtractor.tpe) != NoSymbol)
-            Some(classTagExtractor)
-          else None
-
-        case _ => None
-    }
-    }
+    // If there's a ClassTag that allows us to turn the unchecked type test
+    // for `pt` into a checked type test return the corresponding extractor
+    // (an instance of ClassTag[`pt`]). Only look at top-level type, can't
+    // (reliably, in general) verify unchecked type args.
+    def extractorForUncheckedType(pos: Position, pt: Type): Option[Tree] = (
+      if (settings.XoldPatmat.value || isPastTyper) None
+      else   Some (pt.normalize.typeConstructor)
+          collect { case pt1 if canAddExtractorTest(pt1) => resolveClassTag(pos, pt1) }
+        filterNot (extractor => unapplyMember(extractor.tpe) == NoSymbol)
+    )
+    // If at least one of the types in an intersection is checkable, use the
+    // checkable ones. This avoids problems as in run/matchonseq.scala, where the
+    // expected type is `Coll with scala.collection.SeqLike`. Coll is an abstract
+    // type, but SeqLike of course is not.
+    private def canAddExtractorTest(tp: Type) = (infer isUncheckable tp) && (tp match {
+      case RefinedType(ps, _) if ps.length > 1 => ps forall (infer isUncheckable _)
+      case _                                   => true
+    })
 
     /**
      * Convert an annotation constructor call into an AnnotationInfo.
