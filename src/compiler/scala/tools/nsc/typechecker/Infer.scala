@@ -731,49 +731,114 @@ trait Infer extends Checkable {
         else OverloadedType(tp, appmeth.alternatives)
     }
 
-    /**
-     * Verifies whether the named application is valid. The logic is very
-     * similar to the one in NamesDefaults.removeNames.
-     *
-     * @return a triple (argtpes1, argPos, namesOk) where
-     *  - argtpes1 the argument types in named application (assignments to
-     *    non-parameter names are treated as assignments, i.e. type Unit)
-     *  - argPos a Function1[Int, Int] mapping arguments from their current
-     *    to the corresponding position in params
-     *  - namesOK is false when there's an invalid use of named arguments
-     */
-    private def checkNames(argtpes: List[Type], params: List[Symbol]) = {
-      val argPos = Array.fill(argtpes.length)(-1)
-      var positionalAllowed, namesOK = true
-      var index = 0
-      val argtpes1 = argtpes map {
-        case NamedType(name, tp) => // a named argument
-          var res = tp
-          val pos = params.indexWhere(p => paramMatchesName(p, name) && !p.isSynthetic)
+    sealed abstract class Arg {
+      def name: Name
+      def tpe: Type
+      def pos: Int
+      def isNamed: Boolean
+      def isPositional = !isNamed
+    }
+    class NamedArg(val name: Name, val tpe: Type, val pos: Int) extends Arg {
+      def isNamed = true
+    }
+    class PositionalArg(val tpe: Type, val pos: Int) extends Arg {
+      def isNamed = false
+      def name = nme.NO_NAME
+    }
 
-          if (pos == -1) {
-            if (positionalAllowed) { // treat assignment as positional argument
-              argPos(index) = index
-              res = UnitClass.tpe
-            } else                   // unknown parameter name
-              namesOK = false
-          } else if (argPos.contains(pos)) { // parameter specified twice
-            namesOK = false
-          } else {
-            if (index != pos)
-              positionalAllowed = false
-            argPos(index) = pos
-          }
-          index += 1
-          res
-        case tp => // a positional argument
-          argPos(index) = index
-          if (!positionalAllowed)
-            namesOK = false // positional after named
-          index += 1
-          tp
+    private class IsApplicable(mt: MethodType, val argtpes: List[Type]) {
+      import mt.{ params, paramTypes }
+      val varargsTarget = isVarArgsList(params)
+      val argsCount     = argtpes.length
+      val formals       = formalTypes(paramTypes, argsCount, removeByName = false)
+      val lencmp        = compareLengths(argtpes, formals)
+      val args          = produceArgs()
+      val argPos        = args map (_.pos) toArray;
+      val usedNames     = argtpes collect { case NamedType(name, _) => name } toSet;
+      def usesNamedArgs = usedNames.nonEmpty
+
+      val positionalSpan = (
+        args.zipWithIndex takeWhile { case (arg, idx) =>
+          arg.isPositional || arg.pos == idx
+        }
+      ).length
+
+      def duplicatedPos          = args groupBy (_.pos) filter (_._2.size > 1)
+      def illegalPos             = args drop positionalSpan filter (_.isPositional)
+      def reorderedArgumentTypes = reorderArgs(args map (_.tpe), argPos)
+
+      private def produceArgs() = {
+        // case 2 is assignment expression (e.g. foo(x = 5) where there is no param x)
+        argtpes.zipWithIndex map {
+          case (NamedForPos(name, tpe, pos), _) => new NamedArg(name, tpe, pos)
+          case (NamedType(name, tpe), index)    => new PositionalArg(UnitClass.tpe, index)
+          case (tp, index)                      => new PositionalArg(tp, index)
+        }
       }
-      (argtpes1, argPos, namesOK)
+      private object NamedForPos {
+        def parameterIndex(name: Name) = params.indexWhere(p => paramMatchesName(p, name) && !p.isSynthetic)
+        def unapply(x: Type) = x match {
+          case NamedType(name, tp) => Some(parameterIndex(name)) filter (_ >= 0) map (pos => ((name, tp, pos)))
+          case _                   => None
+        }
+      }
+      // True unless the named argument application is erroneous in some way
+      // (positional after named, duplicate position, misuse of varargs)
+      private def namesUsageOk = !usesNamedArgs || (
+           illegalPos.isEmpty
+        && duplicatedPos.isEmpty
+        && (isIdentity(argPos) || sameLength(formals, params))  // when using named application, the vararg param has to be specified exactly once
+      )
+      private def isTupleable =
+        eligibleForTupleConversion(formals.length, argsCount, varargsTarget)
+
+      // The parameters beyond the positional prefix for which no named
+      // argument was given.
+      private def missingNamedParams: List[Symbol] =
+        params drop positionalSpan filterNot (p => usedNames(p.name))
+
+      // Returns a non-empty list if the missing params all have default arguments.
+      private def supplementaryDefaults: List[NamedType] = {
+        if (lencmp >= 0) Nil else {
+          val missing = missingNamedParams
+          if (missing forall (_.hasDefault))
+            missing map (p => NamedType(p.name, p.tpe))
+          else
+            Nil
+        }
+      }
+
+      /** If there are too few arguments, and the missing ones have
+       *  defaults, append the default types to the known argument types.
+       *  Otherwise, apply tuple conversion if allowable.  Failing that,
+       *  return None.
+       */
+      def argumentsAdaptedToArity = supplementaryDefaults match {
+        case Nil if isTupleable => Some(typeAfterTupleConversion(argtpes) :: Nil)
+        case Nil                => None
+        case defaults           => Some(argtpes ::: defaults)
+      }
+
+      /** If the number of arguments matches the number of formals,
+       *  return the argument types in the correct order, as dictated
+       *  by position and any named arguments.  Otherwise, None.
+       */
+      def argumentsInPosition: Option[List[Type]] = (
+        if (lencmp != 0 || !namesUsageOk) None
+        else if (usesNamedArgs)           Some(reorderedArgumentTypes)
+        else                              Some(argtpes)
+      )
+
+      // log(this)
+      override def toString = s"""
+        |IsApplicable($mt) {
+        |     formals=$formals
+        |     argtpes=$argtpes
+        |        args=$args
+        |   usedNames=$usedNames
+        |       args1=$argumentsInPosition
+        |       args2=$argumentsAdaptedToArity
+        |}""".trim.stripMargin
     }
 
     /** True if the given parameter list can accept a tupled argument list,
@@ -830,81 +895,50 @@ trait Infer extends Checkable {
      *  @param argtpes     the argument types; a NamedType(name, tp) for named
      *    arguments. For each NamedType, if `name` does not exist in `ftpe`, that
      *    type is set to `Unit`, i.e. the corresponding argument is treated as
-     *    an assignment expression (@see checkNames).
+     *    an assignment expression.
      *  @param pt          ...
      *  @return            ...
      */
-    private def isApplicable(undetparams: List[Symbol], ftpe: Type,
-                             argtpes0: List[Type], pt: Type): Boolean =
-      ftpe match {
-        case OverloadedType(pre, alts) =>
-          alts exists (alt => isApplicable(undetparams, pre memberType alt, argtpes0, pt))
-        case ExistentialType(tparams, qtpe) =>
-          isApplicable(undetparams, qtpe, argtpes0, pt)
-        case mt @ MethodType(params, _) =>
-          val argslen = argtpes0.length
-          val formals = formalTypes(mt.paramTypes, argslen, removeByName = false)
+    private def isApplicable(undetparams: List[Symbol], ftpe: Type, argtpes0: List[Type], pt: Type): Boolean = ftpe match {
+      case OverloadedType(pre, alts) =>
+        alts exists (alt => isApplicable(undetparams, pre memberType alt, argtpes0, pt))
+      case ExistentialType(tparams, qtpe) =>
+        isApplicable(undetparams, qtpe, argtpes0, pt)
+      case mt @ MethodType(_, _) =>
+        isApplicableMethod(undetparams, mt, argtpes0, pt)
+      case NullaryMethodType(restpe) => // strip nullary method type, which used to be done by the polytype case below
+        isApplicable(undetparams, restpe, argtpes0, pt)
+      case PolyType(tparams, restpe) =>
+        createFromClonedSymbols(tparams, restpe)((tps1, restpe1) => isApplicable(tps1 ::: undetparams, restpe1, argtpes0, pt))
+      case ErrorType =>
+        true
+      case _ =>
+        false
+    }
+    private def isApplicableMethod(undetparams: List[Symbol], mt: MethodType, argtpes0: List[Type], pt: Type): Boolean = {
+      val app = new IsApplicable(mt, argtpes0)
+      import app._
 
-          def tryTupleApply = {
-            val tupled = tupleIfNecessary(mt.paramTypes, argtpes0)
-            (tupled ne argtpes0) && isApplicable(undetparams, ftpe, tupled, pt)
-          }
-          def typesCompatible(argtpes: List[Type]) = {
-            val restpe = ftpe.resultType(argtpes)
-            if (undetparams.isEmpty) {
-              isCompatibleArgs(argtpes, formals) && isWeaklyCompatible(restpe, pt)
-            } else {
-              try {
-                val AdjustedTypeArgs.Undets(okparams, okargs, leftUndet) = methTypeArgs(undetparams, formals, restpe, argtpes, pt)
-                // #2665: must use weak conformance, not regular one (follow the monomorphic case above)
-                (exprTypeArgs(leftUndet, restpe.instantiateTypeParams(okparams, okargs), pt, useWeaklyCompatible = true)._1 ne null) &&
-                isWithinBounds(NoPrefix, NoSymbol, okparams, okargs)
-              } catch {
-                case ex: NoInstance => false
+      if (lencmp != 0)
+        argumentsAdaptedToArity exists (argtpes => isApplicableMethod(undetparams, mt, argtpes, pt))
+      else
+        argumentsInPosition exists { argtpes =>
+          val restpe = mt resultType argtpes
+          def checkInstantiable = methTypeArgs(undetparams, formals, restpe, argtpes, pt) match {
+            case AdjustedTypeArgs.Undets(okparams, okargs, leftUndet) =>
+              // #2665: must use weak conformance, not regular one (follow the monomorphic case above)
+              val newResult  = restpe.instantiateTypeParams(okparams, okargs)
+              exprTypeArgs(leftUndet, newResult, pt, useWeaklyCompatible = true) match {
+                case (null, _) => false
+                case _         => isWithinBounds(NoPrefix, NoSymbol, okparams, okargs)
               }
-            }
           }
-
-          // very similar logic to doTypedApply in typechecker
-          val lencmp = compareLengths(argtpes0, formals)
-          if (lencmp > 0) tryTupleApply
-          else if (lencmp == 0) {
-            // fast track if no named arguments are used
-            if (!containsNamedType(argtpes0))
-              typesCompatible(argtpes0)
-            else {
-              // named arguments are used
-              val (argtpes1, argPos, namesOK) = checkNames(argtpes0, params)
-              // when using named application, the vararg param has to be specified exactly once
-              (    namesOK
-                && (isIdentity(argPos) || sameLength(formals, params))
-                && typesCompatible(reorderArgs(argtpes1, argPos)) // nb. arguments and names are OK, check if types are compatible
-              )
-            }
-          }
-          else {
-            // not enough arguments, check if applicable using defaults
-            val missing = missingParams[Type](argtpes0, params, {
-              case NamedType(name, _) => Some(name)
-              case _ => None
-            })._1
-            if (missing forall (_.hasDefault)) {
-              // add defaults as named arguments
-              val argtpes1 = argtpes0 ::: (missing map (p => NamedType(p.name, p.tpe)))
-              isApplicable(undetparams, ftpe, argtpes1, pt)
-            }
-            else tryTupleApply
-          }
-
-        case NullaryMethodType(restpe) => // strip nullary method type, which used to be done by the polytype case below
-          isApplicable(undetparams, restpe, argtpes0, pt)
-        case PolyType(tparams, restpe) =>
-          createFromClonedSymbols(tparams, restpe)((tps1, restpe1) => isApplicable(tps1 ::: undetparams, restpe1, argtpes0, pt))
-        case ErrorType =>
-          true
-        case _ =>
-          false
-      }
+          if (undetparams.isEmpty)
+            isCompatibleArgs(argtpes, formals) && isWeaklyCompatible(restpe, pt)
+          else
+            try checkInstantiable catch { case ex: NoInstance => false }
+        }
+    }
 
     /**
      * Todo: Try to make isApplicable always safe (i.e. not cause TypeErrors).
