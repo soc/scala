@@ -93,18 +93,6 @@ trait GenTraversableOnce[+A] extends Any {
    */
   def reduce[A1 >: A](op: (A1, A1) => A1): A1
 
-  /** Reduces the elements of this $coll, if any, using the specified
-   *  associative binary operator.
-   *
-   *  $undefinedorder
-   *
-   *  @tparam A1     A type parameter for the binary operator, a supertype of `A`.
-   *  @param op      A binary operator that must be associative.
-   *  @return        An option value containing result of applying reduce operator `op` between all
-   *                 the elements if the collection is nonempty, and `None` otherwise.
-   */
-  def reduceOption[A1 >: A](op: (A1, A1) => A1): Option[A1]
-
   /** Folds the elements of this $coll using the specified associative
    *  binary operator.
    *
@@ -283,29 +271,6 @@ trait GenTraversableOnce[+A] extends Any {
    *  @throws `UnsupportedOperationException` if this $coll is empty.
    */
   def reduceRight[B >: A](op: (A, B) => B): B
-
-  /** Optionally applies a binary operator to all elements of this $coll, going left to right.
-   *  $willNotTerminateInf
-   *  $orderDependentFold
-   *
-   *  @param  op    the binary operator.
-   *  @tparam  B    the result type of the binary operator.
-   *  @return  an option value containing the result of `reduceLeft(op)` is this $coll is nonempty,
-   *           `None` otherwise.
-   */
-  def reduceLeftOption[B >: A](op: (B, A) => B): Option[B]
-
-  /** Optionally applies a binary operator to all elements of this $coll, going
-   *  right to left.
-   *  $willNotTerminateInf
-   *  $orderDependentFold
-   *
-   *  @param  op    the binary operator.
-   *  @tparam  B    the result type of the binary operator.
-   *  @return  an option value containing the result of `reduceRight(op)` is this $coll is nonempty,
-   *           `None` otherwise.
-   */
-  def reduceRightOption[B >: A](op: (A, B) => B): Option[B]
 
   /** Counts the number of elements in the $coll which satisfy a predicate.
    *

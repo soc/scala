@@ -14,6 +14,47 @@ import scala.annotation.unchecked.{ uncheckedVariance => uV }
 import scala.language.{implicitConversions, higherKinds}
 import scala.reflect.ClassTag
 
+final class TraversableOnceOps[+A](val collection: TraversableOnce[A]) extends AnyVal {
+  import collection._
+
+  /** Optionally applies a binary operator to all elements of this $coll, going left to right.
+   *  $willNotTerminateInf
+   *  $orderDependentFold
+   *
+   *  @param  op    the binary operator.
+   *  @tparam  B    the result type of the binary operator.
+   *  @return  an option value containing the result of `reduceLeft(op)` is this $coll is nonempty,
+   *           `None` otherwise.
+   */
+  def reduceLeftOption[B >: A](op: (B, A) => B): Option[B] =
+    if (isEmpty) None else Some(reduceLeft[B](op))
+
+  /** Optionally applies a binary operator to all elements of this $coll, going
+   *  right to left.
+   *  $willNotTerminateInf
+   *  $orderDependentFold
+   *
+   *  @param  op    the binary operator.
+   *  @tparam  B    the result type of the binary operator.
+   *  @return  an option value containing the result of `reduceRight(op)` is this $coll is nonempty,
+   *           `None` otherwise.
+   */
+  def reduceRightOption[B >: A](op: (A, B) => B): Option[B] =
+    if (isEmpty) None else Some(reduceRight(op))
+
+  /** Reduces the elements of this $coll, if any, using the specified
+   *  associative binary operator.
+   *
+   *  $undefinedorder
+   *
+   *  @tparam A1     A type parameter for the binary operator, a supertype of `A`.
+   *  @param op      A binary operator that must be associative.
+   *  @return        An option value containing result of applying reduce operator `op` between all
+   *                 the elements if the collection is nonempty, and `None` otherwise.
+   */
+  def reduceOption[A1 >: A](op: (A1, A1) => A1): Option[A1] = reduceLeftOption(op)
+}
+
 /** A template trait for collections which can be traversed either once only
  *  or one or more times.
  *  $traversableonceinfo
@@ -171,16 +212,7 @@ trait TraversableOnce[+A] extends Any with GenTraversableOnce[A] {
 
     reversed.reduceLeft[B]((x, y) => op(y, x))
   }
-
-  def reduceLeftOption[B >: A](op: (B, A) => B): Option[B] =
-    if (isEmpty) None else Some(reduceLeft(op))
-
-  def reduceRightOption[B >: A](op: (A, B) => B): Option[B] =
-    if (isEmpty) None else Some(reduceRight(op))
-
   def reduce[A1 >: A](op: (A1, A1) => A1): A1 = reduceLeft(op)
-
-  def reduceOption[A1 >: A](op: (A1, A1) => A1): Option[A1] = reduceLeftOption(op)
 
   def fold[A1 >: A](z: A1)(op: (A1, A1) => A1): A1 = foldLeft(z)(op)
 
