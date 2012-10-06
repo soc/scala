@@ -473,10 +473,7 @@ trait NamesDefaults { self: Analyzer =>
       //   f(x = 1)   <<  "x = 1" typechecks with expected type WildcardType
       savingUndeterminedTParams(context) { udp =>
         val subst = new SubstTypeMap(udp, udp map (_ => WildcardType)) {
-          override def apply(tp: Type): Type = super.apply(tp match {
-            case TypeRef(_, ByNameParamClass, x :: Nil) => x
-            case _                                      => tp
-          })
+          override def apply(tp: Type): Type = super.apply(dropByName(tp))
         }
         // This throws an exception which is caught in `tryTypedApply` (as it
         // uses `silent`) - unfortunately, tryTypedApply recovers from the
