@@ -36,14 +36,17 @@ trait Infer extends Checkable {
    *  By-name types are replaced with their underlying type.
    *
    *  @param removeByName allows keeping ByName parameters. Used in NamesDefaults.
-   *  @param removeRepeated allows keeping repeated parameter (if there's one argument). Used in NamesDefaults.
    */
-  def formalTypes(formals: List[Type], nargs: Int, removeByName: Boolean = true, removeRepeated: Boolean = true): List[Type] = {
-    val formals1 = if (removeByName) formals mapConserve dropByName else formals
-    if (isVarArgTypes(formals1) && (removeRepeated || formals.length != nargs)) {
-      val ft = formals1.last.normalize.typeArgs.head
-      formals1.init ::: (for (i <- List.range(formals1.length - 1, nargs)) yield ft)
-    } else formals1
+  def formalTypes(formals: List[Type], nargs: Int, removeByName: Boolean = true): List[Type] = {
+    if (formals.isEmpty) Nil else {
+      val formals1 = if (removeByName) formals mapConserve dropByName else formals
+      formals1.last.normalize match {
+        case TypeRef(_, RepeatedParamClass, repeatedType :: Nil) =>
+          formals1.init ++ List.fill(nargs - formals1.length + 1)(ft)
+        case _ =>
+          formals1
+      }
+    }
   }
 
   /** Sorts the alternatives according to the given comparison function.
