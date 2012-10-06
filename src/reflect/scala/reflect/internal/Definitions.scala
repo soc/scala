@@ -807,7 +807,7 @@ trait Definitions extends api.StandardDefinitions {
     lazy val Any_isInstanceOf = newT1NullaryMethod(AnyClass, nme.isInstanceOf_, FINAL)(_ => booltype)
     lazy val Any_asInstanceOf = newT1NullaryMethod(AnyClass, nme.asInstanceOf_, FINAL)(_.typeConstructor)
 
-  // A type function from T => Class[U], used to determine the return
+    // A type function from T => Class[U], used to determine the return
     // type of getClass calls.  The returned type is:
     //
     //  1. If T is a value type, Class[T].
@@ -821,23 +821,17 @@ trait Definitions extends api.StandardDefinitions {
     //
     // TODO: If T is final, return type could be Class[T].  Should it?
     def getClassReturnType(tp: Type): Type = {
-      val sym     = tp.typeSymbol
+      val sym = tp.typeSymbol
 
       if (phase.erasedTypes) ClassClass.tpe
       else if (isPrimitiveValueClass(sym)) ClassType(tp.widen)
-      else {
-        val eparams    = typeParamsToExistentials(ClassClass, ClassClass.typeParams)
-        val upperBound = (
+      else appliedTypeAsUpperBounds(
+        ClassClass.typeConstructor, List(
           if (isPhantomClass(sym)) AnyClass.tpe
           else if (sym.isLocalClass) erasure.intersectionDominator(tp.parents)
           else tp.widen
         )
-
-        existentialAbstraction(
-          eparams,
-          ClassType((eparams.head setInfo TypeBounds.upper(upperBound)).tpe)
-        )
-      }
+      )
     }
 
     /** Remove references to class Object (other than the head) in a list of parents */
