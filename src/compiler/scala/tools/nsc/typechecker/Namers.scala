@@ -161,6 +161,9 @@ trait Namers extends MethodSynthesis {
       else innerNamer
     }
 
+    // FIXME - this logic needs to be thoroughly explained
+    // and justified.  I know it's wrong with repect to package
+    // objects, but I think it's also wrong in other ways.
     protected def conflict(newS: Symbol, oldS: Symbol) = (
        (   !oldS.isSourceMethod
         || nme.isSetterName(newS.name)
@@ -188,6 +191,19 @@ trait Namers extends MethodSynthesis {
 
     /** Enter symbol into given scope and return symbol itself */
     def enterInScope(sym: Symbol, scope: Scope): Symbol = {
+      // FIXME - this is broken in a number of ways.
+      //
+      // 1) If "sym" allows overloading, that is not itself sufficient to skip
+      // the check, because "prev.sym" also must allow overloading.
+      //
+      // 2) There is nothing which reconciles a package's scope with
+      // the package object's scope.  This is the source of many bugs
+      // with e.g. defining a case class in a package object.  When
+      // compiling against classes, the class symbol is created in the
+      // package and in the package object, and the conflict is undetected.
+      // There is also a non-deterministic outcome for situations like
+      // an object with the same name as a method in the package object.
+
       // allow for overloaded methods
       if (!allowsOverload(sym)) {
         val prev = scope.lookupEntry(sym.name)
@@ -784,7 +800,7 @@ trait Namers extends MethodSynthesis {
           false
       }
 
-      val tpe1 = dropRepeatedParamType(tpe.deconst)
+      val tpe1 = dropIllegalStarTypes(tpe.deconst)
       val tpe2 = tpe1.widen
 
       // This infers Foo.type instead of "object Foo"
@@ -832,7 +848,7 @@ trait Namers extends MethodSynthesis {
 
       val sym = (
         if (hasType || hasName) {
-          owner.typeOfThis = if (hasType) selfTypeCompleter(tpt) else owner.tpe
+          owner.typeOfThis = if (hasType) selfTypeCompleter(tpt) else owner.tpe_*
           val selfSym = owner.thisSym setPos self.pos
           if (hasName) selfSym setName name else selfSym
         }
@@ -918,7 +934,7 @@ trait Namers extends MethodSynthesis {
 
       // DEPMETTODO: do we need to skolemize value parameter symbols?
       if (tpt.isEmpty && meth.name == nme.CONSTRUCTOR) {
-        tpt defineType context.enclClass.owner.tpe
+        tpt defineType context.enclClass.owner.tpe_*
         tpt setPos meth.pos.focus
       }
       var resultPt = if (tpt.isEmpty) WildcardType else typer.typedType(tpt).tpe
@@ -1506,7 +1522,7 @@ trait Namers extends MethodSynthesis {
 
   /** A class representing a lazy type with known type parameters.
    */
-  class PolyTypeCompleter(tparams: List[TypeDef], restp: TypeCompleter, owner: Tree, ctx: Context) extends LockingTypeCompleter {
+  class PolyTypeCompleter(tparams: List[TypeDef], restp: TypeCompleter, owner: Tree, ctx: Context) extends LockingTypeCompleter with FlagAgnosticCompleter {
     private val ownerSym    = owner.symbol
     override val typeParams = tparams map (_.symbol) //@M
     override val tree       = restp.tree

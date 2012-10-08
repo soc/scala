@@ -19,7 +19,7 @@ trait Extractors {
   //         $treecreator1.super.<init>();
   //         ()
   //       };
-  //       def apply[U >: Nothing <: scala.reflect.api.Universe with Singleton]($m$untyped: scala.reflect.api.MirrorOf[U]): U#Tree = {
+  //       def apply[U >: Nothing <: scala.reflect.api.Universe with Singleton]($m$untyped: scala.reflect.api.Mirror[U]): U#Tree = {
   //         val $u: U = $m$untyped.universe;
   //         val $m: $u.Mirror = $m$untyped.asInstanceOf[$u.Mirror];
   //         $u.Apply($u.Select($u.Select($u.build.This($m.staticPackage("scala.collection.immutable").moduleClass), $u.newTermName("List")), $u.newTermName("apply")), List($u.Literal($u.Constant(1)), $u.Literal($u.Constant(2))))
@@ -32,7 +32,7 @@ trait Extractors {
   //         $typecreator1.super.<init>();
   //         ()
   //       };
-  //       def apply[U >: Nothing <: scala.reflect.api.Universe with Singleton]($m$untyped: scala.reflect.api.MirrorOf[U]): U#Type = {
+  //       def apply[U >: Nothing <: scala.reflect.api.Universe with Singleton]($m$untyped: scala.reflect.api.Mirror[U]): U#Type = {
   //         val $u: U = $m$untyped.universe;
   //         val $m: $u.Mirror = $m$untyped.asInstanceOf[$u.Mirror];
   //         $u.TypeRef($u.ThisType($m.staticPackage("scala.collection.immutable").moduleClass), $m.staticClass("scala.collection.immutable.List"), List($m.staticClass("scala.Int").toTypeConstructor))
@@ -81,7 +81,7 @@ trait Extractors {
         DefDef(NoMods,
           reifierName,
           List(TypeDef(Modifiers(PARAM), tparamu, List(), TypeBoundsTree(Ident(NothingClass), CompoundTypeTree(Template(List(Ident(reifierUniverse), Ident(SingletonClass)), emptyValDef, List()))))),
-          List(List(ValDef(Modifiers(PARAM), nme.MIRROR_UNTYPED, AppliedTypeTree(Ident(MirrorOfClass), List(Ident(tparamu))), EmptyTree))),
+          List(List(ValDef(Modifiers(PARAM), nme.MIRROR_UNTYPED, AppliedTypeTree(Ident(MirrorClass), List(Ident(tparamu))), EmptyTree))),
           reifierTpt, reifierBody))))
     Block(tpec, ApplyConstructor(Ident(tpec.name), List()))
   }
@@ -92,11 +92,18 @@ trait Extractors {
     Block(List(universeAlias, mirrorAlias), wrappee)
   }
 
+  // if we're reifying a MethodType, we can't use it as a type argument for TypeTag ctor
+  // http://groups.google.com/group/scala-internals/browse_thread/thread/2d7bb85bfcdb2e2
+  private def mkTarg(tpe: Type): Tree = (
+    if ((tpe eq null) || !isUseableAsTypeArg(tpe)) TypeTree(AnyTpe)
+    else TypeTree(tpe)
+  )
+
   object ReifiedTree {
     def apply(universe: Tree, mirror: Tree, symtab: SymbolTable, rtree: Tree, tpe: Type, rtpe: Tree, concrete: Boolean): Tree = {
       val tagFactory = if (concrete) nme.TypeTag else nme.WeakTypeTag
-      val tagCtor = TypeApply(Select(Select(Ident(nme.UNIVERSE_SHORT), tagFactory), nme.apply), List(TypeTree(tpe)))
-      val exprCtor = TypeApply(Select(Select(Ident(nme.UNIVERSE_SHORT), nme.Expr), nme.apply), List(TypeTree(tpe)))
+      val tagCtor = TypeApply(Select(Select(Ident(nme.UNIVERSE_SHORT), tagFactory), nme.apply), List(mkTarg(tpe)))
+      val exprCtor = TypeApply(Select(Select(Ident(nme.UNIVERSE_SHORT), nme.Expr), nme.apply), List(mkTarg(tpe)))
       val tagArgs = List(Ident(nme.MIRROR_SHORT), mkCreator(tpnme.REIFY_TYPECREATOR_PREFIX, symtab, rtpe))
       val unwrapped = Apply(Apply(exprCtor, List(Ident(nme.MIRROR_SHORT), mkCreator(tpnme.REIFY_TREECREATOR_PREFIX, symtab, rtree))), List(Apply(tagCtor, tagArgs)))
       mkWrapper(universe, mirror, unwrapped)
@@ -114,7 +121,7 @@ trait Extractors {
             case Select(Select(_, tagFlavor), _) => tagFlavor
             case Select(_, tagFlavor) => tagFlavor
           }
-          Some(universe, mirror, SymbolTable(symbolTable1 ++ symbolTable2), rtree, ttpe.tpe, rtpe, tagFlavor == nme.TypeTag)
+          Some((universe, mirror, SymbolTable(symbolTable1 ++ symbolTable2), rtree, ttpe.tpe, rtpe, tagFlavor == nme.TypeTag))
       case _ =>
         None
     }
@@ -123,7 +130,7 @@ trait Extractors {
   object ReifiedType {
     def apply(universe: Tree, mirror: Tree, symtab: SymbolTable, tpe: Type, rtpe: Tree, concrete: Boolean) = {
       val tagFactory = if (concrete) nme.TypeTag else nme.WeakTypeTag
-      val ctor = TypeApply(Select(Select(Ident(nme.UNIVERSE_SHORT), tagFactory), nme.apply), List(TypeTree(tpe)))
+      val ctor = TypeApply(Select(Select(Ident(nme.UNIVERSE_SHORT), tagFactory), nme.apply), List(mkTarg(tpe)))
       val args = List(Ident(nme.MIRROR_SHORT), mkCreator(tpnme.REIFY_TYPECREATOR_PREFIX, symtab, rtpe))
       val unwrapped = Apply(ctor, args)
       mkWrapper(universe, mirror, unwrapped)
@@ -139,7 +146,7 @@ trait Extractors {
             case Select(Select(_, tagFlavor), _) => tagFlavor
             case Select(_, tagFlavor) => tagFlavor
           }
-          Some(universe, mirror, SymbolTable(symtab), ttpe.tpe, rtpe, tagFlavor == nme.TypeTag)
+          Some((universe, mirror, SymbolTable(symtab), ttpe.tpe, rtpe, tagFlavor == nme.TypeTag))
       case _ =>
         None
     }
@@ -160,9 +167,9 @@ trait Extractors {
   object FreeDef {
     def unapply(tree: Tree): Option[(Tree, TermName, Tree, Long, String)] = tree match {
       case FreeTermDef(uref, name, binding, flags, origin) =>
-        Some(uref, name, binding, flags, origin)
+        Some((uref, name, binding, flags, origin))
       case FreeTypeDef(uref, name, binding, flags, origin) =>
-        Some(uref, name, binding, flags, origin)
+        Some((uref, name, binding, flags, origin))
       case _ =>
         None
     }
@@ -207,7 +214,7 @@ trait Extractors {
     def unapply(tree: Tree): Option[(Tree, TermName)] = tree match {
       case Apply(Select(Select(uref @ Ident(_), build), ident), List(Ident(name: TermName)))
       if build == nme.build && ident == nme.Ident && name.startsWith(nme.REIFY_FREE_PREFIX) =>
-        Some(uref, name)
+        Some((uref, name))
       case _ =>
         None
     }
@@ -226,7 +233,7 @@ trait Extractors {
             Literal(Constant(isClass: Boolean)))))
       if uref1.name == nme.UNIVERSE_SHORT && build1 == nme.build && newNestedSymbol == nme.newNestedSymbol &&
          uref2.name == nme.UNIVERSE_SHORT && build2 == nme.build && flagsFromBits == nme.flagsFromBits =>
-        Some(uref1, name, flags, isClass)
+        Some((uref1, name, flags, isClass))
       case _ =>
         None
     }

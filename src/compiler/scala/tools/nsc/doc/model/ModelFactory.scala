@@ -191,7 +191,7 @@ class ModelFactory(val global: Global, val settings: doc.Settings) {
         case NullaryMethodType(res) => resultTpe(res)
         case _ => tpe
       }
-      val tpe = if (!isImplicitlyInherited) sym.tpe else byConversion.get.toType memberInfo sym
+      val tpe = byConversion.fold(sym.tpe) (_.toType memberInfo sym)
       makeTypeInTemplateContext(resultTpe(tpe), inTemplate, sym)
     }
     def isDef = false
@@ -207,7 +207,8 @@ class ModelFactory(val global: Global, val settings: doc.Settings) {
       ((!sym.isTrait && ((sym hasFlag Flags.ABSTRACT) || (sym hasFlag Flags.DEFERRED)) && (!isImplicitlyInherited)) ||
       sym.isAbstractClass || sym.isAbstractType) && !sym.isSynthetic
     def isTemplate = false
-    lazy val signature = {
+    def signature = externalSignature(sym)
+    lazy val signatureCompat = {
 
       def defParams(mbr: Any): String = mbr match {
         case d: MemberEntity with Def =>
@@ -400,7 +401,7 @@ class ModelFactory(val global: Global, val settings: doc.Settings) {
      * This is the final point in the core model creation: no DocTemplates are created after the model has finished, but
      * inherited templates and implicit members are added to the members at this point.
      */
-    def completeModel: Unit = {
+    def completeModel(): Unit = {
       // DFS completion
       // since alias types and abstract types have no own members, there's no reason for them to call completeModel
       if (!sym.isAliasType && !sym.isAbstractType)
@@ -429,12 +430,12 @@ class ModelFactory(val global: Global, val settings: doc.Settings) {
       conversions flatMap (conv =>
         if (!implicitExcluded(conv.conversionQualifiedName))
           conv.targetTypeComponents map {
-            case pair@(template, tpe) =>
+            case (template, tpe) =>
               template match {
                 case d: DocTemplateImpl if (d != this) => d.registerImplicitlyConvertibleClass(this, conv)
                 case _ => // nothing
               }
-              (pair._1, pair._2, conv)
+              (template, tpe, conv)
           }
         else List()
       )
@@ -483,23 +484,14 @@ class ModelFactory(val global: Global, val settings: doc.Settings) {
     def inheritanceDiagram = makeInheritanceDiagram(this)
     def contentDiagram = makeContentDiagram(this)
 
-    def groupSearch[T](extractor: Comment => T, default: T): T = {
-      // query this template
-      for (c <- comment) {
-        val entity = extractor(c)
-        if (entity != default) return entity
-      }
-      // query linearization
-      for (tpl <- linearizationTemplates.collect{ case dtpl: DocTemplateImpl if dtpl!=this => dtpl}) {
-        val entity = tpl.groupSearch(extractor, default)
-        if (entity != default) return entity
-      }
-      default
+    def groupSearch[T](extractor: Comment => Option[T]): Option[T] = {
+      val comments = comment +: linearizationTemplates.collect { case dtpl: DocTemplateImpl => dtpl.comment }
+      comments.flatten.map(extractor).flatten.headOption
     }
 
-    def groupDescription(group: String): Option[Body] = groupSearch(_.groupDesc.get(group), None)
-    def groupPriority(group: String): Int = groupSearch(_.groupPrio.get(group) match { case Some(prio) => prio; case _ => 0 }, 0)
-    def groupName(group: String): String = groupSearch(_.groupNames.get(group) match { case Some(name) => name; case _ => group }, group)
+    def groupDescription(group: String): Option[Body] = groupSearch(_.groupDesc.get(group))
+    def groupPriority(group: String): Int = groupSearch(_.groupPrio.get(group)) getOrElse 0
+    def groupName(group: String): String = groupSearch(_.groupNames.get(group)) getOrElse group
   }
 
   abstract class PackageImpl(sym: Symbol, inTpl: PackageImpl) extends DocTemplateImpl(sym, inTpl) with Package {
@@ -554,7 +546,7 @@ class ModelFactory(val global: Global, val settings: doc.Settings) {
                                             useCaseOf: Option[MemberEntity], inTpl: DocTemplateImpl)
            extends NonTemplateMemberImpl(sym, conversion, useCaseOf, inTpl) {
     def valueParams = {
-      val info = if (!isImplicitlyInherited) sym.info else conversion.get.toType memberInfo sym
+      val info = conversion.fold(sym.info)(_.toType memberInfo sym)
       info.paramss map { ps => (ps.zipWithIndex) map { case (p, i) =>
         if (p.nameString contains "$") makeValueParam(p, inTpl, optimize("arg" + i)) else makeValueParam(p, inTpl)
       }}
@@ -853,7 +845,7 @@ class ModelFactory(val global: Global, val settings: doc.Settings) {
     inTpl.members.find(_.sym == aSym)
   }
 
-  @deprecated("2.10", "Use findLinkTarget instead!")
+  @deprecated("Use `findLinkTarget` instead.", "2.10.0")
   def findTemplate(query: String): Option[DocTemplateImpl] = {
     assert(modelFinished)
     docTemplatesCache.values find { (tpl: DocTemplateImpl) => tpl.qualifiedName == query && !packageDropped(tpl) && !tpl.isObject }
@@ -967,10 +959,10 @@ class ModelFactory(val global: Global, val settings: doc.Settings) {
       val ignoreParents = Set[Symbol](AnyClass, AnyRefClass, ObjectClass)
       val filtParents =
         // we don't want to expose too many links to AnyRef, that will just be redundant information
-        if (tpl.isDefined && { val sym = tpl.get.sym; (!sym.isModule && parents.length < 2) || (sym == AnyValClass) || (sym == AnyRefClass) || (sym == AnyClass) })
-          parents
-        else
-          parents.filterNot((p: Type) => ignoreParents(p.typeSymbol))
+        tpl match {
+          case Some(tpl) if (!tpl.sym.isModule && parents.length < 2) || (tpl.sym == AnyValClass) || (tpl.sym == AnyRefClass) || (tpl.sym == AnyClass) => parents
+          case _ => parents.filterNot((p: Type) => ignoreParents(p.typeSymbol))
+        }
 
       /** Returns:
        *   - a DocTemplate if the type's symbol is documented
@@ -1067,5 +1059,17 @@ class ModelFactory(val global: Global, val settings: doc.Settings) {
     (settings.docExpandAllTypes.value && (bSym.sourceFile != null)) ||
     { val rawComment = global.expandedDocComment(bSym, inTpl.sym)
       rawComment.contains("@template") || rawComment.contains("@documentable") }
+
+  def findExternalLink(name: String): Option[LinkTo] =
+    settings.extUrlMapping find {
+      case (pkg, _) => name startsWith pkg
+    } map {
+      case (_, url) => LinkToExternal(name, url + "#" + name)
+    }
+
+  def externalSignature(sym: Symbol) = {
+    sym.info // force it, otherwise we see lazy types
+    (sym.nameString + sym.signatureString).replaceAll("\\s", "")
+  }
 }
 

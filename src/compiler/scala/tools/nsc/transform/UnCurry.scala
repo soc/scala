@@ -134,7 +134,7 @@ abstract class UnCurry extends InfoTransform
     def isByNameRef(tree: Tree) = (
          tree.isTerm
       && !byNameArgs(tree)
-      && tree.hasSymbolWhich(s => isByNameParamType(s.tpe))
+      && tree.hasSymbolWhich(isByName)
     )
 
     /** Uncurry a type of a tree node.
@@ -185,7 +185,7 @@ abstract class UnCurry extends InfoTransform
      *    try {
      *      body
      *    } catch {
-     *      case ex: NonLocalReturnControl[_] =>
+     *      case ex: NonLocalReturnControl[T @unchecked] =>
      *        if (ex.key().eq(key)) ex.value()
      *        else throw ex
      *    }
@@ -195,7 +195,8 @@ abstract class UnCurry extends InfoTransform
       localTyper typed {
         val extpe   = nonLocalReturnExceptionType(meth.tpe.finalResultType)
         val ex      = meth.newValue(nme.ex, body.pos) setInfo extpe
-        val pat     = gen.mkBindForCase(ex, NonLocalReturnControlClass, List(meth.tpe.finalResultType))
+        val argType = meth.tpe.finalResultType withAnnotation (AnnotationInfo marker UncheckedClass.tpe)
+        val pat     = gen.mkBindForCase(ex, NonLocalReturnControlClass, List(argType))
         val rhs = (
           IF   ((ex DOT nme.key)() OBJ_EQ Ident(key))
           THEN ((ex DOT nme.value)())
@@ -204,11 +205,8 @@ abstract class UnCurry extends InfoTransform
         val keyDef   = ValDef(key, New(ObjectClass.tpe))
         val tryCatch = Try(body, pat -> rhs)
 
-        body foreach {
-          case Try(t, catches, _) if catches exists treeInfo.catchesThrowable =>
-            unit.warning(body.pos, "catch block may intercept non-local return from " + meth)
-          case _ =>
-        }
+        for (Try(t, catches, _) <- body ; cdef <- catches ; if treeInfo catchesThrowable cdef)
+          unit.warning(body.pos, "catch block may intercept non-local return from " + meth)
 
         Block(List(keyDef), tryCatch)
       }
@@ -690,16 +688,16 @@ abstract class UnCurry extends InfoTransform
         else
           tree
       }
-      
+
       def isThrowable(pat: Tree): Boolean = pat match {
-        case Typed(Ident(nme.WILDCARD), tpt) => 
+        case Typed(Ident(nme.WILDCARD), tpt) =>
           tpt.tpe =:= ThrowableClass.tpe
-        case Bind(_, pat) => 
+        case Bind(_, pat) =>
           isThrowable(pat)
         case _ =>
           false
       }
-      
+
       def isDefaultCatch(cdef: CaseDef) = isThrowable(cdef.pat) && cdef.guard.isEmpty
 
       def postTransformTry(tree: Try) = {
@@ -763,10 +761,10 @@ abstract class UnCurry extends InfoTransform
 
         case tree: Try =>
           postTransformTry(tree)
-          
+
         case Apply(Apply(fn, args), args1) =>
           treeCopy.Apply(tree, fn, args ::: args1)
-          
+
         case Ident(name) =>
           assert(name != tpnme.WILDCARD_STAR, tree)
           applyUnary()
