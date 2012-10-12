@@ -1803,7 +1803,10 @@ trait Types extends api.Types { self: SymbolTable =>
     private var normalized: Type = _
     private def normalizeImpl = {
       // TODO see comments around def intersectionType and def merge
-      def flatten(tps: List[Type]): List[Type] = tps flatMap { case RefinedType(parents, ds) if ds.isEmpty => flatten(parents) case tp => List(tp) }
+      def flatten(tps: List[Type]): List[Type] = tps flatMap {
+        case RefinedType(parents, ds) if ds.isEmpty => flatten(parents)
+        case tp                                     => List(tp)
+      }
       val flattened = flatten(parents).distinct
       if (decls.isEmpty && flattened.tail.isEmpty) {
         flattened.head
@@ -2265,13 +2268,18 @@ trait Types extends api.Types { self: SymbolTable =>
     // selection of sym1 on pre1, since sym's info was probably updated
     // by the TypeMap to yield a new symbol, sym1 with transformed info.
     // @returns sym1
-    override def coevolveSym(pre1: Type): Symbol =
-      if (pre eq pre1) sym else (pre, pre1) match {
-        // don't look at parents -- it would be an error to override alias types anyway
-        case (RefinedType(_, _), RefinedType(_, decls1)) => decls1 lookup sym.name
-        // TODO: is there another way a typeref's symbol can refer to a symbol defined in its pre?
-        case _                                           => sym
+    override def coevolveSym(pre1: Type): Symbol = logResult(s"$this.coevolveSym($pre1)") {
+      if (pre eq pre1) sym else pre1 match {
+        case RefinedType(_, decls1) => decls1 lookup sym.name
+        case _                      => sym
       }
+      //  (pre, pre1) match {
+      //   // don't look at parents -- it would be an error to override alias types anyway
+      //   case (RefinedType(_, _), RefinedType(_, decls1)) => decls1 lookup sym.name
+      //   // TODO: is there another way a typeref's symbol can refer to a symbol defined in its pre?
+      //   case _                                           => sym
+      // }
+    }
     override def kind = "AliasTypeRef"
   }
 
