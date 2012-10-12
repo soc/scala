@@ -2230,9 +2230,9 @@ trait Types extends api.Types { self: SymbolTable =>
     require(sym.isAliasType, sym)
 
     if (args.nonEmpty) {
-      log(s"AliasTypeRef(pre=$pre/$prefix,sym=$sym,args=$args")
-      log(s"  thisInfo=$thisInfo/${thisInfo.normalize}")
-      log(s"  applied=${appliedType(sym.info, args)}")
+      log(s"AliasTypeRef(pre=$pre,sym=$sym/info=${sym.info},args=$args")
+      // log(s"  thisInfo=$thisInfo/${thisInfo.normalize}")
+      // log(s"  applied=${appliedType(sym.info, args)}")
     }
 
     // [log typer] Test.l1.Drop.normalizeImpl: [N <: Nat]Test.l1.Drop[N]
