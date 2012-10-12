@@ -2229,6 +2229,17 @@ trait Types extends api.Types { self: SymbolTable =>
   trait AliasTypeRef extends NonClassTypeRef {
     require(sym.isAliasType, sym)
 
+    if (args.nonEmpty) {
+      log(s"AliasTypeRef(pre=$pre/$prefix,sym=$sym,args=$args")
+      log(s"  thisInfo=$thisInfo/${thisInfo.normalize}")
+      log(s"  applied=${appliedType(sym.info, args)}")
+    }
+
+    // [log typer] Test.l1.Drop.normalizeImpl: [N <: Nat]Test.l1.Drop[N]
+    // [log typer] Test.l1.Drop[...].normalizeImpl: Test.#:[...,...]
+    // [log typer] Test.l1.Apply.normalizeImpl: [N <: Nat]Test.l1.Apply[N]
+    // [log typer] Test.l1.Apply[...].normalizeImpl: Int
+
     override def dealias    = if (typeParamsMatchArgs) betaReduce.dealias else super.dealias
     override def isStable   = normalize.isStable
     override def isVolatile = normalize.isVolatile
@@ -2239,7 +2250,7 @@ trait Types extends api.Types { self: SymbolTable =>
     override def typeSymbol = if (this ne normalize) normalize.typeSymbol else sym
 
     // beta-reduce, but don't do partial application -- cycles have been checked in typeRef
-    override protected def normalizeImpl =
+    override protected def normalizeImpl = asSeenFromOwner(
       if (typeParamsMatchArgs) betaReduce.normalize
       else if (isHigherKinded) super.normalizeImpl
       else {
@@ -2251,6 +2262,7 @@ trait Types extends api.Types { self: SymbolTable =>
         if (overriddenSym != NoSymbol) pre.memberType(overriddenSym).normalize
         else ErrorType
       }
+    )
 
     // isHKSubType0 introduces synthetic type params so that
     // betaReduce can first apply sym.info to typeArgs before calling
