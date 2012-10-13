@@ -598,6 +598,11 @@ trait Types extends api.Types { self: SymbolTable =>
      *  `betaReduce` performs exactly one step and then returns.
      */
     def betaReduce: Type = this
+    def betaReduceChain: List[Type] = {
+      val br = betaReduce
+      if (br eq this) List(this)
+      else this :: br.betaReduceChain
+    }
 
     /** For a classtype or refined type, its defined or declared members;
      *  inherited by subtypes and typerefs.
@@ -1796,7 +1801,18 @@ trait Types extends api.Types { self: SymbolTable =>
     final override def normalize: Type =
       if (phase.erasedTypes) normalizeImpl
       else {
-        if (normalized eq null) normalized = normalizeImpl
+        if (normalized eq null) {
+          normalized = normalizeImpl
+          if (normalized ne this) {
+            sys.printAtShutdown(() => s"""|
+              |NORMALIZE (RefinedType) {
+              |          type: $this
+              |       parents: $parents
+              |    normalized: $normalized
+              |}
+            """.stripMargin)
+          }
+        }
         normalized
       }
 
@@ -1825,7 +1841,8 @@ trait Types extends api.Types { self: SymbolTable =>
             },
             decls,
             typeSymbol))
-      } else super.normalize
+      }
+      else super.normalize
     }
 
     /** A refined type P1 with ... with Pn { decls } is volatile if
@@ -2258,7 +2275,7 @@ trait Types extends api.Types { self: SymbolTable =>
         val br  = betaReduce
         val brn = br.normalize
         sys.printAtShutdown(() => s"""|
-          |NORMALIZE {
+          |NORMALIZE (TypeRef) {
           |          type: $this
           |  beta-reduced: $br
           |    normalized: $brn
@@ -2495,9 +2512,17 @@ trait Types extends api.Types { self: SymbolTable =>
       // arises when argument-dependent types are approximated (see def depoly in implicits)
       if (pre eq WildcardType) WildcardType
       else if (phase.erasedTypes) normalizeImpl
+      else if (normalized ne null) normalized
       else {
-        if (normalized eq null)
-          normalized = normalizeImpl
+        normalized = normalizeImpl
+        if (normalized ne this) {
+          sys.printAtShutdown(() => s"""|
+            |NORMALIZED (AbstractTypeRef) {
+            |          type: $this
+            |    normalized: $normalized
+            |}
+          """.stripMargin)
+        }
         normalized
       }
     }
