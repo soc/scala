@@ -26,10 +26,13 @@ package object sys {
     if (toPrint eq null) {
       addShutdownHook {
         println("Shutdown: printing " + toPrint.size + " queued messages.")
-        toPrint.reverse map {
-          case f: Function0[_] => f()
-          case x               => x
-        } foreach println
+        toPrint.reverse foreach (x =>
+          try println(x match {
+            case f: Function0[_] => f()
+            case x               => x
+          })
+          catch { case t: Throwable => println("Swallowed " + t) }
+        )
       }
       toPrint = Nil
     }

@@ -2399,15 +2399,27 @@ trait Types extends api.Types { self: SymbolTable =>
     private[reflect] var baseTypeSeqPeriod             = NoPeriod
     private var normalized: Type                       = _
 
+    private def hasPolyInfo = sym.info match {
+      case PolyType(_, _) => true
+      case _              => false
+    }
+
     private def logEvent(what: String) = {
-      if (sym.isNonClassType) {
+      if (sym.isNonClassType && (pre ne NoPrefix) && !pre.typeSymbol.isStaticOwner) {
         def tp_s = if (typeParams.isEmpty) "" else s" typeParams=$typeParams"
-        def inst_s = util.shortClassOfInstance(this)
+        def inst_s = util.shortClassOfInstance(fullyInitializeType(this))
+        def info_s = sym.info match {
+          case TypeBounds(WildcardType, WildcardType) => ""
+          case tb: TypeBounds if tb.isEmptyBounds     => ""
+          case info                                   => s" info=$info/${util.shortClassOfInstance(sym.info)}"
+        }
+        def args_s = if (args.isEmpty) "" else args mkString ", "
+
         sys.printAtShutdown(() =>
           s"""|$what $inst_s (
               |   pre = $pre
-              |   sym = $sym (info=${sym.info}$tp_s bounds=${sym.info.bounds})
-              |  args = $args
+              |   sym = $sym ($info_s$tp_s )
+              |  args = $args_s
               |)""".stripMargin
         )
       }
@@ -2417,7 +2429,10 @@ trait Types extends api.Types { self: SymbolTable =>
     override def cloneInfo(owner: Symbol) = {
       val res = super.cloneInfo(owner)
       // val info1 = createFromClonedSymbolsAtOwner(typeParams, owner, sym.info)(newExistentialType)
-      logEvent("Cloned")
+      if ((res eq this) && hasPolyInfo) {
+        logEvent("(Not)cloned")
+      }
+
       res
     }
 
