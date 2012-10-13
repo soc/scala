@@ -2254,7 +2254,12 @@ trait Types extends api.Types { self: SymbolTable =>
 
     // beta-reduce, but don't do partial application -- cycles have been checked in typeRef
     override protected def normalizeImpl = asSeenFromOwner(
-      if (typeParamsMatchArgs) betaReduce.normalize
+      if (typeParamsMatchArgs) {
+        val br  = betaReduce
+        val brn = br.normalize
+        sys.printAtShutdown(() => s"$this {\n  beta-reduced to $br\n  normalized to $brn\n}")
+        brn
+      }
       else if (isHigherKinded) super.normalizeImpl
       else {
         // if we are overriding a type alias in an erroneous way, don't just
@@ -2305,9 +2310,12 @@ trait Types extends api.Types { self: SymbolTable =>
     // appliedType(sym.info, typeArgs).asSeenFrom(pre, sym.owner)
     override def betaReduce = {
       // val res = transform(sym.info.resultType)
-      val res1 = transform(sym.info).resultType
-      sys.printAtShutdown(s"$this.betaReduce == (alternative: $res1)")
-      res1
+      val res = transform(sym.info.resultType)
+      if (hasPolyInfo) {
+        logEvent("BetaReduced")
+        sys.printAtShutdown(s"betaReduce transformed to $res")
+      }
+      res
     }
 
     // #3731: return sym1 for which holds: pre bound sym.name to sym and
@@ -2409,12 +2417,12 @@ trait Types extends api.Types { self: SymbolTable =>
     private[reflect] var baseTypeSeqPeriod             = NoPeriod
     private var normalized: Type                       = _
 
-    private def hasPolyInfo = sym.info match {
+    def hasPolyInfo = sym.info match {
       case PolyType(_, _) => true
       case _              => false
     }
 
-    private def logEvent(what: String) = {
+    def logEvent(what: String) = {
       if (sym.isNonClassType && (pre ne NoPrefix) && !pre.typeSymbol.isStaticOwner) {
         def tp_s = if (typeParams.isEmpty) "" else s" typeParams=$typeParams"
         def inst_s = util.shortClassOfInstance(fullyInitializeType(this))
@@ -2427,7 +2435,7 @@ trait Types extends api.Types { self: SymbolTable =>
 
         sys.printAtShutdown(() =>
           s"""|$what $inst_s (
-              |   pre = $pre
+              |   pre = $pre (in ${pre.typeSymbol.owner})
               |   sym = $sym ($info_s$tp_s )
               |  args = $args_s
               |)""".stripMargin
