@@ -21,10 +21,14 @@ import scala.collection.JavaConverters._
  */
 package object sys {
   private var toPrint: List[Any] = null
+  private var shuttingDown = false
 
   def printAtShutdown[T](value: T): T = {
+    if (shuttingDown) return value
+
     if (toPrint eq null) {
       addShutdownHook {
+        shuttingDown = true
         println("Shutdown: printing " + toPrint.size + " queued messages.")
         toPrint.reverse foreach (x =>
           try println(x match {

@@ -2303,7 +2303,12 @@ trait Types extends api.Types { self: SymbolTable =>
     //
     // this crashes pos/depmet_implicit_tpbetareduce.scala
     // appliedType(sym.info, typeArgs).asSeenFrom(pre, sym.owner)
-    override def betaReduce = transform(sym.info.resultType)
+    override def betaReduce = {
+      // val res = transform(sym.info.resultType)
+      val res1 = transform(sym.info).resultType
+      sys.printAtShutdown(s"$this.betaReduce == (alternative: $res1)")
+      res1
+    }
 
     // #3731: return sym1 for which holds: pre bound sym.name to sym and
     // pre1 now binds sym.name to sym1, conceptually exactly the same
@@ -2311,16 +2316,21 @@ trait Types extends api.Types { self: SymbolTable =>
     // selection of sym1 on pre1, since sym's info was probably updated
     // by the TypeMap to yield a new symbol, sym1 with transformed info.
     // @returns sym1
-    override def coevolveSym(pre1: Type): Symbol = logResult(s"$this.coevolveSym($pre1)") {
+    override def coevolveSym(pre1: Type): Symbol = {
       // if (pre eq pre1) sym else pre1 match {
       //   case RefinedType(_, decls1) => decls1 lookup sym.name
       //   case _                      => sym
       // }
       if (pre eq pre1) sym else (pre, pre1) match {
         // don't look at parents -- it would be an error to override alias types anyway
-        case (RefinedType(_, _), RefinedType(_, decls1)) => decls1 lookup sym.name
+        case (RefinedType(_, _), RefinedType(_, decls1)) =>
+          val res = decls1 lookup sym.name
+          sys.printAtShutdown(s"$this.coevolveSym(pre1=$pre1) == $res")
+          res
         // TODO: is there another way a typeref's symbol can refer to a symbol defined in its pre?
-        case _                                           => sym
+        case _                                           =>
+          sys.printAtShutdown(s"$this.coevolveSym($pre1/${util.shortClassOfInstance(pre1)}) is a bust, sym=$sym")
+          sym
       }
     }
     override def kind = "AliasTypeRef"
