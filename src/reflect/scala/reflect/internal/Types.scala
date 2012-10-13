@@ -2229,12 +2229,15 @@ trait Types extends api.Types { self: SymbolTable =>
   trait AliasTypeRef extends NonClassTypeRef {
     require(sym.isAliasType, sym)
 
-    if (args.nonEmpty) {
-      println(s"AliasTypeRef(pre=$pre,sym=$sym/info=${sym.info},args=$args")
-      // log(s"  thisInfo=$thisInfo/${thisInfo.normalize}")
-      // log(s"  applied=${appliedType(sym.info, args)}")
-    }
-
+    // if (args.nonEmpty) {
+    //   sys.printAtShutdown(() =>
+    //     s"""|Created AliasTypeRef (
+    //         |   pre = $pre
+    //         |   sym = $sym (info=${sym.info} typeParams=$typeParams bounds=${sym.info.bounds})
+    //         |  args = $args
+    //         |)""".stripMargin
+    //   )
+    // }
     // [log typer] Test.l1.Drop.normalizeImpl: [N <: Nat]Test.l1.Drop[N]
     // [log typer] Test.l1.Drop[...].normalizeImpl: Test.#:[...,...]
     // [log typer] Test.l1.Apply.normalizeImpl: [N <: Nat]Test.l1.Apply[N]
@@ -2263,6 +2266,34 @@ trait Types extends api.Types { self: SymbolTable =>
         else ErrorType
       }
     )
+    // override def cloneInfo(owner: Symbol) = {
+    //   val res = super.cloneInfo(owner)
+    //   if (sym.typeParams.nonEmpty || args.nonEmpty) {
+    //     sys.printAtShutdown(() =>
+    //       s"""|Cloned AliasTypeRef @ $owner (
+    //           |   pre = $pre
+    //           |   sym = $sym (params=${sym.typeParams})
+    //           |  args = $args
+    //           |   res = $res
+    //           |)""".stripMargin
+    //     )
+    //   }
+    //   res
+    //       // s"$this/(params=${sym.typeParams},args=$args).cloneInfo(owner=$owner) == $res")
+
+    //   // if ((res eq this) && (sym.typeParams.nonEmpty || args.nonEmpty)) {
+    //   //   sys.printAtShutdown(() => s"$this/(params=${sym.typeParams},args=$args).cloneInfo(owner=$owner) == $res")
+    //   //   val sym1 = sym cloneSymbol owner
+    //   //   // val vparams = cloneSymbolsAtOwner(sym.typeParams, sym1)
+    //   //   val args1 = args map (arg => arg.substSym(sym.typeParams, sym1.typeParams).cloneInfo(owner))
+    //   //   val res1 = copyTypeRef(this, pre, sym1, args1)
+    //   //   sys.printAtShutdown(() => "... replaced it with " + res1)
+    //   //   res1
+    //   // }
+    //   // else res
+    //   // val vparams = cloneSymbolsAtOwner(params, owner)
+    //   // copyMethodType(this, vparams, resultType.substSym(params, vparams).cloneInfo(owner))
+    // }
 
     // isHKSubType0 introduces synthetic type params so that
     // betaReduce can first apply sym.info to typeArgs before calling
@@ -2281,16 +2312,16 @@ trait Types extends api.Types { self: SymbolTable =>
     // by the TypeMap to yield a new symbol, sym1 with transformed info.
     // @returns sym1
     override def coevolveSym(pre1: Type): Symbol = logResult(s"$this.coevolveSym($pre1)") {
-      if (pre eq pre1) sym else pre1 match {
-        case RefinedType(_, decls1) => decls1 lookup sym.name
-        case _                      => sym
-      }
-      //  (pre, pre1) match {
-      //   // don't look at parents -- it would be an error to override alias types anyway
-      //   case (RefinedType(_, _), RefinedType(_, decls1)) => decls1 lookup sym.name
-      //   // TODO: is there another way a typeref's symbol can refer to a symbol defined in its pre?
-      //   case _                                           => sym
+      // if (pre eq pre1) sym else pre1 match {
+      //   case RefinedType(_, decls1) => decls1 lookup sym.name
+      //   case _                      => sym
       // }
+      if (pre eq pre1) sym else (pre, pre1) match {
+        // don't look at parents -- it would be an error to override alias types anyway
+        case (RefinedType(_, _), RefinedType(_, decls1)) => decls1 lookup sym.name
+        // TODO: is there another way a typeref's symbol can refer to a symbol defined in its pre?
+        case _                                           => sym
+      }
     }
     override def kind = "AliasTypeRef"
   }
@@ -2368,13 +2399,35 @@ trait Types extends api.Types { self: SymbolTable =>
     private[reflect] var baseTypeSeqPeriod             = NoPeriod
     private var normalized: Type                       = _
 
+    private def logEvent(what: String) = {
+      if (sym.isNonClassType) {
+        def tp_s = if (typeParams.isEmpty) "" else s" typeParams=$typeParams"
+        def inst_s = util.shortClassOfInstance(this)
+        sys.printAtShutdown(() =>
+          s"""|$what $inst_s (
+              |   pre = $pre
+              |   sym = $sym (info=${sym.info}$tp_s bounds=${sym.info.bounds})
+              |  args = $args
+              |)""".stripMargin
+        )
+      }
+    }
+    logEvent("Created")
+
     override def cloneInfo(owner: Symbol) = {
       val res = super.cloneInfo(owner)
-      sys.printAtShutdown(() => s"$this.cloneInfo(owner=$owner) == $res")
+      // val info1 = createFromClonedSymbolsAtOwner(typeParams, owner, sym.info)(newExistentialType)
+      logEvent("Cloned")
       res
-      // val vparams = cloneSymbolsAtOwner(params, owner)
-      // copyMethodType(this, vparams, resultType.substSym(params, vparams).cloneInfo(owner))
     }
+
+    // override def cloneInfo(owner: Symbol) = {
+    //   val res = super.cloneInfo(owner)
+    //   sys.printAtShutdown(() => s"$this.cloneInfo(owner=$owner) == $res")
+    //   res
+    //   // val vparams = cloneSymbolsAtOwner(params, owner)
+    //   // copyMethodType(this, vparams, resultType.substSym(params, vparams).cloneInfo(owner))
+    // }
 
     //OPT specialize hashCode
     override final def computeHashCode = {

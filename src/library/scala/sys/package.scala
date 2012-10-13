@@ -24,10 +24,13 @@ package object sys {
 
   def printAtShutdown[T](value: T): T = {
     if (toPrint eq null) {
-      addShutdownHook(toPrint.reverse foreach {
-        case f: Function0[_] => println(f())
-        case x               => println(x)
-      })
+      addShutdownHook {
+        println("Shutdown: printing " + toPrint.size + " queued messages.")
+        toPrint.reverse map {
+          case f: Function0[_] => f()
+          case x               => x
+        } foreach println
+      }
       toPrint = Nil
     }
 
