@@ -2514,7 +2514,16 @@ trait Types extends api.Types { self: SymbolTable =>
       else {
         val tref1 = copyTypeRef(this, pre, sym, tpars map (_.tpeHK))
         val res   = typeFunAnon(tpars, tref1) // todo: also beta-reduce?
-        sys.printAtShutdown(s"$this.etaExpand  res=$res")
+
+        sys.printAtShutdown(() => s"""|
+          |ETA-EXPAND {
+          |          type: $this
+          |  eta-expanded: $res
+          |  beta-reduced: ${res.betaReduce}
+          |    normalized: ${res.normalize}
+          |}
+        """.stripMargin)
+
         res
       }
     }
