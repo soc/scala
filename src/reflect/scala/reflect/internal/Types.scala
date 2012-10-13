@@ -2368,6 +2368,14 @@ trait Types extends api.Types { self: SymbolTable =>
     private[reflect] var baseTypeSeqPeriod             = NoPeriod
     private var normalized: Type                       = _
 
+    override def cloneInfo(owner: Symbol) = {
+      val res = super.cloneInfo(owner)
+      sys.printAtShutdown(() => s"$this.cloneInfo(owner=$owner) == $res")
+      res
+      // val vparams = cloneSymbolsAtOwner(params, owner)
+      // copyMethodType(this, vparams, resultType.substSym(params, vparams).cloneInfo(owner))
+    }
+
     //OPT specialize hashCode
     override final def computeHashCode = {
       import scala.util.hashing.MurmurHash3._
