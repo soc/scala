@@ -2257,7 +2257,13 @@ trait Types extends api.Types { self: SymbolTable =>
       if (typeParamsMatchArgs) {
         val br  = betaReduce
         val brn = br.normalize
-        sys.printAtShutdown(() => s"$this {\n  beta-reduced to $br\n  normalized to $brn\n}")
+        sys.printAtShutdown(() => s"""|
+          |NORMALIZE {
+          |          type: $this
+          |  beta-reduced: $br
+          |    normalized: $brn
+          |}
+        """.stripMargin)
         brn
       }
       else if (isHigherKinded) super.normalizeImpl
@@ -2311,10 +2317,10 @@ trait Types extends api.Types { self: SymbolTable =>
     override def betaReduce = {
       // val res = transform(sym.info.resultType)
       val res = transform(sym.info.resultType)
-      if (hasPolyInfo) {
-        logEvent("BetaReduced")
-        sys.printAtShutdown(s"betaReduce transformed to $res")
-      }
+      // if (hasPolyInfo) {
+      //   logEvent("BetaReduced")
+      //   sys.printAtShutdown(s"betaReduce transformed to $res")
+      // }
       res
     }
 
@@ -2447,9 +2453,9 @@ trait Types extends api.Types { self: SymbolTable =>
     override def cloneInfo(owner: Symbol) = {
       val res = super.cloneInfo(owner)
       // val info1 = createFromClonedSymbolsAtOwner(typeParams, owner, sym.info)(newExistentialType)
-      if ((res eq this) && hasPolyInfo) {
-        logEvent("(Not)cloned")
-      }
+      // if ((res eq this) && hasPolyInfo) {
+      //   logEvent("(Not)cloned")
+      // }
 
       res
     }
@@ -2505,7 +2511,12 @@ trait Types extends api.Types { self: SymbolTable =>
       // must initialise symbol, see test/files/pos/ticket0137.scala
       val tpars = initializedTypeParams
       if (tpars.isEmpty) this
-      else typeFunAnon(tpars, copyTypeRef(this, pre, sym, tpars map (_.tpeHK))) // todo: also beta-reduce?
+      else {
+        val tref1 = copyTypeRef(this, pre, sym, tpars map (_.tpeHK))
+        val res   = typeFunAnon(tpars, tref1) // todo: also beta-reduce?
+        sys.printAtShutdown(s"$this.etaExpand  res=$res")
+        res
+      }
     }
 
     // only need to rebind type aliases, as typeRef already handles abstract types
