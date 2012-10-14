@@ -104,6 +104,34 @@ abstract class TreeInfo {
       false
   }
 
+  /** As if the name of the method didn't give it away,
+   *  this logic is designed around issuing helpful
+   *  warnings and minimizing spurious ones.  That means
+   *  don't reuse it for important matters like inlining
+   *  decisions.
+   */
+  def isPureExprForWarningPurposes(tree: Tree) = tree match {
+    case EmptyTree | Literal(Constant(())) => false
+    case _                                 =>
+      def isWarnableRefTree = tree match {
+        case t: RefTree => isExprSafeToInline(t.qualifier) && t.symbol != null && t.symbol.isAccessor
+        case _          => false
+      }
+      def isWarnableSymbol = {
+        val sym = tree.symbol
+        (sym == null) || !(sym.isModule || sym.isLazy) || {
+          debuglog("'Pure' but side-effecting expression in statement position: " + tree)
+          false
+        }
+      }
+
+      (    !tree.isErrorTyped
+        && (isExprSafeToInline(tree) || isWarnableRefTree)
+        && isWarnableSymbol
+      )
+  }
+
+
   @deprecated("Use isExprSafeToInline instead", "2.10.0")
   def isPureExpr(tree: Tree) = isExprSafeToInline(tree)
 
@@ -247,7 +275,7 @@ abstract class TreeInfo {
 
   /** Is tree a variable pattern? */
   def isVarPattern(pat: Tree): Boolean = pat match {
-    case x: Ident           => !x.isBackquoted && isVariableName(x.name)
+    case x: Ident           => !x.isBackquoted && nme.isVariableName(x.name)
     case _                  => false
   }
   def isDeprecatedIdentifier(tree: Tree): Boolean = tree match {
@@ -311,14 +339,6 @@ abstract class TreeInfo {
 
   /** Is name a left-associative operator? */
   def isLeftAssoc(operator: Name) = operator.nonEmpty && (operator.endChar != ':')
-
-  private val reserved = Set[Name](nme.false_, nme.true_, nme.null_)
-
-  /** Is name a variable name? */
-  def isVariableName(name: Name): Boolean = {
-    val first = name.startChar
-    ((first.isLower && first.isLetter) || first == '_') && !reserved(name)
-  }
 
   /** Is tree a `this` node which belongs to `enclClass`? */
   def isSelf(tree: Tree, enclClass: Symbol): Boolean = tree match {
@@ -405,19 +425,31 @@ abstract class TreeInfo {
     case _                          => false
   }
 
-  /** Does this CaseDef catch Throwable? */
-  def catchesThrowable(cdef: CaseDef) = catchesAllOf(cdef, ThrowableClass.tpe)
+  private def hasNoSymbol(t: Tree) = t.symbol == null || t.symbol == NoSymbol
 
-  /** Does this CaseDef catch everything of a certain Type? */
-  def catchesAllOf(cdef: CaseDef, threshold: Type) = {
-    def unbound(t: Tree) = t.symbol == null || t.symbol == NoSymbol
+  /** If this CaseDef assigns a name to its top-level pattern,
+   *  in the form 'expr @ pattern' or 'expr: pattern', returns
+   *  the name. Otherwise, nme.NO_NAME.
+   *
+   *  Note: in the case of Constant patterns such as 'case x @ "" =>',
+   *  the pattern matcher eliminates the binding and inlines the constant,
+   *  so as far as this method is likely to be able to determine,
+   *  the name is NO_NAME.
+   */
+  def assignedNameOfPattern(cdef: CaseDef): Name = cdef.pat match {
+    case Bind(name, _)  => name
+    case Ident(name)    => name
+    case _              => nme.NO_NAME
+  }
+
+  /** Does this CaseDef catch Throwable? */
+  def catchesThrowable(cdef: CaseDef) = (
     cdef.guard.isEmpty && (unbind(cdef.pat) match {
       case Ident(nme.WILDCARD)       => true
-      case i@Ident(name)             => unbound(i)
-      case Typed(_, tpt)             => (tpt.tpe != null) && (threshold <:< tpt.tpe)
+      case i@Ident(name)             => hasNoSymbol(i)
       case _                         => false
     })
-  }
+  )
 
   /** Is this pattern node a catch-all or type-test pattern? */
   def isCatchCase(cdef: CaseDef) = cdef match {

@@ -606,11 +606,10 @@ abstract class GenJVM extends SubComponent with GenJVMUtil with GenAndroid with 
       // put some random value; the actual number is determined at the end
       buf putShort 0xbaba.toShort
 
-      for (AnnotationInfo(tp, List(exc), _) <- excs.distinct if tp.typeSymbol == ThrowsClass) {
-        val Literal(const) = exc
+      for (ThrownException(exc) <- excs.distinct) {
         buf.putShort(
           cpool.addClass(
-            javaName(const.typeValue.typeSymbol)).shortValue)
+            javaName(exc)).shortValue)
         nattr += 1
       }
 
@@ -1023,8 +1022,6 @@ abstract class GenJVM extends SubComponent with GenJVMUtil with GenAndroid with 
 
        	  method = m
        	  jmethod = clinitMethod
-
-          computeLocalVarsIndex(m)
        	  genCode(m)
        	case None =>
           legacyStaticInitializer(cls, clinit)
@@ -1133,9 +1130,7 @@ abstract class GenJVM extends SubComponent with GenJVMUtil with GenAndroid with 
           log("No forwarder for " + m + " due to conflict with " + linkedClass.info.member(m.name))
         else {
           log("Adding static forwarder for '%s' from %s to '%s'".format(m, className, moduleClass))
-          if (m.isAccessor && m.accessed.hasStaticAnnotation) {
-            log("@static: accessor " + m + ", accessed: " + m.accessed)
-          } else addForwarder(jclass, moduleClass, m)
+          addForwarder(jclass, moduleClass, m)
         }
       }
     }

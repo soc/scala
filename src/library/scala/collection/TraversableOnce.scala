@@ -184,7 +184,7 @@ trait TraversableOnce[+A] extends Any with GenTraversableOnce[A] {
 
   def fold[A1 >: A](z: A1)(op: (A1, A1) => A1): A1 = foldLeft(z)(op)
 
-  def aggregate[B](z: B)(seqop: (B, A) => B, combop: (B, B) => B): B = foldLeft(z)(seqop)
+  def aggregate[B](z: =>B)(seqop: (B, A) => B, combop: (B, B) => B): B = foldLeft(z)(seqop)
 
   def sum[B >: A](implicit num: Numeric[B]): B = foldLeft(num.zero)(num.plus)
 
@@ -366,9 +366,9 @@ trait TraversableOnce[+A] extends Any with GenTraversableOnce[A] {
 
 
 object TraversableOnce {
-  @deprecated("use OnceCanBuildFrom instead")
+  @deprecated("use OnceCanBuildFrom instead", "2.10.0")
   def traversableOnceCanBuildFrom[T] = new OnceCanBuildFrom[T]
-  @deprecated("use MonadOps instead")
+  @deprecated("use MonadOps instead", "2.10.0")
   def wrapTraversableOnce[A](trav: TraversableOnce[A]) = new MonadOps(trav)
 
   implicit def alternateImplicit[A](trav: TraversableOnce[A]) = new ForceImplicitAmbiguity

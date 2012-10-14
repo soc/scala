@@ -132,7 +132,7 @@ trait Implicits {
   }
 
   /* Map a polytype to one in which all type parameters and argument-dependent types are replaced by wildcards.
-   * Consider `implicit def b(implicit x: A): x.T = error("")`. We need to approximate DebruijnIndex types
+   * Consider `implicit def b(implicit x: A): x.T = error("")`. We need to approximate debruijn index types
    * when checking whether `b` is a valid implicit, as we haven't even searched a value for the implicit arg `x`,
    * so we have to approximate (otherwise it is excluded a priori).
    */
@@ -997,7 +997,7 @@ trait Implicits {
                       case Some(imap) => imap
                       case None =>
                         val result = new InfoMap
-                        getClassParts(sym.tpe)(result, new mutable.HashSet(), pending + sym)
+                        getClassParts(sym.tpeHK)(result, new mutable.HashSet(), pending + sym)
                         infoMapCache(sym) = result
                         result
                     }
@@ -1150,9 +1150,9 @@ trait Implicits {
 
     private def TagSymbols =  TagMaterializers.keySet
     private val TagMaterializers = Map[Symbol, Symbol](
-      ClassTagClass   -> MacroInternal_materializeClassTag,
-      WeakTypeTagClass -> MacroInternal_materializeWeakTypeTag,
-      TypeTagClass    -> MacroInternal_materializeTypeTag
+      ClassTagClass    -> materializeClassTag,
+      WeakTypeTagClass -> materializeWeakTypeTag,
+      TypeTagClass     -> materializeTypeTag
     )
 
     /** Creates a tree will produce a tag of the requested flavor.
@@ -1183,7 +1183,7 @@ trait Implicits {
 
       val prefix = (
         // ClassTags are not path-dependent, so their materializer doesn't care about prefixes
-        if (tagClass eq ClassTagClass) gen.mkBasisUniverseRef
+        if (tagClass eq ClassTagClass) EmptyTree
         else pre match {
           case SingleType(prePre, preSym) =>
             gen.mkAttributedRef(prePre, preSym) setType pre
@@ -1205,7 +1205,7 @@ trait Implicits {
         }
       )
       // todo. migrate hardcoded materialization in Implicits to corresponding implicit macros
-      var materializer = atPos(pos.focus)(gen.mkMethodCall(TagMaterializers(tagClass), List(tp), List(prefix)))
+      var materializer = atPos(pos.focus)(gen.mkMethodCall(TagMaterializers(tagClass), List(tp), if (prefix != EmptyTree) List(prefix) else List()))
       if (settings.XlogImplicits.value) println("materializing requested %s.%s[%s] using %s".format(pre, tagClass.name, tp, materializer))
       if (context.macrosEnabled) success(materializer)
       // don't call `failure` here. if macros are disabled, we just fail silently
@@ -1334,7 +1334,7 @@ trait Implicits {
     def wrapResult(tree: Tree): SearchResult =
       if (tree == EmptyTree) SearchFailure else new SearchResult(tree, EmptyTreeTypeSubstituter)
 
-    /** Materializes implicits of magic types (currently, manifests and tags).
+    /** Materializes implicits of predefined types (currently, manifests and tags).
      *  Will be replaced by implicit macros once we fix them.
      */
     private def materializeImplicit(pt: Type): SearchResult =

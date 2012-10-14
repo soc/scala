@@ -1001,7 +1001,7 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
    *
    *  @param    sym A class symbol, object symbol, package, or package class.
    */
-  @deprecated("use invalidateClassPathEntries instead")
+  @deprecated("use invalidateClassPathEntries instead", "2.10.0")
   def clearOnNextRun(sym: Symbol) = false
     /* To try out clearOnNext run on the scala.tools.nsc project itself
      * replace `false` above with the following code
@@ -1033,12 +1033,12 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
    *  of what file was being compiled when it broke.  Since I really
    *  really want to know, this hack.
    */
-  private var lastSeenSourceFile: SourceFile = NoSourceFile
+  protected var lastSeenSourceFile: SourceFile = NoSourceFile
 
   /** Let's share a lot more about why we crash all over the place.
    *  People will be very grateful.
    */
-  private var lastSeenContext: analyzer.Context = null
+  protected var lastSeenContext: analyzer.Context = null
 
   /** The currently active run
    */
@@ -1046,8 +1046,15 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
   def currentUnit: CompilationUnit = if (currentRun eq null) NoCompilationUnit else currentRun.currentUnit
   def currentSource: SourceFile    = if (currentUnit.exists) currentUnit.source else lastSeenSourceFile
 
+  override def isPastTyper = (
+       (curRun ne null)
+    && (currentRun.typerPhase ne null)
+    && (globalPhase.id > currentRun.typerPhase.id)
+  )
+
   // TODO - trim these to the absolute minimum.
   @inline final def exitingErasure[T](op: => T): T        = exitingPhase(currentRun.erasurePhase)(op)
+  @inline final def exitingPostErasure[T](op: => T): T    = exitingPhase(currentRun.posterasurePhase)(op)
   @inline final def exitingExplicitOuter[T](op: => T): T  = exitingPhase(currentRun.explicitouterPhase)(op)
   @inline final def exitingFlatten[T](op: => T): T        = exitingPhase(currentRun.flattenPhase)(op)
   @inline final def exitingIcode[T](op: => T): T          = exitingPhase(currentRun.icodePhase)(op)
@@ -1157,7 +1164,7 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
 
   /** A Run is a single execution of the compiler on a sets of units
    */
-  class Run {
+  class Run extends RunContextApi {
     /** Have been running into too many init order issues with Run
      *  during erroneous conditions.  Moved all these vals up to the
      *  top of the file so at least they're not trivially null.
@@ -1258,7 +1265,7 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
     /** Reset all classes contained in current project, as determined by
      *  the clearOnNextRun hook
      */
-    @deprecated("use invalidateClassPathEntries instead")
+    @deprecated("use invalidateClassPathEntries instead", "2.10.0")
     def resetProjectClasses(root: Symbol): Unit = try {
       def unlink(sym: Symbol) =
         if (sym != NoSymbol) root.info.decls.unlink(sym)
@@ -1357,6 +1364,7 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
     val specializePhase              = phaseNamed("specialize")
     val explicitouterPhase           = phaseNamed("explicitouter")
     val erasurePhase                 = phaseNamed("erasure")
+    val posterasurePhase             = phaseNamed("posterasure")
     // val lazyvalsPhase                = phaseNamed("lazyvals")
     val lambdaliftPhase              = phaseNamed("lambdalift")
     // val constructorsPhase            = phaseNamed("constructors")

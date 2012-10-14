@@ -206,7 +206,6 @@ trait StdNames {
   }
 
   abstract class TypeNames extends Keywords with TypeNamesApi {
-    type NameType = TypeName
     protected implicit def createNameType(name: String): TypeName = newTypeNameCached(name)
 
     final val BYNAME_PARAM_CLASS_NAME: NameType        = "<byname>"
@@ -246,7 +245,6 @@ trait StdNames {
     final val BeanPropertyAnnot: NameType = "BeanProperty"
     final val BooleanBeanPropertyAnnot: NameType = "BooleanBeanProperty"
     final val bridgeAnnot: NameType = "bridge"
-    final val staticAnnot: NameType = "static"
 
     // Classfile Attributes
     final val AnnotationDefaultATTR: NameType      = "AnnotationDefault"
@@ -274,7 +272,6 @@ trait StdNames {
   }
 
   abstract class TermNames extends Keywords with TermNamesApi {
-    type NameType = TermName
     protected implicit def createNameType(name: String): TermName = newTermNameCached(name)
 
     /** Base strings from which synthetic names are derived. */
@@ -348,6 +345,16 @@ trait StdNames {
     def isTraitSetterName(name: Name)       = isSetterName(name) && (name containsName TRAIT_SETTER_SEPARATOR_STRING)
     def isSingletonName(name: Name)         = name endsWith SINGLETON_SUFFIX
     def isModuleName(name: Name)            = name endsWith MODULE_SUFFIX_NAME
+
+    /** Is name a variable name? */
+    def isVariableName(name: Name): Boolean = {
+      val first = name.startChar
+      (    ((first.isLower && first.isLetter) || first == '_')
+        && (name != nme.false_)
+        && (name != nme.true_)
+        && (name != nme.null_)
+      )
+    }
 
     def isDeprecatedIdentifierName(name: Name) = name.toTermName match {
       case nme.`then` | nme.`macro` => true
@@ -571,7 +578,7 @@ trait StdNames {
     // Compiler utilized names
 
     val AnnotatedType: NameType        = "AnnotatedType"
-    val AnnotationInfo: NameType       = "AnnotationInfo"
+    val Annotation: NameType           = "Annotation"
     val Any: NameType                  = "Any"
     val AnyVal: NameType               = "AnyVal"
     val AppliedTypeTree: NameType      = "AppliedTypeTree"
@@ -636,7 +643,6 @@ trait StdNames {
     val asInstanceOf_Ob : NameType     = "$asInstanceOf"
     val assert_ : NameType             = "assert"
     val assume_ : NameType             = "assume"
-    val basis : NameType               = "basis"
     val box: NameType                  = "box"
     val build : NameType               = "build"
     val bytes: NameType                = "bytes"

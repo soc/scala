@@ -1,10 +1,13 @@
-import scala.actors.migration.MigrationSystem._
+/**
+ * NOTE: Code snippets from this test are included in the Actor Migration Guide. In case you change
+ * code in these tests prior to the 2.10.0 release please send the notification to @vjovanov.
+ */
 import scala.actors.Actor._
 import scala.actors._
 import scala.actors.migration._
 import java.util.concurrent.{ TimeUnit, CountDownLatch }
 import scala.collection.mutable.ArrayBuffer
-import scala.concurrent.util.duration._
+import scala.concurrent.duration._
 import scala.concurrent.{ Promise, Await }
 
 object Test {
@@ -36,7 +39,7 @@ object Test {
     Await.ready(finishedLWCR1.future, 5 seconds)
 
     // Loop with Condition Snippet - migrated
-    val myAkkaActor = MigrationSystem.actorOf(Props(() => new StashingActor {
+    val myAkkaActor = ActorDSL.actor(new StashingActor {
 
       def receive = {
         case x: Int =>
@@ -47,7 +50,7 @@ object Test {
             context.stop(self)
           }
       }
-    }, "default-stashing-dispatcher"))
+    })
     myAkkaActor ! 1
     myAkkaActor ! 42
   }
@@ -84,7 +87,7 @@ object Test {
     Await.ready(finishedTNR1.future, 5 seconds)
 
     // Loop with Condition Snippet - migrated
-    val myAkkaActor = MigrationSystem.actorOf(Props(() => new StashingActor {
+    val myAkkaActor = ActorDSL.actor(new StashingActor {
 
       def receive = {
         case x: Int =>
@@ -103,7 +106,7 @@ object Test {
               context.unbecome()
             }).orElse { case x => stash() })
       }
-    }, "default-stashing-dispatcher"))
+    })
 
     myAkkaActor ! 1
     myAkkaActor ! "I am a String"
@@ -113,7 +116,7 @@ object Test {
 
   def exceptionHandling() = {
     // Stashing actor with act and exception handler
-    val myActor = MigrationSystem.actorOf(Props(() => new StashingActor {
+    val myActor = ActorDSL.actor(new StashingActor {
 
       def receive = { case _ => println("Dummy method.") }
       override def act() = {
@@ -134,7 +137,7 @@ object Test {
         case x: Exception => println("scala got exception")
       }
 
-    }, "default-stashing-dispatcher"))
+    })
 
     myActor ! "work"
     myActor ! "fail"
@@ -142,7 +145,7 @@ object Test {
 
     Await.ready(finishedEH1.future, 5 seconds)
     // Stashing actor in Akka style
-    val myAkkaActor = MigrationSystem.actorOf(Props(() => new StashingActor {
+    val myAkkaActor = ActorDSL.actor(new StashingActor {
       def receive = PFCatch({
         case "fail" =>
           throw new Exception("failed")
@@ -152,14 +155,14 @@ object Test {
           finishedEH.success(true)
           context.stop(self)
       }, { case x: Exception => println("akka got exception") })
-    }, "default-stashing-dispatcher"))
+    })
 
     myAkkaActor ! "work"
     myAkkaActor ! "fail"
     myAkkaActor ! "die"
   }
 
-  def main(args: Array[String]) = {
+  def main(args: Array[String]): Unit = {
     testLoopWithConditionReact()
     Await.ready(finishedLWCR.future, 5 seconds)
     exceptionHandling()

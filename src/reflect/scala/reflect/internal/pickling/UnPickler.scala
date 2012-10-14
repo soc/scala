@@ -446,7 +446,7 @@ abstract class UnPickler /*extends scala.reflect.generic.UnPickler*/ {
     private def readArrayAnnot() = {
       readByte() // skip the `annotargarray` tag
       val end = readNat() + readIndex
-      until(end, () => readClassfileAnnotArg(readNat())).toArray(ClassfileAnnotArgTag)
+      until(end, () => readClassfileAnnotArg(readNat())).toArray(JavaArgumentTag)
     }
     protected def readClassfileAnnotArg(i: Int): ClassfileAnnotArg = bytes(index(i)) match {
       case ANNOTINFO     => NestedAnnotArg(at(i, readAnnotation))
@@ -848,7 +848,7 @@ abstract class UnPickler /*extends scala.reflect.generic.UnPickler*/ {
     }
 
     /** A lazy type which when completed returns type at index `i`. */
-    private class LazyTypeRef(i: Int) extends LazyType {
+    private class LazyTypeRef(i: Int) extends LazyType with FlagAgnosticCompleter {
       private val definedAtRunId = currentRunId
       private val p = phase
       override def complete(sym: Symbol) : Unit = try {

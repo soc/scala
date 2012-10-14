@@ -132,7 +132,7 @@ abstract class AddInterfaces extends InfoTransform { self: Erasure =>
    *  - for every interface member of iface: its implementation method, if one is needed
    *  - every former member of iface that is implementation only
    */
-  private class LazyImplClassType(iface: Symbol) extends LazyType {
+  private class LazyImplClassType(iface: Symbol) extends LazyType with FlagAgnosticCompleter {
     /** Compute the decls of implementation class implClass,
      *  given the decls ifaceDecls of its interface.
      */
@@ -231,9 +231,8 @@ abstract class AddInterfaces extends InfoTransform { self: Erasure =>
           extends ChangeOwnerTraverser(oldowner, newowner) {
     override def traverse(tree: Tree) {
       tree match {
-        case Return(expr) =>
-          if (tree.symbol == oldowner) tree.symbol = newowner
-        case _ =>
+        case _: Return => change(tree.symbol)
+        case _         =>
       }
       super.traverse(tree)
     }
@@ -321,7 +320,7 @@ abstract class AddInterfaces extends InfoTransform { self: Erasure =>
         Block(List(Apply(gen.mkSuperInitCall, Nil)), expr)
 
       case Block(stats, expr) =>
-        // needs `hasSymbol` check because `supercall` could be a block (named / default args)
+        // needs `hasSymbolField` check because `supercall` could be a block (named / default args)
         val (presuper, supercall :: rest) = stats span (t => t.hasSymbolWhich(_ hasFlag PRESUPER))
         treeCopy.Block(tree, presuper ::: (supercall :: mixinConstructorCalls ::: rest), expr)
     }

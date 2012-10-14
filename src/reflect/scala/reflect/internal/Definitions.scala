@@ -10,7 +10,7 @@ import scala.annotation.{ switch, meta }
 import scala.collection.{ mutable, immutable }
 import Flags._
 import PartialFunction._
-import scala.reflect.base.{Universe => BaseUniverse}
+import scala.reflect.api.{Universe => ApiUniverse}
 
 trait Definitions extends api.StandardDefinitions {
   self: SymbolTable =>
@@ -223,7 +223,7 @@ trait Definitions extends api.StandardDefinitions {
     def fullyInitializeSymbol(sym: Symbol): Symbol = {
       sym.initialize
       fullyInitializeType(sym.info)
-      fullyInitializeType(sym.tpe)
+      fullyInitializeType(sym.tpe_*)
       sym
     }
     def fullyInitializeType(tp: Type): Type = {
@@ -410,7 +410,8 @@ trait Definitions extends api.StandardDefinitions {
     def isScalaRepeatedParamType(tp: Type) = tp.typeSymbol == RepeatedParamClass
     def isJavaRepeatedParamType(tp: Type)  = tp.typeSymbol == JavaRepeatedParamClass
     def isRepeatedParamType(tp: Type)      = isScalaRepeatedParamType(tp) || isJavaRepeatedParamType(tp)
-    def isRepeated(param: Symbol)          = isRepeatedParamType(param.tpe)
+    def isRepeated(param: Symbol)          = isRepeatedParamType(param.tpe_*)
+    def isByName(param: Symbol)            = isByNameParamType(param.tpe_*)
     def isCastSymbol(sym: Symbol)          = sym == Any_asInstanceOf || sym == Object_asInstanceOf
 
     def isJavaVarArgsMethod(m: Symbol)      = m.isMethod && isJavaVarArgs(m.info.params)
@@ -487,7 +488,7 @@ trait Definitions extends api.StandardDefinitions {
 
     // scala.reflect
     lazy val ReflectPackage              = requiredModule[scala.reflect.`package`.type]
-         def ReflectBasis                = getMemberValue(ReflectPackage, nme.basis)
+    lazy val ReflectApiPackage           = getPackageObjectIfDefined("scala.reflect.api") // defined in scala-reflect.jar, so we need to be careful
     lazy val ReflectRuntimePackage       = getPackageObjectIfDefined("scala.reflect.runtime") // defined in scala-reflect.jar, so we need to be careful
          def ReflectRuntimeUniverse      = if (ReflectRuntimePackage != NoSymbol) getMemberValue(ReflectRuntimePackage, nme.universe) else NoSymbol
          def ReflectRuntimeCurrentMirror = if (ReflectRuntimePackage != NoSymbol) getMemberMethod(ReflectRuntimePackage, nme.currentMirror) else NoSymbol
@@ -499,28 +500,31 @@ trait Definitions extends api.StandardDefinitions {
     lazy val OptManifestClass      = requiredClass[scala.reflect.OptManifest[_]]
     lazy val NoManifest            = requiredModule[scala.reflect.NoManifest.type]
 
-    lazy val ExprsClass            = requiredClass[scala.reflect.base.Exprs]
-    lazy val ExprClass             = getMemberClass(ExprsClass, tpnme.Expr)
-         def ExprSplice            = getMemberMethod(ExprClass, nme.splice)
-         def ExprValue             = getMemberMethod(ExprClass, nme.value)
-    lazy val ExprModule            = getMemberModule(ExprsClass, nme.Expr)
+    lazy val ExprsClass            = getClassIfDefined("scala.reflect.api.Exprs") // defined in scala-reflect.jar, so we need to be careful
+    lazy val ExprClass             = if (ExprsClass != NoSymbol) getMemberClass(ExprsClass, tpnme.Expr) else NoSymbol
+         def ExprSplice            = if (ExprsClass != NoSymbol) getMemberMethod(ExprClass, nme.splice) else NoSymbol
+         def ExprValue             = if (ExprsClass != NoSymbol) getMemberMethod(ExprClass, nme.value) else NoSymbol
+    lazy val ExprModule            = if (ExprsClass != NoSymbol) getMemberModule(ExprsClass, nme.Expr) else NoSymbol
 
-    lazy val ClassTagModule        = requiredModule[scala.reflect.ClassTag[_]]
-    lazy val ClassTagClass         = requiredClass[scala.reflect.ClassTag[_]]
-    lazy val TypeTagsClass         = requiredClass[scala.reflect.base.TypeTags]
-    lazy val WeakTypeTagClass       = getMemberClass(TypeTagsClass, tpnme.WeakTypeTag)
-    lazy val WeakTypeTagModule      = getMemberModule(TypeTagsClass, nme.WeakTypeTag)
-    lazy val TypeTagClass          = getMemberClass(TypeTagsClass, tpnme.TypeTag)
-    lazy val TypeTagModule         = getMemberModule(TypeTagsClass, nme.TypeTag)
+    lazy val ClassTagModule         = requiredModule[scala.reflect.ClassTag[_]]
+    lazy val ClassTagClass          = requiredClass[scala.reflect.ClassTag[_]]
+    lazy val TypeTagsClass          = getClassIfDefined("scala.reflect.api.TypeTags") // defined in scala-reflect.jar, so we need to be careful
+    lazy val WeakTypeTagClass       = if (TypeTagsClass != NoSymbol) getMemberClass(TypeTagsClass, tpnme.WeakTypeTag) else NoSymbol
+    lazy val WeakTypeTagModule      = if (TypeTagsClass != NoSymbol) getMemberModule(TypeTagsClass, nme.WeakTypeTag) else NoSymbol
+    lazy val TypeTagClass           = if (TypeTagsClass != NoSymbol) getMemberClass(TypeTagsClass, tpnme.TypeTag) else NoSymbol
+    lazy val TypeTagModule          = if (TypeTagsClass != NoSymbol) getMemberModule(TypeTagsClass, nme.TypeTag) else NoSymbol
+         def materializeClassTag    = getMemberMethod(ReflectPackage, nme.materializeClassTag)
+         def materializeWeakTypeTag = if (ReflectApiPackage != NoSymbol) getMemberMethod(ReflectApiPackage, nme.materializeWeakTypeTag) else NoSymbol
+         def materializeTypeTag     = if (ReflectApiPackage != NoSymbol) getMemberMethod(ReflectApiPackage, nme.materializeTypeTag) else NoSymbol
 
-    lazy val BaseUniverseClass     = requiredClass[scala.reflect.base.Universe]
-         def BaseUniverseReify     = getMemberMethod(BaseUniverseClass, nme.reify)
+    lazy val ApiUniverseClass      = getClassIfDefined("scala.reflect.api.Universe") // defined in scala-reflect.jar, so we need to be careful
+         def ApiUniverseReify      = if (ApiUniverseClass != NoSymbol) getMemberMethod(ApiUniverseClass, nme.reify) else NoSymbol
     lazy val JavaUniverseClass     = getClassIfDefined("scala.reflect.api.JavaUniverse") // defined in scala-reflect.jar, so we need to be careful
 
-    lazy val MirrorOfClass         = requiredClass[scala.reflect.base.MirrorOf[_]]
+    lazy val MirrorClass           = getClassIfDefined("scala.reflect.api.Mirror") // defined in scala-reflect.jar, so we need to be careful
 
-    lazy val TypeCreatorClass      = requiredClass[scala.reflect.base.TypeCreator]
-    lazy val TreeCreatorClass      = requiredClass[scala.reflect.base.TreeCreator]
+    lazy val TypeCreatorClass      = getClassIfDefined("scala.reflect.api.TypeCreator") // defined in scala-reflect.jar, so we need to be careful
+    lazy val TreeCreatorClass      = getClassIfDefined("scala.reflect.api.TreeCreator") // defined in scala-reflect.jar, so we need to be careful
 
     lazy val MacroContextClass                   = getClassIfDefined("scala.reflect.macros.Context") // defined in scala-reflect.jar, so we need to be careful
          def MacroContextPrefix                  = if (MacroContextClass != NoSymbol) getMemberMethod(MacroContextClass, nme.prefix) else NoSymbol
@@ -528,10 +532,6 @@ trait Definitions extends api.StandardDefinitions {
          def MacroContextUniverse                = if (MacroContextClass != NoSymbol) getMemberMethod(MacroContextClass, nme.universe) else NoSymbol
          def MacroContextMirror                  = if (MacroContextClass != NoSymbol) getMemberMethod(MacroContextClass, nme.mirror) else NoSymbol
     lazy val MacroImplAnnotation                 = requiredClass[scala.reflect.macros.internal.macroImpl]
-    lazy val MacroInternalPackage                = getPackageObject("scala.reflect.macros.internal")
-         def MacroInternal_materializeClassTag   = getMemberMethod(MacroInternalPackage, nme.materializeClassTag)
-         def MacroInternal_materializeWeakTypeTag = getMemberMethod(MacroInternalPackage, nme.materializeWeakTypeTag)
-         def MacroInternal_materializeTypeTag    = getMemberMethod(MacroInternalPackage, nme.materializeTypeTag)
 
     lazy val StringContextClass                  = requiredClass[scala.StringContext]
          def StringContext_f                     = getMemberMethod(StringContextClass, nme.f)
@@ -545,12 +545,12 @@ trait Definitions extends api.StandardDefinitions {
     lazy val NoneModule: ModuleSymbol = requiredModule[scala.None.type]
     lazy val SomeModule: ModuleSymbol = requiredModule[scala.Some.type]
 
-    def compilerTypeFromTag(tt: BaseUniverse # WeakTypeTag[_]): Type = tt.in(rootMirror).tpe
-    def compilerSymbolFromTag(tt: BaseUniverse # WeakTypeTag[_]): Symbol = tt.in(rootMirror).tpe.typeSymbol
+    def compilerTypeFromTag(tt: ApiUniverse # WeakTypeTag[_]): Type = tt.in(rootMirror).tpe
+    def compilerSymbolFromTag(tt: ApiUniverse # WeakTypeTag[_]): Symbol = tt.in(rootMirror).tpe.typeSymbol
 
     // The given symbol represents either String.+ or StringAdd.+
     def isStringAddition(sym: Symbol) = sym == String_+ || sym == StringAdd_+
-    def isArrowAssoc(sym: Symbol) = ArrowAssocClass.tpe.decls.toList contains sym
+    def isArrowAssoc(sym: Symbol) = sym.owner == ArrowAssocClass
 
     // The given symbol is a method with the right name and signature to be a runnable java program.
     def isJavaMainMethod(sym: Symbol) = (sym.name == nme.main) && (sym.info match {
@@ -717,6 +717,13 @@ trait Definitions extends api.StandardDefinitions {
       if (phase.erasedTypes || forMSIL) ClassClass.tpe
       else appliedType(ClassClass, arg)
 
+    def EnumType(sym: Symbol) =
+      // given (in java): "class A { enum E { VAL1 } }"
+      //  - sym: the symbol of the actual enumeration value (VAL1)
+      //  - .owner: the ModuleClassSymbol of the enumeration (object E)
+      //  - .linkedClassOfClass: the ClassSymbol of the enumeration (class E)
+      sym.owner.linkedClassOfClass.tpe
+
     def vmClassType(arg: Type): Type = ClassType(arg)
     def vmSignature(sym: Symbol, info: Type): String = signature(info)    // !!!
 
@@ -727,7 +734,7 @@ trait Definitions extends api.StandardDefinitions {
      *    C[E1, ..., En] forSome { E1 >: LB1 <: UB1 ... en >: LBn <: UBn }.
      */
     def classExistentialType(clazz: Symbol): Type =
-      newExistentialType(clazz.typeParams, clazz.tpe)
+      newExistentialType(clazz.typeParams, clazz.tpe_*)
 
     /** Given type U, creates a Type representing Class[_ <: U].
      */
@@ -935,7 +942,6 @@ trait Definitions extends api.StandardDefinitions {
     lazy val SwitchClass                = requiredClass[scala.annotation.switch]
     lazy val TailrecClass               = requiredClass[scala.annotation.tailrec]
     lazy val VarargsClass               = requiredClass[scala.annotation.varargs]
-    lazy val StaticClass                = requiredClass[scala.annotation.static]
     lazy val uncheckedStableClass       = requiredClass[scala.annotation.unchecked.uncheckedStable]
     lazy val uncheckedVarianceClass     = requiredClass[scala.annotation.unchecked.uncheckedVariance]
 
@@ -952,7 +958,7 @@ trait Definitions extends api.StandardDefinitions {
     lazy val ScalaNoInlineClass         = requiredClass[scala.noinline]
     lazy val SerialVersionUIDAttr       = requiredClass[scala.SerialVersionUID]
     lazy val SpecializedClass           = requiredClass[scala.specialized]
-    lazy val ThrowsClass                = requiredClass[scala.throws]
+    lazy val ThrowsClass                = requiredClass[scala.throws[_]]
     lazy val TransientAttr              = requiredClass[scala.transient]
     lazy val UncheckedClass             = requiredClass[scala.unchecked]
     lazy val UnspecializedClass         = requiredClass[scala.annotation.unspecialized]
@@ -1119,7 +1125,8 @@ trait Definitions extends api.StandardDefinitions {
 
     /** Is symbol a phantom class for which no runtime representation exists? */
     lazy val isPhantomClass = Set[Symbol](AnyClass, AnyValClass, NullClass, NothingClass)
-    lazy val magicSymbols = List(
+    /** Lists core classes that don't have underlying bytecode, but are synthesized on-the-fly in every reflection universe */
+    lazy val syntheticCoreClasses = List(
       AnnotationDefaultAttr, // #2264
       RepeatedParamClass,
       JavaRepeatedParamClass,
@@ -1130,7 +1137,10 @@ trait Definitions extends api.StandardDefinitions {
       NullClass,
       NothingClass,
       SingletonClass,
-      EqualsPatternClass,
+      EqualsPatternClass
+    )
+    /** Lists core methods that don't have underlying bytecode, but are synthesized on-the-fly in every reflection universe */
+    lazy val syntheticCoreMethods = List(
       Any_==,
       Any_!=,
       Any_equals,
@@ -1148,10 +1158,19 @@ trait Definitions extends api.StandardDefinitions {
       Object_synchronized,
       Object_isInstanceOf,
       Object_asInstanceOf,
-      String_+,
+      String_+
+    )
+    /** Lists core classes that do have underlying bytecode, but are adjusted on-the-fly in every reflection universe */
+    lazy val hijackedCoreClasses = List(
       ComparableClass,
       JavaSerializableClass
     )
+    /** Lists symbols that are synthesized or hijacked by the compiler.
+     *
+     *  Such symbols either don't have any underlying bytecode at all ("synthesized")
+     *  or get loaded from bytecode but have their metadata adjusted ("hijacked").
+     */
+    lazy val symbolsNotPresentInBytecode = syntheticCoreClasses ++ syntheticCoreMethods ++ hijackedCoreClasses
 
     /** Is the symbol that of a parent which is added during parsing? */
     lazy val isPossibleSyntheticParent = ProductClass.toSet[Symbol] + ProductRootClass + SerializableClass
@@ -1215,7 +1234,8 @@ trait Definitions extends api.StandardDefinitions {
 
     def init() {
       if (isInitialized) return
-      val forced = magicSymbols // force initialization of every symbol that is entered as a side effect
+      // force initialization of every symbol that is synthesized or hijacked by the compiler
+      val forced = symbolsNotPresentInBytecode
       isInitialized = true
     } //init
 
