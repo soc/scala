@@ -329,7 +329,7 @@ trait NamesDefaults { self: Analyzer =>
             // ValDef's in the block), change the arguments to these local values.
             case Apply(expr, typedArgs) =>
               // typedArgs: definition-site order
-              val formals = formalTypes(expr.tpe.paramTypes, typedArgs.length, false, false)
+              val formals = formalTypes(expr.tpe.paramTypes, typedArgs.length, removeByName = false)
               // valDefs: call-site order
               val valDefs = argValDefs(reorderArgsInv(typedArgs, argPos),
                                        reorderArgsInv(formals, argPos),

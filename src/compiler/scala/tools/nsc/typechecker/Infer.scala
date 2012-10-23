@@ -41,7 +41,7 @@ trait Infer extends Checkable {
     if (formals.isEmpty) Nil else {
       val formals1 = if (removeByName) formals mapConserve dropByName else formals
       formals1.last.normalize match {
-        case TypeRef(_, RepeatedParamClass, repeatedType :: Nil) =>
+        case TypeRef(_, RepeatedParamClass, ft :: Nil) =>
           formals1.init ++ List.fill(nargs - formals1.length + 1)(ft)
         case _ =>
           formals1
