@@ -1,0 +1,310 @@
+Improving.org Mail 	*Paul Phillips <paulp@improving.org> *
+
+------------------------------------------------------------------------
+*[scala-user] Get back a result from the interpreter?*
+9 messages
+------------------------------------------------------------------------
+*Johann Petrak <johann.petrak@chello.at> * 	*Mon, Jul 4, 2011 at 1:46 AM *
+To: scala-user@googlegroups.com
+What is the best way to get back the results from the
+interpreter IMain to the invoking program or otherwise access
+results from the interpreter?
+
+the IMain.interpret function returns a result that
+only indicates if there was success or failure.
+
+But is it somehow possible to get more back or share
+data between the caller and the code run by the
+interpreter?
+I guess I am looking for something that is similar to
+how embedding works with JSR223 scripting where I can
+get back the result of code run in the scripting engine.
+
+What am I missing here?
+
+------------------------------------------------------------------------
+*Norbert Tausch <ntausch55@gmail.com> * 	*Mon, Jul 4, 2011 at 1:59 AM *
+To: scala-user@googlegroups.com
+Hi,
+
+in order to forward console output, set a PrintWriter when calling the
+Interpreter (see below, the old, deprecated notation). In order to pass
+objects, you have to bind a receiver object to the Scala interpreter. In
+your interpreted Scala program you can simple set your result into this
+receiver object.
+
+val interpreter = new QueryInterpreter("/* A valid classpath */",
+this.getClass().getClassLoader())
+val receiver = new Receiver
+{
+   val result: Any = null
+}
+
+interpreter.bind("globalReceiver", "Receiver", receiver)
+
+But if you do so, there might be a problem concerning class loaders
+since your class loader is different from the one within the Scala
+interpreter. I solved this issue by setting my class loader as parent
+class loader for the one within the Scala interpreter (see code below).
+The bound object must be of a class that is available in your program
+and in your interpreted code.
+
+I hope this helps.....
+
+class QueryInterpreter(classPath: String, parentClassLoader: ClassLoader)
+{
+   val settings: Settings = new Settings()
+   val interpreterOutputStream = new ByteArrayOutputStream()
+   var interpreter: Interpreter = null
+
+   try
+   {
+       settings.classpath.value = classPath
+       settings.embeddedDefaults(parentClassLoader)
+
+       interpreter = new Interpreter(settings, new
+PrintWriter(interpreterOutputStream))
+       interpreter.setContextClassLoader
+   }
+   catch
+   {
+       case exception    =>
+       {
+           // Print error message if there is one
+           flushToConsole()
+
+           throw new Exception(exception)
+       }
+   }
+
+
+   def bind(name: String, boundType: String, value: Object): QueryResult =
+   {
+       val queryResult = new QueryResult()
+
+       // Clear interpreter output
+       interpreterOutputStream.reset
+
+       val result = interpreter.bind(name, boundType, value)
+
+       if(InterpreterResults.Success != result)
+       {
+           queryResult.error = true;
+           queryResult.errorDetails = "Can't bind type '" + name +
+"':\n" + interpreterOutputStream.toString
+       }
+       else
+       {
+           flushToConsole()
+       } // if
+
+       return queryResult
+   }
+
+Best regards
+
+Norbert Tausch
+
+
+Am 04.07.2011 10:46, schrieb Johann Petrak:
+[Quoted text hidden]
+
+------------------------------------------------------------------------
+*Johann Petrak <johann.petrak@chello.at> * 	*Mon, Jul 4, 2011 at 4:14 AM *
+To: scala-user@googlegroups.com
+Thank you a lot - that was very useful!
+
+I am just using IMain instead of Interpreter as Interpreter
+is deprecated in version 2.9 but so far everything works
+just as well with IMain.
+
+It is a pity that there is so few documentation here --
+the Settings and GenericRunnerSettings classes have no
+API documentation at all ... of what would be the purpose of
+and  difference between beQuietDuring and beSilentDuring?
+
+There is one other thing about the Scala API documentation in general:
+like  with JavaDoc it is awfully difficult to figure out which
+classes, traits, methods etc. are *intended* to be used as
+API methods by a client and which are just here for "internal"
+purposes. Is there any idea floating around how these could be
+distinguished ... looking at the docs can quite overwhelming,
+confusing and even misleading if this information is not given IMO.
+
+Cheers,
+ johann
+[Quoted text hidden]
+
+------------------------------------------------------------------------
+*Paul Phillips <paulp@improving.org> * 	*Mon, Jul 4, 2011 at 8:19 AM *
+To: Johann Petrak <johann.petrak@chello.at>
+On 7/4/11 4:14 AM, Johann Petrak wrote:
+> There is one other thing about the Scala API documentation in general:
+> like  with JavaDoc it is awfully difficult to figure out which
+> classes, traits, methods etc. are *intended* to be used as
+> API methods by a client and which are just here for "internal"
+> purposes.
+
+Is it suggested somewhere that anything in scala.tools.nsc is intended
+as API? It's all internal.  I'm trying to change that but there's only
+so much I can do in a given day.
+
+------------------------------------------------------------------------
+*Razvan Cojocaru <pub@razie.com> * 	*Mon, Jul 4, 2011 at 11:20 AM *
+To: Johann Petrak <johann.petrak@chello.at>, scala-user@googlegroups.com
+You might try this: https://github.com/razie/scripster
+<https://github.com/razie/scripster>
+
+Full user guide: http://wiki.homecloud.ca/scripster
+<http://wiki.homecloud.ca/scripster>
+
+Examples
+
+Many examples are in the junits: test_src/razie/scripster/test/
+
+Put some objects in a context and run a simple scala script:
+
+val context = new ScalaScriptContext(null, "a", "1", "b", "2")
+ScriptScala ("a+b").eval (context) getOrElse "?"
+
+ Create and add variables to the context, to pass to the next script:
+
+ val ctx = new ScalaScriptContext(null, "a", "1", "b", "2")
+ ScriptScala ("val c = a+b").interactive (ctx)
+ ScriptScala ("c").interactive (ctx) getOrElse "?"
+
+
+Cheers,
+Razie
+[Quoted text hidden]
+
+------------------------------------------------------------------------
+*Johann Petrak <johann.petrak@chello.at> * 	*Mon, Jul 4, 2011 at 3:55 PM *
+To: Paul Phillips <paulp@improving.org>, scala-user
+<scala-user@googlegroups.com>
+[Quoted text hidden]
+I was speaking in more general terms here, sorry: what I mean is that
+a collection of classes, traits, methods etc. often consists of far
+more components than are really intended for the one using the API.
+But unless this is mentioned in the explaining text, it is not
+easy to figure out (especially for noobies) which methods or classes
+are intended for the being directly used and which are just there
+to facilitate the implementation. I like the way how ScalaDoc
+provides more options to filter and navigate the API, but I thought
+it would be interesting to hear if others think that this distinction
+would make sense to include somehow in the API. I should have
+said it inside a separate topic though ...
+
+With regard to scala.tools.nsc I am confused that you call it "all
+internal": practically all JVM-based languages I know of either
+allow embedding/scripting via a JS223-compliant scripting engine
+or at least provide their own usually rather reliable API for
+interpreting or compiling code.
+I thought that scala.tools.nsc is the place where those who want
+to embed Scala would find an API of how to do that.
+If it is all internal, would that mean that this is something
+simply not intended to be done with Scala?
+
+Cheers,
+ johan
+
+------------------------------------------------------------------------
+*Johann Petrak <johann.petrak@chello.at> * 	*Mon, Jul 4, 2011 at 4:04 PM *
+To: Norbert Tausch <ntausch55@gmail.com>
+Cc: scala-user@googlegroups.com
+Hi Norbert,
+
+one more little question about the code you shared, if I may .. :)
+
+On 2011-07-04 10:59, Norbert Tausch wrote:
+>         settings.embeddedDefaults(parentClassLoader)
+
+I have to admit that I do not understand the description of this
+method in the docs:
+
+"Initializes these settings for embedded use by a class from the given
+class loader."
+
+Does this mean that by calling this with  a class loader that can load
+some class X that class X (and all others that can be loaded by the
+classloader)  will be (fully) usable in the interpreter?
+I thought to access classes, the compiler/interpreter needs to
+access the bare classpath?
+I guess my question is: would providing a classloader that can access
+the needed classes here be equivalent to specifying the original JARs.
+for settings.classpath.value ?
+I seam to remember that I was told that the compiler needs to
+access the actual URLs on the classpath and cannot just use a classloader?
+
+Cheers,
+ johann
+
+------------------------------------------------------------------------
+*Razie <razie@razie.com> * 	*Mon, Jul 4, 2011 at 8:28 PM *
+Reply-To: scala-user@googlegroups.com
+To: scala-user@googlegroups.com
+Cc: Johann Petrak <johann.petrak@chello.at>
+
+Before you spend too much time looking at the implementation which is in
+https://github.com/razie/scripster/blob/master/src/main/scala/razie/base/scripting/ScalaScript.scala
+<https://github.com/razie/scripster/blob/master/src/main/scala/razie/base/scripting/ScalaScript.scala>______
+
+ ____
+
+you should take into account that this is based on a hacked version of
+the Interpreter - which was needed to access a few internals, required
+to extract the values out of the current session.____
+
+ ____
+
+the hacked version is in
+https://github.com/razie/scripster/blob/master/src/main/scala/scala/tools/nsc/Interpreter.scala
+<https://github.com/razie/scripster/blob/master/src/main/scala/scala/tools/nsc/Interpreter.scala>____
+
+and it's actually fairly small - just publicize some members:____
+
+ ____
+
+   def lastRequest : Option[PublicRequest] =____
+
+     prevRequests.lastOption map (l =>____
+
+       PublicRequest (l.usedNames.map(_.decode),
+partialFlatMap(l.handlers) { case x: ValHandler => x.boundNames
+}.map(_.decode), l.extractionValue, errAccumulator.toList)____
+
+    ____
+
+That's why i recommend, if you go this route, to just use the
+ScalaScriptContext as shown... and the Scripster jar file in front of
+the classpath :)____
+
+ ____
+
+cheers,____
+
+Razvan____
+
+------------------------------------------------------------------------
+*Norbert Tausch <ntausch55@gmail.com> * 	*Tue, Jul 5, 2011 at 3:19 AM *
+To: Johann Petrak <johann.petrak@chello.at>
+Cc: Norbert Tausch <ntausch55@gmail.com>, scala-user@googlegroups.com
+Hi,
+
+when I left the classpath then the instantiation of the interpreter
+fails. Otherwise when I left the parent class loader then my objects
+aren't accessible within the interpreter. I'm not so familiar with the
+internals of the Scala interpreter. All I know I tried to gathered from
+the interpreter's source code.
+It seems that both is required. This would confirm your assumption that
+a classloader is only usable together with a suitable classpath.
+
+Best regards
+
+Norbert Tausch
+
+
+Am 05.07.2011 01:04, schrieb Johann Petrak:
+[Quoted text hidden]
+
+------------------------------------------------------------------------
