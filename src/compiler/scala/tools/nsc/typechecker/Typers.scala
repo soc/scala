@@ -5644,13 +5644,6 @@ trait Typers extends Modes with Adaptations with Tags {
       case Some(tree1) => transformed -= tree; tree1
       case None => typed(tree, mode, pt)
     }
-
-/*
-    def convertToTypeTree(tree: Tree): Tree = tree match {
-      case TypeTree() => tree
-      case _ => TypeTree(tree.tpe)
-    }
-*/
   }
 }
 
