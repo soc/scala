@@ -22,8 +22,8 @@ trait Contexts { self: Analyzer =>
 
     override def enclClass: Context = this
     override def enclMethod: Context = this
-    override def enclClassChain: List[Context] = Nil
     override def nextEnclosing(p: Context => Boolean): Context = this
+    override def enclClassChain: List[Context] = Nil
     override def enclosingContextChain: List[Context] = Nil
     override def implicitss: List[List[ImplicitInfo]] = Nil
     override def toString = "NoContext"
@@ -146,6 +146,13 @@ trait Contexts { self: Analyzer =>
       case _: DefDef => true
       case _         => false
     }
+    def isLocalContext: Boolean = tree match {
+      case Block(_,_)       => true
+      case PackageDef(_, _) => false
+      case EmptyTree        => false
+      case _                => outer.isLocalContext
+    }
+    def isLocal() = isLocalContext
 
     def enclClassChain: List[Context] = if (isClassContext) this :: outer.enclClassChain else outer.enclClassChain
     def enclClass: Context  = if (isClassContext) this else outer.enclClass
@@ -335,9 +342,7 @@ trait Contexts { self: Analyzer =>
     }
 
     def makeConstructorContext = {
-      var baseContext = enclClass.outer
-      while (baseContext.tree.isInstanceOf[Template])
-        baseContext = baseContext.outer
+      val baseContext = enclClass.outer.nextEnclosing(c => !c.tree.isInstanceOf[Template])
       val argContext = baseContext.makeNewScope(tree, owner)
       argContext.inSelfSuperCall = true
       argContext.restoreState(this.state)
@@ -408,13 +413,6 @@ trait Contexts { self: Analyzer =>
       if (reportErrors || force) unit.warning(pos, msg)
     }
 
-    def isLocal(): Boolean = tree match {
-      case Block(_,_)       => true
-      case PackageDef(_, _) => false
-      case EmptyTree        => false
-      case _                => outer.isLocal()
-    }
-
     /** Fast path for some slow checks (ambiguous assignment in Refchecks, and
      *  existence of __match for MatchTranslation in virtpatmat.) This logic probably
      *  needs improvement.
@@ -455,9 +453,10 @@ trait Contexts { self: Analyzer =>
     )
     /** Is `sub` a subclass of `base` or a companion object of such a subclass?
      */
-    def isSubClassOrCompanion(sub: Symbol, base: Symbol) =
-      sub.toCompanionClass isNonBottomSubClass base
-
+    def isSubClassOrCompanion(sub: Symbol, base: Symbol) = (
+         (sub isNonBottomSubClass base)
+      || (sub.toCompanionClass isNonBottomSubClass base)
+    )
     /** Is `clazz` a subclass of an enclosing class? */
     def isSubClassOfEnclosing(clazz: Symbol): Boolean =
       enclosingSuperClassContext(clazz) != NoContext
@@ -678,6 +677,8 @@ trait Contexts { self: Analyzer =>
   } //class Context
 
   class ImportInfo(val tree: Import, val depth: Int) {
+    // private def sym = tree.symbol
+
     /** The prefix expression */
     def qual: Tree = tree.symbol.info match {
       case ImportType(expr) => expr
