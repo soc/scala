@@ -18,10 +18,11 @@ trait Contexts { self: Analyzer =>
   import global._
 
   object NoContext extends Context {
-    outer      = this
-    enclClass  = this
-    enclMethod = this
+    outer = this
 
+    override def enclClass: Context = this
+    override def enclMethod: Context = this
+    override def enclClassChain: List[Context] = Nil
     override def nextEnclosing(p: Context => Boolean): Context = this
     override def enclosingContextChain: List[Context] = Nil
     override def implicitss: List[List[ImplicitInfo]] = Nil
@@ -104,15 +105,7 @@ trait Contexts { self: Analyzer =>
     var owner: Symbol = NoSymbol            // The current owner
     var scope: Scope = _                    // The current scope
     var outer: Context = _                  // The next outer context
-    var enclClass: Context = _              // The next outer context whose tree is a
-                                            // template or package definition
-    @inline final def savingEnclClass[A](c: Context)(a: => A): A = {
-      val saved = enclClass
-      enclClass = c
-      try a finally enclClass = saved
-    }
 
-    var enclMethod: Context = _             // The next outer context whose tree is a method
     var variance: Int = _                   // Variance relative to enclosing class
     private var _undetparams: List[Symbol] = List() // Undetermined type parameters,
                                                     // not inherited to child contexts
@@ -144,6 +137,21 @@ trait Contexts { self: Analyzer =>
     def typingIndent = "  " * typingIndentLevel
 
     var buffer: Set[AbsTypeError] = _
+
+    def isClassContext = tree match {
+      case _: Template | _: PackageDef => true
+      case _                           => false
+    }
+    def isMethodContext = tree match {
+      case _: DefDef => true
+      case _         => false
+    }
+
+    def enclClassChain: List[Context] = if (isClassContext) this :: outer.enclClassChain else outer.enclClassChain
+    def enclClass: Context  = if (isClassContext) this else outer.enclClass
+    def enclMethod: Context = if (isMethodContext) this else outer.enclMethod
+    // if ((owner eq NoSymbol) || owner.isClass) this else outer.enclClass
+    // def enclMethod = if ((owner eq NoSymbol) || owner.isMethod) this else outer.enclMethod
 
     def enclClassOrMethod: Context =
       if ((owner eq NoSymbol) || (owner.isClass) || (owner.isMethod)) this
@@ -252,21 +260,13 @@ trait Contexts { self: Analyzer =>
 
       tree match {
         case Template(_, _, _) | PackageDef(_, _) =>
-          c.enclClass = c
           c.prefix = c.owner.thisType
           c.inConstructorSuffix = false
         case _ =>
-          c.enclClass = this.enclClass
           c.prefix =
             if (c.owner != this.owner && c.owner.isTerm) NoPrefix
             else this.prefix
           c.inConstructorSuffix = this.inConstructorSuffix
-      }
-      tree match {
-        case DefDef(_, _, _, _, _, _) =>
-          c.enclMethod = c
-        case _ =>
-          c.enclMethod = this.enclMethod
       }
       c.variance = this.variance
       c.depth = if (scope == this.scope) this.depth else this.depth + 1
@@ -456,29 +456,22 @@ trait Contexts { self: Analyzer =>
     /** Is `sub` a subclass of `base` or a companion object of such a subclass?
      */
     def isSubClassOrCompanion(sub: Symbol, base: Symbol) =
-      sub.isNonBottomSubClass(base) ||
-      sub.isModuleClass && sub.linkedClassOfClass.isNonBottomSubClass(base)
+      sub.toCompanionClass isNonBottomSubClass base
+
+    /** Is `clazz` a subclass of an enclosing class? */
+    def isSubClassOfEnclosing(clazz: Symbol): Boolean =
+      enclosingSuperClassContext(clazz) != NoContext
 
     /** Return closest enclosing context that defines a superclass of `clazz`, or a
      *  companion module of a superclass of `clazz`, or NoContext if none exists */
-    def enclosingSuperClassContext(clazz: Symbol): Context = {
-      var c = this.enclClass
-      while (c != NoContext &&
-             !clazz.isNonBottomSubClass(c.owner) &&
-             !(c.owner.isModuleClass && clazz.isNonBottomSubClass(c.owner.companionClass)))
-        c = c.outer.enclClass
-      c
-    }
+    def enclosingSuperClassContext(clazz: Symbol): Context =
+      enclClassChain find (c => isSubClassOrCompanion(clazz, c.owner)) getOrElse NoContext
 
     /** Return the closest enclosing context that defines a subclass of `clazz`
      *  or a companion object thereof, or `NoContext` if no such context exists.
      */
-    def enclosingSubClassContext(clazz: Symbol): Context = {
-      var c = this.enclClass
-      while (c != NoContext && !isSubClassOrCompanion(c.owner, clazz))
-        c = c.outer.enclClass
-      c
-    }
+    def enclosingSubClassContext(clazz: Symbol): Context =
+      enclClassChain find (c => isSubClassOrCompanion(c.owner, clazz)) getOrElse NoContext
 
     /** Is `sym` accessible as a member of tree `site` with type
      *  `pre` in current context?
@@ -507,20 +500,6 @@ trait Contexts { self: Analyzer =>
         } else (owner hasTransOwner ab)
       }
 
-/*
-        var c = this
-        while (c != NoContext && c.owner != owner) {
-          if (c.outer eq null) assert(false, "accessWithin(" + owner + ") " + c);//debug
-          if (c.outer.enclClass eq null) assert(false, "accessWithin(" + owner + ") " + c);//debug
-          c = c.outer.enclClass
-        }
-        c != NoContext
-      }
-*/
-      /** Is `clazz` a subclass of an enclosing class? */
-      def isSubClassOfEnclosing(clazz: Symbol): Boolean =
-        enclosingSuperClassContext(clazz) != NoContext
-
       def isSubThisType(pre: Type, clazz: Symbol): Boolean = pre match {
         case ThisType(pclazz) => pclazz isNonBottomSubClass clazz
         case _ => false
@@ -532,22 +511,19 @@ trait Contexts { self: Analyzer =>
         if (c == NoContext)
           lastAccessCheckDetails =
             "\n Access to protected "+target+" not permitted because"+
-            "\n "+"enclosing "+this.enclClass.owner+
-            this.enclClass.owner.locationString+" is not a subclass of "+
-            "\n "+sym.owner+sym.owner.locationString+" where target is defined"
+            "\n "+"enclosing "+enclClass.owner.fullLocationString +" is not a subclass of "+
+            "\n "+sym.owner.fullLocationString+" where target is defined"
         c != NoContext &&
         {
           target.isType || { // allow accesses to types from arbitrary subclasses fixes #4737
-            val res =
-              isSubClassOrCompanion(pre.widen.typeSymbol, c.owner) ||
-              c.owner.isModuleClass &&
-              isSubClassOrCompanion(pre.widen.typeSymbol, c.owner.linkedClassOfClass)
-            if (!res)
-              lastAccessCheckDetails =
+            isSubClassOrCompanion(pre.widen.typeSymbol, c.owner.toCompanionClass) || {
+              lastAccessCheckDetails = (
                 "\n Access to protected "+target+" not permitted because"+
                 "\n prefix type "+pre.widen+" does not conform to"+
-                "\n "+c.owner+c.owner.locationString+" where the access take place"
-              res
+                "\n "+c.owner.fullLocationString+" where the access take place"
+              )
+              false
+            }
           }
         }
       }
@@ -655,13 +631,14 @@ trait Contexts { self: Analyzer =>
           if (owner != nextOuter.owner && owner.isClass && !owner.isPackageClass && !inSelfSuperCall) {
             if (!owner.isInitialized) return nextOuter.implicitss
             // debuglog("collect member implicits " + owner + ", implicit members = " + owner.thisType.implicitMembers)//DEBUG
-            savingEnclClass(this) {
+            // savingEnclClass(this) {
               // !!! In the body of `class C(implicit a: A) { }`, `implicitss` returns `List(List(a), List(a), List(<predef..)))`
               //     it handled correctly by implicit search, which considers the second `a` to be shadowed, but should be
               //     remedied nonetheless.
               collectImplicits(owner.thisType.implicitMembers, owner.thisType)
-            }
-          } else if (scope != nextOuter.scope && !owner.isPackageClass) {
+            // }
+          }
+          else if (scope != nextOuter.scope && !owner.isPackageClass) {
             debuglog("collect local implicits " + scope.toList)//DEBUG
             collectImplicits(scope, NoPrefix)
           } else if (imports != nextOuter.imports) {

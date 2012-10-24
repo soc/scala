@@ -1991,6 +1991,28 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
      */
     def linkedClassOfClass: Symbol = NoSymbol
 
+    /** Conversion methods: given a symbol which represents any of a module,
+     *  a module class, or a regular class, these methods will return the desired
+     *  variation of that class (which might be the symbol itself.) The returned
+     *  symbol is guaranteed to be the variation requested, or NoSymbol will be
+     *  returned if it does not exist.
+     */
+    def toCompanionModule = if (isModule) this           else if (isModuleClass) sourceModule       else if (isClass) companionModule    else NoSymbol
+    def toCompanionClass  = if (isModule) companionClass else if (isModuleClass) linkedClassOfClass else if (isClass) this               else NoSymbol
+    def toModuleClass     = if (isModule) moduleClass    else if (isModuleClass) this               else if (isClass) linkedClassOfClass else NoSymbol
+
+    /** If this is a module class, its source module; if a module or class, the
+     *  symbol itself; otherwise, NoSymbol.
+     */
+    def toCompanionSymbol = if (isModuleClass) sourceModule else if (isModule || isClass) this else NoSymbol
+
+    /** If this is a module, its module class; if a class, the symbol itself;
+     *  otherwise, NoSymbol.
+     */
+    def toClassSymbol = if (isModule) moduleClass else if (isClass) this else NoSymbol
+
+    def relatedSymbols = List(toCompanionModule, toCompanionClass, toModuleClass) filterNot (_ eq NoSymbol)
+
     /**
      * Returns the rawInfo of the owner. If the current phase has flat classes,
      * it first applies all pending type maps to this symbol.
@@ -2414,6 +2436,16 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
   /** A class for term symbols */
   class TermSymbol protected[Symbols] (initOwner: Symbol, initPos: Position, initName: TermName)
   extends Symbol(initOwner, initPos, initName) with TermSymbolApi {
+    /** A field utilized, in different ways, by term symbols which refer to
+     *  some other symbol. Those ways include:
+     *    - superaccessors refer to the accessed member
+     *    - paramaccessors refer to the parameter
+     *    - lazy accessors refer to the underlying field
+     *    - specialized members refer to the unspecialized member
+     *    - trait forwarders refer to the implementation class method
+     *    - modules refer to their module class
+     *    - $outer accessors refer to the class from which they originate
+     */
     private[this] var _referenced: Symbol = NoSymbol
     privateWithin = NoSymbol
 

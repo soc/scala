@@ -151,7 +151,7 @@ private[reflect] trait JavaMirrors extends internal.SymbolTable with api.JavaUni
 
       object ConstantArg {
         def enumToSymbol(enum: Enum[_]): Symbol = {
-          val staticPartOfEnum = classToScala(enum.getClass).companionSymbol
+          val staticPartOfEnum = classToScala(enum.getClass).toCompanionModule
           staticPartOfEnum.typeSignature.declaration(enum.name: TermName)
         }
 
