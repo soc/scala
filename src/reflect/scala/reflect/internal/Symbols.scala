@@ -654,7 +654,7 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
       info.firstParent.typeSymbol == AnyValClass && !isPrimitiveValueClass
 
     final def isMethodWithExtension =
-      isMethod && owner.isDerivedValueClass && !isParamAccessor && !isConstructor && !hasFlag(SUPERACCESSOR)
+      isMethod && owner.isDerivedValueClass && !isParamAccessor && !isConstructor && !hasFlag(SUPERACCESSOR) && !isTermMacro
 
     final def isAnonymousFunction = isSynthetic && (name containsName tpnme.ANON_FUN_NAME)
     final def isDefinedInPackage  = effectiveOwner.isPackageClass
@@ -1394,6 +1394,10 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
     final def initialize: this.type = {
       if (!isInitialized) info
       this
+    }
+    def maybeInitialize = {
+      try   { initialize ; true }
+      catch { case _: CyclicReference => debuglog("Hit cycle in maybeInitialize of $this") ; false }
     }
 
     /** Called when the programmer requests information that might require initialization of the underlying symbol.
@@ -2611,8 +2615,6 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
       mtpeResult = res
       res
     }
-
-    override def params: List[List[Symbol]] = paramss
 
     override def isVarargs: Boolean = definitions.isVarArgsList(paramss.flatten)
 
