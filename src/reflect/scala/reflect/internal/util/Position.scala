@@ -19,18 +19,12 @@ object Position {
       else if (posIn.isDefined) posIn.inUltimateSource(posIn.source)
       else posIn
     )
-    def file   = pos.source.file
-    def prefix = if (shortenFile) file.name else file.path
+    val prefix = if (shortenFile) pos.sourceName else pos.sourcePath
 
     pos match {
       case FakePos(fmsg) => fmsg+" "+msg
       case NoPosition    => msg
-      case _             =>
-        List(
-          "%s:%s: %s".format(prefix, pos.line, msg),
-          pos.lineContent.stripLineEnd,
-          " " * (pos.column - 1) + "^"
-        ) mkString "\n"
+      case _             => "%s:%s: %s\n%s\n%s".format(prefix, pos.line, msg, pos.lineContent, pos.lineCarat)
     }
   }
 }
@@ -205,12 +199,22 @@ abstract class Position extends scala.reflect.api.Position { self =>
 
   def column: Int = throw new UnsupportedOperationException("Position.column")
 
+  /** A line with a ^ padded with the right number of spaces.
+   */
+  def lineCarat: String = " " * (column - 1) + "^"
+
   /** Convert this to a position around `point` that spans a single source line */
   def toSingleLine: Position = this
 
-  def lineContent: String =
-    if (isDefined) source.lineToString(line - 1)
-    else "NO_LINE"
+  /** The source code corresponding to the range, if this is a range position.
+   *  Otherwise the empty string.
+   */
+  def lengthInChars = 0
+  def lengthInLines = 0
+  def sourceCode    = ""
+  def sourceName    = "<none>"
+  def sourcePath    = "<none>"
+  def lineContent   = "<none>"
 
   /** Map this position to a position in an original source
    * file.  If the SourceFile is a normal SourceFile, simply
@@ -221,6 +225,8 @@ abstract class Position extends scala.reflect.api.Position { self =>
 
   def dbgString: String = toString
   def safeLine: Int = try line catch { case _: UnsupportedOperationException => -1 }
+  override def toString = "%s:%s(%s)".format(sourceName, safeLine, locationString)
+  def locationString = ""
 
   def show: String = "["+toString+"]"
 }
@@ -239,7 +245,10 @@ class OffsetPosition(override val source: SourceFile, override val point: Int) e
   override def withPoint(off: Int) = new OffsetPosition(source, off)
   override def withSource(source: SourceFile, shift: Int) = new OffsetPosition(source, point + shift)
 
-  override def line: Int = source.offsetToLine(point) + 1
+  override def line        = source.offsetToLine(point) + 1
+  override def sourceName  = source.file.name
+  override def sourcePath  = source.file.path
+  override def lineContent = source.lineToString(line - 1)
 
   override def column: Int = {
     var idx = source.lineToOffset(source.offsetToLine(point))
@@ -259,10 +268,7 @@ class OffsetPosition(override val source: SourceFile, override val point: Int) e
   }
   override def hashCode = point * 37 + source.file.hashCode
 
-  override def toString = {
-    val pointmsg = if (point > source.length) "out-of-bounds-" else "offset="
-    "source-%s,line-%s,%s%s".format(source.file.canonicalPath, line, pointmsg, point)
-  }
+  override def locationString = "col=" + column
   override def show = "["+point+"]"
 }
 
@@ -297,7 +303,15 @@ extends OffsetPosition(source, point) {
     case _ => this
   }
 
-  override def toString = "RangePosition("+source.file.canonicalPath+", "+start+", "+point+", "+end+")"
+  override def lengthInChars = end - start
+  override def lengthInLines = focusEnd.line - focusStart.line + 1
+  override def sourceCode    = new String(source.content, start, lengthInChars)
+
+  override def locationString = "%s line%s, %s char%s".format(
+    lengthInLines, if (lengthInLines == 1) "" else "s",
+    lengthInChars, if (lengthInChars == 1) "" else "s"
+  )
+
   override def show = "["+start+":"+end+"]"
   private var focusCache: Position = NoPosition
 }
