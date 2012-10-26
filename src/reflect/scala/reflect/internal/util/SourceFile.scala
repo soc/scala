@@ -36,6 +36,9 @@ abstract class SourceFile {
   def dbg(offset: Int) = (new OffsetPosition(this, offset)).dbgString
   def path = file.path
 
+  def beginsWith(offset: Int, text: String): Boolean =
+    content drop offset startsWith text
+
   def lineToString(index: Int): String =
     content drop lineToOffset(index) takeWhile (c => !isLineBreakChar(c.toChar)) mkString ""
 
@@ -80,8 +83,8 @@ object ScriptSourceFile {
 
   def apply(file: AbstractFile, content: Array[Char]) = {
     val underlying = new BatchSourceFile(file, content)
-    val headerLen = headerLength(content)
-    val stripped = new ScriptSourceFile(underlying, content drop headerLen, headerLen)
+    val headerLen  = headerLength(content)
+    val stripped   = new ScriptSourceFile(underlying, content drop headerLen, headerLen)
 
     stripped
   }

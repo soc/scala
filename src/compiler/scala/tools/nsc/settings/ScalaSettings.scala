@@ -187,6 +187,7 @@ trait ScalaSettings extends AbsScalaSettings
   val YmacrodebugVerbose      = BooleanSetting("-Ymacro-debug-verbose", "Trace all macro-related activities: compilation, generation of synthetics, classloading, expansion, exceptions.")
   val Ypmatdebug              = BooleanSetting("-Ypmat-debug", "Trace all pattern matcher activity.")
   val Yposdebug               = BooleanSetting("-Ypos-debug", "Trace position validation.")
+  val Yrangeposdebug          = BooleanSetting("-Yrangepos-debug", "Dump range positions.") withPostSetHook (set => if (set.value) Yrangepos.value = true)
   val Yreifydebug             = BooleanSetting("-Yreify-debug", "Trace reification.")
   val Yrepldebug              = BooleanSetting("-Yrepl-debug", "Trace all repl activity.") andThen (interpreter.replProps.debug setValue _)
   val Ytyperdebug             = BooleanSetting("-Ytyper-debug", "Trace all type assignments.")
