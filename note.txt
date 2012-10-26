@@ -1,0 +1,3 @@
++
++  val Xposenhance   = BooleanSetting    ("-Xenhanced-positions", "Enhance positions.") .
++                                          withPostSetHook (set => if (set.value) Yrangepos.value = true)
