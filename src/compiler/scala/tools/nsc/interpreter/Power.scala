@@ -17,6 +17,78 @@ import scala.language.implicitConversions
 import scala.reflect.runtime.{universe => ru}
 import scala.reflect.{ClassTag, classTag}
 
+trait TagWrappers {
+  val global: api.Universe
+  import global._
+
+  class TaggedValue[T : TypeTag : ClassTag](val value: T) {
+    def ttag = typeTag[T]
+    def ctag = classTag[T]
+
+    override def toString = value match {
+      case null => "" + typeOf[T]
+      case x    => "%s: %s".format(x, typeOf[T])
+    }
+  }
+  implicit def newTaggedValue[T : TypeTag : ClassTag](value: T): TaggedValue[T] = new TaggedValue[T](value)
+}
+
+trait ReplInternalInfos extends TagWrappers {
+  val global: scala.tools.nsc.Global
+  import global._
+
+  override implicit def newTaggedValue[T : TypeTag : ClassTag](value: T): TaggedValue[T] = new TaggedValue[T](value)
+
+  class TaggedValue[T : TypeTag : ClassTag](value0: T) extends super.TaggedValue[T](value0) {
+    def ? = newInfo(value)
+  }
+
+  def newInfo[T : TypeTag : ClassTag](value: T): InternalInfo = new InternalInfo(value)
+
+  /** Todos...
+   *    translate tag type arguments into applied types
+   *    customizable symbol filter (had to hardcode no-spec to reduce noise)
+   */
+  class InternalInfo(taggedValue: TaggedValue[_]) {
+    def ttag         = taggedValue.ttag
+    def ctag         = taggedValue.ctag
+    def tpe          = tag.tpe
+    def symbol       = tpe.typeSymbol
+    def runtimeClass = ctag.runtimeClass
+
+    private def isSpecialized(s: Symbol) = s.name.toString contains "$mc"
+    private def isImplClass(s: Symbol)   = s.name.toString endsWith "$class"
+
+    /** Standard noise reduction filter. */
+    def excludeMember(s: Symbol) = (
+         isImplClass(s)
+      || s.isAnonOrRefinementClass
+      || s.isAnonymousFunction
+    )
+    def baseClasses  = tpe.baseClasses
+    def baseTypes    = tpe.baseTypeSeq.toList
+    def companion    = symbol.companionSymbol
+    def declsByClass = mapFrom(baseClasses)(_.info.decls.toList.sortBy(_.name))
+    def moduleClass  = symbol.moduleClass
+    def name         = symbol.name
+    def owner        = symbol.owner
+    def owners       = symbol.ownerChain drop 1
+    def parents      = tpe.parents
+    def shortClass   = runtimeClass.getName split "[$.]" last
+    def sig          = symbol.defString
+
+    def <:<[U: TypeTag](other: U) = tpe <:< typeOf[U]
+    def lub[U: TypeTag](other: U) = global.lub(List(tpe, typeOf[U]))
+    def glb[U: TypeTag](other: U) = global.glb(List(tpe, typeOf[U]))
+
+    override def toString = taggedValue match {
+      case null   => runtimeClass.getName
+      case x      => "%s (%s)".format(x, shortClass)
+    }
+  }
+}
+
+
 /** Collecting some power mode examples.
 
 scala> trait F[@specialized(Int) T] { def f: T = ??? }
@@ -162,91 +234,6 @@ class Power[ReplValsImpl <: ReplVals : ru.TypeTag: ClassTag](val intp: IMain, re
            map to_str
       mkString ("Name and type of values imported into the repl in power mode.\n\n", "\n", "")
     )
-  }
-
-  trait LowPriorityInternalInfo {
-    implicit def apply[T: ru.TypeTag : ClassTag] : InternalInfo[T] = new InternalInfo[T](None)
-  }
-  object InternalInfo extends LowPriorityInternalInfo { }
-
-  /** Now dealing with the problem of acidentally calling a method on Type
-   *  when you're holding a Symbol and seeing the Symbol converted to the
-   *  type of Symbol rather than the type of the thing represented by the
-   *  symbol, by only implicitly installing one method, "?", and the rest
-   *  of the conveniences exist on that wrapper.
-   */
-  trait LowPriorityInternalInfoWrapper {
-    implicit def apply[T: ru.TypeTag : ClassTag] : InternalInfoWrapper[T] = new InternalInfoWrapper[T](None)
-  }
-  object InternalInfoWrapper extends LowPriorityInternalInfoWrapper {
-
-  }
-  class InternalInfoWrapper[T: ru.TypeTag : ClassTag](value: Option[T] = None) {
-    def ? : InternalInfo[T] = new InternalInfo[T](value)
-  }
-
-  /** Todos...
-   *    translate tag type arguments into applied types
-   *    customizable symbol filter (had to hardcode no-spec to reduce noise)
-   */
-  class InternalInfo[T](value: Option[T] = None)(implicit typeEvidence: ru.TypeTag[T], runtimeClassEvidence: ClassTag[T]) {
-    private def newInfo[U: ru.TypeTag : ClassTag](value: U): InternalInfo[U] = new InternalInfo[U](Some(value))
-    private def isSpecialized(s: Symbol) = s.name.toString contains "$mc"
-    private def isImplClass(s: Symbol)   = s.name.toString endsWith "$class"
-
-    /** Standard noise reduction filter. */
-    def excludeMember(s: Symbol) = (
-         isSpecialized(s)
-      || isImplClass(s)
-      || s.isAnonOrRefinementClass
-      || s.isAnonymousFunction
-    )
-    def symbol      = compilerSymbolFromTag(tag)
-    def tpe         = compilerTypeFromTag(tag)
-    def name        = symbol.name
-    def companion   = symbol.companionSymbol
-    def info        = symbol.info
-    def moduleClass = symbol.moduleClass
-    def owner       = symbol.owner
-    def owners      = symbol.ownerChain drop 1
-    def signature   = symbol.defString
-
-    def decls         = info.decls
-    def declsOverride = membersDeclared filter (_.isOverride)
-    def declsOriginal = membersDeclared filterNot (_.isOverride)
-
-    def members           = membersUnabridged filterNot excludeMember
-    def membersUnabridged = tpe.members.toList
-    def membersDeclared   = members filterNot excludeMember
-    def membersInherited  = members filterNot (membersDeclared contains _)
-    def memberTypes       = members filter (_.name.isTypeName)
-    def memberMethods     = members filter (_.isMethod)
-
-    def pkg             = symbol.enclosingPackage
-    def pkgName         = pkg.fullName
-    def pkgClass        = symbol.enclosingPackageClass
-    def pkgMembers      = pkg.info.members filterNot excludeMember
-    def pkgClasses      = pkgMembers filter (s => s.isClass && s.isDefinedInPackage)
-    def pkgSymbols      = new PackageSlurper(pkgClass).slurp() filterNot excludeMember
-
-    def tag            = typeEvidence
-    def runtimeClass   = runtimeClassEvidence.runtimeClass
-    def shortClass     = runtimeClass.getName split "[$.]" last
-
-    def baseClasses                    = tpe.baseClasses
-    def baseClassDecls                 = mapFrom(baseClasses)(_.info.decls.toList.sortBy(_.name))
-    def ancestors                      = baseClasses drop 1
-    def ancestorDeclares(name: String) = ancestors filter (_.info member newTermName(name) ne NoSymbol)
-    def baseTypes                      = tpe.baseTypeSeq.toList
-
-    def <:<[U: ru.TypeTag : ClassTag](other: U) = tpe <:< newInfo(other).tpe
-    def lub[U: ru.TypeTag : ClassTag](other: U) = intp.global.lub(List(tpe, newInfo(other).tpe))
-    def glb[U: ru.TypeTag : ClassTag](other: U) = intp.global.glb(List(tpe, newInfo(other).tpe))
-
-    override def toString = value match {
-      case Some(x)  => "%s (%s)".format(x, shortClass)
-      case _        => runtimeClass.getName
-    }
   }
 
   trait LowPriorityPrettifier {
