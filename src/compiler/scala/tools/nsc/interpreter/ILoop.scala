@@ -286,6 +286,7 @@ class ILoop(in0: Option[BufferedReader], protected val out: JPrintWriter)
     shCommand,
     nullary("silent", "disable/enable automatic printing of results", verbosity),
     cmd("type", "[-v] <expr>", "display the type of an expression without evaluating it", typeCommand),
+    cmd("unlink", "<name>", "remove a name from the repls scope", unlinkCommand),
     nullary("warnings", "show the suppressed warnings from the most recent line which had any", warningsCommand)
   )
 
@@ -433,6 +434,17 @@ class ILoop(in0: Option[BufferedReader], protected val out: JPrintWriter)
       case s if s startsWith "-v " => typeCommandInternal(s stripPrefix "-v " trim, true)
       case s                       => typeCommandInternal(s, false)
     }
+  }
+  private def unlinkCommand(line: String): Result = {
+    onIntp { intp =>
+      words(line) foreach { name =>
+        intp.unlinkAll(name) match {
+          case Nil  => echo(s"No symbol named $name in repl scope.")
+          case syms => syms foreach (sym => intp.printAfterTyper(s"Unlinked ${sym.defString} from repl scope."))
+        }
+      }
+    }
+    ()
   }
 
   private def warningsCommand(): Result = {
