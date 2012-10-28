@@ -192,11 +192,25 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
 
   import global._
   import definitions.{ScalaPackage, JavaLangPackage, ObjectClass, termMember, typeMember, dropNullaryMethod}
-  import global.{ rootMirror => rmirror }
-  import rmirror.{RootClass, getClassIfDefined, getModuleIfDefined, getRequiredModule, getRequiredClass}
+  // import global.{ rootMirror => rmirror }
+  // import rmirror.{RootClass, getClassIfDefined, getModuleIfDefined, getRequiredModule, getRequiredClass}
 
-  lazy val rumirror = ru.runtimeMirror(classLoader)
-  import rumirror.{ staticClass, staticModule }
+  lazy val runtimeMirror = ru.runtimeMirror(classLoader)
+
+  private def noFatal(body: => Symbol): Symbol = try body catch { case _: FatalError => NoSymbol }
+
+  def getClassIfDefined(path: String)  = (
+           noFatal(runtimeMirror staticClass path)
+    orElse noFatal(rootMirror staticClass path)
+  )
+  def getModuleIfDefined(path: String) = (
+           noFatal(runtimeMirror staticModule path)
+    orElse noFatal(rootMirror staticModule path)
+  )
+  def getPathIfDefined(path: String) = (
+    if (path endsWith "$") getModuleIfDefined(path.init)
+    else getClassIfDefined(path)
+  )
 
   implicit class ReplTypeOps(tp: Type) {
     def orElse(other: => Type): Type    = if (tp ne NoType) tp else other
@@ -787,7 +801,7 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
       * following accessPath into the outer one.
       */
     def resolvePathToSymbol(accessPath: String): Symbol = {
-      val readRoot  = getRequiredModule(readPath)   // the outermost wrapper
+      val readRoot  = getModuleIfDefined(readPath)   // the outermost wrapper
       (accessPath split '.').foldLeft(readRoot: Symbol) {
         case (sym, "")    => sym
         case (sym, name)  => exitingTyper(termMember(sym, name))
@@ -865,7 +879,7 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
       * append to objectName to access anything bound by request.
       */
     val ComputedImports(importsPreamble, importsTrailer, accessPath) =
-      importsCode(referencedNames.toSet)
+      exitingTyper(importsCode(referencedNames.toSet))
 
     /** The unmangled symbol name, but supplemented with line info. */
     def disambiguated(name: Name): String = name + " (in " + lineRep + ")"
@@ -1031,9 +1045,8 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
     def value() = {
       val sym0    = symbolOfTerm(id)
       val sym     = (importer importSymbol sym0).asTerm
-      val mirror  = ru.runtimeMirror(classLoader)
-      val module  = mirror.reflectModule(sym.owner.companionSymbol.asModule).instance
-      val module1 = mirror.reflect(module)
+      val module  = runtimeMirror.reflectModule(sym.owner.companionSymbol.asModule).instance
+      val module1 = runtimeMirror.reflect(module)
       val invoker = module1.reflectField(sym)
 
       invoker.get
@@ -1042,25 +1055,33 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
     try Some(value()) catch { case _: Exception => None }
   }
 
-  def symbolOfPath(path: String): Symbol = {
-    if (path contains '.') {
-      tryTwice {
-        if (path endsWith "$") rmirror.staticModule(path.init)
-        else rmirror.staticModule(path) orElse rmirror.staticClass(path)
-      }
+  def symbolOfPath(path0: String): Symbol = {
+    exitingTyper {
+      getPathIfDefined(path0)
     }
-    else {
-      if (path endsWith "$") symbolOfTerm(path.init)
-      else symbolOfIdent(path) orElse rumirror.staticClass(path)
-    }
+
+    // val (path, isModule) = if (path0 endsWith '$') (path0.init, true) else (path0, false)
+    // val isDotted = path contains '.'
+
+    // exitingTyper {
+    //   if (isModule)
+    //     symbolOfTerm(path) orElse getModuleIfDefined(path)
+    //   else
+    //     ( symbolOfIdent(path)
+    //         orElse getClassIfDefined(path)
+    //         orElse getModuleIfDefined(path)
+    //         orElse (runtimeMirror staticClass path)
+    //     )
+    // }
   }
 
-  def tryTwice(op: => Symbol): Symbol = {
-    exitingTyper(op) orElse exitingFlatten(op)
-  }
+  /** It's a bit of a shotgun approach, but for now we will gain in
+   *  robustness. Try a symbol-producing operation at phase typer, and
+   *  if that is NoSymbol, try again at phase flatten.
+   */
+  def tryTwice(op: => Symbol): Symbol = exitingTyper(op) orElse exitingFlatten(op)
 
-  def signatureOf(sym: Symbol) = typerOp sig sym
-  // exitingTyper(sym.defString)
+  def signatureOf(sym: Symbol)          = typerOp sig sym
   def symbolOfIdent(id: String): Symbol = symbolOfTerm(id) orElse symbolOfType(id)
   def symbolOfType(id: String): Symbol  = tryTwice(replScope lookup (id: TypeName))
   def symbolOfTerm(id: String): Symbol  = tryTwice(replScope lookup (id: TermName))
