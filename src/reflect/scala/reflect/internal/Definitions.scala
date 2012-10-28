@@ -235,6 +235,21 @@ trait Definitions extends api.StandardDefinitions {
       scope.sorted foreach fullyInitializeSymbol
       scope
     }
+    /** Is this symbol a member of Object or Any? */
+    def isUniversalMember(sym: Symbol) = (
+         (sym ne NoSymbol)
+      && (ObjectClass isSubClass sym.owner)
+    )
+
+    /** Is this symbol unimportable? */
+    def isUnimportable(sym: Symbol) = (
+         (sym eq NoSymbol)
+      || sym.isConstructor
+      || sym.isPrivateLocal
+      || isUniversalMember(sym)
+    )
+    def isImportable(sym: Symbol) = !isUnimportable(sym)
+
     /** Is this type equivalent to Any, AnyVal, or AnyRef? */
     def isTrivialTopType(tp: Type) = (
          tp =:= AnyClass.tpe
