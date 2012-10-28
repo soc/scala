@@ -182,12 +182,24 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
   }
 
   import global._
-  import definitions.{ScalaPackage, JavaLangPackage, ObjectClass, termMember, typeMember, dropNullaryMethod}
-  import global.{ rootMirror => rmirror }
-  import rmirror.{RootClass, getClassIfDefined, getModuleIfDefined, getRequiredModule, getRequiredClass}
+  import definitions.{ ObjectClass, termMember, dropNullaryMethod }
 
-  lazy val rumirror = ru.runtimeMirror(classLoader)
-  import rumirror.{ staticClass, staticModule }
+  lazy val runtimeMirror = ru.runtimeMirror(classLoader)
+
+  private def noFatal(body: => Symbol): Symbol = try body catch { case _: FatalError => NoSymbol }
+
+  def getClassIfDefined(path: String)  = (
+           noFatal(runtimeMirror staticClass path)
+    orElse noFatal(rootMirror staticClass path)
+  )
+  def getModuleIfDefined(path: String) = (
+           noFatal(runtimeMirror staticModule path)
+    orElse noFatal(rootMirror staticModule path)
+  )
+  def getPathIfDefined(path: String) = (
+    if (path endsWith "$") getModuleIfDefined(path.init)
+    else getClassIfDefined(path)
+  )
 
   implicit class ReplTypeOps(tp: Type) {
     def orElse(other: => Type): Type    = if (tp ne NoType) tp else other
@@ -319,9 +331,10 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
     def shift[T](op: => T): T = exitingFlatten(op)
   }
 
-  def originalPath(name: Name): String  = typerOp path name
-  def originalPath(sym: Symbol): String = typerOp path sym
-  def flatPath(sym: Symbol): String     = flatOp shift sym.javaClassName
+  def originalPath(name: String): String = originalPath(name: TermName)
+  def originalPath(name: Name): String   = typerOp path name
+  def originalPath(sym: Symbol): String  = typerOp path sym
+  def flatPath(sym: Symbol): String      = flatOp shift sym.javaClassName
   // def translatePath(path: String) = symbolOfPath(path).fold(Option.empty[String])(flatPath)
   def translatePath(path: String) = {
     val sym = if (path endsWith "$") symbolOfTerm(path.init) else symbolOfIdent(path)
@@ -353,13 +366,8 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
   // Set the current Java "context" class loader to this interpreter's class loader
   def setContextClassLoader() = classLoader.setAsContext()
 
-  def allDefinedNames = exitingTyper(replScope.toList.map(_.name).sorted)
-  def pathToType(id: String): String = pathToName(newTypeName(id))
-  def pathToTerm(id: String): String = pathToName(newTermName(id))
-  def pathToName(name: Name): String = replScope lookup name match {
-    case NoSymbol => name.toString
-    case sym      => exitingTyper(sym.fullName)
-  }
+  def allDefinedNames: List[Name]  = exitingTyper(replScope.toList.map(_.name).sorted)
+  def unqualifiedIds: List[String] = allDefinedNames map (_.decode) sorted
 
   /** Most recent tree handled which wasn't wholly synthetic. */
   private def mostRecentlyHandledTree: Option[Tree] = {
@@ -413,9 +421,7 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
     }
     exitingTyper {
       req.imports foreach (sym => updateReplScope(sym, isDefined = false))
-      req.defines foreach { sym =>
-        updateReplScope(sym, isDefined = true)
-      }
+      req.defines foreach (sym => updateReplScope(sym, isDefined = true))
     }
   }
 
@@ -759,7 +765,7 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
       * following accessPath into the outer one.
       */
     def resolvePathToSymbol(accessPath: String): Symbol = {
-      val readRoot  = getRequiredModule(readPath)   // the outermost wrapper
+      val readRoot  = getModuleIfDefined(readPath)   // the outermost wrapper
       (accessPath split '.').foldLeft(readRoot: Symbol) {
         case (sym, "")    => sym
         case (sym, name)  => exitingTyper(termMember(sym, name))
@@ -836,7 +842,7 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
       * append to objectName to access anything bound by request.
       */
     val ComputedImports(importsPreamble, importsTrailer, accessPath) =
-      importsCode(referencedNames.toSet)
+      exitingTyper(importsCode(referencedNames.toSet))
 
     /** The unmangled symbol name, but supplemented with line info. */
     def disambiguated(name: Name): String = name + " (in " + lineRep + ")"
@@ -848,7 +854,7 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
 
     /** generate the source code for the object that computes this request */
     private object ObjectSourceCode extends CodeAssembler[MemberHandler] {
-      def path = pathToTerm("$intp")
+      def path = originalPath("$intp")
       def envLines = {
         if (!isReplPower) Nil // power mode only for now
         // $intp is not bound; punt, but include the line.
@@ -943,9 +949,6 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
     /** String representations of same. */
     lazy val typeOf         = typeMap[String](tp => exitingTyper(tp.toString))
 
-    // lazy val definedTypes: Map[Name, Type] = {
-    //   typeNames map (x => x -> exitingTyper(resultSymbol.info.nonPrivateDecl(x).tpe)) toMap
-    // }
     lazy val definedSymbols = (
       termNames.map(x => x -> applyToResultMember(x, x => x)) ++
       typeNames.map(x => x -> compilerTypeOf(x).typeSymbolDirect)
@@ -978,33 +981,25 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
   private var mostRecentWarnings: List[(global.Position, String)] = Nil
   def lastWarnings = mostRecentWarnings
 
-  private lazy val globalImporter = global.mkImporter(ru)
-  private lazy val importer = ru.mkImporter(global)
-
-  private implicit def importFromRu(sym: ru.Symbol): global.Symbol =
-    globalImporter importSymbol sym
-
-  private implicit def importToRu(sym: global.Symbol): ru.Symbol =
-    importer importSymbol sym
-
-  private def jmirror = ru.rootMirror match {
-    case j: ru.JavaMirror => j
+  private lazy val importToGlobal  = global mkImporter ru
+  private lazy val importToRuntime = ru mkImporter global
+  private lazy val javaMirror = ru.rootMirror match {
+    case x: ru.JavaMirror => x
     case _                => null
   }
+  private implicit def importFromRu(sym: ru.Symbol): Symbol = importToGlobal importSymbol sym
+  private implicit def importToRu(sym: Symbol): ru.Symbol   = importToRuntime importSymbol sym
+
   def classOfTerm(id: String): Option[JClass] = symbolOfTerm(id) match {
     case NoSymbol => None
-    case sym      => Some(jmirror runtimeClass (importer importSymbol sym).asClass)
+    case sym      => Some(javaMirror runtimeClass importToRu(sym).asClass)
   }
-
-  def typeOfTerm(id: String): Type = symbolOfTerm(id).tpe
-
   def valueOfTerm(id: String): Option[Any] = exitingTyper {
     def value() = {
       val sym0    = symbolOfTerm(id)
-      val sym     = (importer importSymbol sym0).asTerm
-      val mirror  = ru.runtimeMirror(classLoader)
-      val module  = mirror.reflectModule(sym.owner.companionSymbol.asModule).instance
-      val module1 = mirror.reflect(module)
+      val sym     = (importToRuntime importSymbol sym0).asTerm
+      val module  = runtimeMirror.reflectModule(sym.owner.companionSymbol.asModule).instance
+      val module1 = runtimeMirror.reflect(module)
       val invoker = module1.reflectField(sym)
 
       invoker.get
@@ -1013,29 +1008,15 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
     try Some(value()) catch { case _: Exception => None }
   }
 
-  def symbolOfPath(path: String): Symbol = {
-    if (path contains '.') {
-      tryTwice {
-        if (path endsWith "$") rmirror.staticModule(path.init)
-        else rmirror.staticModule(path) orElse rmirror.staticClass(path)
-      }
-    }
-    else {
-      if (path endsWith "$") symbolOfTerm(path.init)
-      else symbolOfIdent(path) orElse rumirror.staticClass(path)
-    }
-  }
+  def signatureOf(sym: Symbol)           = typerOp sig sym
+  def symbolOfPath(path: String): Symbol = exitingTyper(getPathIfDefined(path))
+  def symbolOfIdent(id: String): Symbol  = symbolOfTerm(id) orElse symbolOfType(id)
+  def symbolOfType(id: String): Symbol   = exitingTyper(replScope lookup (id: TypeName))
+  def symbolOfTerm(id: String): Symbol   = exitingTyper(replScope lookup (id: TermName))
+  def symbolOfName(id: Name): Symbol     = replScope lookup id
 
-  def tryTwice(op: => Symbol): Symbol = {
-    exitingTyper(op) orElse exitingFlatten(op)
-  }
-
-  def signatureOf(sym: Symbol) = typerOp sig sym
-  // exitingTyper(sym.defString)
-  def symbolOfIdent(id: String): Symbol = symbolOfTerm(id) orElse symbolOfType(id)
-  def symbolOfType(id: String): Symbol  = tryTwice(replScope lookup (id: TypeName))
-  def symbolOfTerm(id: String): Symbol  = tryTwice(replScope lookup (id: TermName))
-  def symbolOfName(id: Name): Symbol    = replScope lookup id
+  def typeOfTerm(id: String): Type = symbolOfTerm(id).tpe
+  def typeOfName(id: Name): Type   = symbolOfName(id).tpe
 
   def runtimeClassAndTypeOfTerm(id: String): Option[(JClass, Type)] = {
     classOfTerm(id) flatMap { clazz =>
@@ -1078,11 +1059,28 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
   def symbolOfLine(code: String): Symbol =
     exprTyper.symbolOfLine(code)
 
-  def typeOfExpression(expr: String, silent: Boolean = true): Type =
-    exprTyper.typeOfExpression(expr, silent)
+  def memberType(prefix: Type, name: Name): Type = prefix member name match {
+    case NoSymbol => NoType
+    case sym      => prefix memberType sym
+  }
+  def followMemberTypes(prefix: Type, names: Name*): Type = names.toList match {
+    case Nil      => prefix
+    case x :: xs  => if (prefix == NoType) NoType else followMemberTypes(memberType(prefix, x), xs: _*)
+  }
+  def followMemberTypes(names: Name*): Type = names.toList match {
+    case Nil     => NoType
+    case x :: xs => followMemberTypes(typeOfName(x), xs: _*)
+  }
+  def typeOfExpression(expr: String, silent: Boolean = true): Type = {
+    val names = if (expr contains " ") Nil else (expr split '.').toList map newTermName
+    followMemberTypes(names: _*) match {
+      case NoType => exprTyper.typeOfExpression(expr, silent)
+      case tpe    => tpe
+    }
+  }
 
-  protected def onlyTerms(xs: List[Name]) = xs collect { case x: TermName => x }
-  protected def onlyTypes(xs: List[Name]) = xs collect { case x: TypeName => x }
+  protected def onlyTerms(xs: List[Name]): List[TermName] = xs collect { case x: TermName => x }
+  protected def onlyTypes(xs: List[Name]): List[TypeName] = xs collect { case x: TypeName => x }
 
   def definedTerms      = onlyTerms(allDefinedNames) filterNot isInternalTermName
   def definedTypes      = onlyTypes(allDefinedNames)
@@ -1156,14 +1154,6 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
   def allSeenTypes        = prevRequestList flatMap (_.typeOf.values.toList) distinct
   def allImplicits        = allHandlers filter (_.definesImplicit) flatMap (_.definedNames)
   def importHandlers      = allHandlers collect { case x: ImportHandler => x }
-
-  def visibleTermNames: List[Name] = definedTerms ++ importedTerms distinct
-
-  /** Another entry point for tab-completion, ids in scope */
-  def unqualifiedIds = visibleTermNames map (_.toString) filterNot (_ contains "$") sorted
-
-  /** Parse the ScalaSig to find type aliases */
-  def aliasForType(path: String) = ByteCode.aliasForType(path)
 
   def withoutUnwrapping(op: => Unit): Unit = {
     val saved = isettings.unwrapStrings
