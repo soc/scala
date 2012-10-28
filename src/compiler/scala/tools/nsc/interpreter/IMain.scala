@@ -194,6 +194,7 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
   import definitions.{ScalaPackage, JavaLangPackage, ObjectClass, termMember, typeMember, dropNullaryMethod}
   import global.{ rootMirror => rmirror }
   import rmirror.{RootClass, getClassIfDefined, getModuleIfDefined, getRequiredModule, getRequiredClass}
+  import global.analyzer.Context
 
   lazy val rumirror = ru.runtimeMirror(classLoader)
   import rumirror.{ staticClass, staticModule }
@@ -202,6 +203,9 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
     def orElse(other: => Type): Type    = if (tp ne NoType) tp else other
     def andAlso(fn: Type => Type): Type = if (tp eq NoType) tp else fn(tp)
   }
+
+  private var _replContext: Context = _
+  private var _replScope: Scope = _
 
   // TODO: If we try to make naming a lazy val, we run into big time
   // scalac unhappiness with what look like cycles.  It has not been easy to
@@ -381,6 +385,11 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
     None
   }
 
+  private def importIntoReplContext(imp: Import) {
+    _replContext = replContext.makeNewImport(imp)
+    scopelog(s"[import] (into context) $imp")
+  }
+
   private def updateReplScope(sym: Symbol, isDefined: Boolean) {
     def log(what: String) {
       val mark = if (sym.isType) "t " else "v "
@@ -425,6 +434,10 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
       req.defines foreach { sym =>
         updateReplScope(sym, isDefined = true)
       }
+      req.trees foreach {
+        case imp: Import => importIntoReplContext(imp)
+        case _           =>
+      }
     }
   }
 
@@ -467,8 +480,8 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
 
   /** Build a request from the user. `trees` is `line` after being parsed.
    */
-  private def buildRequest(line: String, trees: List[Tree]): Request = {
-    executingRequest = new Request(line, trees)
+  private def buildRequest(line: String, untypedTrees: List[Tree]): Request = {
+    executingRequest = new Request(line, untypedTrees)
     executingRequest
   }
 
@@ -720,6 +733,12 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
     private var evalCaught: Option[Throwable] = None
     private var conditionalWarnings: List[ConditionalWarning] = Nil
 
+    def typedTrees = typedUnits map (_.body)
+    def typedUnits = (
+      if (lastRun == null) Nil
+      else lastRun.units.toList
+    )
+
     val packageName = sessionNames.line + lineId
     val readName    = sessionNames.read
     val evalName    = sessionNames.eval
@@ -830,7 +849,7 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
 
   /** One line of code submitted by the user for interpretation */
   // private
-  class Request(val line: String, val trees: List[Tree]) {
+  class Request(val line: String, val untypedTrees: List[Tree]) {
     def defines    = defHandlers flatMap (_.definedSymbols)
     def imports    = importedSymbols
     def references = referencedNames map symbolOfName
@@ -839,16 +858,33 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
     val reqId = nextReqId()
     val lineRep = new ReadEvalPrint()
 
+    private def isTreeFromRequest(t: Tree) = t match {
+      case x: DefTree if (x.symbol ne null) && (definedNames contains x.symbol.name) => true
+      case x                                                                         => handlers exists (_.member eq x)
+    }
+    lazy val typedUnits = lineRep.typedUnits
+    lazy val typedTrees = exitingTyper {
+      val lb = mutable.ListBuffer[Tree]()
+      lineRep.typedTrees foreach { tt =>
+        tt foreach { t =>
+          if (isTreeFromRequest(t))
+            lb += t
+        }
+      }
+      lb.toList
+    }
+    def trees = typedTrees
+
     private var _originalLine: String = null
     def withOriginalLine(s: String): this.type = { _originalLine = s ; this }
     def originalLine = if (_originalLine == null) line else _originalLine
 
     /** handlers for each tree in this request */
-    val handlers: List[MemberHandler] = trees map (memberHandlers chooseHandler _)
+    val handlers = untypedTrees map (memberHandlers chooseHandler _)
     def defHandlers = handlers collect { case x: MemberDefHandler => x }
 
     /** all (public) names defined by these statements */
-    val definedNames = handlers flatMap (_.definedNames)
+    val definedNames: List[Name] = handlers flatMap (_.definedNames)
 
     /** list of names used by this expression */
     val referencedNames: List[Name] = handlers flatMap (_.referencedNames)
@@ -942,13 +978,22 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
         typeOf
         typesOfDefinedTerms
 
-        // Assign symbols to the original trees
-        // TODO - just use the new trees.
-        defHandlers foreach { dh =>
-          val name = dh.member.name
-          definedSymbols get name foreach { sym =>
-            dh.member setSymbol sym
-            repldbg("Set symbol of " + name + " to " + symbolDefString(sym))
+        exitingTyper {
+          typedTrees foreach { t =>
+            Console.err.println("Typed tree: " + t)
+            Console.err.println(" ... " + ((t.symbol, t.tpe)))
+          }
+          defHandlers foreach { h =>
+            val name = h.name
+            typedTrees find (_ eq h.member) foreach { tt =>
+              h.typedMember = tt
+              Console.err.println("Set member: " + ((h.member, h.typedMember)))
+              // h.member setSymbol tt.symbol
+            }
+            definedSymbols get name foreach { sym =>
+              h.member setSymbol sym
+              Console.err.println("Set symbol of " + name + " to " + symbolDefString(sym))
+            }
           }
         }
 
@@ -988,7 +1033,7 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
       catch { case ex: Throwable => (lineRep.bindError(ex), false) }
     }
 
-    override def toString = "Request(line=%s, %s trees)".format(line, trees.size)
+    override def toString = "Request(line=%s, %s trees)".format(line, untypedTrees.size)
   }
 
   /** Returns the name of the most recent interpreter result.
@@ -1138,7 +1183,6 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
     case x: TypeName => replScope enter (NoSymbol.newClass(x) setInfo DummyInfo)
   }
 
-  private var _replScope: Scope = _
   private def resetReplScope() {
     _replScope = newScope
   }
@@ -1148,6 +1192,12 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
         updateReplScope(sym, isDefined = false)
       }
     }
+  }
+  def replContext = {
+    if (_replContext eq null)
+      _replContext = analyzer.rootContext(newCompilationUnit(""))
+
+    _replContext
   }
   def replScope = {
     if (_replScope eq null)
