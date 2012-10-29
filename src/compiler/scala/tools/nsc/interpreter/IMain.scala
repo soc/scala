@@ -195,9 +195,13 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
            noFatal(runtimeMirror staticModule path)
     orElse noFatal(rootMirror staticModule path)
   )
-  def getPathIfDefined(path: String) = (
-    if (path endsWith "$") getModuleIfDefined(path.init)
-    else getClassIfDefined(path)
+  def getPathIfDefined(path: Name): Symbol = (
+    if (path.isTermName) getModuleIfDefined(path.toString)
+    else getClassIfDefined(path.toString)
+  )
+  def getPathIfDefined(path: String): Symbol = (
+    if (path endsWith "$") getPathIfDefined(path.init: TermName)
+    else getPathIfDefined(path: TypeName)
   )
 
   implicit class ReplTypeOps(tp: Type) {
@@ -500,7 +504,7 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
         subs map (t0 =>
           "  " + safePos(t0, -1) + ": " + t0.shortClass + "\n"
         ) mkString ""
-      }) mkString "\n"
+      }) mkString (s"requestFromLine($line, synthetic=$synthetic) {\n", "\n  ", "\n}")
     )
     // If the last tree is a bare expression, pinpoint where it begins using the
     // AST node position and snap the line off there.  Rewrite the code embodied
@@ -1010,16 +1014,21 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
    *  robustness. Try a symbol-producing operation at phase typer, and
    *  if that is NoSymbol, try again at phase flatten.
    */
-  def tryTwice(op: => Symbol): Symbol = exitingTyper(op) orElse exitingFlatten(op)
+  def tryTwice(op: => Symbol): Symbol = exitingTyper(op) //orElse exitingFlatten(op)
 
   def signatureOf(sym: Symbol)           = typerOp sig sym
   def symbolOfPath(path: String): Symbol = exitingTyper(getPathIfDefined(path))
   def symbolOfIdent(id: String): Symbol  = symbolOfTerm(id) orElse symbolOfType(id)
-  def symbolOfType(id: String): Symbol   = tryTwice(replScope lookup (id: TypeName))
-  def symbolOfTerm(id: String): Symbol   = tryTwice(replScope lookup (id: TermName))
-  def symbolOfName(id: Name): Symbol     = replScope lookup id
+  def symbolOfType(id: String): Symbol   = tryTwice(symbolOfName(id: TypeName))
+  def symbolOfTerm(id: String): Symbol   = tryTwice(symbolOfName(id: TermName))
+  def symbolOfName(id: Name): Symbol     = tracing(s"symbolOfName(${id.longString} @ $phase)")(
+    (replScope lookup id)
+      orElse getPathIfDefined(id)
+      orElse (EmptyPackageClass.info member id)
+  )
 
-  def typeOfTerm(id: String): Type = symbolOfTerm(id).tpe
+  def typeOfType(id: String): Type = typeOfName(id: TypeName)
+  def typeOfTerm(id: String): Type = typeOfName(id: TermName)
   def typeOfName(id: Name): Type   = symbolOfName(id).tpe
 
   def runtimeClassAndTypeOfTerm(id: String): Option[(JClass, Type)] = {
