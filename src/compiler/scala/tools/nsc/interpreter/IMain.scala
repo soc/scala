@@ -1023,9 +1023,6 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
     case NoSymbol => None
     case sym      => Some(javaMirror runtimeClass importToRu(sym).asClass)
   }
-
-  def typeOfTerm(id: String): Type = symbolOfTerm(id).tpe
-
   def valueOfTerm(id: String): Option[Any] = exitingTyper {
     def value() = {
       val sym0    = symbolOfTerm(id)
@@ -1040,7 +1037,6 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
     try Some(value()) catch { case _: Exception => None }
   }
 
-
   /** It's a bit of a shotgun approach, but for now we will gain in
    *  robustness. Try a symbol-producing operation at phase typer, and
    *  if that is NoSymbol, try again at phase flatten.
@@ -1053,6 +1049,9 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
   def symbolOfType(id: String): Symbol   = tryTwice(replScope lookup (id: TypeName))
   def symbolOfTerm(id: String): Symbol   = tryTwice(replScope lookup (id: TermName))
   def symbolOfName(id: Name): Symbol     = replScope lookup id
+
+  def typeOfTerm(id: String): Type = symbolOfTerm(id).tpe
+  def typeOfName(id: Name): Type   = symbolOfName(id).tpe
 
   def runtimeClassAndTypeOfTerm(id: String): Option[(JClass, Type)] = {
     classOfTerm(id) flatMap { clazz =>
@@ -1095,8 +1094,25 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
   def symbolOfLine(code: String): Symbol =
     exprTyper.symbolOfLine(code)
 
-  def typeOfExpression(expr: String, silent: Boolean = true): Type =
-    exprTyper.typeOfExpression(expr, silent)
+  def memberType(prefix: Type, name: Name): Type = prefix member name match {
+    case NoSymbol => NoType
+    case sym      => prefix memberType sym
+  }
+  def followMemberTypes(prefix: Type, names: Name*): Type = names.toList match {
+    case Nil      => prefix
+    case x :: xs  => if (prefix == NoType) NoType else followMemberTypes(memberType(prefix, x), xs: _*)
+  }
+  def followMemberTypes(names: Name*): Type = names.toList match {
+    case Nil     => NoType
+    case x :: xs => followMemberTypes(typeOfName(x), xs: _*)
+  }
+  def typeOfExpression(expr: String, silent: Boolean = true): Type = {
+    val names = if (expr contains " ") Nil else (expr split '.').toList map newTermName
+    followMemberTypes(names: _*) match {
+      case NoType => exprTyper.typeOfExpression(expr, silent)
+      case tpe    => tpe
+    }
+  }
 
   protected def onlyTerms(xs: List[Name]): List[TermName] = xs collect { case x: TermName => x }
   protected def onlyTypes(xs: List[Name]): List[TypeName] = xs collect { case x: TypeName => x }
