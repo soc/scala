@@ -8,7 +8,7 @@ package interpreter
 
 import scala.reflect.{ ClassTag, classTag }
 
-class RichClass[T](val clazz: Class[T]) {
+final class RichClass[T](val clazz: Class[T]) extends AnyVal {
   def toTag: ClassTag[T] = ClassTag[T](clazz)
   def toTypeString: String = TypeStrings.fromClazz(clazz)
 
