@@ -476,7 +476,7 @@ class ILoop(in0: Option[BufferedReader], protected val out: JPrintWriter)
         case wrapper :: Nil =>
           intp.typeOfExpression(wrapper) match {
             case PolyType(List(targ), MethodType(List(arg), restpe)) =>
-              intp setExecutionWrapper intp.pathToTerm(wrapper)
+              intp setExecutionWrapper intp.originalPath(wrapper)
               "Set wrapper to '" + wrapper + "'"
             case tp =>
               failMsg + "\nFound: <unknown>"
@@ -486,7 +486,7 @@ class ILoop(in0: Option[BufferedReader], protected val out: JPrintWriter)
     }
   }
 
-  private def pathToPhaseWrapper = intp.pathToTerm("$r") + ".phased.atCurrent"
+  private def pathToPhaseWrapper = intp.originalPath("$r") + ".phased.atCurrent"
   private def phaseCommand(name: String): Result = {
     val phased: Phased = power.phased
     import phased.NoPhaseName
