@@ -1,0 +1,144 @@
+Hi Paul,
+
+As promised when we met briefly at Scala Days, here is a list of things
+I had to work around with the REPL and the compiler for Spark.
+
+First, there's a compilation issue that affects even non-REPL use
+of Spark by sometimes unnecessarily bloating closure objects:
+https://issues.scala-lang.org/browse/SI-2617. (Don't mind the extra
+dollar signs, they were added in the migration from Trac to JIRA.)
+The problem is that a closure inside another closure (e.g. a map in a
+for loop) has a $outer field to point to the outer closure and thus
+references *all* variables in that outer closure, even potentially
+unneeded non-serializable ones. This also affects any use case where
+someone captures a closure as an event handler (indeed I think Jorge
+Ortiz had run into it at foursquare), so it might be worth fixing, but
+when I posted it without really explaining the value of my use case,
+they decided it was too much of a special case to fix. My workaround for
+this is to use some bytecode analysis to determine which $outer fields
+I need and then clone $outer and null out the other fields (recursing
+up the tree if $outer is itself nested in a closure). This is done in
+ClosureCleaner.scala in Spark.
+
+Second, an easy one: I need access to the virtual directory where the
+compiler instance in the REPL outputs classes, so that I can serve them
+over the network. This could probably just be made public (maybe it
+already is now). But because I had to modify other parts of the REPL in
+Spark anyway, I replaced it with an on-disk directory that I can serve
+through Jetty.
+
+Third is the most involved change: modifying the REPL's per-line code
+generation strategy so that the previous line objects that a given
+closure depends on get captured with it. Here's the use case this is
+meant to enable:
+
+scala> var x = 5
+
+scala> dataset.map(_ + x).reduce(_ + _)
+
+For these two lines, the REPL will normally create something like this:
+
+object Line1 {
+  var x = 5
+}
+
+object Line2 {
+  import Line1.x
+  // also import dataset from somewhere
+  dataset.map(_ + x).reduce(_ + _)
+}
+
+This is fine for the simple case where x is a constant (as the slaves
+will also run the static initializer of Line1 when the _ + x closure
+accesses it and set x to 5), but here's how it runs into trouble:
+
+1) x might've actually been initialized by some computation that
+can't be done on a slave, such as reading a local file (var x = new
+FileInputStream(...).blah).
+
+2) x might've been modified locally by some other line. But if the
+slaves don't run that line's static initializer, they'll still see 5.
+
+3) x might've been the result of another Spark job (e.g. a previous
+map/reduce), in which case the slaves should really not attempt to
+re-execute its initialization.
+
+Unfortunately, for these issues, bytecode analysis and trying to pass
+other objects around is not enough because the closure makes a static
+method call to class Line1 to get its instance and then get x (it
+doesn't have a field pointing directly to the Line1 instance). My
+solution was therefore to change the per-line generated code to look
+like this:
+
+class Line1 {
+  var x = 5
+}
+object Line1 { val INSTANCE = new Line1 }
+
+class Line2 {
+  import Line1
+  val x = Line1.INSTANCE.x
+  // also import dataset from somewhere
+  dataset.map(_ + x).reduce(_ + _)
+}
+object Line2 { val INSTANCE = new Line2 }
+
+Now what happens is that the closure inside Line2 has a pointer to the
+Line2 instance (its $outer), which has a field pointing to the Line1
+instance. We can thus safely serialize the closure and get only the
+lines it depends on. Hopefully this makes sense.. let me know if it is
+confusing.
+
+Even this strategy is not perfect though. One unfortunate thing is that
+classes now have some trouble. When you have a class C inside another
+class (rather than inside an object), it compiles, but you get errors
+like the following, likely because the compiler can't know whether the
+two instances of C are from the same instance of the line defining the
+class:
+
+scala> class C(val x: Int)
+defined class C
+
+scala> var c = new C(5)
+c: this.C = C@9293709
+
+scala> c = new C(6)
+<console>:14: error: type mismatch;
+ found   : this.C
+ required: this.C
+       c = new C(6)
+           ^
+
+Ideally, the REPL would use my class / INSTANCE compilation strategy
+for vals, vars and defs, and the current object strategy for classes,
+objects and case classes. In the case that a user typed both a val and
+a class on the same line (maybe through a paste), it would split them
+into different lines. I realize that this is very complicated, but I'd
+love to hear if you have other thoughts on this. This is the best way I
+thought of solving the problem. The cool thing though is that if you do
+solve this in the REPL, then the REPL will be usable for all kinds of
+distributed computing beyond Spark. Interactive distributed computing in
+a fast, statically typed language is very compelling and is currently
+very hard to achieve in other languages.
+
+If you want to see my code for this stuff, check out the master
+branch of Spark (or the scala-2.9 branch for the 2.9 REPL) from
+https://github.com/mesos/spark and look in the repl subproject. It
+contains classes copied directly from the Scala source into the spark
+package. Only IMain, Imports and ILoop are interesting, but some of the
+others had to be replicated to make it all compile in a new package.
+
+Finally, I had another question that might be interesting to think
+about: Do you think there will be any way to specialize the Spark
+classes so that, for example, a map + filter on a collection of integers
+turns into something that passes unboxed ints? I read a bit about
+"stream fusion" on http://jnordenberg.blogspot.com/ and it seems that
+this is currently a little tricky, but I'd love to hear if this will
+become possible in the future. In the meantime I might dabble with
+manually inspecting a given chain of operations and generating an
+optimized bytecode implementation.
+
+Apologies for the long email, but I hope this is interesting to you as a
+pretty involved use of Scala and the REPL.
+
+Matei
