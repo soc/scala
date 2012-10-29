@@ -39,6 +39,27 @@ package object interpreter extends ReplConfig with ReplStrings {
 
   val IR = Results
 
+  private val nextCell = {
+    var cellCount = 0
+    () => try cellCount finally cellCount += 1
+  }
+  def staticCellFor[T: TypeTag](value: T): StaticCell[T] = {
+    val num       = nextCell()
+    val tpe       = ru.typeOf[T]
+    val pkg       = "scala.repl"
+    val className = "Cell" + num
+    val path      = pkg + "." + className + "$"
+    val source    = s"""
+      |package $pkg
+      |object $className {
+      |  var value: $tpe = _
+      |  def set(x: $tpe) = value = x
+      |}""".trim.stripMargin
+
+    compile(source)
+    new StaticCell[T](path)
+  }
+
   implicit def postfixOps = scala.language.postfixOps // make all postfix ops in this package compile without warning
 
   private[interpreter] implicit def javaCharSeqCollectionToScala(xs: JCollection[_ <: CharSequence]): List[String] = {

@@ -687,7 +687,7 @@ class ILoop(in0: Option[BufferedReader], protected val out: JPrintWriter)
     }
     // Bind intp somewhere out of the regular namespace where
     // we can get at it in generated code.
-    intp.quietBind(NamedParam[IMain]("$intp", intp)(tagOfIMain, classTag[IMain]))
+    intp.bootstrapBind()
     // Auto-run code via some setting.
     ( replProps.replAutorunCode.option
         flatMap (f => io.File(f).safeSlurp())

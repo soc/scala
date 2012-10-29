@@ -9,12 +9,16 @@ package interpreter
 import scala.language.implicitConversions
 import scala.reflect.api.{Universe => ApiUniverse}
 import scala.reflect.runtime.{universe => ru}
+import scala.collection.{ mutable, immutable }
 
 /** A class which the repl utilizes to expose predefined objects.
  *  The base implementation is empty; the standard repl implementation
  *  is StdReplVals.
  */
-abstract class ReplVals { }
+abstract class ReplVals {
+  val values     = mutable.Map[String, Any]()
+  val valueTypes = mutable.Map[String, ru.Type]()
+}
 
 class StdReplVals(final val r: ILoop) extends ReplVals {
   final lazy val repl                     = r

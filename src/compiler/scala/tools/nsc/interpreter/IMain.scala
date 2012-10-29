@@ -30,6 +30,18 @@ import scala.reflect.runtime.{ universe => ru }
 import scala.reflect.{ ClassTag, classTag }
 import scala.tools.reflect.StdRuntimeTags._
 
+class StaticCell[T](objectPath: String) {
+  private def clazz       = Class.forName(objectPath)
+  private def module      = clazz.getField("MODULE$").get(null)
+  private def moduleClazz = module.getClass
+  private def setter      = moduleClazz getMethod "set"
+  private def getter      = moduleClazz getMethod "value"
+
+  def get: T        = getter.invoke()
+  def set(x: T)     = setter.invoke(x.asInstanceOf[AnyRef])
+  def clear(): Unit = set(null.asInstanceOf[T])
+}
+
 /** directory to save .class files to */
 private class ReplVirtualDirectory(out: JPrintWriter) extends VirtualDirectory("(memory)", None) {
   private def pp(root: AbstractFile, indentLevel: Int) {
@@ -193,6 +205,27 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
   import global._
   import definitions.{ ObjectClass, termMember, dropNullaryMethod }
 
+  private val nextCell = {
+    var cellCount = 0
+    () => try cellCount finally cellCount += 1
+  }
+  def newStaticCell[T: TypeTag](value: T): StaticCell[T] = {
+    val num       = nextCell()
+    val tpe       = typeOf[T]
+    val pkg       = "scala.repl"
+    val className = "Cell" + num
+    val path      = pkg + "." + className + "$"
+    val source    = s"""
+      |package $pkg
+      |object $className {
+      |  var value: $tpe = _
+      |  def set(x: Any) = value = x.asInstanceOf[$tpe]
+      |}""".trim.stripMargin
+
+    compileString(source)
+    new StaticCell[T](path)
+  }
+
   lazy val runtimeMirror = ru.runtimeMirror(classLoader)
 
   private def noFatal(body: => Symbol): Symbol = try body catch { case _: FatalError => NoSymbol }
@@ -348,7 +381,6 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
   def originalPath(name: Name): String   = typerOp path name
   def originalPath(sym: Symbol): String  = typerOp path sym
   def flatPath(sym: Symbol): String      = flatOp shift sym.javaClassName
-  // def translatePath(path: String) = symbolOfPath(path).fold(Option.empty[String])(flatPath)
   def translatePath(path: String) = {
     val sym = if (path endsWith "$") symbolOfTerm(path.init) else symbolOfIdent(path)
     sym match {
@@ -639,41 +671,47 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
     }
   }
 
+  /** We only need to bind $intp the "old" way.
+   *  Afterward everything can happen much more rapidly by
+   *  simply adding the value to bind to $intp.valuesMap
+   *  and interpreting a repl line which grabs it from the
+   *  map and casts it to the right type.
+   */
+  def bootstrapBind() = {
+    val bindRep = new ReadEvalPrint()
+    val thisClass = this.getClass.getName
+    val run = bindRep.compile(s"""
+      |object ${bindRep.evalName} {
+      |  var value: $thisClass = _
+      |  def set(x: $thisClass) = value = x
+      |}
+    """.stripMargin
+    )
+    val path = bindRep.evalPath
+
+    bindRep.callEither("set", IMain.this) match {
+      case Left(_)  => IR.Error
+      case Right(_) =>
+        val line = s"val $$intp = $path.value"
+        repldbg("Interpreting: " + line)
+        interpret(line)
+    }
+  }
+
   /** Bind a specified name to a specified value.  The name may
    *  later be used by expressions passed to interpret.
    *
    *  @param name      the variable name to bind
    *  @param boundType the type of the variable, as a string
-   *  @param value     the object value to bind to it
+   *  @param value     the instance to bind
    *  @return          an indication of whether the binding succeeded
    */
   def bind(name: String, boundType: String, value: Any, modifiers: List[String] = Nil): IR.Result = {
-    val bindRep = new ReadEvalPrint()
-    val run = bindRep.compile("""
-        |object %s {
-        |  var value: %s = _
-        |  def set(x: Any) = value = x.asInstanceOf[%s]
-        |}
-      """.stripMargin.format(bindRep.evalName, boundType, boundType)
-      )
-    bindRep.callEither("set", value) match {
-      case Left(ex) =>
-        repldbg("Set failed in bind(%s, %s, %s)".format(name, boundType, value))
-        repldbg(util.stackTraceString(ex))
-        IR.Error
-
-      case Right(_) =>
-        val line = "%sval %s = %s.value".format(modifiers map (_ + " ") mkString, name, bindRep.evalPath)
-        repldbg("Interpreting: " + line)
-        interpret(line)
-    }
+    valuesMap(name) = value
+    val mods_s = modifiers map (_ + " ") mkString ""
+    interpret(s"""${mods_s}val $name = $$intp.valuesMap("$name").value.asInstanceOf[$boundType]""")
   }
-  def directBind(name: String, boundType: String, value: Any): IR.Result = {
-    val result = bind(name, boundType, value)
-    if (result == IR.Success)
-      directlyBoundNames += newTermName(name)
-    result
-  }
+  def directBind(name: String, boundType: String, value: Any): IR.Result      = bind(name, boundType, value)
   def directBind(p: NamedParam): IR.Result                                    = directBind(p.name, p.tpe, p.value)
   def directBind[T: ru.TypeTag : ClassTag](name: String, value: T): IR.Result = directBind((name, value))
 
@@ -742,7 +780,7 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
 
       val unwrapped = unwrap(t)
       withLastExceptionLock[String]({
-        directBind[Throwable]("lastException", unwrapped)(tagOfThrowable, classTag[Throwable])
+        directBind("lastException", unwrapped)
         util.stackTraceString(unwrapped)
       }, util.stackTraceString(unwrapped))
     }
@@ -1027,15 +1065,20 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
     case NoSymbol => None
     case sym      => Some(javaMirror runtimeClass importToRu(sym).asClass)
   }
+  def valueOfSymbol(sym: ru.TermSymbol): Any = {
+    import ru._ // otherwise we can't match on abstract type MethodSymbol
+    val module  = IMain.this.runtimeMirror.reflectModule(sym.owner.companionSymbol.asModule).instance
+    val module1 = IMain.this.runtimeMirror.reflect(module)
+    sym match {
+      case x: MethodSymbol => (module1 reflectMethod x)()
+      case _               => (module1 reflectField sym).get
+    }
+  }
   def valueOfTerm(id: String): Option[Any] = exitingTyper {
     def value() = {
       val sym0    = symbolOfTerm(id)
       val sym     = (importToRuntime importSymbol sym0).asTerm
-      val module  = runtimeMirror.reflectModule(sym.owner.companionSymbol.asModule).instance
-      val module1 = runtimeMirror.reflect(module)
-      val invoker = module1.reflectField(sym)
-
-      invoker.get
+      valueOfSymbol(sym)
     }
 
     try Some(value()) catch { case _: Exception => None }
@@ -1052,10 +1095,10 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
   def symbolOfIdent(id: String): Symbol  = symbolOfTerm(id) orElse symbolOfType(id)
   def symbolOfType(id: String): Symbol   = tryTwice(symbolOfName(id: TypeName))
   def symbolOfTerm(id: String): Symbol   = tryTwice(symbolOfName(id: TermName))
-  def symbolOfName(id: Name): Symbol     = (
+  def symbolOfName(id: Name): Symbol     = debugging(s"symbolOfName($id) initialized=$isInitializeComplete")(
     (replScope lookup id)
-      orElse getPathIfDefined(id)
-      orElse (EmptyPackageClass.info member id)
+      // orElse getPathIfDefined(id)
+      // orElse (EmptyPackageClass.info member id)
   )
 
   def typeOfType(id: String): Type = typeOfName(id: TypeName)
@@ -1116,6 +1159,7 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
     case x :: xs => followMemberTypes(typeOfName(x), xs: _*)
   }
   def typeOfExpression(expr: String, silent: Boolean = true): Type = {
+    repldbg(s"typeOfExpression($expr, silent=$silent)")
     val names = if (expr contains " ") Nil else (expr split '.').toList map newTermName
     followMemberTypes(names: _*) match {
       case NoType => exprTyper.typeOfExpression(expr, silent)
@@ -1126,13 +1170,13 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
   protected def onlyTerms(xs: List[Name]): List[TermName] = xs collect { case x: TermName => x }
   protected def onlyTypes(xs: List[Name]): List[TypeName] = xs collect { case x: TypeName => x }
 
-  def definedTerms      = onlyTerms(allDefinedNames) filterNot isInternalTermName
-  def definedTypes      = onlyTypes(allDefinedNames)
+  def definedTerms      = allDefinedNames collect { case x: TermName if !isInternalTermName(x) => x }
+  def definedTypes      = allDefinedNames collect { case x: TypeName => x }
   def definedSymbols    = prevRequestList flatMap (_.defines) toSet
   def definedSymbolList = prevRequestList flatMap (_.defines) filterNot (s => isInternalTermName(s.name))
 
   // Terms with user-given names (i.e. not res0 and not synthetic)
-  def namedDefinedTerms = definedTerms filterNot (x => isUserVarName("" + x) || directlyBoundNames(x))
+  def namedDefinedTerms = definedTerms filterNot isUserTermName
 
   /** Translate a repl-defined identifier into a Symbol.
    */
@@ -1187,7 +1231,12 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
 
   private var executingRequest: Request = _
   private val prevRequests       = mutable.ListBuffer[Request]()
-  private val directlyBoundNames = mutable.Set[Name]()
+
+  case class ReplValue[+T: ru.TypeTag](name: String, value: T) {
+    def typeString = typeOf[T].toString
+    override def toString = s"""$$intp("$name").value.asInstanceOf[$typeString]"""
+  }
+  val valuesMap = mutable.Map[String, ReplValue[_]]("$intp" -> new ReplValue[IMain]("$intp", IMain.this))
 
   def allHandlers    = prevRequestList flatMap (_.handlers)
   def allDefHandlers = allHandlers collect { case x: MemberDefHandler => x }
