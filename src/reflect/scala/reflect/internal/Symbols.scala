@@ -792,7 +792,11 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
      *  A: If it's a member of a toplevel object, or of an object contained in a toplevel object, or any number of levels deep.
      *  http://groups.google.com/group/scala-internals/browse_thread/thread/d385bcd60b08faf6
      */
-    def isStatic = (this hasFlag STATIC) || owner.isStaticOwner
+    def isStatic = (
+         (this hasFlag STATIC)
+      || owner.isStaticOwner
+      // || owner.typeOfThis.typeSymbol.isStaticOwner
+    )
 
     /** Is this symbol a static constructor? */
     final def isStaticConstructor: Boolean =
@@ -803,8 +807,11 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
       hasFlag(STATIC) || owner.isImplClass
 
     /** Does this symbol denote a class that defines static symbols? */
-    final def isStaticOwner: Boolean =
-      isPackageClass || isModuleClass && isStatic
+    final def isStaticOwner: Boolean = (
+         isPackageClass
+      || isModuleClass && isStatic
+      || (thisSym != this && typeOfThis.typeSymbol.isStaticOwner)
+    )
 
     def isTopLevelModule = hasFlag(MODULE) && owner.isPackageClass
 
