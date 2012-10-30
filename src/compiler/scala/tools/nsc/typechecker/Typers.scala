@@ -1458,9 +1458,15 @@ trait Typers extends Modes with Adaptations with Tags {
     private def validateDerivedValueClass(clazz: Symbol, body: List[Tree]) = {
       if (clazz.isTrait)
         unit.error(clazz.pos, "only classes (not traits) are allowed to extend AnyVal")
-      if (!clazz.isStatic)
-        unit.error(clazz.pos, "value class may not be a "+
-          (if (clazz.owner.isTerm) "local class" else "member of another class"))
+      if (!clazz.isStatic) {
+        if (clazz.staticOwner.isStaticOwner)
+          println("Okay static owner " + ((clazz, clazz.owner, clazz.staticOwner)))
+        // if (isSingleType(clazz.owner.typeOfThis))
+        //   clazz.owner = clazz.owner.typeOfThis.typeSymbol
+        else
+          unit.error(clazz.pos, "value class may not be a "+
+            (if (clazz.owner.isTerm) "local class" else "member of another class"))
+      }
       if (!clazz.isPrimitiveValueClass) {
         clazz.info.decls.toList.filter(acc => acc.isMethod && acc.isParamAccessor) match {
           case List(acc) =>
