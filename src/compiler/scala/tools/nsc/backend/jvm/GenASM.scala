@@ -53,7 +53,7 @@ abstract class GenASM extends SubComponent with BytecodeWriters {
     override def erasedTypes = true
     def apply(cls: IClass) = sys.error("no implementation")
 
-    val BeanInfoAttr = rootMirror.getRequiredClass("scala.beans.BeanInfo")
+    lazy val BeanInfoAttr = rootMirror.getRequiredClass("scala.beans.BeanInfo")
 
     def isJavaEntryPoint(icls: IClass) = {
       val sym = icls.symbol

@@ -1048,8 +1048,8 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
 
   override def isPastTyper = (
        (curRun ne null)
-    && (currentRun.typerPhase ne null)
     && (rootMirror.isRootMirrorInitialized)
+    && (definitions.isDefinitionsInitialized)
     && (globalPhase.id > currentRun.typerPhase.id)
   )
 
