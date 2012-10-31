@@ -228,8 +228,6 @@ trait Mirrors extends api.Mirrors {
     //   }
     // }
 
-    private var initialized = false
-    def isRootMirrorInitialized = initialized
     def init() {
       // Still fiddling with whether it's cleaner to do some of this setup here
       // or from constructors.  The latter approach tends to invite init order issues.
@@ -242,8 +240,6 @@ trait Mirrors extends api.Mirrors {
 
       RootClass.info.decls enter EmptyPackage
       RootClass.info.decls enter RootPackage
-
-      initialized = true
     }
   }
 

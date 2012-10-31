@@ -1049,8 +1049,6 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
   override def isPastTyper = (
        (curRun ne null)
     && (currentRun.typerPhase ne null)
-    // && (definitions.isDefinitionsInitialized) // otherwise (new Run) => definitions.init => currentRun.typerPhase => null
-    && (rootMirror.isRootMirrorInitialized)
     && (globalPhase.id > currentRun.typerPhase.id)
   )
 
@@ -1263,38 +1261,6 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
       phaseLinks.foldLeft(parserPhase)((chain, ph) => ph newPhase chain)
       parserPhase
     }
-    /** All phases as of 3/2012 here for handiness; the ones in
-     *  active use uncommented.
-     */
-    val parserPhase                  = phaseNamed("parser")
-    val namerPhase                   = phaseNamed("namer")
-    // val packageobjectsPhase          = phaseNamed("packageobjects")
-    val typerPhase                   = phaseNamed("typer")
-    val inlineclassesPhase           = phaseNamed("inlineclasses")
-    // val superaccessorsPhase          = phaseNamed("superaccessors")
-    val picklerPhase                 = phaseNamed("pickler")
-    val refchecksPhase               = phaseNamed("refchecks")
-    // val selectiveanfPhase            = phaseNamed("selectiveanf")
-    // val selectivecpsPhase            = phaseNamed("selectivecps")
-    val uncurryPhase                 = phaseNamed("uncurry")
-    // val tailcallsPhase               = phaseNamed("tailcalls")
-    val specializePhase              = phaseNamed("specialize")
-    val explicitouterPhase           = phaseNamed("explicitouter")
-    val erasurePhase                 = phaseNamed("erasure")
-    val posterasurePhase             = phaseNamed("posterasure")
-    // val lazyvalsPhase                = phaseNamed("lazyvals")
-    val lambdaliftPhase              = phaseNamed("lambdalift")
-    // val constructorsPhase            = phaseNamed("constructors")
-    val flattenPhase                 = phaseNamed("flatten")
-    val mixinPhase                   = phaseNamed("mixin")
-    val cleanupPhase                 = phaseNamed("cleanup")
-    val icodePhase                   = phaseNamed("icode")
-    val inlinerPhase                 = phaseNamed("inliner")
-    val inlineExceptionHandlersPhase = phaseNamed("inlineExceptionHandlers")
-    val closelimPhase                = phaseNamed("closelim")
-    val dcePhase                     = phaseNamed("dce")
-    val jvmPhase                     = phaseNamed("jvm")
-    // val msilPhase                    = phaseNamed("msil")
 
     /** Reset all classes contained in current project, as determined by
      *  the clearOnNextRun hook
@@ -1379,6 +1345,39 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
 
     def phaseNamed(name: String): Phase =
       findOrElse(firstPhase.iterator)(_.name == name)(NoPhase)
+
+    /** All phases as of 3/2012 here for handiness; the ones in
+     *  active use uncommented.
+     */
+    val parserPhase                  = phaseNamed("parser")
+    val namerPhase                   = phaseNamed("namer")
+    // val packageobjectsPhase          = phaseNamed("packageobjects")
+    val typerPhase                   = phaseNamed("typer")
+    val inlineclassesPhase           = phaseNamed("inlineclasses")
+    // val superaccessorsPhase          = phaseNamed("superaccessors")
+    val picklerPhase                 = phaseNamed("pickler")
+    val refchecksPhase               = phaseNamed("refchecks")
+    // val selectiveanfPhase            = phaseNamed("selectiveanf")
+    // val selectivecpsPhase            = phaseNamed("selectivecps")
+    val uncurryPhase                 = phaseNamed("uncurry")
+    // val tailcallsPhase               = phaseNamed("tailcalls")
+    val specializePhase              = phaseNamed("specialize")
+    val explicitouterPhase           = phaseNamed("explicitouter")
+    val erasurePhase                 = phaseNamed("erasure")
+    val posterasurePhase             = phaseNamed("posterasure")
+    // val lazyvalsPhase                = phaseNamed("lazyvals")
+    val lambdaliftPhase              = phaseNamed("lambdalift")
+    // val constructorsPhase            = phaseNamed("constructors")
+    val flattenPhase                 = phaseNamed("flatten")
+    val mixinPhase                   = phaseNamed("mixin")
+    val cleanupPhase                 = phaseNamed("cleanup")
+    val icodePhase                   = phaseNamed("icode")
+    val inlinerPhase                 = phaseNamed("inliner")
+    val inlineExceptionHandlersPhase = phaseNamed("inlineExceptionHandlers")
+    val closelimPhase                = phaseNamed("closelim")
+    val dcePhase                     = phaseNamed("dce")
+    val jvmPhase                     = phaseNamed("jvm")
+    // val msilPhase                    = phaseNamed("msil")
 
     def runIsAt(ph: Phase)   = globalPhase.id == ph.id
     def runIsPast(ph: Phase) = globalPhase.id > ph.id
@@ -1526,9 +1525,9 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
     def compileUnits(units: List[CompilationUnit], fromPhase: Phase) {
       try compileUnitsInternal(units, fromPhase)
       catch { case ex: Throwable =>
-        val shown = if (settings.verbose.value)
+        val shown = if (settings.verbose.value) 
            stackTraceString(ex)
-         else
+         else 
            ex.getClass.getName
         // ex.printStackTrace(Console.out) // DEBUG for fsc, note that error stacktraces do not print in fsc
         globalError(supplementErrorMessage("uncaught exception during compilation: " + shown))
