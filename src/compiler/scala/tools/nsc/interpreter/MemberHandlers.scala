@@ -179,10 +179,12 @@ trait MemberHandlers {
 
   class ImportHandler(imp: Import) extends MemberHandler(imp) {
     val Import(expr, selectors) = imp
-    def targetType = intp.global.rootMirror.getModuleIfDefined("" + expr) match {
+    override def path = intp originalPath "" + expr
+    def targetType = symbol match {
       case NoSymbol => intp.typeOfExpression("" + expr)
       case sym      => sym.thisType
     }
+
     private def importableTargetMembers = importableMembers(targetType).toList
     override def isLegalTopLevel = true
 

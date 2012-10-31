@@ -196,8 +196,10 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
     orElse noFatal(rootMirror staticModule path)
   )
   def getPathIfDefined(path: Name): Symbol = (
-    if (path.isTermName) getModuleIfDefined(path.toString)
-    else getClassIfDefined(path.toString)
+    noFatal(rootMirror findMemberFromRoot path)
+
+    // if (path.isTermName) getModuleIfDefined(path.toString)
+    // else getClassIfDefined(path.toString)
   )
   def getPathIfDefined(path: String): Symbol = (
     if (path endsWith "$") getPathIfDefined(path.init: TermName)
@@ -320,12 +322,24 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
   abstract class PhaseDependentOps {
     def shift[T](op: => T): T
 
-    def lookup(name: Name): Symbol = shift(replScope lookup name)
-    def path(name: => Name): String = shift(path(symbolOfName(name)))
+    // def lookup(name: Name): Symbol = shift(replScope lookup name)
+    // def path(name: => Name): String = shift(path(symbolOfName(name)))
     def path(sym: Symbol): String = backticked(shift(sym.fullName))
     def name(sym: Symbol): Name   = shift(sym.name)
     def info(sym: Symbol): Type   = shift(sym.info)
     def sig(sym: Symbol): String  = shift(sym.defString)
+
+    def path(name: => Name): String = path(lookup(name))
+    def lookup(name: => Name): Symbol = shift(
+      withoutUnwrapping(
+        printCaller(s"lookup(${name.longString})")(
+          (replScope lookup name)
+            orElse getPathIfDefined(name)
+            orElse (RootClass.info member name)
+            orElse (EmptyPackageClass.info member name)
+        )
+      )
+    )
   }
   object typerOp extends PhaseDependentOps {
     def shift[T](op: => T): T = exitingTyper(op)
@@ -339,8 +353,9 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
   def originalPath(sym: Symbol): String  = typerOp path sym
   def flatPath(sym: Symbol): String      = flatOp shift sym.javaClassName
   // def translatePath(path: String) = symbolOfPath(path).fold(Option.empty[String])(flatPath)
-  def translatePath(path: String) = {
-    val sym = if (path endsWith "$") symbolOfTerm(path.init) else symbolOfIdent(path)
+  def translatePath(path0: String) = {
+    val path = translateClassToPath(path0)
+    val sym = if (path endsWith "$") symbolOfTerm(path.init) else symbolOfPath(path)
     sym match {
       case NoSymbol => None
       case _        => Some(flatPath(sym))
@@ -352,11 +367,12 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
      *  class name if the original attempt fails.  This method is used by
      *  getResourceAsStream as well as findClass.
      */
-    override protected def findAbstractFile(name: String): AbstractFile =
+    override protected def findAbstractFile(name: String): AbstractFile = tracing(s"findAbstractFile($name)") {
       super.findAbstractFile(name) match {
         case null => translatePath(name) map (super.findAbstractFile(_)) orNull
         case file => file
       }
+    }
   }
   private def makeClassLoader(): AbstractFileClassLoader =
     new TranslatingClassLoader(parentClassLoader match {
@@ -393,11 +409,15 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
       scopelog(f"[$mark$what%6s] $name%-25s $defn%s")
     }
     if (ObjectClass isSubClass sym.owner) return
-    // unlink previous
-    replScope lookupAll sym.name foreach { sym =>
-      log("unlink")
-      replScope unlink sym
+
+    if (replScope containsName sym.name) {
+      _replScope = newNestedScope(replScope)
     }
+    // unlink previous
+    // replScope lookupAll sym.name foreach { sym =>
+    //   log("unlink")
+    //   replScope unlink sym
+    // }
     val what = if (isDefined) "define" else "import"
     log(what)
     replScope enter sym
@@ -846,8 +866,10 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
     val ComputedImports(importsPreamble, importsTrailer, accessPath) =
       exitingTyper(importsCode(referencedNames.toSet))
 
+    repltrace(s"ComputedImports($importsPreamble, $importsTrailer, $accessPath)")
+
     /** The unmangled symbol name, but supplemented with line info. */
-    def disambiguated(name: Name): String = name + " (in " + lineRep + ")"
+    def disambiguated(name: Name): String = s"$name (in $lineRep)"
 
     /** the line of code to compute */
     def toCompute = line
@@ -1014,18 +1036,24 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
    *  robustness. Try a symbol-producing operation at phase typer, and
    *  if that is NoSymbol, try again at phase flatten.
    */
-  def tryTwice(op: => Symbol): Symbol = exitingTyper(op) //orElse exitingFlatten(op)
+  // def tryTwice(op: => Symbol): Symbol = exitingTyper(op) //orElse exitingFlatten(op)
+  def translateClassToPath(s: String): String = if (s endsWith ".class") s.stripSuffix(".class").replace('/', '.') else s
+  def typeOrTerm(name: String)(op: Name => Symbol): Symbol =
+    op(name: TypeName) orElse op(name: TermName)
 
+  def symbolOfPath(path: String): Symbol = typeOrTerm(translateClassToPath(path))(typerOp lookup _)
+  def symbolOfType(id: String): Symbol   = typerOp lookup (id: TypeName)
+  def symbolOfTerm(id: String): Symbol   = typerOp lookup (id: TermName)
+  def symbolOfName(name: Name): Symbol   = typerOp lookup name
   def signatureOf(sym: Symbol)           = typerOp sig sym
-  def symbolOfPath(path: String): Symbol = exitingTyper(getPathIfDefined(path))
-  def symbolOfIdent(id: String): Symbol  = symbolOfTerm(id) orElse symbolOfType(id)
-  def symbolOfType(id: String): Symbol   = tryTwice(symbolOfName(id: TypeName))
-  def symbolOfTerm(id: String): Symbol   = tryTwice(symbolOfName(id: TermName))
-  def symbolOfName(id: Name): Symbol     = tracing(s"symbolOfName(${id.longString} @ $phase)")(
-    (replScope lookup id)
-      orElse getPathIfDefined(id)
-      orElse (EmptyPackageClass.info member id)
-  )
+
+  // exitingTyper(
+  //   tracing(s"symbolOfName(${id.longString} @ $phase)")(
+  //     (replScope lookup id)
+  //       orElse getPathIfDefined(id)
+  //       orElse (EmptyPackageClass.info member id)
+  //   )
+  // )
 
   def typeOfType(id: String): Type = typeOfName(id: TypeName)
   def typeOfTerm(id: String): Type = typeOfName(id: TermName)
@@ -1168,7 +1196,7 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
   def allImplicits        = allHandlers filter (_.definesImplicit) flatMap (_.definedNames)
   def importHandlers      = allHandlers collect { case x: ImportHandler => x }
 
-  def withoutUnwrapping(op: => Unit): Unit = {
+  def withoutUnwrapping[T](op: => T): T = {
     val saved = isettings.unwrapStrings
     isettings.unwrapStrings = false
     try op
