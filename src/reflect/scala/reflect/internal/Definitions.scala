@@ -1247,6 +1247,7 @@ trait Definitions extends api.StandardDefinitions {
       if (isInitialized) return
       // force initialization of every symbol that is synthesized or hijacked by the compiler
       val forced = symbolsNotPresentInBytecode
+      RuntimePackageClass
       isInitialized = true
     } //init
 
