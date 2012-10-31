@@ -106,6 +106,7 @@ trait Imports {
   case class ComputedImports(prepend: String, append: String, access: String)
   protected def importsCode(wanted0: Set[Name]): ComputedImports = {
     val wanted = wanted0 filterNot isUnlinked
+    repltrace(s"wanted=$wanted")
 
     /** Narrow down the list of requests from which imports
      *  should be taken.  Removes requests which cannot contribute
@@ -163,7 +164,7 @@ trait Imports {
           // If the user entered an import, then just use it; add an import wrapping
           // level if the import might conflict with some other import
           case x: ImportHandler if x.importsWildcard =>
-            wrapBeforeAndAfter(code append (x.member + "\n"))
+            wrapBeforeAndAfter(code append s"${x.path}._\n")
           case x: ImportHandler =>
             maybeWrap(x.importedNames: _*)
             code append (x.member + "\n")
@@ -175,7 +176,7 @@ trait Imports {
           // the name of the variable, so that we don't need to
           // handle quoting keywords separately.
           case x =>
-            for (sym <- x.definedSymbols) {
+            for (sym <- x.definedSymbols ; if sym.isImplicit || wanted(sym.name)) {
               maybeWrap(sym.name)
               code append s"import ${x.path}\n"
               currentImps += sym.name

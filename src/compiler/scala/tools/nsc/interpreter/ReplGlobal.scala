@@ -21,6 +21,27 @@ trait ReplGlobal extends Global {
     super.abort(msg)
   }
 
+  override type Mirror >: Null <: ReplMirror
+
+  class ReplMirror extends {
+    override val universe: ReplGlobal.this.type = ReplGlobal.this
+  } with GlobalMirror {
+
+    override protected def mirrorMissingHook(owner: Symbol, name: Name): Symbol =
+      tracing(s"mirrorMissingHook($owner, $name)")(super.mirrorMissingHook(owner, name))
+
+    override protected def universeMissingHook(owner: Symbol, name: Name): Symbol =
+      tracing(s"universeMissingHook($owner, $name)")(super.universeMissingHook(owner, name))
+
+    override def toString = "repl mirror"
+  }
+
+  override lazy val rootMirror: Mirror = {
+    val rm = new ReplMirror
+    rm.init()
+    rm.asInstanceOf[Mirror]
+  }
+
   override lazy val analyzer = new {
     val global: ReplGlobal.this.type = ReplGlobal.this
   } with Analyzer {
