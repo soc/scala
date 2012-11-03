@@ -333,12 +333,12 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
     def path(name: => Name): String = path(lookup(name))
     def lookup(name: => Name): Symbol = shift(
       withoutUnwrapping(
-        printCaller(s"lookup(${name.longString})")(
+        // printCaller(s"lookup(${name.longString})")(
           (replScope lookup name)
             orElse getPathIfDefined(name)
             orElse (RootClass.info member name)
             orElse (EmptyPackageClass.info member name)
-        )
+        // )
       )
     )
   }
@@ -865,8 +865,8 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
     /** Code to import bound names from previous lines - accessPath is code to
       * append to objectName to access anything bound by request.
       */
-    val ComputedImports(importsPreamble, importsTrailer, accessPath) =
-      exitingTyper(importsCode(referencedNames.toSet))
+    val ComputedImports(importsPreamble, importsTrailer, accessPath) = importsCode(referencedNames.toSet)
+      // exitingTyper(importsCode(referencedNames.toSet))
 
     repltrace(s"ComputedImports($importsPreamble, $importsTrailer, $accessPath)")
 
@@ -1206,6 +1206,7 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
      */
     def isShow = code.lines exists (_.trim endsWith "// show")
     if (isReplDebug || isShow) {
+      echo(code)
       beSilentDuring(parse(code)) foreach { ts =>
         ts foreach { t =>
           withoutUnwrapping(echo(asCompactString(t)))
