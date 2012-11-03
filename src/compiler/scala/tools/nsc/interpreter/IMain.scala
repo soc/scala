@@ -1132,6 +1132,7 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
      */
     def isShow = code.lines exists (_.trim endsWith "// show")
     if (isReplDebug || isShow) {
+      echo(code)
       beSilentDuring(parse(code)) foreach { ts =>
         ts foreach { t =>
           withoutUnwrapping(echo(asCompactString(t)))

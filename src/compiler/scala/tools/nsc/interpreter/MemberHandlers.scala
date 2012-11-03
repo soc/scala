@@ -19,6 +19,23 @@ trait MemberHandlers {
   import global._
   import naming._
 
+  private final val tq = "\"\"\""
+  private final val sq = "\\\""
+
+  sealed trait Printable
+  implicit class Lit(val str: String) extends Printable {
+    override def toString = "\"\"\"" + str + "\"\"\""
+  }
+  case class Val(name: String) extends Printable {
+    override def toString = name
+  }
+  case object NL extends Printable {
+    override def toString = "\n"
+  }
+  private def mkInterpolate(xs: Printable*): String = {
+    xs.toArray.toString + ".mkString"
+  }
+
   private def codegenln(leadingPlus: Boolean, xs: String*): String = codegen(leadingPlus, (xs ++ Array("\n")): _*)
   private def codegenln(xs: String*): String = codegenln(true, xs: _*)
   private def codegen(leadingPlus: Boolean, xs: String*): String = {
@@ -118,7 +135,8 @@ trait MemberHandlers {
           if (replProps.vids) """" + " @ " + "%%8x".format(System.identityHashCode(%s)) + " """.trim.format(req fullPath name)
           else ""
 
-        """ + "%s%s: %s = " + %s""".format(prettyName, vidString, string2code(req typeOf name), resultString)
+        s" + $tq$prettyName$vidString: ${string2code(req typeOf name)} = $tq + $resultString"
+        // """ + "%s%s: %s = " + %s""".format(prettyName, vidString, string2code(req typeOf name), resultString)
       }
     }
   }
@@ -129,7 +147,8 @@ trait MemberHandlers {
     // true if not a macro and 0-arity
     override def definesValue = !isMacro && flattensToEmpty(vparamss)
     override def resultExtractionCode(req: Request) =
-      if (mods.isPublic) codegenln(name, ": ", req.typeOf(name)) else ""
+      if (mods.isPublic) mkInterpolate(Var(name), ": ", req typeOf name) else ""
+      // codegenln(name, ": ", req.typeOf(name)) else ""
   }
 
   class AssignHandler(member: Assign) extends MemberHandler(member) {
@@ -139,14 +158,17 @@ trait MemberHandlers {
     override def definesTerm = Some(name)
     override def definesValue = true
     override def extraCodeToEvaluate(req: Request) =
-      """val %s = %s""".format(name, lhs)
+      s"val $name = $lhs"
 
     /** Print out lhs instead of the generated varName */
     override def resultExtractionCode(req: Request) = {
       val lhsType = string2code(req lookupTypeOf name)
       val res     = string2code(req fullPath name)
 
-      """ + "%s: %s = " + %s + "\n" """.format(lhs, lhsType, res) + "\n"
+      mkInterpolate(Var(lhs), ": ", lhsType, " = ", Var(req fullPath name), NL)
+
+      // s" + $tq$lhs: $lhsType = $tq + $res + ${sq}\n${sq}"
+      // """ + "%s: %s = " + %s + "\n" """.format(lhs, lhsType, res) + "\n"
     }
   }
 
@@ -164,7 +186,7 @@ trait MemberHandlers {
     override def isLegalTopLevel = true
 
     override def resultExtractionCode(req: Request) =
-      codegenln("defined %s %s".format(keyword, name))
+      codegenln(s"defined $keyword $name")
   }
 
   class TypeAliasHandler(member: TypeDef) extends MemberDefHandler(member) {
@@ -172,7 +194,7 @@ trait MemberHandlers {
     override def definesType = Some(name.toTypeName) filter (_ => isAlias)
 
     override def resultExtractionCode(req: Request) =
-      codegenln("defined type alias ", name) + "\n"
+      codegenln(s"defined type alias $name\n")
   }
 
   class ImportHandler(imp: Import) extends MemberHandler(imp) {
@@ -182,10 +204,10 @@ trait MemberHandlers {
 
     def createImportForName(name: Name): String = {
       selectors foreach {
-        case sel @ ImportSelector(old, _, `name`, _)  => return "import %s.{ %s }".format(expr, sel)
+        case sel @ ImportSelector(old, _, `name`, _)  => return s"import $expr.{ $sel }"
         case _ => ()
       }
-      "import %s.%s".format(expr, name)
+      s"import $expr.$name"
     }
     // TODO: Need to track these specially to honor Predef masking attempts,
     // because they must be the leading imports in the code generated for each
