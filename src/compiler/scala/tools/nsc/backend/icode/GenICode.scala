@@ -489,7 +489,12 @@ abstract class GenICode extends SubComponent  {
      */
     private def msil_genLoadZeroOfNonEnumValuetype(ctx: Context, kind: TypeKind, pos: Position, leaveAddressOnStackInstead: Boolean) {
       val REFERENCE(clssym) = kind
-      assert(loaders.clrTypes.isNonEnumValuetype(clssym), clssym)
+      Predef.assert(loaders.clrTypes.isNonEnumValuetype(clssym), clssym)
+      // [scalacfork] /scala/trunk/src/compiler/scala/tools/nsc/backend/icode/GenICode.scala:492: error: type mismatch;
+      // [scalacfork]  found   : GenICode.this.global.icodes.global.Symbol
+      // [scalacfork]  required: scala.tools.nsc.symtab.SymbolLoaders{val global: GenICode.this.global.type}#clrTypes.global.Symbol
+      // [scalacfork]       assert(loaders.clrTypes.isNonEnumValuetype(clssym), clssym)
+      // [scalacfork]                                                  ^
       val local = ctx.makeLocal(pos, clssym.tpe, "tmp")
       ctx.method.addLocal(local)
       ctx.bb.emit(CIL_LOAD_LOCAL_ADDRESS(local), pos)

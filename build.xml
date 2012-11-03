@@ -666,6 +666,7 @@ LOCAL REFERENCE BUILD (LOCKER)
         <compilerarg line="${javac.args} -XDignore.symbol.file"/>
         <classpath>
           <path refid="forkjoin.classpath"/>
+          <path refid="lib.extra"/>
           <pathelement location="${build-locker.dir}/classes/library"/>
         </classpath>
     </javac>
@@ -683,6 +684,7 @@ LOCAL REFERENCE BUILD (LOCKER)
       <compilationpath>
         <pathelement location="${build-locker.dir}/classes/library"/>
         <path refid="forkjoin.classpath"/>
+        <path refid="lib.extra"/>
       </compilationpath>
     </scalacfork>
     <propertyfile file="${build-locker.dir}/classes/library/library.properties">
