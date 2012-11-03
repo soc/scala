@@ -1,5 +1,5 @@
 /* NSC -- new Scala compiler
- * Copyright 2005-2011 LAMP/EPFL
+ * Copyright 2005-2012 LAMP/EPFL
  * @author Alexander Spoon
  */
 
@@ -23,9 +23,9 @@ import scala.reflect.NameTransformer._
 import util.ScalaClassLoader
 import ScalaClassLoader._
 import scala.tools.util._
-import language.{implicitConversions, existentials}
+import scala.language.{implicitConversions, existentials}
 import scala.reflect.{ClassTag, classTag}
-import scala.tools.reflect.StdTags._
+import scala.tools.reflect.StdRuntimeTags._
 
 /** The Scala interactive shell.  It provides a read-eval-print loop
  *  around the Interpreter class.
@@ -65,7 +65,7 @@ class ILoop(in0: Option[BufferedReader], protected val out: JPrintWriter)
     import global._
 
     def printAfterTyper(msg: => String) =
-      intp.reporter printUntruncatedMessage afterTyper(msg)
+      intp.reporter printUntruncatedMessage exitingTyper(msg)
 
     /** Strip NullaryMethodType artifacts. */
     private def replInfo(sym: Symbol) = {
@@ -276,21 +276,6 @@ class ILoop(in0: Option[BufferedReader], protected val out: JPrintWriter)
     cmd("phase", "<phase>", "set the implicit phase for power commands", phaseCommand)
   )
 
-  private def dumpCommand(): Result = {
-    echo("" + power)
-    history.asStrings takeRight 30 foreach echo
-    in.redrawLine()
-  }
-  private def valsCommand(): Result = power.valsDescription
-
-  private val typeTransforms = List(
-    "scala.collection.immutable." -> "immutable.",
-    "scala.collection.mutable."   -> "mutable.",
-    "scala.collection.generic."   -> "generic.",
-    "java.lang."                  -> "jl.",
-    "scala.runtime."              -> "runtime."
-  )
-
   private def importsCommand(line: String): Result = {
     val tokens    = words(line)
     val handlers  = intp.languageWildcardHandlers ++ intp.importHandlers
@@ -342,7 +327,7 @@ class ILoop(in0: Option[BufferedReader], protected val out: JPrintWriter)
 
         // This groups the members by where the symbol is defined
         val byOwner = syms groupBy (_.owner)
-        val sortedOwners = byOwner.toList sortBy { case (owner, _) => afterTyper(source.info.baseClasses indexOf owner) }
+        val sortedOwners = byOwner.toList sortBy { case (owner, _) => exitingTyper(source.info.baseClasses indexOf owner) }
 
         sortedOwners foreach {
           case (owner, members) =>
@@ -438,7 +423,10 @@ class ILoop(in0: Option[BufferedReader], protected val out: JPrintWriter)
   }
 
   private def warningsCommand(): Result = {
-    intp.lastWarnings foreach { case (pos, msg) => intp.reporter.warning(pos, msg) }
+    if (intp.lastWarnings.isEmpty)
+      "Can't find any cached warnings."
+    else
+      intp.lastWarnings foreach { case (pos, msg) => intp.reporter.warning(pos, msg) }
   }
 
   private def javapCommand(line: String): Result = {
@@ -453,36 +441,6 @@ class ILoop(in0: Option[BufferedReader], protected val out: JPrintWriter)
         if (res.isError) return "Failed: " + res.value
         else res.show()
       }
-  }
-
-  private def wrapCommand(line: String): Result = {
-    def failMsg = "Argument to :wrap must be the name of a method with signature [T](=> T): T"
-    onIntp { intp =>
-      import intp._
-      import global._
-
-      words(line) match {
-        case Nil            =>
-          intp.executionWrapper match {
-            case ""   => "No execution wrapper is set."
-            case s    => "Current execution wrapper: " + s
-          }
-        case "clear" :: Nil =>
-          intp.executionWrapper match {
-            case ""   => "No execution wrapper is set."
-            case s    => intp.clearExecutionWrapper() ; "Cleared execution wrapper."
-          }
-        case wrapper :: Nil =>
-          intp.typeOfExpression(wrapper) match {
-            case PolyType(List(targ), MethodType(List(arg), restpe)) =>
-              intp setExecutionWrapper intp.pathToTerm(wrapper)
-              "Set wrapper to '" + wrapper + "'"
-            case tp =>
-              failMsg + "\nFound: <unknown>"
-          }
-        case _ => failMsg
-      }
-    }
   }
 
   private def pathToPhaseWrapper = intp.pathToTerm("$r") + ".phased.atCurrent"
@@ -836,7 +794,7 @@ class ILoop(in0: Option[BufferedReader], protected val out: JPrintWriter)
     addThunk({
       import scala.tools.nsc.io._
       import Properties.userHome
-      import compat.Platform.EOL
+      import scala.compat.Platform.EOL
       val autorun = replProps.replAutorunCode.option flatMap (f => io.File(f).safeSlurp())
       if (autorun.isDefined) intp.quietRun(autorun.get)
     })
@@ -888,7 +846,6 @@ class ILoop(in0: Option[BufferedReader], protected val out: JPrintWriter)
 
 object ILoop {
   implicit def loopToInterpreter(repl: ILoop): IMain = repl.intp
-  private def echo(msg: String) = Console println msg
 
   // Designed primarily for use by test code: take a String with a
   // bunch of code, and prints out a transcript of what it would look

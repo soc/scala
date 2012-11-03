@@ -1,11 +1,14 @@
-import scala.actors.MigrationSystem._
+/**
+ * NOTE: Code snippets from this test are included in the Actor Migration Guide. In case you change
+ * code in these tests prior to the 2.10.0 release please send the notification to @vjovanov.
+ */
 import scala.actors.Actor._
-import scala.actors.{ Actor, StashingActor, ActorRef, Props, MigrationSystem, PoisonPill }
+import scala.actors._
+import scala.actors.migration._
 import java.util.concurrent.{ TimeUnit, CountDownLatch }
 import scala.collection.mutable.ArrayBuffer
-import scala.concurrent.util.duration._
+import scala.concurrent.duration._
 import scala.concurrent.{ Promise, Await }
-
 
 object Test {
   val finishedLWCR, finishedTNR, finishedEH = Promise[Boolean]
@@ -36,7 +39,7 @@ object Test {
     Await.ready(finishedLWCR1.future, 5 seconds)
 
     // Loop with Condition Snippet - migrated
-    val myAkkaActor = MigrationSystem.actorOf(Props(() => new StashingActor {
+    val myAkkaActor = ActorDSL.actor(new StashingActor {
 
       def receive = {
         case x: Int =>
@@ -47,7 +50,7 @@ object Test {
             context.stop(self)
           }
       }
-    }, "default-stashing-dispatcher"))
+    })
     myAkkaActor ! 1
     myAkkaActor ! 42
   }
@@ -64,13 +67,14 @@ object Test {
             println("do task " + x)
             if (x == 42) {
               c = false
-              finishedTNR1.success(true)
-            } else
+            } else {
               react {
                 case y: String =>
                   println("do string " + y)
               }
+            }
             println("after react")
+            finishedTNR1.success(true)
         }
       }
     }
@@ -83,13 +87,14 @@ object Test {
     Await.ready(finishedTNR1.future, 5 seconds)
 
     // Loop with Condition Snippet - migrated
-    val myAkkaActor = MigrationSystem.actorOf(Props(() => new StashingActor {
+    val myAkkaActor = ActorDSL.actor(new StashingActor {
 
       def receive = {
         case x: Int =>
           // do task
           println("do task " + x)
           if (x == 42) {
+            println("after react")
             finishedTNR.success(true)
             context.stop(self)
           } else
@@ -101,7 +106,7 @@ object Test {
               context.unbecome()
             }).orElse { case x => stash() })
       }
-    }, "default-stashing-dispatcher"))
+    })
 
     myAkkaActor ! 1
     myAkkaActor ! "I am a String"
@@ -111,7 +116,7 @@ object Test {
 
   def exceptionHandling() = {
     // Stashing actor with act and exception handler
-    val myActor = MigrationSystem.actorOf(Props(() => new StashingActor {
+    val myActor = ActorDSL.actor(new StashingActor {
 
       def receive = { case _ => println("Dummy method.") }
       override def act() = {
@@ -132,7 +137,7 @@ object Test {
         case x: Exception => println("scala got exception")
       }
 
-    }, "default-stashing-dispatcher"))
+    })
 
     myActor ! "work"
     myActor ! "fail"
@@ -140,7 +145,7 @@ object Test {
 
     Await.ready(finishedEH1.future, 5 seconds)
     // Stashing actor in Akka style
-    val myAkkaActor = MigrationSystem.actorOf(Props(() => new StashingActor {
+    val myAkkaActor = ActorDSL.actor(new StashingActor {
       def receive = PFCatch({
         case "fail" =>
           throw new Exception("failed")
@@ -150,14 +155,14 @@ object Test {
           finishedEH.success(true)
           context.stop(self)
       }, { case x: Exception => println("akka got exception") })
-    }, "default-stashing-dispatcher"))
+    })
 
     myAkkaActor ! "work"
     myAkkaActor ! "fail"
     myAkkaActor ! "die"
   }
 
-  def main(args: Array[String]) = {
+  def main(args: Array[String]): Unit = {
     testLoopWithConditionReact()
     Await.ready(finishedLWCR.future, 5 seconds)
     exceptionHandling()
@@ -169,7 +174,8 @@ object Test {
 }
 
 // As per Jim Mcbeath's blog (http://jim-mcbeath.blogspot.com/2008/07/actor-exceptions.html)
-class PFCatch(f: PartialFunction[Any, Unit], handler: PartialFunction[Exception, Unit])
+class PFCatch(f: PartialFunction[Any, Unit],
+  handler: PartialFunction[Exception, Unit])
   extends PartialFunction[Any, Unit] {
 
   def apply(x: Any) = {
@@ -184,5 +190,6 @@ class PFCatch(f: PartialFunction[Any, Unit], handler: PartialFunction[Exception,
 }
 
 object PFCatch {
-  def apply(f: PartialFunction[Any, Unit], handler: PartialFunction[Exception, Unit]) = new PFCatch(f, handler)
+  def apply(f: PartialFunction[Any, Unit],
+    handler: PartialFunction[Exception, Unit]) = new PFCatch(f, handler)
 }

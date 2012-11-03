@@ -12,9 +12,9 @@ package scala.collection
 package mutable
 
 import generic._
-import collection.immutable.{List, Nil}
-import collection.Iterator
-import annotation.migration
+import scala.collection.immutable.{List, Nil}
+import scala.collection.Iterator
+import scala.annotation.migration
 
 /** Factory object for the `mutable.Stack` class.
  *
@@ -53,7 +53,6 @@ object Stack extends SeqFactory[Stack] {
  *  @define mayNotTerminateInf
  *  @define willNotTerminateInf
  */
-@cloneable
 class Stack[A] private (var elems: List[A])
 extends AbstractSeq[A]
    with Seq[A]

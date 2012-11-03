@@ -1,5 +1,5 @@
 /* NSC -- new Scala compiler
- * Copyright 2006-2011 LAMP/EPFL
+ * Copyright 2006-2012 LAMP/EPFL
  * @author  Martin Odersky
  */
 
@@ -31,10 +31,6 @@ object ClassPath {
     /** Get all subdirectories, jars, zips out of a directory. */
     def lsDir(dir: Directory, filt: String => Boolean = _ => true) =
       dir.list filter (x => filt(x.name) && (x.isDirectory || isJarOrZip(x))) map (_.path) toList
-
-    def basedir(s: String) =
-      if (s contains File.separator) s.substring(0, s.lastIndexOf(File.separator))
-      else "."
 
     if (pattern == "*") lsDir(Directory("."))
     else if (pattern endsWith wildSuffix) lsDir(Directory(pattern dropRight 2))
@@ -160,9 +156,9 @@ object ClassPath {
     override def isValidName(name: String) = !isTraitImplementation(name)
   }
 
-  @inline private def endsClass(s: String) = s.length > 6 && s.substring(s.length - 6) == ".class"
-  @inline private def endsScala(s: String) = s.length > 6 && s.substring(s.length - 6) == ".scala"
-  @inline private def endsJava(s: String)  = s.length > 5 && s.substring(s.length - 5) == ".java"
+  private def endsClass(s: String) = s.length > 6 && s.substring(s.length - 6) == ".class"
+  private def endsScala(s: String) = s.length > 6 && s.substring(s.length - 6) == ".scala"
+  private def endsJava(s: String)  = s.length > 5 && s.substring(s.length - 5) == ".java"
 
   /** From the source file to its identifier.
    */

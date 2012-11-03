@@ -6,8 +6,9 @@
 **                          |/                                          **
 \*                                                                      */
 
-
 package scala.actors
+
+import scala.language.higherKinds
 
 /**
  * Defines result-bearing message send operations.

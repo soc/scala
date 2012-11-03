@@ -1,5 +1,5 @@
 /* NSC -- new Scala compiler
- * Copyright 2005-2011 LAMP/EPFL
+ * Copyright 2005-2012 LAMP/EPFL
  * @author Martin Odersky
  */
 
@@ -20,14 +20,16 @@ abstract class Flatten extends InfoTransform {
 
   /** Updates the owning scope with the given symbol; returns the old symbol.
    */
-  private def replaceSymbolInCurrentScope(sym: Symbol): Symbol = afterFlatten {
+  private def replaceSymbolInCurrentScope(sym: Symbol): Symbol = exitingFlatten {
     val scope = sym.owner.info.decls
-    val old   = scope lookup sym.name
-    if (old ne NoSymbol)
-      scope unlink old
-
+    val old   = scope lookup sym.name andAlso scope.unlink
     scope enter sym
-    log("lifted " + sym.fullLocationString)
+
+    if (old eq NoSymbol)
+      log(s"lifted ${sym.fullLocationString}")
+    else
+      log(s"lifted ${sym.fullLocationString} after unlinking existing $old from scope.")
+
     old
   }
 
@@ -35,9 +37,7 @@ abstract class Flatten extends InfoTransform {
     if (!sym.isLifted) {
       sym setFlag LIFTED
       debuglog("re-enter " + sym.fullLocationString)
-      val old = replaceSymbolInCurrentScope(sym)
-      if (old ne NoSymbol)
-        log("unlinked " + old.fullLocationString + " after lifting " + sym)
+      replaceSymbolInCurrentScope(sym)
     }
   }
   private def liftSymbol(sym: Symbol) {
@@ -53,7 +53,7 @@ abstract class Flatten extends InfoTransform {
     clazz.isClass && !clazz.isPackageClass && {
       // Cannot flatten here: class A[T] { object B }
       // was "at erasurePhase.prev"
-      beforeErasure(clazz.typeParams.isEmpty)
+      enteringErasure(clazz.typeParams.isEmpty)
     }
   }
 
@@ -67,11 +67,11 @@ abstract class Flatten extends InfoTransform {
         val decls1 = scopeTransform(clazz) {
           val decls1 = newScope
           if (clazz.isPackageClass) {
-            afterFlatten { decls foreach (decls1 enter _) }
+            exitingFlatten { decls foreach (decls1 enter _) }
           }
           else {
             val oldowner = clazz.owner
-            afterFlatten { oldowner.info }
+            exitingFlatten { oldowner.info }
             parents1 = parents mapConserve (this)
 
             for (sym <- decls) {
@@ -123,7 +123,7 @@ abstract class Flatten extends InfoTransform {
           liftedDefs(sym.enclosingTopLevelClass.owner) += tree
           EmptyTree
         case Select(qual, name) if (sym.isStaticModule && !sym.owner.isPackageClass) =>
-          afterFlatten(atPos(tree.pos)(gen.mkAttributedRef(sym)))
+          exitingFlatten(atPos(tree.pos)(gen.mkAttributedRef(sym)))
         case _ =>
           tree
       }

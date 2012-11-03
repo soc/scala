@@ -1,5 +1,5 @@
 /* NSC -- new Scala compiler
- * Copyright 2005-2011 LAMP/EPFL
+ * Copyright 2005-2012 LAMP/EPFL
  * @author  Paul Phillips
  */
 
@@ -7,8 +7,8 @@ package scala.tools.nsc
 package symtab
 
 import scala.collection.{ mutable, immutable }
-import language.implicitConversions
-import language.postfixOps
+import scala.language.implicitConversions
+import scala.language.postfixOps
 
 /** Printing the symbol graph (for those symbols attached to an AST node)
  *  after each phase.
@@ -16,9 +16,6 @@ import language.postfixOps
 trait SymbolTrackers {
   val global: Global
   import global._
-
-  private implicit lazy val TreeOrdering: Ordering[Tree] =
-    Ordering by (x => (x.shortClass, x.symbol))
 
   private implicit lazy val SymbolOrdering: Ordering[Symbol] =
     Ordering by (x => (x.kindString, x.name.toString))
@@ -76,7 +73,6 @@ trait SymbolTrackers {
     private def isFlagsChange(sym: Symbol) = changed.flags contains sym
 
     private implicit def NodeOrdering: Ordering[Node] = Ordering by (_.root)
-    private def ownersString(sym: Symbol, num: Int) = sym.ownerChain drop 1 take num mkString " -> "
 
     object Node {
       def nodes(syms: Set[Symbol]): List[Node] = {

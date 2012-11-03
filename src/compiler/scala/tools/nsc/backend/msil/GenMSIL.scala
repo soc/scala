@@ -1,5 +1,5 @@
 /* NSC -- new scala compiler
- * Copyright 2005-2011 LAMP/EPFL
+ * Copyright 2005-2012 LAMP/EPFL
  * @author Nikolay Mihaylov
  */
 
@@ -15,7 +15,7 @@ import scala.tools.nsc.symtab._
 import ch.epfl.lamp.compiler.msil.{Type => MsilType, _}
 import ch.epfl.lamp.compiler.msil.emit._
 import ch.epfl.lamp.compiler.msil.util.PECustomMod
-import language.postfixOps
+import scala.language.postfixOps
 
 abstract class GenMSIL extends SubComponent {
   import global._
@@ -45,8 +45,8 @@ abstract class GenMSIL extends SubComponent {
 
       //classes is ICodes.classes, a HashMap[Symbol, IClass]
       classes.values foreach codeGenerator.findEntryPoint
-      if( opt.showClass.isDefined && (codeGenerator.entryPoint == null) ) { // TODO introduce dedicated setting instead
-        val entryclass = opt.showClass.get.toString
+      if( settings.Xshowcls.isSetByUser && (codeGenerator.entryPoint == null) ) { // TODO introduce dedicated setting instead
+        val entryclass = settings.Xshowcls.value.toString
         warning("Couldn't find entry class " + entryclass)
       }
 
@@ -124,7 +124,6 @@ abstract class GenMSIL extends SubComponent {
 
     // Scala attributes
     // symtab.Definitions -> object (singleton..)
-    val SerializableAttr = definitions.SerializableAttr.tpe
     val CloneableAttr    = definitions.CloneableAttr.tpe
     val TransientAtt     = definitions.TransientAttr.tpe
     // remoting: the architectures are too different, no mapping (no portable code
@@ -1126,7 +1125,7 @@ abstract class GenMSIL extends SubComponent {
               }
 
               // method: implicit view(FunctionX[PType0, PType1, ...,PTypeN, ResType]):DelegateType
-              val (isDelegateView, paramType, resType) = beforeTyper {
+              val (isDelegateView, paramType, resType) = enteringTyper {
                 msym.tpe match {
                   case MethodType(params, resultType)
                   if (params.length == 1 && msym.name == nme.view_) =>
@@ -1633,18 +1632,6 @@ abstract class GenMSIL extends SubComponent {
       mf = mf | (if (sym hasFlag Flags.ABSTRACT) TypeAttributes.Abstract else 0)
       mf = mf | (if (sym.isTrait && !sym.isImplClass) TypeAttributes.Interface else TypeAttributes.Class)
       mf = mf | (if (sym isFinal) TypeAttributes.Sealed else 0)
-
-      sym.annotations foreach { a => a match {
-        case AnnotationInfo(SerializableAttr, _, _) =>
-          // TODO: add the Serializable TypeAttribute also if the annotation
-          // System.SerializableAttribute is present (.net annotation, not scala)
-          //  Best way to do it: compare with
-          //  definitions.getClass("System.SerializableAttribute").tpe
-          //  when frontend available
-          mf = mf | TypeAttributes.Serializable
-        case _ => ()
-      }}
-
       mf
       // static: not possible (or?)
     }
@@ -1731,8 +1718,8 @@ abstract class GenMSIL extends SubComponent {
         false
       }
 
-      if((entryPoint == null) && opt.showClass.isDefined) {  // TODO introduce dedicated setting instead
-        val entryclass = opt.showClass.get.toString
+      if((entryPoint == null) && settings.Xshowcls.isSetByUser) {  // TODO introduce dedicated setting instead
+        val entryclass = settings.Xshowcls.value.toString
         val cfn = cls.symbol.fullName
         if(cfn == entryclass) {
           for (m <- cls.methods; if isEntryPoint(m.symbol)) { entryPoint = m.symbol }
@@ -1955,7 +1942,7 @@ abstract class GenMSIL extends SubComponent {
     } // createClassMembers0
 
     private def isTopLevelModule(sym: Symbol): Boolean =
-      beforeRefchecks {
+      enteringRefchecks {
         sym.isModuleClass && !sym.isImplClass && !sym.isNestedClass
       }
 
@@ -2255,97 +2242,6 @@ abstract class GenMSIL extends SubComponent {
     private def mapMethod(sym: Symbol, mInfo: MethodInfo) {
       assert (mInfo != null, mInfo)
       methods(sym) = mInfo
-    }
-
-    /*
-     * add mapping between sym and method with newName, paramTypes of newClass
-     */
-    private def mapMethod(sym: Symbol, newClass: MsilType, newName: String, paramTypes: Array[MsilType]) {
-      val methodInfo = newClass.GetMethod(newName, paramTypes)
-      assert(methodInfo != null, "Can't find mapping for " + sym + " -> " +
-             newName + "(" + paramTypes + ")")
-      mapMethod(sym, methodInfo)
-      if (methodInfo.IsStatic)
-        dynToStatMapped += sym
-    }
-
-    /*
-     * add mapping between method with name and paramTypes of clazz to
-     * method with newName and newParamTypes of newClass (used for instance
-     * for "wait")
-     */
-    private def mapMethod(
-      clazz: Symbol, name: Name, paramTypes: Array[Type],
-      newClass: MsilType, newName: String, newParamTypes: Array[MsilType]) {
-        val methodSym = lookupMethod(clazz, name, paramTypes)
-        assert(methodSym != null, "cannot find method " + name + "(" +
-               paramTypes + ")" + " in class " + clazz)
-        mapMethod(methodSym, newClass, newName, newParamTypes)
-      }
-
-    /*
-     * add mapping for member with name and paramTypes to member
-     * newName of newClass (same parameters)
-     */
-    private def mapMethod(
-      clazz: Symbol, name: Name, paramTypes: Array[Type],
-      newClass: MsilType, newName: String) {
-        mapMethod(clazz, name, paramTypes, newClass, newName, paramTypes map msilType)
-      }
-
-    /*
-     * add mapping for all methods with name of clazz to the corresponding
-     * method (same parameters) with newName of newClass
-     */
-    private def mapMethod(
-      clazz: Symbol, name: Name,
-      newClass: MsilType, newName: String) {
-        val memberSym: Symbol = clazz.tpe.member(name)
-        memberSym.tpe match {
-          // alternatives: List[Symbol]
-          case OverloadedType(_, alternatives) =>
-            alternatives.foreach(s => mapMethod(s, newClass, newName, msilParamTypes(s)))
-
-          // paramTypes: List[Type], resType: Type
-          case MethodType(params, resType) =>
-            mapMethod(memberSym, newClass, newName, msilParamTypes(memberSym))
-
-          case _ =>
-            abort("member not found: " + clazz + ", " + name)
-        }
-      }
-
-
-    /*
-     * find the method in clazz with name and paramTypes
-     */
-    private def lookupMethod(clazz: Symbol, name: Name, paramTypes: Array[Type]): Symbol = {
-      val memberSym = clazz.tpe.member(name)
-      memberSym.tpe match {
-        case OverloadedType(_, alternatives) =>
-          alternatives.find(s => {
-            var i: Int = 0
-            var typesOK: Boolean = true
-            if (paramTypes.length == s.tpe.paramTypes.length) {
-              while(i < paramTypes.length) {
-                if (paramTypes(i) != s.tpe.paramTypes(i))
-                  typesOK = false
-                i += 1
-              }
-            } else {
-              typesOK = false
-            }
-            typesOK
-          }) match {
-            case Some(sym) => sym
-            case None => abort("member of " + clazz + ", " + name + "(" +
-                               paramTypes + ") not found")
-          }
-
-        case MethodType(_, _) => memberSym
-
-        case _ => abort("member not found: " + name + " of " + clazz)
-      }
     }
 
     private def showsym(sym: Symbol): String = (sym.toString +

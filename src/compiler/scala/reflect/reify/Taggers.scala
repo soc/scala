@@ -1,7 +1,7 @@
 package scala.reflect.reify
 
-import scala.reflect.makro.{ReificationError, UnexpectedReificationError}
-import scala.reflect.makro.runtime.Context
+import scala.reflect.macros.{ReificationException, UnexpectedReificationException, TypecheckException}
+import scala.reflect.macros.runtime.Context
 
 abstract class Taggers {
   val c: Context
@@ -27,9 +27,9 @@ abstract class Taggers {
     NothingTpe -> nme.Nothing,
     NullTpe -> nme.Null)
 
-  def materializeClassTag(prefix: Tree, tpe: Type): Tree = {
+  def materializeClassTag(tpe: Type): Tree = {
     val tagModule = ClassTagModule
-    materializeTag(prefix, tpe, tagModule, {
+    materializeTag(EmptyTree, tpe, tagModule, {
       val erasure = c.reifyRuntimeClass(tpe, concrete = true)
       val factory = TypeApply(Select(Ident(tagModule), nme.apply), List(TypeTree(tpe)))
       Apply(factory, List(erasure))
@@ -37,23 +37,21 @@ abstract class Taggers {
   }
 
   def materializeTypeTag(universe: Tree, mirror: Tree, tpe: Type, concrete: Boolean): Tree = {
-    if (universe.symbol == MacroContextUniverse && mirror == EmptyTree) {
-      import scala.reflect.makro.runtime.ContextReifiers
-      import language.implicitConversions
-      implicit def context2contextreifiers(c0: Context) : ContextReifiers { val c: c0.type } = new { val c: c0.type = c0 } with ContextReifiers
-      val Select(prefix, _) = universe
-      c.materializeTypeTagForMacroContext(prefix, tpe, concrete)
-    } else {
-      val tagType = if (concrete) TypeTagClass else AbsTypeTagClass
-      val unaffiliatedTagTpe = TypeRef(BaseUniverseClass.asTypeConstructor, tagType, List(tpe))
-      val unaffiliatedTag = c.inferImplicitValue(unaffiliatedTagTpe, silent = true, withMacrosDisabled = true)
-      unaffiliatedTag match {
-        case success if !success.isEmpty =>
-          Apply(Select(success, nme.in), List(mirror orElse mkDefaultMirrorRef(c.universe)(universe, c.callsiteTyper)))
-        case _ =>
-          val tagModule = if (concrete) TypeTagModule else AbsTypeTagModule
-          materializeTag(universe, tpe, tagModule, c.reifyType(universe, mirror, tpe, concrete = concrete))
-      }
+    val tagType = if (concrete) TypeTagClass else WeakTypeTagClass
+    // what we need here is to compose a type Universe # TypeTag[$tpe]
+    // to look for an implicit that conforms to this type
+    // that's why neither appliedType(tagType, List(tpe)) aka TypeRef(TypeTagsClass.thisType, tagType, List(tpe))
+    // nor TypeRef(ApiUniverseClass.thisType, tagType, List(tpe)) won't fit here
+    // scala> :type -v def foo: scala.reflect.api.Universe#TypeTag[Int] = ???
+    // NullaryMethodType(TypeRef(pre = TypeRef(TypeSymbol(Universe)), TypeSymbol(TypeTag), args = List($tpe))))
+    val unaffiliatedTagTpe = TypeRef(ApiUniverseClass.typeConstructor, tagType, List(tpe))
+    val unaffiliatedTag = c.inferImplicitValue(unaffiliatedTagTpe, silent = true, withMacrosDisabled = true)
+    unaffiliatedTag match {
+      case success if !success.isEmpty =>
+        Apply(Select(success, nme.in), List(mirror orElse mkDefaultMirrorRef(c.universe)(universe, c.callsiteTyper)))
+      case _ =>
+        val tagModule = if (concrete) TypeTagModule else WeakTypeTagModule
+        materializeTag(universe, tpe, tagModule, c.reifyType(universe, mirror, tpe, concrete = concrete))
     }
   }
 
@@ -67,22 +65,22 @@ abstract class Taggers {
           translatingReificationErrors(materializer)
       }
     try c.typeCheck(result)
-    catch { case terr @ c.TypeError(pos, msg) => failTag(result, terr) }
+    catch { case terr @ TypecheckException(pos, msg) => failTag(result, terr) }
   }
 
   def materializeExpr(universe: Tree, mirror: Tree, expr: Tree): Tree = {
     val result = translatingReificationErrors(c.reifyTree(universe, mirror, expr))
     try c.typeCheck(result)
-    catch { case terr @ c.TypeError(pos, msg) => failExpr(result, terr) }
+    catch { case terr @ TypecheckException(pos, msg) => failExpr(result, terr) }
   }
 
   private def translatingReificationErrors(materializer: => Tree): Tree = {
     try materializer
     catch {
-      case ReificationError(pos, msg) =>
+      case ReificationException(pos, msg) =>
         c.error(pos.asInstanceOf[c.Position], msg) // this cast is a very small price for the sanity of exception handling
         EmptyTree
-      case UnexpectedReificationError(pos, err, cause) if cause != null =>
+      case UnexpectedReificationException(pos, err, cause) if cause != null =>
         throw cause
     }
   }

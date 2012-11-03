@@ -22,10 +22,8 @@ class DotDiagramGenerator(settings: doc.Settings) extends DiagramGenerator {
   private var pathToLib: String = null
   // maps nodes to unique indices
   private var node2Index: Map[Node, Int] = null
-  // maps an index to its corresponding node
-  private var index2Node: Map[Int, Node] = null
   // true if the current diagram is a class diagram
-  private var isClassDiagram = false
+  private var isInheritanceDiagram = false
   // incoming implicit nodes (needed for determining the CSS class of a node)
   private var incomingImplicitNodes: List[Node] = List()
   // the suffix used when there are two many classes to show
@@ -42,7 +40,6 @@ class DotDiagramGenerator(settings: doc.Settings) extends DiagramGenerator {
     // clean things up a bit, so we don't leave garbage on the heap
     this.page = null
     node2Index = null
-    index2Node = null
     incomingImplicitNodes = List()
     result
   }
@@ -66,15 +63,15 @@ class DotDiagramGenerator(settings: doc.Settings) extends DiagramGenerator {
     var superClasses = List[Node]()
     var incomingImplicits = List[Node]()
     var outgoingImplicits = List[Node]()
-    isClassDiagram = false
+    isInheritanceDiagram = false
 
     d match {
-      case ClassDiagram(_thisNode, _superClasses, _subClasses, _incomingImplicits, _outgoingImplicits) =>
+      case InheritanceDiagram(_thisNode, _superClasses, _subClasses, _incomingImplicits, _outgoingImplicits) =>
 
         def textTypeEntity(text: String) =
           new TypeEntity {
             val name = text
-            def refEntity: SortedMap[Int, (TemplateEntity, Int)] = SortedMap()
+            def refEntity: SortedMap[Int, (LinkTo, Int)] = SortedMap()
           }
 
         // it seems dot chokes on node names over 8000 chars, so let's limit the size of the string
@@ -86,29 +83,29 @@ class DotDiagramGenerator(settings: doc.Settings) extends DiagramGenerator {
         //   them by on node with a corresponding tooltip
         superClasses = if (_superClasses.length > settings.docDiagramsMaxNormalClasses.value) {
           val superClassesTooltip = Some(limitSize(_superClasses.map(_.tpe.name).mkString(", ")))
-          List(NormalNode(textTypeEntity(_superClasses.length + MultiSuffix), None, superClassesTooltip))
+          List(NormalNode(textTypeEntity(_superClasses.length + MultiSuffix), None)(superClassesTooltip))
         } else _superClasses
 
         subClasses = if (_subClasses.length > settings.docDiagramsMaxNormalClasses.value) {
           val subClassesTooltip = Some(limitSize(_subClasses.map(_.tpe.name).mkString(", ")))
-          List(NormalNode(textTypeEntity(_subClasses.length + MultiSuffix), None, subClassesTooltip))
+          List(NormalNode(textTypeEntity(_subClasses.length + MultiSuffix), None)(subClassesTooltip))
         } else _subClasses
 
         incomingImplicits = if (_incomingImplicits.length > settings.docDiagramsMaxImplicitClasses.value) {
           val incomingImplicitsTooltip = Some(limitSize(_incomingImplicits.map(_.tpe.name).mkString(", ")))
-          List(ImplicitNode(textTypeEntity(_incomingImplicits.length + MultiSuffix), None, incomingImplicitsTooltip))
+          List(ImplicitNode(textTypeEntity(_incomingImplicits.length + MultiSuffix), None)(incomingImplicitsTooltip))
         } else _incomingImplicits
 
         outgoingImplicits = if (_outgoingImplicits.length > settings.docDiagramsMaxImplicitClasses.value) {
           val outgoingImplicitsTooltip = Some(limitSize(_outgoingImplicits.map(_.tpe.name).mkString(", ")))
-          List(ImplicitNode(textTypeEntity(_outgoingImplicits.length + MultiSuffix), None, outgoingImplicitsTooltip))
+          List(ImplicitNode(textTypeEntity(_outgoingImplicits.length + MultiSuffix), None)(outgoingImplicitsTooltip))
         } else _outgoingImplicits
 
         thisNode = _thisNode
         nodes = List()
         edges = (thisNode -> superClasses) :: subClasses.map(_ -> List(thisNode))
         node2Index = (thisNode::subClasses:::superClasses:::incomingImplicits:::outgoingImplicits).zipWithIndex.toMap
-        isClassDiagram = true
+        isInheritanceDiagram = true
         incomingImplicitNodes = incomingImplicits
       case _ =>
         nodes = d.nodes
@@ -116,10 +113,9 @@ class DotDiagramGenerator(settings: doc.Settings) extends DiagramGenerator {
         node2Index = d.nodes.zipWithIndex.toMap
         incomingImplicitNodes = List()
     }
-    index2Node = node2Index map {_.swap}
 
     val implicitsDot = {
-      if (!isClassDiagram) ""
+      if (!isInheritanceDiagram) ""
       else {
         // dot cluster containing thisNode
         val thisCluster = "subgraph clusterThis {\n" +
@@ -242,6 +238,8 @@ class DotDiagramGenerator(settings: doc.Settings) extends DiagramGenerator {
       attr ++= classStyle
     else if(node.isObjectNode)
       attr ++= objectStyle
+    else if(node.isTypeNode)
+      attr ++= typeStyle
     else
       attr ++= defaultStyle
 
@@ -254,6 +252,8 @@ class DotDiagramGenerator(settings: doc.Settings) extends DiagramGenerator {
       img = "class_diagram.png"
     else if(node.isObjectNode)
       img = "object_diagram.png"
+    else if(node.isTypeNode)
+      img = "type_diagram.png"
 
     if(!img.equals("")) {
       img = "<TD><IMG SCALE=\"TRUE\" SRC=\"" + settings.outdir.value + "/lib/" + img + "\" /></TD>"
@@ -307,6 +307,8 @@ class DotDiagramGenerator(settings: doc.Settings) extends DiagramGenerator {
       space + "trait"
     else if (node.isObjectNode)
       space + "object"
+    else if (node.isTypeNode)
+      space + "type"
     else
       default
 
@@ -327,7 +329,7 @@ class DotDiagramGenerator(settings: doc.Settings) extends DiagramGenerator {
         else
           NodeSeq.Empty
       } catch {
-        case exc =>
+        case exc: Exception =>
           if (settings.docDiagramsDebug.value) {
             settings.printMsg("\n\n**********************************************************************")
             settings.printMsg("Encountered an error while generating page for " + template.qualifiedName)
@@ -360,7 +362,7 @@ class DotDiagramGenerator(settings: doc.Settings) extends DiagramGenerator {
   private def transform(e:scala.xml.Node): scala.xml.Node = e match {
     // add an id and class attribute to the SVG element
     case Elem(prefix, "svg", attribs, scope, child @ _*) => {
-      val klass = if (isClassDiagram) "class-diagram" else "package-diagram"
+      val klass = if (isInheritanceDiagram) "class-diagram" else "package-diagram"
       Elem(prefix, "svg", attribs, scope, child map(x => transform(x)) : _*) %
       new UnprefixedAttribute("id", "graph" + counter, Null) %
       new UnprefixedAttribute("class", klass, Null)
@@ -420,7 +422,7 @@ class DotDiagramGenerator(settings: doc.Settings) extends DiagramGenerator {
     else if (klass.contains("object")) "object"
     else ""
 
-  def getPosition(g: xml.Node, axis: String, offset: Double): Option[Double] = {
+  def getPosition(g: scala.xml.Node, axis: String, offset: Double): Option[Double] = {
     val node = g \ "a" \ "text" \ ("@" + axis)
     if (node.isEmpty)
       None
@@ -488,6 +490,12 @@ class DotDiagramGenerator(settings: doc.Settings) extends DiagramGenerator {
   private val objectStyle = Map(
     "color" -> "#102966",
     "fillcolor" -> "#3556a7",
+    "fontcolor" -> "#ffffff"
+  )
+
+  private val typeStyle = Map(
+    "color" -> "#115F3B",
+    "fillcolor" -> "#0A955B",
     "fontcolor" -> "#ffffff"
   )
 

@@ -1,5 +1,5 @@
 /* NSC -- new Scala compiler
- * Copyright 2005-2011 LAMP/EPFL
+ * Copyright 2005-2012 LAMP/EPFL
  * @author  Paul Phillips
  */
 
@@ -58,7 +58,20 @@ trait TypeDiagnostics {
   /** A map of Positions to addendums - if an error involves a position in
    *  the map, the addendum should also be printed.
    */
-  private var addendums = perRunCaches.newMap[Position, () => String]()
+  private val addendums = perRunCaches.newMap[Position, () => String]()
+  private var isTyperInPattern = false
+
+  /** Devising new ways of communicating error info out of
+   *  desperation to work on error messages.  This is used
+   *  by typedPattern to wrap its business so we can generate
+   *  a sensible error message when things go south.
+   */
+  def typingInPattern[T](body: => T): T = {
+    val saved = isTyperInPattern
+    isTyperInPattern = true
+    try body
+    finally isTyperInPattern = saved
+  }
 
   def setAddendum(pos: Position, msg: () => String) =
     if (pos != NoPosition)
@@ -138,13 +151,17 @@ trait TypeDiagnostics {
     def hasParams         = tree.tpe.paramSectionCount > 0
     def preResultString   = if (hasParams) ": " else " of type "
 
-    def nullMessage       = "expression of type " + tree.tpe
-    def overloadedMessage = "overloaded method " + sym + " with alternatives:\n" + alternativesString(tree)
+    def patternMessage    = "pattern " + tree.tpe.finalResultType + valueParamsString(tree.tpe)
+    def exprMessage       = "expression of type " + tree.tpe
+    def overloadedMessage = s"overloaded method $sym with alternatives:\n" + alternativesString(tree)
     def moduleMessage     = "" + sym
     def defaultMessage    = moduleMessage + preResultString + tree.tpe
     def applyMessage      = defaultMessage + tree.symbol.locationString
 
-    if (sym == null) nullMessage
+    if ((sym eq null) || (sym eq NoSymbol)) {
+      if (isTyperInPattern) patternMessage
+      else exprMessage
+    }
     else if (sym.isOverloaded) overloadedMessage
     else if (sym.isModule) moduleMessage
     else if (sym.name == nme.apply) applyMessage
@@ -252,6 +269,13 @@ trait TypeDiagnostics {
     }
     ""    // no elaborable variance situation found
   }
+
+  // For found/required errors where AnyRef would have sufficed:
+  // explain in greater detail.
+  def explainAnyVsAnyRef(found: Type, req: Type): String = {
+    if (AnyRefClass.tpe <:< req) notAnyRefMessage(found) else ""
+  }
+
   // TODO - figure out how to avoid doing any work at all
   // when the message will never be seen.  I though context.reportErrors
   // being false would do that, but if I return "<suppressed>" under
@@ -261,7 +285,10 @@ trait TypeDiagnostics {
       ";\n found   : " + found.toLongString + existentialContext(found) + explainAlias(found) +
        "\n required: " + req + existentialContext(req) + explainAlias(req)
     )
-    withDisambiguation(Nil, found, req)(baseMessage) + explainVariance(found, req)
+    (   withDisambiguation(Nil, found, req)(baseMessage)
+      + explainVariance(found, req)
+      + explainAnyVsAnyRef(found, req)
+    )
   }
 
   case class TypeDiag(tp: Type, sym: Symbol) extends Ordered[TypeDiag] {
@@ -399,9 +426,70 @@ trait TypeDiagnostics {
     def permanentlyHiddenWarning(pos: Position, hidden: Name, defn: Symbol) =
       contextWarning(pos, "imported `%s' is permanently hidden by definition of %s".format(hidden, defn.fullLocationString))
 
+    object checkUnused {
+      val ignoreNames = Set[TermName]("readResolve", "readObject", "writeObject", "writeReplace")
+
+      class UnusedPrivates extends Traverser {
+        val defnTrees = ListBuffer[MemberDef]()
+        val targets   = mutable.Set[Symbol]()
+        def qualifies(sym: Symbol) = (
+             (sym ne null)
+          && (sym.isMethod || sym.isPrivateLocal && !nme.isLocalName(sym.name))
+          && !sym.isParameter
+          && !sym.isParamAccessor  // could improve this, but it's a pain
+        )
+
+        override def traverse(t: Tree): Unit = {
+          t match {
+            case t: ValOrDefDef if qualifies(t.symbol) => defnTrees += t
+            case t: RefTree if t.symbol ne null        => targets += t.symbol
+            case _                                     =>
+          }
+          super.traverse(t)
+        }
+        def isUnused(m: Symbol): Boolean = (
+             m.isPrivate
+          && !targets(m)
+          && !ignoreNames(m.name)               // serialization methods
+          && !isConstantType(m.info.resultType) // subject to constant inlining
+        )
+        def unused = defnTrees.toList filter (t => isUnused(t.symbol))
+      }
+
+      def apply(unit: CompilationUnit) = {
+        val p = new UnusedPrivates
+        p traverse unit.body
+        p.unused foreach { defn: DefTree =>
+          val sym             = defn.symbol
+          val isDefaultGetter = sym.name containsName nme.DEFAULT_GETTER_STRING
+          val pos = (
+            if (defn.pos.isDefined) defn.pos
+            else if (sym.pos.isDefined) sym.pos
+            else sym match {
+              case sym: TermSymbol => sym.referenced.pos
+              case _               => NoPosition
+            }
+          )
+          val what = (
+            if (isDefaultGetter) "default argument"
+            else if (sym.isConstructor) "constructor"
+            else if (sym.isSetter) "setter"
+            else if (sym.isGetter) "getter"
+            else if (sym.isMethod) "method"
+            else "member"
+          )
+          unit.warning(pos, s"private $what in ${sym.owner} is never used")
+        }
+      }
+    }
+
     object checkDead {
       private var expr: Symbol = NoSymbol
-      private def exprOK = expr != Object_synchronized
+
+      private def exprOK =
+        (expr != Object_synchronized) &&
+        !(expr.isLabel && treeInfo.isSynthCaseSymbol(expr)) // it's okay to jump to matchEnd (or another case) with an argument of type nothing
+
       private def treeOK(tree: Tree) = tree.tpe != null && tree.tpe.typeSymbol == NothingClass
 
       def updateExpr(fn: Tree) = {
@@ -458,7 +546,6 @@ trait TypeDiagnostics {
         case CyclicReference(sym, info: TypeCompleter) =>
           if (context0.owner.isTermMacro) {
             // see comments to TypeSigError for an explanation of this special case
-            // [Eugene] is there a better way?
             throw ex
           } else {
             val pos = info.tree match {

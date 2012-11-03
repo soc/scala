@@ -1,5 +1,5 @@
 /* NSC -- new Scala compiler
- * Copyright 2002-2011 LAMP/EPFL
+ * Copyright 2002-2012 LAMP/EPFL
  * @author Martin Odersky
  */
 
@@ -94,6 +94,5 @@ class ConsoleReporter(val settings: Settings, reader: BufferedReader, writer: Pr
     }
   }
 
-  private def abort(msg: String) = throw new Error(msg)
   override def flush() { writer.flush() }
 }

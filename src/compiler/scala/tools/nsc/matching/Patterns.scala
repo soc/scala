@@ -1,5 +1,5 @@
 /* NSC -- new Scala compiler
- * Copyright 2005-2011 LAMP/EPFL
+ * Copyright 2005-2012 LAMP/EPFL
  * Author: Paul Phillips
  */
 
@@ -21,7 +21,7 @@ trait Patterns extends ast.TreeDSL {
   import definitions._
   import CODE._
   import Debug._
-  import treeInfo.{ unbind, isStar, isVarPattern, isVariableName }
+  import treeInfo.{ unbind, isStar, isVarPattern }
 
   type PatternMatch       = MatchMatrix#PatternMatch
   private type PatternVar = MatrixContext#PatternVar
@@ -189,13 +189,6 @@ trait Patterns extends ast.TreeDSL {
     private lazy val packedType = global.typer.computeType(tpt, tpt.tpe)
     private lazy val consRef    = appliedType(ConsClass, packedType)
     private lazy val listRef    = appliedType(ListClass, packedType)
-    private lazy val seqRef     = appliedType(SeqClass, packedType)
-
-    private def thisSeqRef = {
-      val tc = (tree.tpe baseType SeqClass).typeConstructor
-      if (tc.typeParams.size == 1) appliedType(tc, List(packedType))
-      else seqRef
-    }
 
     // Fold a list into a well-typed x :: y :: etc :: tree.
     private def listFolder(hd: Tree, tl: Tree): Tree = unbind(hd) match {
@@ -366,7 +359,7 @@ trait Patterns extends ast.TreeDSL {
     lazy val Select(qualifier, name) = select
     def pathSegments = getPathSegments(tree)
     def backticked: Option[String] = qualifier match {
-      case _: This if isVariableName(name)  => Some("`%s`".format(name))
+      case _: This if nme.isVariableName(name)  => Some("`%s`".format(name))
       case _                                => None
     }
     override def covers(sym: Symbol) = newMatchesPattern(sym, tree.tpe)
@@ -388,11 +381,11 @@ trait Patterns extends ast.TreeDSL {
     lazy val UnApply(unfn, args) = tree
     lazy val Apply(fn, _) = unfn
     lazy val MethodType(List(arg, _*), _) = fn.tpe
-    
+
     // Covers if the symbol matches the unapply method's argument type,
     // and the return type of the unapply is Some.
     override def covers(sym: Symbol) = newMatchesPattern(sym, arg.tpe)
-    
+
     // TODO: for alwaysCovers:
     //   fn.tpe.finalResultType.typeSymbol == SomeClass
 
@@ -402,7 +395,7 @@ trait Patterns extends ast.TreeDSL {
       case _                                => toPats(args)
     }
 
-    def resTypes = analyzer.unapplyTypeList(unfn.symbol, unfn.tpe)
+    def resTypes = analyzer.unapplyTypeList(unfn.symbol, unfn.tpe, args.length)
     def resTypesString = resTypes match {
       case Nil  => "Boolean"
       case xs   => xs.mkString(", ")
@@ -451,7 +444,7 @@ trait Patterns extends ast.TreeDSL {
         (sym.tpe.baseTypeSeq exists (_ matchesPattern pattp))
       }
     }
-    
+
     def    sym  = tree.symbol
     def    tpe  = tree.tpe
     def isEmpty = tree.isEmpty

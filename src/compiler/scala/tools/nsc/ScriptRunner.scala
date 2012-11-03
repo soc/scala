@@ -1,5 +1,5 @@
 /* NSC -- new Scala compiler
- * Copyright 2005-2011 LAMP/EPFL
+ * Copyright 2005-2012 LAMP/EPFL
  * @author  Martin Odersky
  */
 
@@ -56,17 +56,6 @@ class ScriptRunner extends HasCompileSocket {
     if (scriptFile endsWith ".jar") scriptFile
     else scriptFile.stripSuffix(".scala") + ".jar"
   )
-
-  /** Read the entire contents of a file as a String. */
-  private def contentsOfFile(filename: String) = File(filename).slurp()
-
-  /** Split a fully qualified object name into a
-   *  package and an unqualified object name */
-  private def splitObjectName(fullname: String): (Option[String], String) =
-    (fullname lastIndexOf '.') match {
-      case -1   => (None, fullname)
-      case idx  => (Some(fullname take idx), fullname drop (idx + 1))
-    }
 
   /** Compile a script using the fsc compilation daemon.
    */
@@ -199,7 +188,7 @@ class ScriptRunner extends HasCompileSocket {
     scriptArgs: List[String]): Either[Throwable, Boolean] =
   {
     try Right(runScript(settings, scriptFile, scriptArgs))
-    catch { case e => Left(unwrap(e)) }
+    catch { case e: Throwable => Left(unwrap(e)) }
   }
 
   /** Run a command

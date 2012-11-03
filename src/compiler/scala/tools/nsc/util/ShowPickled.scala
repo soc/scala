@@ -1,5 +1,5 @@
 /* NSC -- new Scala compiler
- * Copyright 2005-2011 LAMP/EPFL
+ * Copyright 2005-2012 LAMP/EPFL
  * @author  Martin Odersky
  */
 
@@ -94,7 +94,6 @@ object ShowPickled extends Names {
     case ANNOTATEDtpe   => "ANNOTATEDtpe"
     case ANNOTINFO      => "ANNOTINFO"
     case ANNOTARGARRAY  => "ANNOTARGARRAY"
-    // case DEBRUIJNINDEXtpe => "DEBRUIJNINDEXtpe"
     case EXISTENTIALtpe => "EXISTENTIALtpe"
     case TREE           => "TREE"
     case MODIFIERS      => "MODIFIERS"

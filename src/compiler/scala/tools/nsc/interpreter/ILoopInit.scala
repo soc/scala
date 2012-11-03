@@ -1,5 +1,5 @@
 /* NSC -- new Scala compiler
- * Copyright 2005-2011 LAMP/EPFL
+ * Copyright 2005-2012 LAMP/EPFL
  * @author Paul Phillips
  */
 
@@ -8,6 +8,7 @@ package interpreter
 
 import scala.reflect.internal.util.Position
 import scala.util.control.Exception.ignoring
+import scala.tools.nsc.util.stackTraceString
 
 /**
  *  Machinery for the asynchronous initialization of the repl.
@@ -93,10 +94,8 @@ trait ILoopInit {
       postInitThunks foreach (f => addThunk(f()))
       runThunks()
     } catch {
-      case ex =>
-        val message = new java.io.StringWriter()
-        ex.printStackTrace(new java.io.PrintWriter(message))
-        initError = message.toString
+      case ex: Throwable =>
+        initError = stackTraceString(ex)
         throw ex
     } finally {
       initIsComplete = true

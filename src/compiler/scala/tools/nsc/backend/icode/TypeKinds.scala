@@ -1,5 +1,5 @@
 /* NSC -- new Scala compiler
- * Copyright 2005-2011 LAMP/EPFL
+ * Copyright 2005-2012 LAMP/EPFL
  * @author  Martin Odersky
  */
 
@@ -55,7 +55,7 @@ trait TypeKinds { self: ICodes =>
 
     def toType: Type = reversePrimitiveMap get this map (_.tpe) getOrElse {
       this match {
-        case REFERENCE(cls) => cls.tpe
+        case REFERENCE(cls) => cls.tpe_*
         case ARRAY(elem)    => arrayType(elem.toType)
         case _              => abort("Unknown type kind.")
       }
@@ -139,7 +139,7 @@ trait TypeKinds { self: ICodes =>
      *  Here we make the adjustment by rewinding to a pre-erasure state and
      *  sifting through the parents for a class type.
      */
-    def lub0(tk1: TypeKind, tk2: TypeKind): Type = beforeUncurry {
+    def lub0(tk1: TypeKind, tk2: TypeKind): Type = enteringUncurry {
       import definitions._
       val tp = global.lub(List(tk1.toType, tk2.toType))
       val (front, rest) = tp.parents span (_.typeSymbol.isTrait)

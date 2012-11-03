@@ -1,5 +1,5 @@
 /* NSC -- new Scala compiler
- * Copyright 2005-2011 LAMP/EPFL
+ * Copyright 2005-2012 LAMP/EPFL
  * @author  Paul Phillips
  */
 
@@ -44,7 +44,7 @@ trait JavaPlatform extends Platform {
     else List(dependencyAnalysis)
 
   private def classEmitPhase =
-    if (settings.target.value == "jvm-1.5") genJVM
+    if (settings.target.value == "jvm-1.5-fjbg") genJVM
     else genASM
 
   def platformPhases = List(

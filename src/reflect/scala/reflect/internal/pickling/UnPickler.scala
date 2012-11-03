@@ -1,5 +1,5 @@
 /* NSC -- new Scala compiler
- * Copyright 2005-2011 LAMP/EPFL
+ * Copyright 2005-2012 LAMP/EPFL
  * @author  Martin Odersky
  */
 
@@ -14,13 +14,13 @@ import java.lang.Double.longBitsToDouble
 import Flags._
 import PickleFormat._
 import scala.collection.{ mutable, immutable }
-import collection.mutable.ListBuffer
-import annotation.switch
+import scala.collection.mutable.ListBuffer
+import scala.annotation.switch
 
 /** @author Martin Odersky
  *  @version 1.0
  */
-abstract class UnPickler /*extends reflect.generic.UnPickler*/ {
+abstract class UnPickler /*extends scala.reflect.generic.UnPickler*/ {
   val global: SymbolTable
   import global._
 
@@ -230,9 +230,11 @@ abstract class UnPickler /*extends reflect.generic.UnPickler*/ {
           fromName(nme.expandedName(name.toTermName, owner)) orElse {
             // (3) Try as a nested object symbol.
             nestedObjectSymbol orElse {
-              // (4) Otherwise, fail.
-              //System.err.println("missing "+name+" in "+owner+"/"+owner.id+" "+owner.info.decls)
-              adjust(errorMissingRequirement(name, owner))
+              // (4) Call the mirror's "missing" hook.
+              adjust(mirrorThatLoaded(owner).missingHook(owner, name)) orElse {
+                // (5) Create a stub symbol to defer hard failure a little longer.
+                owner.newStubSymbol(name)
+              }
             }
           }
         }
@@ -373,12 +375,7 @@ abstract class UnPickler /*extends reflect.generic.UnPickler*/ {
             NullaryMethodType(restpe)
         case EXISTENTIALtpe =>
           val restpe  = readTypeRef()
-          // @PP: Where is the flag setting supposed to happen? I infer
-          // from the lack of flag setting in the rest of the unpickler
-          // that it isn't right here. See #4757 for the immediate
-          // motivation to fix it.
-          val tparams = until(end, readSymbolRef) map (_ setFlag EXISTENTIAL)
-          newExistentialType(tparams, restpe)
+          newExistentialType(until(end, readSymbolRef), restpe)
 
         case ANNOTATEDtpe =>
           var typeRef = readNat()
@@ -449,7 +446,7 @@ abstract class UnPickler /*extends reflect.generic.UnPickler*/ {
     private def readArrayAnnot() = {
       readByte() // skip the `annotargarray` tag
       val end = readNat() + readIndex
-      until(end, () => readClassfileAnnotArg(readNat())).toArray(ClassfileAnnotArgTag)
+      until(end, () => readClassfileAnnotArg(readNat())).toArray(JavaArgumentTag)
     }
     protected def readClassfileAnnotArg(i: Int): ClassfileAnnotArg = bytes(index(i)) match {
       case ANNOTINFO     => NestedAnnotArg(at(i, readAnnotation))
@@ -772,8 +769,21 @@ abstract class UnPickler /*extends reflect.generic.UnPickler*/ {
     }
 
     /* Read a reference to a pickled item */
+    protected def readSymbolRef(): Symbol             = {//OPT inlined from: at(readNat(), readSymbol) to save on closure creation
+      val i = readNat()
+      var r = entries(i)
+      if (r eq null) {
+        val savedIndex = readIndex
+        readIndex = index(i)
+        r = readSymbol()
+        assert(entries(i) eq null, entries(i))
+        entries(i) = r
+        readIndex = savedIndex
+      }
+      r.asInstanceOf[Symbol]
+    }
+
     protected def readNameRef(): Name                 = at(readNat(), readName)
-    protected def readSymbolRef(): Symbol             = at(readNat(), readSymbol)
     protected def readTypeRef(): Type                 = at(readNat(), () => readType()) // after the NMT_TRANSITION period, we can leave off the () => ... ()
     protected def readConstantRef(): Constant         = at(readNat(), readConstant)
     protected def readAnnotationRef(): AnnotationInfo = at(readNat(), readAnnotation)
@@ -818,7 +828,7 @@ abstract class UnPickler /*extends reflect.generic.UnPickler*/ {
       throw new RuntimeException("malformed Scala signature of " + classRoot.name + " at " + readIndex + "; " + msg)
 
     protected def errorMissingRequirement(name: Name, owner: Symbol): Symbol =
-      missingHook(owner, name) orElse MissingRequirementError.signal(
+      mirrorThatLoaded(owner).missingHook(owner, name) orElse MissingRequirementError.signal(
         s"bad reference while unpickling $filename: ${name.longString} not found in ${owner.tpe.widen}"
       )
 
@@ -832,16 +842,18 @@ abstract class UnPickler /*extends reflect.generic.UnPickler*/ {
      *  Similar in intent to what SymbolLoader does (but here we don't have access to
      *  error reporting, so we rely on the typechecker to report the error).
      */
-    def toTypeError(e: MissingRequirementError) =
+    def toTypeError(e: MissingRequirementError) = {
+      // e.printStackTrace()
       new TypeError(e.msg)
+    }
 
     /** A lazy type which when completed returns type at index `i`. */
-    private class LazyTypeRef(i: Int) extends LazyType {
+    private class LazyTypeRef(i: Int) extends LazyType with FlagAgnosticCompleter {
       private val definedAtRunId = currentRunId
       private val p = phase
       override def complete(sym: Symbol) : Unit = try {
         val tp = at(i, () => readType(sym.isTerm)) // after NMT_TRANSITION, revert `() => readType(sym.isTerm)` to `readType`
-        atPhase(p) (sym setInfo tp)
+        enteringPhase(p) (sym setInfo tp)
         if (currentRunId != definedAtRunId)
           sym.setInfo(adaptToNewRunMap(tp))
       }
@@ -859,7 +871,7 @@ abstract class UnPickler /*extends reflect.generic.UnPickler*/ {
         super.complete(sym)
         var alias = at(j, readSymbol)
         if (alias.isOverloaded)
-          alias = atPhase(picklerPhase)((alias suchThat (alt => sym.tpe =:= sym.owner.thisType.memberType(alt))))
+          alias = enteringPhase(picklerPhase)((alias suchThat (alt => sym.tpe =:= sym.owner.thisType.memberType(alt))))
 
         sym.asInstanceOf[TermSymbol].setAlias(alias)
       }

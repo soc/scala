@@ -1,7 +1,8 @@
 package scala.reflect
 package runtime
 
-trait SynchronizedOps extends internal.SymbolTable
+// SI-6240: test thread-safety, make trees synchronized as well
+private[reflect] trait SynchronizedOps extends internal.SymbolTable
                          with SynchronizedSymbols
                          with SynchronizedTypes { self: SymbolTable =>
 

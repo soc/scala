@@ -1,5 +1,5 @@
 /* NSC -- new Scala compiler
- * Copyright 2005-2011 LAMP/EPFL
+ * Copyright 2005-2012 LAMP/EPFL
  * @author  Paul Phillips
  */
 
@@ -14,7 +14,7 @@ import scala.reflect.runtime.{universe => ru}
 import scala.reflect.{ClassTag, classTag}
 import typechecker.DestructureTypes
 import scala.reflect.internal.util.StringOps.ojoin
-import language.implicitConversions
+import scala.language.implicitConversions
 
 /** A more principled system for turning types into strings.
  */
@@ -39,7 +39,6 @@ trait StructuredTypeStrings extends DestructureTypes {
   val ParamGrouping   = Grouping("(", ", ", ")", true)
   val BlockGrouping   = Grouping(" { ", "; ", "}", false)
 
-  private implicit def lowerName(n: Name): String = "" + n
   private def str(level: Int)(body: => String): String = "  " * level + body
   private def block(level: Int, grouping: Grouping)(name: String, nodes: List[TypeNode]): String = {
     val l1 = str(level)(name + grouping.ldelim)
@@ -57,7 +56,7 @@ trait StructuredTypeStrings extends DestructureTypes {
     else block(level, grouping)(name, nodes)
   }
   private def shortClass(x: Any) = {
-    if (opt.debug) {
+    if (settings.debug.value) {
       val name   = (x.getClass.getName split '.').last
       val isAnon = name.reverse takeWhile (_ != '$') forall (_.isDigit)
       val str    = if (isAnon) name else (name split '$').last
@@ -212,11 +211,8 @@ trait TypeStrings {
   }
 
   private def tparamString[T: ru.TypeTag] : String = {
-    // [Eugene++ to Paul] needs review!!
-    def typeArguments: List[ru.Type] = ru.typeOf[T].typeArguments
-    // [Eugene++] todo. need to use not the `rootMirror`, but a mirror with the REPL's classloader
-    // how do I get to it? acquiring context classloader seems unreliable because of multithreading
-    def typeVariables: List[java.lang.Class[_]] = typeArguments map (targ => ru.rootMirror.runtimeClass(targ))
+    import ru._
+    def typeArguments: List[ru.Type] = ru.typeOf[T] match { case ru.TypeRef(_, _, args) => args; case _ => Nil }
     brackets(typeArguments map (jc => tvarString(List(jc))): _*)
   }
 

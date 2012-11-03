@@ -1,5 +1,5 @@
 /* NSC -- new Scala compiler
- * Copyright 2005-2011 LAMP/EPFL
+ * Copyright 2005-2012 LAMP/EPFL
  * @author  Martin Odersky
  */
 
@@ -25,8 +25,6 @@ import Flags._
  */
 abstract class Pickler extends SubComponent {
   import global._
-
-  private final val showSig = false
 
   val phaseName = "pickler"
 
@@ -68,8 +66,12 @@ abstract class Pickler extends SubComponent {
           return
         }
 
-        if (!t.isDef && t.hasSymbol && t.symbol.isTermMacro) {
-          unit.error(t.pos, "macro has not been expanded")
+        if (!t.isDef && t.hasSymbolField && t.symbol.isTermMacro) {
+          unit.error(t.pos, t.symbol.typeParams.length match {
+            case 0 => "macro has not been expanded"
+            case 1 => "this type parameter must be specified"
+            case _ => "these type parameters must be specified"
+          })
           return
         }
       }
@@ -173,7 +175,7 @@ abstract class Pickler extends SubComponent {
      */
     private def putType(tp: Type): Unit = if (putEntry(tp)) {
       tp match {
-        case NoType | NoPrefix /*| DeBruijnIndex(_, _) */ =>
+        case NoType | NoPrefix =>
           ;
         case ThisType(sym) =>
           putSymbol(sym)
@@ -231,7 +233,7 @@ abstract class Pickler extends SubComponent {
     private def putTree(tree: Tree): Unit = if (putEntry(tree)) {
       if (tree != EmptyTree)
         putType(tree.tpe)
-      if (tree.hasSymbol)
+      if (tree.hasSymbolField)
         putSymbol(tree.symbol)
 
       tree match {
@@ -503,7 +505,7 @@ abstract class Pickler extends SubComponent {
     private def writeSymInfo(sym: Symbol) {
       writeRef(sym.name)
       writeRef(localizedOwner(sym))
-      writeLongNat((rawFlagsToPickled(sym.flags & PickledFlags)))
+      writeLongNat((rawToPickledFlags(sym.flags & PickledFlags)))
       if (sym.hasAccessBoundary) writeRef(sym.privateWithin)
       writeRef(sym.info)
     }
@@ -512,7 +514,7 @@ abstract class Pickler extends SubComponent {
     private def writeName(name: Name) {
       ensureCapacity(name.length * 3)
       val utfBytes = Codec toUTF8 name.toString
-      compat.Platform.arraycopy(utfBytes, 0, bytes, writeIndex, utfBytes.length)
+      scala.compat.Platform.arraycopy(utfBytes, 0, bytes, writeIndex, utfBytes.length)
       writeIndex += utfBytes.length
     }
 
@@ -564,7 +566,7 @@ abstract class Pickler extends SubComponent {
           tag
         case sym: ClassSymbol =>
           writeSymInfo(sym)
-          if (sym.thisSym.tpe != sym.tpe) writeRef(sym.typeOfThis)
+          if (sym.thisSym.tpe_* != sym.tpe_*) writeRef(sym.typeOfThis)
           CLASSsym
         case sym: TypeSymbol =>
           writeSymInfo(sym)
@@ -605,8 +607,6 @@ abstract class Pickler extends SubComponent {
           writeRef(restpe); writeRefs(tparams); POLYtpe
         case ExistentialType(tparams, restpe) =>
           writeRef(restpe); writeRefs(tparams); EXISTENTIALtpe
-        // case DeBruijnIndex(l, i) =>
-        //   writeNat(l); writeNat(i); DEBRUIJNINDEXtpe
         case c @ Constant(_) =>
           if (c.tag == BooleanTag) writeLong(if (c.booleanValue) 1 else 0)
           else if (ByteTag <= c.tag && c.tag <= LongTag) writeLong(c.longValue)
@@ -966,7 +966,7 @@ abstract class Pickler extends SubComponent {
           TREE
 
         case Modifiers(flags, privateWithin, _) =>
-          val pflags = rawFlagsToPickled(flags)
+          val pflags = rawToPickledFlags(flags)
           writeNat((pflags >> 32).toInt)
           writeNat((pflags & 0xFFFFFFFF).toInt)
           writeRef(privateWithin)
@@ -1053,8 +1053,6 @@ abstract class Pickler extends SubComponent {
         case ExistentialType(tparams, restpe) =>
           print("EXISTENTIALtpe "); printRef(restpe); printRefs(tparams);
           print("||| "+entry)
-        // case DeBruijnIndex(l, i) =>
-        //   print("DEBRUIJNINDEXtpe "); print(l+" "+i)
         case c @ Constant(_) =>
           print("LITERAL ")
           if (c.tag == BooleanTag) print("Boolean "+(if (c.booleanValue) 1 else 0))

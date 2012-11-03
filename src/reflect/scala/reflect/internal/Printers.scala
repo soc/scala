@@ -1,16 +1,16 @@
 /* NSC -- new Scala compiler
- * Copyright 2005-2011 LAMP/EPFL
+ * Copyright 2005-2012 LAMP/EPFL
  * @author  Martin Odersky
  */
 
-// [Eugene++ to Martin] we need to unify this prettyprinter with NodePrinters
+// todo. we need to unify this prettyprinter with NodePrinters
 
 package scala.reflect
 package internal
 
 import java.io.{ OutputStream, PrintWriter, StringWriter, Writer }
 import Flags._
-import compat.Platform.EOL
+import scala.compat.Platform.EOL
 
 trait Printers extends api.Printers { self: SymbolTable =>
 
@@ -174,12 +174,7 @@ trait Printers extends api.Printers { self: SymbolTable =>
     }
 
     def printAnnotations(tree: Tree) {
-      if (!isCompilerUniverse && tree.symbol != null && tree.symbol != NoSymbol)
-        // [Eugene++] todo. this is not 100% correct, but is necessary for sane printing
-        // the problem is that getting annotations doesn't automatically initialize the symbol
-        // so we might easily print something as if it doesn't have annotations, whereas it does
-        tree.symbol.initialize
-
+      // SI-5885: by default this won't print annotations of not yet initialized symbols
       val annots = tree.symbol.annotations match {
         case Nil  => tree.asInstanceOf[MemberDef].mods.annotations
         case anns => anns
@@ -530,7 +525,7 @@ trait Printers extends api.Printers { self: SymbolTable =>
     private var depth = 0
     private var printTypesInFootnotes = true
     private var printingFootnotes = false
-    private var footnotes = footnoteIndex.mkFootnotes()
+    private val footnotes = footnoteIndex.mkFootnotes()
 
     def print(args: Any*): Unit = {
       // don't print type footnotes if the argument is a mere type
@@ -539,20 +534,19 @@ trait Printers extends api.Printers { self: SymbolTable =>
 
       depth += 1
       args foreach {
+        case expr: Expr[_] =>
+          print("Expr")
+          if (printTypes) print(expr.staticType)
+          print("(")
+          print(expr.tree)
+          print(")")
         case EmptyTree =>
           print("EmptyTree")
         case emptyValDef: AnyRef if emptyValDef eq self.emptyValDef =>
           print("emptyValDef")
-        case Literal(Constant(value)) =>
-          def print(s: String) = this.print("Literal(Constant(" + s + "))")
-          value match {
-            case s: String => print("\"" + s + "\"")
-            case null => print(null)
-            case _ => print(value.toString)
-          }
         case tree: Tree =>
-          val hasSymbol = tree.hasSymbol && tree.symbol != NoSymbol
-          val isError = hasSymbol && tree.symbol.name.toString == nme.ERROR.toString
+          val hasSymbolField = tree.hasSymbolField && tree.symbol != NoSymbol
+          val isError = hasSymbolField && tree.symbol.name.toString == nme.ERROR.toString
           printProduct(
             tree,
             preamble = _ => {
@@ -565,7 +559,7 @@ trait Printers extends api.Printers { self: SymbolTable =>
                   if (isError) print("<")
                   print(name)
                   if (isError) print(": error>")
-                } else if (hasSymbol) {
+                } else if (hasSymbolField) {
                   tree match {
                     case _: Ident | _: Select | _: SelectFromTypeTree => print(tree.symbol)
                     case _ => print(tree.symbol.name)
@@ -573,6 +567,12 @@ trait Printers extends api.Printers { self: SymbolTable =>
                 } else {
                   print(name)
                 }
+              case Constant(s: String) =>
+                print("Constant(\"" + s + "\")")
+              case Constant(null) =>
+                print("Constant(null)")
+              case Constant(value) =>
+                print("Constant(" + value + ")")
               case arg =>
                 print(arg)
             },
@@ -581,19 +581,24 @@ trait Printers extends api.Printers { self: SymbolTable =>
               case _ => // do nothing
             })
         case sym: Symbol =>
-          if (sym.isStatic && (sym.isClass || sym.isModule)) print(sym.fullName)
+          if (sym == NoSymbol) print("NoSymbol")
+          else if (sym.isStatic && (sym.isClass || sym.isModule)) print(sym.fullName)
           else print(sym.name)
           if (printIds) print("#", sym.id)
           if (printKinds) print("#", sym.abbreviatedKindString)
-          if (printMirrors) print("%M", footnotes.put[MirrorOf[_]](mirrorThatLoaded(sym)))
-        case NoType =>
-          print("NoType")
-        case NoPrefix =>
-          print("NoPrefix")
+          if (printMirrors) print("%M", footnotes.put[scala.reflect.api.Mirror[_]](mirrorThatLoaded(sym)))
+        case tag: TypeTag[_] =>
+          print("TypeTag(", tag.tpe, ")")
+        case tag: WeakTypeTag[_] =>
+          print("WeakTypeTag(", tag.tpe, ")")
         case tpe: Type =>
           val defer = printTypesInFootnotes && !printingFootnotes
           if (defer) print("[", footnotes.put(tpe), "]")
-          else printProduct(tpe.asInstanceOf[Product])
+          else tpe match {
+            case NoType => print("NoType")
+            case NoPrefix => print("NoPrefix")
+            case _ => printProduct(tpe.asInstanceOf[Product])
+          }
         case mods: Modifiers =>
           print("Modifiers(")
           if (mods.flags != NoFlags || mods.privateWithin != tpnme.EMPTY || mods.annotations.nonEmpty) print(show(mods.flags))
@@ -602,6 +607,9 @@ trait Printers extends api.Printers { self: SymbolTable =>
           print(")")
         case name: Name =>
           print(show(name))
+        case scope: Scope =>
+          print("Scope")
+          printIterable(scope.toList)
         case list: List[_] =>
           print("List")
           printIterable(list)
@@ -614,7 +622,7 @@ trait Printers extends api.Printers { self: SymbolTable =>
       if (depth == 0 && !printingFootnotes) {
         printingFootnotes = true
         footnotes.print[Type](this)
-        footnotes.print[MirrorOf[_]](this)
+        footnotes.print[scala.reflect.api.Mirror[_]](this)
         printingFootnotes = false
       }
     }
@@ -649,19 +657,17 @@ trait Printers extends api.Printers { self: SymbolTable =>
   }
 
   def show(name: Name): String = name match {
-    // base.StandardNames
-    case tpnme.EMPTY => "tpnme.EMPTY"
-    case tpnme.ROOT => "tpnme.ROOT"
-    case tpnme.EMPTY_PACKAGE_NAME => "tpnme.EMPTY_PACKAGE_NAME"
     case tpnme.WILDCARD => "tpnme.WILDCARD"
-    case nme.CONSTRUCTOR => "nme.CONSTRUCTOR"
-    case nme.NO_NAME => "nme.NO_NAME"
-    // api.StandardNames
+    case tpnme.EMPTY => "tpnme.EMPTY"
     case tpnme.ERROR => "tpnme.ERROR"
-    case nme.ERROR => "nme.ERROR"
-    case nme.EMPTY => "nme.EMPTY"
     case tpnme.PACKAGE => "tpnme.PACKAGE"
+    case tpnme.WILDCARD_STAR => "tpnme.WILDCARD_STAR"
+    case nme.WILDCARD => "nme.WILDCARD"
+    case nme.EMPTY => "nme.EMPTY"
+    case nme.ERROR => "tpnme.ERROR"
     case nme.PACKAGE => "nme.PACKAGE"
+    case nme.CONSTRUCTOR => "nme.CONSTRUCTOR"
+    case nme.ROOTPKG => "nme.ROOTPKG"
     case _ =>
       val prefix = if (name.isTermName) "newTermName(\"" else "newTypeName(\""
       prefix + name.toString + "\")"
@@ -670,8 +676,9 @@ trait Printers extends api.Printers { self: SymbolTable =>
   def show(flags: FlagSet): String = {
     if (flags == NoFlags) nme.NoFlags.toString
     else {
-      val s_flags = new collection.mutable.ListBuffer[String]
-      for (i <- 0 to 63 if (flags containsAll (1L << i)))
+      val s_flags = new scala.collection.mutable.ListBuffer[String]
+      def hasFlag(left: Long, right: Long): Boolean = (left & right) != 0
+      for (i <- 0 to 63 if hasFlag(flags, 1L << i))
         s_flags += flagToString(1L << i).replace("<", "").replace(">", "").toUpperCase
       s_flags mkString " | "
     }

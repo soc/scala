@@ -1,5 +1,5 @@
 /* NSC -- new Scala compiler
- * Copyright 2005-2011 LAMP/EPFL
+ * Copyright 2005-2012 LAMP/EPFL
  * Author: Paul Phillips
  */
 
@@ -8,7 +8,7 @@ package matching
 
 import transform.ExplicitOuter
 import PartialFunction._
-import language.postfixOps
+import scala.language.postfixOps
 
 trait PatternBindings extends ast.TreeDSL
 {
@@ -108,8 +108,6 @@ trait PatternBindings extends ast.TreeDSL
       case b @ Bind(_, pat) => b.symbol :: strip(pat)
       case _                => Nil
     }
-    private def deepstrip(t: Tree): List[Symbol] =
-      treeCollect(t, { case x: Bind => x.symbol })
   }
 
   case class Binding(pvar: Symbol, tvar: Symbol) {

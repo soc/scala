@@ -9,14 +9,14 @@
 package scala.concurrent
 
 import java.util.concurrent.{ExecutorService, Callable, TimeUnit}
-import language.implicitConversions
+import scala.language.implicitConversions
 
 /** The `ThreadPoolRunner` trait uses a `java.util.concurrent.ExecutorService`
  *  to run submitted tasks.
  *
  *  @author Philipp Haller
  */
-@deprecated("Use `ExecutionContext`s instead.", "2.10.0")
+@deprecated("Use `ExecutionContext` instead.", "2.10.0")
 trait ThreadPoolRunner extends FutureTaskRunner {
 
   type Task[T] = Callable[T] with Runnable
@@ -43,6 +43,7 @@ trait ThreadPoolRunner extends FutureTaskRunner {
     executor execute task
   }
 
+  @deprecated("Use `blocking` instead.", "2.10.0")
   def managedBlock(blocker: ManagedBlocker) {
     blocker.block()
   }

@@ -11,7 +11,7 @@ package scala.util.automata
 import scala.collection.{ immutable, mutable }
 import scala.util.regexp.WordExp
 
-/** This class turns a regular expression into a [[scala.util.automata.NondetWorkAutom]]
+/** This class turns a regular expression into a [[scala.util.automata.NondetWordAutom]]
   * celebrated position automata construction (also called ''Berry-Sethi'' or ''Glushkov'').
   *
   *  @author Burak Emir
@@ -152,7 +152,6 @@ abstract class WordBerrySethi extends BaseBerrySethi {
         new NondetWordAutom[_labelT] {
           val nstates  = pos
           val labels   = WordBerrySethi.this.labels.toList
-          val initials = initialsArr
           val finals   = finalsArr
           val delta    = deltaArr
           val default  = defaultArr

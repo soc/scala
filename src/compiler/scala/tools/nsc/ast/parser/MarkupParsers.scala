@@ -1,5 +1,5 @@
 /* NSC -- new Scala compiler
- * Copyright 2005-2011 LAMP/EPFL
+ * Copyright 2005-2012 LAMP/EPFL
  * @author Burak Emir
  */
 
@@ -89,7 +89,7 @@ trait MarkupParsers {
 
     var xEmbeddedBlock = false
 
-    private var debugLastStartElement = new mutable.Stack[(Int, String)]
+    private val debugLastStartElement = new mutable.Stack[(Int, String)]
     private def debugLastPos = debugLastStartElement.top._1
     private def debugLastElem = debugLastStartElement.top._2
 

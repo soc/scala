@@ -6,7 +6,7 @@
 package scala.tools.nsc
 package typechecker
 
-import language.implicitConversions
+import scala.language.implicitConversions
 
 /** A generic means of breaking down types into their subcomponents.
  *  Types are decomposed top down, and recognizable substructure is
@@ -37,9 +37,7 @@ trait DestructureTypes {
     def wrapSequence(nodes: List[Node]): Node
     def wrapAtom[U](value: U): Node
 
-    private implicit def liftToTerm(name: String): TermName = newTermName(name)
-
-    private val openSymbols = collection.mutable.Set[Symbol]()
+    private val openSymbols = scala.collection.mutable.Set[Symbol]()
 
     private def nodeList[T](elems: List[T], mkNode: T => Node): Node =
       if (elems.isEmpty) wrapEmpty else list(elems map mkNode)
@@ -188,7 +186,6 @@ trait DestructureTypes {
       case AntiPolyType(pre, targs)                  => product(tp, prefix(pre), typeArgs(targs))
       case ClassInfoType(parents, decls, clazz)      => product(tp, parentList(parents), scope(decls), wrapAtom(clazz))
       case ConstantType(const)                       => product(tp, constant("value", const))
-      case DeBruijnIndex(level, index, args)         => product(tp, const("level" -> level), const("index" -> index), typeArgs(args))
       case OverloadedType(pre, alts)                 => product(tp, prefix(pre), node("alts", typeList(alts map pre.memberType)))
       case RefinedType(parents, decls)               => product(tp, parentList(parents), scope(decls))
       case SingleType(pre, sym)                      => product(tp, prefix(pre), wrapAtom(sym))

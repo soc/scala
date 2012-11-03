@@ -19,6 +19,7 @@ import org.apache.tools.ant.util.facade.{FacadeTaskHelper,
                                   ImplementationSpecificArgument}
 
 import scala.tools.nsc.{Global, Settings, CompilerCommand}
+import scala.tools.nsc.interactive.RangePositions
 import scala.tools.nsc.io.{Path => SPath}
 import scala.tools.nsc.reporters.{Reporter, ConsoleReporter}
 
@@ -99,7 +100,7 @@ class Scalac extends ScalaMatchingTask with ScalacShared {
 
   /** Defines valid values for the `target` property. */
   object Target extends PermissibleValue {
-    val values = List("jvm-1.5", "msil")
+    val values = List("jvm-1.5", "jvm-1.5-fjbg", "jvm-1.5-asm", "jvm-1.6", "jvm-1.7", "msil")
   }
 
   /** Defines valid values for the `deprecation` and `unchecked` properties. */
@@ -518,7 +519,10 @@ class Scalac extends ScalaMatchingTask with ScalacShared {
     new Settings(error)
 
   protected def newGlobal(settings: Settings, reporter: Reporter) =
-    new Global(settings, reporter)
+    if (settings.Yrangepos.value)
+      new Global(settings, reporter) with RangePositions
+    else
+      new Global(settings, reporter)
 
 /*============================================================================*\
 **                           The big execute method                           **

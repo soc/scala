@@ -1,5 +1,5 @@
 /* NSC -- new Scala compiler
- * Copyright 2005-2011 LAMP/EPFL
+ * Copyright 2005-2012 LAMP/EPFL
  * @author Martin Odersky
  */
 
@@ -63,7 +63,7 @@ trait SyntheticMethods extends ast.TreeDSL {
     // in the original order.
     def accessors = clazz.caseFieldAccessors sortBy { acc =>
       originalAccessors indexWhere { orig =>
-        (acc.name == orig.name) || (acc.name startsWith (orig.name append "$").asInstanceOf[Name]) // [Eugene++] why do we need this cast?
+        (acc.name == orig.name) || (acc.name startsWith (orig.name append "$"))
       }
     }
     val arity = accessors.size
@@ -77,7 +77,7 @@ trait SyntheticMethods extends ast.TreeDSL {
     // like Tags and Arrays which are not robust and infer things
     // which they shouldn't.
     val accessorLub  = (
-      if (opt.experimental) {
+      if (settings.Xexperimental.value) {
         global.weakLub(accessors map (_.tpe.finalResultType))._1 match {
           case RefinedType(parents, decls) if !decls.isEmpty => intersectionType(parents)
           case tp                                            => tp
@@ -87,7 +87,7 @@ trait SyntheticMethods extends ast.TreeDSL {
     )
 
     def forwardToRuntime(method: Symbol): Tree =
-      forwardMethod(method, getMember(ScalaRunTimeModule, (method.name prepend "_").asInstanceOf[Name]))(mkThis :: _) // [Eugene++] why do we need this cast?
+      forwardMethod(method, getMember(ScalaRunTimeModule, (method.name prepend "_")))(mkThis :: _)
 
     def callStaticsMethod(name: String)(args: Tree*): Tree = {
       val method = termMember(RuntimeStaticsModule, name)
@@ -102,12 +102,6 @@ trait SyntheticMethods extends ast.TreeDSL {
       val sym = clazz.info nonPrivateMember meth.name
       sym.alternatives exists { m0 =>
         (m0 ne meth) && !m0.isDeferred && !m0.isSynthetic && (m0.owner != AnyValClass) && (typeInClazz(m0) matches typeInClazz(meth))
-      }
-    }
-    def readConstantValue[T](name: String, default: T = null.asInstanceOf[T]): T = {
-      clazzMember(newTermName(name)).info match {
-        case NullaryMethodType(ConstantType(Constant(value))) => value.asInstanceOf[T]
-        case _                                                => default
       }
     }
     def productIteratorMethod = {
@@ -196,17 +190,18 @@ trait SyntheticMethods extends ast.TreeDSL {
      *     (this.underlying == that.underlying
      */
     def equalsDerivedValueClassMethod: Tree = createMethod(nme.equals_, List(AnyClass.tpe), BooleanClass.tpe) { m =>
-      equalsCore(m, List(clazz.firstParamAccessor))
+      equalsCore(m, List(clazz.derivedValueClassUnbox))
     }
 
     /** The hashcode method for value classes
      * def hashCode(): Int = this.underlying.hashCode
      */
     def hashCodeDerivedValueClassMethod: Tree = createMethod(nme.hashCode_, Nil, IntClass.tpe) { m =>
-      Select(mkThisSelect(clazz.firstParamAccessor), nme.hashCode_)
+      Select(mkThisSelect(clazz.derivedValueClassUnbox), nme.hashCode_)
     }
 
-    /** The _1, _2, etc. methods to implement ProductN.
+    /** The _1, _2, etc. methods to implement ProductN, disabled
+     *  until we figure out how to introduce ProductN without cycles.
      */
      def productNMethods = {
       val accs = accessors.toIndexedSeq
@@ -266,13 +261,13 @@ trait SyntheticMethods extends ast.TreeDSL {
       Any_equals -> (() => equalsDerivedValueClassMethod)
     )
 
-    def caseClassMethods = productMethods ++ productNMethods ++ Seq(
+    def caseClassMethods = productMethods ++ /*productNMethods ++*/ Seq(
       Object_hashCode -> (() => chooseHashcode),
       Object_toString -> (() => forwardToRuntime(Object_toString)),
       Object_equals   -> (() => equalsCaseClassMethod)
     )
 
-    def valueCaseClassMethods = productMethods ++ productNMethods ++ valueClassMethods ++ Seq(
+    def valueCaseClassMethods = productMethods ++ /*productNMethods ++*/ valueClassMethods ++ Seq(
       Any_toString -> (() => forwardToRuntime(Object_toString))
     )
 

@@ -1,12 +1,12 @@
 /* NSC -- new Scala compiler
- * Copyright 2005-2011 LAMP/EPFL
+ * Copyright 2005-2012 LAMP/EPFL
  * @author  Paul Phillips
  */
 
 package scala.tools
 package cmd
 
-import collection.mutable.ListBuffer
+import scala.collection.mutable.ListBuffer
 import nsc.Properties.envOrNone
 
 /** Mixes in the specification trait and uses the vals therein to
@@ -46,7 +46,7 @@ object Reference {
   val MaxLine = 80
 
   class Accumulators() {
-    private var _help     = new ListBuffer[() => String]
+    private val _help    = new ListBuffer[() => String]
     private var _unary   = List[String]()
     private var _binary  = List[String]()
     private var _expand  = Map[String, List[String]]()

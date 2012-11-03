@@ -1,5 +1,5 @@
 /* NSC -- new Scala compiler
- * Copyright 2005-2011 LAMP/EPFL
+ * Copyright 2005-2012 LAMP/EPFL
  * Author: Paul Phillips
  */
 
@@ -9,7 +9,7 @@ package matching
 import transform.ExplicitOuter
 import symtab.Flags
 import scala.collection.mutable
-import language.implicitConversions
+import scala.language.implicitConversions
 
 trait Matrix extends MatrixAdditions {
   self: ExplicitOuter with ParallelMatching =>
@@ -247,7 +247,7 @@ trait Matrix extends MatrixAdditions {
     private def newVar(
       pos: Position,
       tpe: Type,
-      flags: List[Long] = Nil,
+      flags: List[Long],
       name: TermName = null): Symbol =
     {
       val n = if (name == null) cunit.freshTermName("temp") else name

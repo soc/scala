@@ -1,5 +1,5 @@
 /* NSC -- new Scala compiler
- * Copyright 2005-2011 LAMP/EPFL
+ * Copyright 2005-2012 LAMP/EPFL
  * @author  Paul Phillips
  */
 
@@ -7,7 +7,7 @@ package scala.tools.nsc
 package interpreter
 
 import scala.collection.{ mutable, immutable }
-import language.implicitConversions
+import scala.language.implicitConversions
 
 /** Mix this into an object and use it as a phasing
  *  swiss army knife.
@@ -68,7 +68,7 @@ trait Phased {
 
   def apply[T](body: => T) = immutable.SortedMap[PhaseName, T](atMap(PhaseName.all)(body): _*)
 
-  def atCurrent[T](body: => T): T = atPhase(get)(body)
+  def atCurrent[T](body: => T): T = enteringPhase(get)(body)
   def multi[T](body: => T): Seq[T] = multi map (ph => at(ph)(body))
   def all[T](body: => T): Seq[T] = atMulti(PhaseName.all)(body)
   def show[T](body: => T): Seq[T] = {
@@ -121,7 +121,7 @@ trait Phased {
     def isEmpty   = this eq NoPhaseName
 
     // Execute some code during this phase.
-    def apply[T](body: => T): T = atPhase(phase)(body)
+    def apply[T](body: => T): T = enteringPhase(phase)(body)
   }
 
   case object Parser extends PhaseName

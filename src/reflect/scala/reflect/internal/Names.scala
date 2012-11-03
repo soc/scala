@@ -1,5 +1,5 @@
 /* NSC -- new Scala compiler
- * Copyright 2005-2011 LAMP/EPFL
+ * Copyright 2005-2012 LAMP/EPFL
  * @author  Martin Odersky
  */
 
@@ -8,14 +8,20 @@ package internal
 
 import scala.io.Codec
 import java.security.MessageDigest
-import language.implicitConversions
+import scala.language.implicitConversions
+
+trait LowPriorityNames {
+  self: Names =>
+
+  implicit def nameToNameOps(name: Name): NameOps[Name] = new NameOps[Name](name)
+}
 
 /** The class Names ...
  *
  *  @author  Martin Odersky
  *  @version 1.0, 05/02/2005
  */
-trait Names extends api.Names {
+trait Names extends api.Names with LowPriorityNames {
   implicit def promoteTermNamesAsNecessary(name: Name): TermName = name.toTermName
 
 // Operations -------------------------------------------------------------
@@ -61,7 +67,7 @@ trait Names extends api.Names {
     while (i < len) {
       if (nc + i == chrs.length) {
         val newchrs = new Array[Char](chrs.length * 2)
-        compat.Platform.arraycopy(chrs, 0, newchrs, 0, chrs.length)
+        scala.compat.Platform.arraycopy(chrs, 0, newchrs, 0, chrs.length)
         chrs = newchrs
       }
       chrs(nc + i) = cs(offset + i)
@@ -139,15 +145,19 @@ trait Names extends api.Names {
    *  or Strings as Names.  Give names the key functions the absence of which
    *  make people want Strings all the time.
    */
-  sealed abstract class Name(protected val index: Int, protected val len: Int) extends NameApi with Function1[Int, Char] {
+  sealed abstract class Name(protected val index: Int, protected val len: Int) extends NameApi {
     type ThisNameType >: Null <: Name
     protected[this] def thisName: ThisNameType
+
+    // Note that "Name with ThisNameType" should be redundant
+    // because ThisNameType <: Name, but due to SI-6161 the
+    // compile loses track of this fact.
 
     /** Index into name table */
     def start: Int = index
 
     /** The next name in the same hash bucket. */
-    def next: ThisNameType
+    def next: Name with ThisNameType
 
     /** The length of this name. */
     final def length: Int = len
@@ -163,17 +173,17 @@ trait Names extends api.Names {
     def bothNames: List[Name] = List(toTermName, toTypeName)
 
     /** Return the subname with characters from from to to-1. */
-    def subName(from: Int, to: Int): ThisNameType
+    def subName(from: Int, to: Int): Name with ThisNameType
 
     /** Return a new name of the same variety. */
-    def newName(str: String): ThisNameType
+    def newName(str: String): Name with ThisNameType
 
     /** Return a new name based on string transformation. */
-    def mapName(f: String => String): ThisNameType = newName(f(toString))
+    def mapName(f: String => String): Name with ThisNameType = newName(f(toString))
 
     /** Copy bytes of this name to buffer cs, starting at position `offset`. */
     final def copyChars(cs: Array[Char], offset: Int) =
-      compat.Platform.arraycopy(chrs, index, cs, offset, len)
+      scala.compat.Platform.arraycopy(chrs, index, cs, offset, len)
 
     /** @return the ascii representation of this name */
     final def toChars: Array[Char] = {
@@ -189,15 +199,18 @@ trait Names extends api.Names {
      */
     final def copyUTF8(bs: Array[Byte], offset: Int): Int = {
       val bytes = Codec.toUTF8(chrs, index, len)
-      compat.Platform.arraycopy(bytes, 0, bs, offset, bytes.length)
+      scala.compat.Platform.arraycopy(bytes, 0, bs, offset, bytes.length)
       offset + bytes.length
     }
 
     /** @return the hash value of this name */
     final override def hashCode(): Int = index
 
-    // Presently disabled.
-    // override def equals(other: Any) = paranoidEquals(other)
+    /****
+     *  This has been quite useful to find places where people are comparing
+     *  a TermName and a TypeName, or a Name and a String.
+
+    override def equals(other: Any) = paranoidEquals(other)
     private def paranoidEquals(other: Any): Boolean = {
       val cmp = this eq other.asInstanceOf[AnyRef]
       if (cmp || !nameDebug)
@@ -205,7 +218,7 @@ trait Names extends api.Names {
 
       other match {
         case x: String  =>
-          Console.println("Compared " + debugString + " and String '" + x + "'")
+          Console.println(s"Compared $debugString and String '$x'")
         case x: Name    =>
           if (this.isTermName != x.isTermName) {
             val panic = this.toTermName == x.toTermName
@@ -218,9 +231,10 @@ trait Names extends api.Names {
       }
       false
     }
+    ****/
 
     /** @return the i'th Char of this name */
-    final def apply(i: Int): Char = chrs(index + i)
+    final def charAt(i: Int): Char = chrs(index + i)
 
     /** @return the index of first occurrence of char c in this name, length if not found */
     final def pos(c: Char): Int = pos(c, 0)
@@ -349,17 +363,12 @@ trait Names extends api.Names {
     /** Some thoroughly self-explanatory convenience functions.  They
      *  assume that what they're being asked to do is known to be valid.
      */
-    final def startChar: Char                   = apply(0)
-    final def endChar: Char                     = apply(len - 1)
+    final def startChar: Char                   = this charAt 0
+    final def endChar: Char                     = this charAt len - 1
     final def startsWith(char: Char): Boolean   = len > 0 && startChar == char
     final def startsWith(name: String): Boolean = startsWith(newTermName(name))
     final def endsWith(char: Char): Boolean     = len > 0 && endChar == char
     final def endsWith(name: String): Boolean   = endsWith(newTermName(name))
-
-    def dropRight(n: Int): ThisNameType = subName(0, len - n)
-    def drop(n: Int): ThisNameType = subName(n, len)
-    def stripSuffix(suffix: Name): ThisNameType =
-      if (this endsWith suffix) dropRight(suffix.length) else thisName
 
     def indexOf(ch: Char) = {
       val idx = pos(ch)
@@ -379,14 +388,14 @@ trait Names extends api.Names {
       val cs = new Array[Char](len)
       var i = 0
       while (i < len) {
-        val ch = this(i)
+        val ch = charAt(i)
         cs(i) = if (ch == from) to else ch
         i += 1
       }
       newTermName(cs, 0, len)
     }
 
-    /** TODO - reconcile/fix that encode returns a Name but
+    /* TODO - reconcile/fix that encode returns a Name but
      *  decode returns a String.
      */
 
@@ -427,6 +436,16 @@ trait Names extends api.Names {
     def isOperatorName: Boolean = decode != toString
     def longString: String      = nameKind + " " + decode
     def debugString = { val s = decode ; if (isTypeName) s + "!" else s }
+  }
+
+  implicit def TermNameOps(name: TermName): NameOps[TermName] = new NameOps(name)
+  implicit def TypeNameOps(name: TypeName): NameOps[TypeName] = new NameOps(name)
+
+  final class NameOps[T <: Name](name: T) {
+    def stripSuffix(suffix: Name): T = if (name endsWith suffix) dropRight(suffix.length) else name
+    def dropRight(n: Int): T         = name.subName(0, name.length - n).asInstanceOf[T]
+    def drop(n: Int): T              = name.subName(n, name.length).asInstanceOf[T]
+    def nonEmpty: Boolean            = name.length > 0
   }
 
   implicit val NameTag = ClassTag[Name](classOf[Name])

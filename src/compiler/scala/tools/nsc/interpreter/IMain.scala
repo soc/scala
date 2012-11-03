@@ -1,5 +1,5 @@
 /* NSC -- new Scala compiler
- * Copyright 2005-2011 LAMP/EPFL
+ * Copyright 2005-2012 LAMP/EPFL
  * @author  Martin Odersky
  */
 
@@ -25,22 +25,10 @@ import scala.util.control.Exception.{ ultimately }
 import IMain._
 import java.util.concurrent.Future
 import typechecker.Analyzer
-import language.implicitConversions
+import scala.language.implicitConversions
 import scala.reflect.runtime.{ universe => ru }
 import scala.reflect.{ ClassTag, classTag }
-import scala.tools.reflect.StdTags._
-
-/** directory to save .class files to */
-private class ReplVirtualDirectory(out: JPrintWriter) extends VirtualDirectory("(memory)", None) {
-  private def pp(root: AbstractFile, indentLevel: Int) {
-    val spaces = "    " * indentLevel
-    out.println(spaces + root.name)
-    if (root.isDirectory)
-      root.toList sortBy (_.name) foreach (x => pp(x, indentLevel + 1))
-  }
-  // print the contents hierarchically
-  def show() = pp(this, 0)
-}
+import scala.tools.reflect.StdRuntimeTags._
 
 /** An interpreter for Scala code.
  *
@@ -77,16 +65,19 @@ private class ReplVirtualDirectory(out: JPrintWriter) extends VirtualDirectory("
 class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends Imports {
   imain =>
 
-  /** Leading with the eagerly evaluated.
-   */
-  val virtualDirectory: VirtualDirectory            = new ReplVirtualDirectory(out) // "directory" for classfiles
-  private var currentSettings: Settings             = initialSettings
-  private[nsc] var printResults                     = true      // whether to print result lines
-  private[nsc] var totalSilence                     = false     // whether to print anything
-  private var _initializeComplete                   = false     // compiler is initialized
-  private var _isInitialized: Future[Boolean]       = null      // set up initialization future
-  private var bindExceptions                        = true      // whether to bind the lastException variable
-  private var _executionWrapper                     = ""        // code to be wrapped around all lines
+  object replOutput extends ReplOutput(settings.Yreploutdir) { }
+
+  @deprecated("Use replOutput.dir instead", "2.11.0")
+  def virtualDirectory = replOutput.dir
+  def showDirectory = replOutput.show(out)
+
+  private var currentSettings: Settings       = initialSettings
+  private[nsc] var printResults               = true      // whether to print result lines
+  private[nsc] var totalSilence               = false     // whether to print anything
+  private var _initializeComplete             = false     // compiler is initialized
+  private var _isInitialized: Future[Boolean] = null      // set up initialization future
+  private var bindExceptions                  = true      // whether to bind the lastException variable
+  private var _executionWrapper               = ""        // code to be wrapped around all lines
 
   /** We're going to go to some trouble to initialize the compiler asynchronously.
    *  It's critical that nothing call into it until it's been initialized or we will
@@ -108,27 +99,19 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
     else new PathResolver(settings).result.asURLs  // the compiler's classpath
   )
   def settings = currentSettings
-  def savingSettings[T](fn: Settings => Unit)(body: => T): T = {
-    val saved = currentSettings
-    currentSettings = saved.copy()
-    fn(currentSettings)
-    try body
-    finally currentSettings = saved
-  }
   def mostRecentLine = prevRequestList match {
     case Nil      => ""
     case req :: _ => req.originalLine
   }
-  def rerunWith(names: String*) = {
-    savingSettings((ss: Settings) => {
-      import ss._
-      names flatMap lookupSetting foreach {
-        case s: BooleanSetting => s.value = true
-        case _                 => ()
-      }
-    })(interpret(mostRecentLine))
+  // Run the code body with the given boolean settings flipped to true.
+  def withoutWarnings[T](body: => T): T = beQuietDuring {
+    val saved = settings.nowarn.value
+    if (!saved)
+      settings.nowarn.value = true
+
+    try body
+    finally if (!saved) settings.nowarn.value = false
   }
-  def rerunForWarnings = rerunWith("-deprecation", "-unchecked", "-Xlint")
 
   /** construct an interpreter that reports to Console */
   def this(settings: Settings) = this(settings, new NewLinePrintWriter(new ConsoleWriter, true))
@@ -153,7 +136,7 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
   private def _initSources = List(new BatchSourceFile("<init>", "class $repl_$init { }"))
   private def _initialize() = {
     try {
-      // [Eugene] todo. if this crashes, REPL will hang
+      // todo. if this crashes, REPL will hang
       new _compiler.Run() compileSources _initSources
       _initializeComplete = true
       true
@@ -195,8 +178,6 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
       else null
     }
   }
-  @deprecated("Use `global` for access to the compiler instance.", "2.9.0")
-  lazy val compiler: global.type = global
 
   import global._
   import definitions.{ScalaPackage, JavaLangPackage, termMember, typeMember}
@@ -268,9 +249,12 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
 
   /** Instantiate a compiler.  Overridable. */
   protected def newCompiler(settings: Settings, reporter: Reporter): ReplGlobal = {
-    settings.outputDirs setSingleOutput virtualDirectory
+    settings.outputDirs setSingleOutput replOutput.dir
     settings.exposeEmptyPackage.value = true
-    new Global(settings, reporter) with ReplGlobal
+    if (settings.Yrangepos.value)
+      new Global(settings, reporter) with ReplGlobal with interactive.RangePositions
+    else
+      new Global(settings, reporter) with ReplGlobal
   }
 
   /** Parent classloader.  Overridable. */
@@ -303,7 +287,7 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
     ensureClassLoader()
     _classLoader
   }
-  private class TranslatingClassLoader(parent: ClassLoader) extends AbstractFileClassLoader(virtualDirectory, parent) {
+  private class TranslatingClassLoader(parent: ClassLoader) extends AbstractFileClassLoader(replOutput.dir, parent) {
     /** Overridden here to try translating a simple name to the generated
      *  class name if the original attempt fails.  This method is used by
      *  getResourceAsStream as well as findClass.
@@ -395,8 +379,7 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
       newSym <- req.definedSymbols get name
       oldSym <- oldReq.definedSymbols get name.companionName
     } {
-      replwarn("warning: previously defined %s is not a companion to %s.".format(
-        stripString("" + oldSym), stripString("" + newSym)))
+      exitingTyper(replwarn(s"warning: previously defined $oldSym is not a companion to $newSym."))
       replwarn("Companions must be defined together; you may wish to use :paste mode for this.")
     }
 
@@ -452,18 +435,6 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
   private def buildRequest(line: String, trees: List[Tree]): Request = {
     executingRequest = new Request(line, trees)
     executingRequest
-  }
-
-  // rewriting "5 // foo" to "val x = { 5 // foo }" creates broken code because
-  // the close brace is commented out.  Strip single-line comments.
-  // ... but for error message output reasons this is not used, and rather than
-  // enclosing in braces it is constructed like "val x =\n5 // foo".
-  private def removeComments(line: String): String = {
-    showCodeIfDebugging(line) // as we're about to lose our // show
-    line.lines map (s => s indexOf "//" match {
-      case -1   => s
-      case idx  => s take idx
-    }) mkString "\n"
   }
 
   private def safePos(t: Tree, alt: Int): Int =
@@ -678,7 +649,7 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
     prevRequests.clear()
     referencedNameMap.clear()
     definedNameMap.clear()
-    virtualDirectory.clear()
+    replOutput.dir.clear()
   }
 
   /** This instance is no longer needed, so release any resources
@@ -751,15 +722,11 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
 
     private def load(path: String): Class[_] = {
       try Class.forName(path, true, classLoader)
-      catch { case ex => evalError(path, unwrap(ex)) }
+      catch { case ex: Throwable => evalError(path, unwrap(ex)) }
     }
 
-    var evalCaught: Option[Throwable] = None
     lazy val evalClass = load(evalPath)
-    lazy val evalValue = callEither(resultName) match {
-      case Left(ex)      => evalCaught = Some(ex) ; None
-      case Right(result) => Some(result)
-    }
+    lazy val evalValue = callOpt(resultName)
 
     def compile(source: String): Boolean = compileAndSaveRun("<console>", source)
 
@@ -770,33 +737,31 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
       val readRoot  = getRequiredModule(readPath)   // the outermost wrapper
       (accessPath split '.').foldLeft(readRoot: Symbol) {
         case (sym, "")    => sym
-        case (sym, name)  => afterTyper(termMember(sym, name))
+        case (sym, name)  => exitingTyper(termMember(sym, name))
       }
     }
     /** We get a bunch of repeated warnings for reasons I haven't
      *  entirely figured out yet.  For now, squash.
      */
-    private def removeDupWarnings(xs: List[(Position, String)]): List[(Position, String)] = {
-      if (xs.isEmpty)
-        return Nil
-
-      val ((pos, msg)) :: rest = xs
-      val filtered = rest filter { case (pos0, msg0) =>
-        (msg != msg0) || (pos.lineContent.trim != pos0.lineContent.trim) || {
-          // same messages and same line content after whitespace removal
-          // but we want to let through multiple warnings on the same line
-          // from the same run.  The untrimmed line will be the same since
-          // there's no whitespace indenting blowing it.
-          (pos.lineContent == pos0.lineContent)
-        }
+    private def updateRecentWarnings(run: Run) {
+      def loop(xs: List[(Position, String)]): List[(Position, String)] = xs match {
+        case Nil                  => Nil
+        case ((pos, msg)) :: rest =>
+          val filtered = rest filter { case (pos0, msg0) =>
+            (msg != msg0) || (pos.lineContent.trim != pos0.lineContent.trim) || {
+              // same messages and same line content after whitespace removal
+              // but we want to let through multiple warnings on the same line
+              // from the same run.  The untrimmed line will be the same since
+              // there's no whitespace indenting blowing it.
+              (pos.lineContent == pos0.lineContent)
+            }
+          }
+          ((pos, msg)) :: loop(filtered)
       }
-      ((pos, msg)) :: removeDupWarnings(filtered)
+      val warnings = loop(run.allConditionalWarnings flatMap (_.warnings))
+      if (warnings.nonEmpty)
+        mostRecentWarnings = warnings
     }
-    def lastWarnings: List[(Position, String)] = (
-      if (lastRun == null) Nil
-      else removeDupWarnings(lastRun.allConditionalWarnings flatMap (_.warnings))
-    )
-    private var lastRun: Run = _
     private def evalMethod(name: String) = evalClass.getMethods filter (_.getName == name) match {
       case Array(method) => method
       case xs            => sys.error("Internal error: eval object " + evalClass + ", " + xs.mkString("\n", "\n", ""))
@@ -804,7 +769,7 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
     private def compileAndSaveRun(label: String, code: String) = {
       showCodeIfDebugging(code)
       val (success, run) = compileSourcesKeepingRun(new BatchSourceFile(label, packaged(code)))
-      lastRun = run
+      updateRecentWarnings(run)
       success
     }
   }
@@ -953,16 +918,12 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
         }
 
         // compile the result-extraction object
-        beQuietDuring {
-          savingSettings(_.nowarn.value = true) {
-            lineRep compile ResultObjectSourceCode(handlers)
-          }
-        }
+        withoutWarnings(lineRep compile ResultObjectSourceCode(handlers))
       }
     }
 
     lazy val resultSymbol = lineRep.resolvePathToSymbol(accessPath)
-    def applyToResultMember[T](name: Name, f: Symbol => T) = afterTyper(f(resultSymbol.info.nonPrivateDecl(name)))
+    def applyToResultMember[T](name: Name, f: Symbol => T) = exitingTyper(f(resultSymbol.info.nonPrivateDecl(name)))
 
     /* typeOf lookup with encoding */
     def lookupTypeOf(name: Name) = typeOf.getOrElse(name, typeOf(global.encode(name.toString)))
@@ -974,10 +935,10 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
     /** Types of variables defined by this request. */
     lazy val compilerTypeOf = typeMap[Type](x => x) withDefaultValue NoType
     /** String representations of same. */
-    lazy val typeOf         = typeMap[String](tp => afterTyper(tp.toString))
+    lazy val typeOf         = typeMap[String](tp => exitingTyper(tp.toString))
 
     // lazy val definedTypes: Map[Name, Type] = {
-    //   typeNames map (x => x -> afterTyper(resultSymbol.info.nonPrivateDecl(x).tpe)) toMap
+    //   typeNames map (x => x -> exitingTyper(resultSymbol.info.nonPrivateDecl(x).tpe)) toMap
     // }
     lazy val definedSymbols = (
       termNames.map(x => x -> applyToResultMember(x, x => x)) ++
@@ -989,7 +950,7 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
     /** load and run the code using reflection */
     def loadAndRun: (String, Boolean) = {
       try   { ("" + (lineRep call sessionNames.print), true) }
-      catch { case ex => (lineRep.bindError(ex), false) }
+      catch { case ex: Throwable => (lineRep.bindError(ex), false) }
     }
 
     override def toString = "Request(line=%s, %s trees)".format(line, trees.size)
@@ -1008,12 +969,8 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
       case _                        => naming.mostRecentVar
     })
 
-  def lastWarnings: List[(global.Position, String)] = (
-    prevRequests.reverseIterator
-       map (_.lineRep.lastWarnings)
-      find (_.nonEmpty)
-      getOrElse Nil
-  )
+  private var mostRecentWarnings: List[(global.Position, String)] = Nil
+  def lastWarnings = mostRecentWarnings
 
   def treesForRequestId(id: Int): List[Tree] =
     requestForReqId(id).toList flatMap (_.trees)
@@ -1074,9 +1031,9 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
       else NoType
     }
   }
-  def cleanMemberDecl(owner: Symbol, member: Name): Type = afterTyper {
+  def cleanMemberDecl(owner: Symbol, member: Name): Type = exitingTyper {
     normalizeNonPublic {
-      owner.info.nonPrivateDecl(member).tpe match {
+      owner.info.nonPrivateDecl(member).tpe_* match {
         case NullaryMethodType(tp) => tp
         case tp                    => tp
       }
@@ -1163,7 +1120,7 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
 
   def symbolDefString(sym: Symbol) = {
     TypeStrings.quieter(
-      afterTyper(sym.defString),
+      exitingTyper(sym.defString),
       sym.owner.name + ".this.",
       sym.owner.fullName + "."
     )
@@ -1173,13 +1130,12 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
     /** Secret bookcase entrance for repl debuggers: end the line
      *  with "// show" and see what's going on.
      */
-    def isShow    = code.lines exists (_.trim endsWith "// show")
-    def isShowRaw = code.lines exists (_.trim endsWith "// raw")
-
-    // old style
-    beSilentDuring(parse(code)) foreach { ts =>
-      ts foreach { t =>
-        withoutUnwrapping(repldbg(asCompactString(t)))
+    def isShow = code.lines exists (_.trim endsWith "// show")
+    if (isReplDebug || isShow) {
+      beSilentDuring(parse(code)) foreach { ts =>
+        ts foreach { t =>
+          withoutUnwrapping(echo(asCompactString(t)))
+        }
       }
     }
   }

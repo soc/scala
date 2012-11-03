@@ -1,8 +1,8 @@
 package scala.reflect.reify
 
 import scala.tools.nsc.Global
-import scala.reflect.makro.ReificationError
-import scala.reflect.makro.UnexpectedReificationError
+import scala.reflect.macros.ReificationException
+import scala.reflect.macros.UnexpectedReificationException
 import scala.reflect.reify.utils.Utils
 
 /** Given a tree or a type, generate a tree that when executed at runtime produces the original tree or type.
@@ -52,17 +52,15 @@ abstract class Reifier extends States
    */
   lazy val reification: Tree = {
     try {
-      // [Eugene] conventional way of doing this?
       if (universe exists (_.isErroneous)) CannotReifyErroneousPrefix(universe)
       if (universe.tpe == null) CannotReifyUntypedPrefix(universe)
 
       val result = reifee match {
         case tree: Tree =>
-          reifyTrace("reifying = ")(if (opt.showTrees) "\n" + nodePrinters.nodeToString(tree).trim else tree.toString)
+          reifyTrace("reifying = ")(if (settings.Xshowtrees.value || settings.XshowtreesCompact.value || settings.XshowtreesStringified.value) "\n" + nodePrinters.nodeToString(tree).trim else tree.toString)
           reifyTrace("reifee is located at: ")(tree.pos)
           reifyTrace("universe = ")(universe)
           reifyTrace("mirror = ")(mirror)
-          // [Eugene] conventional way of doing this?
           if (tree exists (_.isErroneous)) CannotReifyErroneousReifee(tree)
           if (tree.tpe == null) CannotReifyUntypedReifee(tree)
           val pipeline = mkReificationPipeline
@@ -108,14 +106,10 @@ abstract class Reifier extends States
       //
       // todo. this is a common problem with non-trivial macros in our current macro system
       // needs to be solved some day
-      //
-      // list of non-hygienic transformations:
-      // todo. to be updated
-      // [Eugene++] yeah, ugly and extremely brittle, but we do need to do resetAttrs. will be fixed later
-      // todo. maybe try `resetLocalAttrs` once the dust settles
+      // maybe try `resetLocalAttrs` once the dust settles
       var importantSymbols = Set[Symbol](
-        NothingClass, AnyClass, SingletonClass, PredefModule, ScalaRunTimeModule, TypeCreatorClass, TreeCreatorClass, MirrorOfClass,
-        BaseUniverseClass, ApiUniverseClass, JavaUniverseClass, ReflectRuntimePackage, ReflectRuntimeCurrentMirror)
+        NothingClass, AnyClass, SingletonClass, PredefModule, ScalaRunTimeModule, TypeCreatorClass, TreeCreatorClass, MirrorClass,
+        ApiUniverseClass, JavaUniverseClass, ReflectRuntimePackage, ReflectRuntimeCurrentMirror)
       importantSymbols ++= importantSymbols map (_.companionSymbol)
       importantSymbols ++= importantSymbols map (_.moduleClass)
       importantSymbols ++= importantSymbols map (_.linkedClassOfClass)
@@ -138,12 +132,12 @@ abstract class Reifier extends States
 
       untyped
     } catch {
-      case ex: ReificationError =>
+      case ex: ReificationException =>
         throw ex
-      case ex: UnexpectedReificationError =>
+      case ex: UnexpectedReificationException =>
         throw ex
       case ex: Throwable =>
-        throw new UnexpectedReificationError(defaultErrorPosition, "reification crashed", ex)
+        throw new UnexpectedReificationException(defaultErrorPosition, "reification crashed", ex)
     }
   }
 }

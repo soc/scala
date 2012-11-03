@@ -53,7 +53,7 @@ import model.{ RootPackage => RootPackageEntity }
  * TODO: Give an overview here
  */
 trait ModelFactoryImplicitSupport {
-  thisFactory: ModelFactory with CommentFactory with TreeFactory =>
+  thisFactory: ModelFactory with ModelFactoryTypeSupport with CommentFactory with TreeFactory =>
 
   import global._
   import global.analyzer._
@@ -98,7 +98,7 @@ trait ModelFactoryImplicitSupport {
     else {
       var context: global.analyzer.Context = global.analyzer.rootContext(NoCompilationUnit)
 
-      val results = global.analyzer.allViewsFrom(sym.tpe, context, sym.typeParams)
+      val results = global.analyzer.allViewsFrom(sym.tpe_*, context, sym.typeParams)
       var conversions = results.flatMap(result => makeImplicitConversion(sym, result._1, result._2, context, inTpl))
       // also keep empty conversions, so they appear in diagrams
       // conversions = conversions.filter(!_.members.isEmpty)
@@ -109,13 +109,13 @@ trait ModelFactoryImplicitSupport {
           hardcoded.arraySkipConversions.contains(conv.conversionQualifiedName))
 
       // Filter out non-sensical conversions from value types
-      if (isPrimitiveValueType(sym.tpe))
+      if (isPrimitiveValueType(sym.tpe_*))
         conversions = conversions.filter((ic: ImplicitConversionImpl) =>
           hardcoded.valueClassFilter(sym.nameString, ic.conversionQualifiedName))
 
-      // Put the class-specific conversions in front
+      // Put the visible conversions in front
       val (ownConversions, commonConversions) =
-        conversions.partition(conv => !hardcoded.commonConversionTargets.contains(conv.conversionQualifiedName))
+        conversions.partition(!_.isHiddenConversion)
 
       ownConversions ::: commonConversions
     }
@@ -176,7 +176,7 @@ trait ModelFactoryImplicitSupport {
       val appliedTree = new ApplyImplicitView(viewTree, List(Ident("<argument>") setType viewTree.tpe.paramTypes.head))
       val appliedTreeTyped: Tree = {
         val newContext = context.makeImplicit(context.ambiguousErrors)
-        newContext.macrosEnabled = false // [Eugene] I assume you want macro signature, not macro expansion
+        newContext.macrosEnabled = false
         val newTyper = global.analyzer.newTyper(newContext)
           newTyper.silent(_.typed(appliedTree, global.analyzer.EXPRmode, WildcardType), false) match {
 
@@ -242,7 +242,7 @@ trait ModelFactoryImplicitSupport {
 
           available = Some(search.tree != EmptyTree)
         } catch {
-          case _ =>
+          case _: TypeError =>
         }
       }
 
@@ -329,11 +329,6 @@ trait ModelFactoryImplicitSupport {
       }
     }
 
-  def makeQualifiedName(sym: Symbol): String = {
-    val remove = Set[Symbol](RootPackage, RootClass, EmptyPackage, EmptyPackageClass)
-    sym.ownerChain.filterNot(remove.contains(_)).reverse.map(_.nameString).mkString(".")
-  }
-
   /* ============== IMPLEMENTATION PROVIDING ENTITY TYPES ============== */
 
   class ImplicitConversionImpl(
@@ -352,7 +347,7 @@ trait ModelFactoryImplicitSupport {
       if (convSym != NoSymbol)
         makeTemplate(convSym.owner)
       else {
-        error("Scaladoc implicits: Implicit conversion from " + sym.tpe + " to " + toType + " done by " + convSym + " = NoSymbol!")
+        error("Scaladoc implicits: " + toString + " = NoSymbol!")
         makeRootPackage
       }
 
@@ -391,7 +386,7 @@ trait ModelFactoryImplicitSupport {
 
     lazy val memberImpls: List[MemberImpl] = {
       // Obtain the members inherited by the implicit conversion
-      val memberSyms = toType.members.filter(implicitShouldDocument(_))
+      val memberSyms = toType.members.filter(implicitShouldDocument(_)).toList
       val existingSyms = sym.info.members
 
       // Debugging part :)
@@ -408,94 +403,73 @@ trait ModelFactoryImplicitSupport {
       debug("")
 
       memberSyms.flatMap({ aSym =>
-        makeTemplate(aSym.owner) match {
-          case d: DocTemplateImpl =>
-            // we can't just pick up nodes from the previous template, although that would be very convenient:
-            // they need the byConversion field to be attached to themselves -- this is design decision I should
-            // revisit soon
-            //
-            // d.ownMembers.collect({
-            //   // it's either a member or has a couple of usecases it's hidden behind
-            //   case m: MemberImpl if m.sym == aSym =>
-            //     m // the member itself
-            //   case m: MemberImpl if m.useCaseOf.isDefined && m.useCaseOf.get.asInstanceOf[MemberImpl].sym == aSym =>
-            //     m.useCaseOf.get.asInstanceOf[MemberImpl] // the usecase
-            // })
-            makeMember(aSym, this, d)
-          case _ =>
-            // should only happen if the code for this template is not part of the scaladoc run =>
-            // members won't have any comments
-            makeMember(aSym, this, inTpl)
-        }
+        // we can't just pick up nodes from the original template, although that would be very convenient:
+        // they need the byConversion field to be attached to themselves and the types to be transformed by
+        // asSeenFrom
+
+        // at the same time, the member itself is in the inTpl, not in the new template -- but should pick up
+        // variables from the old template. Ugly huh? We'll always create the member inTpl, but it will change
+        // the template when expanding variables in the comment :)
+        makeMember(aSym, Some(this), inTpl)
       })
     }
 
     lazy val members: List[MemberEntity] = memberImpls
+
+    def isHiddenConversion = settings.hiddenImplicits(conversionQualifiedName)
+
+    override def toString = "Implcit conversion from " + sym.tpe + " to " + toType + " done by " + convSym
   }
 
   /* ========================= HELPER METHODS ========================== */
   /**
    *  Computes the shadowing table for all the members in the implicit conversions
-   *  @param mbrs All template's members, including usecases and full signature members
+   *  @param members All template's members, including usecases and full signature members
    *  @param convs All the conversions the template takes part in
-   *  @param inTpl the ususal :)
+   *  @param inTpl the usual :)
    */
-  def makeShadowingTable(mbrs: List[MemberImpl],
+  def makeShadowingTable(members: List[MemberImpl],
                          convs: List[ImplicitConversionImpl],
                          inTpl: DocTemplateImpl): Map[MemberEntity, ImplicitMemberShadowing] = {
     assert(modelFinished)
 
-    var shadowingTable = Map[MemberEntity, ImplicitMemberShadowing]()
+    val shadowingTable = mutable.Map[MemberEntity, ImplicitMemberShadowing]()
+    val membersByName: Map[Name, List[MemberImpl]] = members.groupBy(_.sym.name)
+    val convsByMember = (Map.empty[MemberImpl, ImplicitConversionImpl] /: convs) {
+      case (map, conv) => map ++ conv.memberImpls.map (_ -> conv)
+    }
 
     for (conv <- convs) {
-      val otherConvs = convs.filterNot(_ == conv)
+      val otherConvMembers: Map[Name, List[MemberImpl]] = convs filterNot (_ == conv) flatMap (_.memberImpls) groupBy (_.sym.name)
 
       for (member <- conv.memberImpls) {
-        // for each member in our list
         val sym1 = member.sym
         val tpe1 = conv.toType.memberInfo(sym1)
 
-        // check if it's shadowed by a member in the original class
-        var shadowedBySyms: List[Symbol] = List()
-        for (mbr <- mbrs) {
-          val sym2 = mbr.sym
-          if (sym1.name == sym2.name) {
-            val shadowed = !settings.docImplicitsSoundShadowing.value || {
-              val tpe2 = inTpl.sym.info.memberInfo(sym2)
-              !isDistinguishableFrom(tpe1, tpe2)
-            }
-            if (shadowed)
-              shadowedBySyms ::= sym2
-          }
+        // check if it's shadowed by a member in the original class.
+        val shadowed = membersByName.get(sym1.name).toList.flatten filter { other =>
+          !settings.docImplicitsSoundShadowing.value || !isDistinguishableFrom(tpe1, inTpl.sym.info.memberInfo(other.sym))
         }
 
-        val shadowedByMembers = mbrs.filter((mb: MemberImpl) => shadowedBySyms.contains(mb.sym))
-
-        // check if it's shadowed by another member
-        var ambiguousByMembers: List[MemberEntity] = List()
-        for (conv <- otherConvs)
-          for (member2 <- conv.memberImpls) {
-            val sym2 = member2.sym
-            if (sym1.name == sym2.name) {
-              val tpe2 = conv.toType.memberInfo(sym2)
-              // Ambiguity should be an equivalence relation
-              val ambiguated = !isDistinguishableFrom(tpe1, tpe2) || !isDistinguishableFrom(tpe2, tpe1)
-              if (ambiguated)
-                ambiguousByMembers ::= member2
-            }
-          }
+        // check if it's shadowed by another conversion.
+        val ambiguous = otherConvMembers.get(sym1.name).toList.flatten filter { other =>
+          val tpe2 = convsByMember(other).toType.memberInfo(other.sym)
+          !isDistinguishableFrom(tpe1, tpe2) || !isDistinguishableFrom(tpe2, tpe1)
+        }
 
         // we finally have the shadowing info
-        val shadowing = new ImplicitMemberShadowing {
-          def shadowingMembers: List[MemberEntity] = shadowedByMembers
-          def ambiguatingMembers: List[MemberEntity] = ambiguousByMembers
-        }
+        if (!shadowed.isEmpty || !ambiguous.isEmpty) {
+          val shadowing = new ImplicitMemberShadowing {
+            def shadowingMembers: List[MemberEntity] = shadowed
+            def ambiguatingMembers: List[MemberEntity] = ambiguous
+          }
 
-        shadowingTable += (member -> shadowing)
+          shadowingTable += (member -> shadowing)
+        }
       }
     }
 
-    shadowingTable
+    shadowingTable.toMap
   }
 
 

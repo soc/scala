@@ -7,9 +7,9 @@ class WorkScheduler {
 
   type Action = () => Unit
 
-  private var todo = new mutable.Queue[Action]
-  private var throwables = new mutable.Queue[Throwable]
-  private var interruptReqs = new mutable.Queue[InterruptReq]
+  private val todo = new mutable.Queue[Action]
+  private val throwables = new mutable.Queue[Throwable]
+  private val interruptReqs = new mutable.Queue[InterruptReq]
 
   /** Called from server: block until one of todo list, throwables or interruptReqs is nonempty */
   def waitForMoreWork() = synchronized {
@@ -54,6 +54,11 @@ class WorkScheduler {
 
   /** Called from client: have interrupt executed by server and return result */
   def doQuickly[A](op: () => A): A = {
+    val ir = askDoQuickly(op)
+    ir.getResult()
+  }
+
+  def askDoQuickly[A](op: () => A): InterruptReq { type R = A } = {
     val ir = new InterruptReq {
       type R = A
       val todo = op
@@ -62,7 +67,7 @@ class WorkScheduler {
       interruptReqs enqueue ir
       notify()
     }
-    ir.getResult()
+    ir
   }
 
   /** Called from client: have action executed by server */

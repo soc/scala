@@ -1,5 +1,5 @@
 /* NSC -- new Scala compiler
- * Copyright 2005-2011 LAMP/EPFL
+ * Copyright 2005-2012 LAMP/EPFL
  * @author  Martin Odersky
  */
 
@@ -103,7 +103,6 @@ abstract class ICodeCheckers {
     private def posStr(p: Position) =
       if (p.isDefined) p.line.toString else "<??>"
 
-    private def indent(s: String, spaces: Int): String = indent(s, " " * spaces)
     private def indent(s: String, prefix: String): String = {
       val lines = s split "\\n"
       lines map (prefix + _) mkString "\n"
@@ -170,7 +169,6 @@ abstract class ICodeCheckers {
       val preds = bl.predecessors
 
       def hasNothingType(s: TypeStack) = s.nonEmpty && (s.head == NothingReference)
-      def hasNullType(s: TypeStack) = s.nonEmpty && (s.head == NullReference)
 
       /** XXX workaround #1: one stack empty, the other has BoxedUnit.
        *  One example where this arises is:
@@ -369,11 +367,6 @@ abstract class ICodeCheckers {
         }
       }
 
-      /** Return true if k1 is a subtype of any of the following types,
-       *  according to the somewhat relaxed subtyping standards in effect here.
-       */
-      def isOneOf(k1: TypeKind, kinds: TypeKind*) = kinds exists (k => isSubtype(k1, k))
-
       def subtypeTest(k1: TypeKind, k2: TypeKind): Unit =
         if (isSubtype(k1, k2)) ()
         else typeError(k2, k1)
@@ -381,10 +374,9 @@ abstract class ICodeCheckers {
       for (instr <- b) {
         this.instruction = instr
 
-        def checkLocal(local: Local): Unit = {
-          method lookupLocal local.sym.name getOrElse {
-            icodeError(" " + local + " is not defined in method " + method)
-          }
+        def checkLocal(local: Local) {
+          if ((method lookupLocal local.sym.name).isEmpty)
+            icodeError(s" $local is not defined in method $method")
         }
         def checkField(obj: TypeKind, field: Symbol): Unit = obj match {
           case REFERENCE(sym) =>

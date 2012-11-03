@@ -9,7 +9,7 @@
 package scala.math
 
 import java.math.BigInteger
-import language.implicitConversions
+import scala.language.implicitConversions
 
 /**
  *  @author  Martin Odersky
@@ -22,12 +22,6 @@ object BigInt {
   private val maxCached = 1024
   private val cache = new Array[BigInt](maxCached - minCached + 1)
   private val minusOne = BigInteger.valueOf(-1)
-
-  @deprecated("Use Long.MinValue", "2.9.0")
-  val MinLong = BigInt(Long.MinValue)
-
-  @deprecated("Use Long.MaxValue", "2.9.0")
-  val MaxLong = BigInt(Long.MaxValue)
 
   /** Constructs a `BigInt` whose value is equal to that of the
    *  specified integer value.
@@ -114,6 +108,7 @@ object BigInt {
  *  @author  Martin Odersky
  *  @version 1.0, 15/07/2003
  */
+@deprecatedInheritance("This class will me made final.", "2.10.0")
 class BigInt(val bigInteger: BigInteger) extends ScalaNumber with ScalaNumericConversions with Serializable {
   /** Returns the hash code for this BigInt. */
   override def hashCode(): Int =
@@ -162,7 +157,7 @@ class BigInt(val bigInteger: BigInteger) extends ScalaNumber with ScalaNumericCo
   }
   /** Some implementations of java.math.BigInteger allow huge values with bit length greater than Int.MaxValue .
    * The BigInteger.bitLength method returns truncated bit length in this case .
-   * This method tests if result of bitLength is valid. 
+   * This method tests if result of bitLength is valid.
    * This method will become unnecessary if BigInt constructors reject huge BigIntegers.
    */
   private def bitLengthOverflow = {
@@ -170,7 +165,7 @@ class BigInt(val bigInteger: BigInteger) extends ScalaNumber with ScalaNumericCo
     (shifted.signum != 0) && !(shifted equals BigInt.minusOne)
   }
 
-  protected[math] def isWhole = true
+  def isWhole() = true
   def underlying = bigInteger
 
   /** Compares this BigInt with the specified BigInt for equality.

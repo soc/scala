@@ -1,5 +1,5 @@
 /* NSC -- new scala compiler
- * Copyright 2005-2011 LAMP/EPFL
+ * Copyright 2005-2012 LAMP/EPFL
  * @author  Martin Odersky
  */
 
@@ -9,7 +9,7 @@ package internal
 import scala.collection.{ mutable, immutable }
 import util._
 
-abstract class SymbolTable extends makro.Universe
+abstract class SymbolTable extends macros.Universe
                               with Collections
                               with Names
                               with Symbols
@@ -43,7 +43,12 @@ abstract class SymbolTable extends makro.Universe
   lazy val treeBuild = gen
 
   def log(msg: => AnyRef): Unit
-  def abort(msg: String): Nothing = throw new FatalError(supplementErrorMessage(msg))
+  def warning(msg: String): Unit     = Console.err.println(msg)
+  def globalError(msg: String): Unit = abort(msg)
+  def abort(msg: String): Nothing    = throw new FatalError(supplementErrorMessage(msg))
+
+  def shouldLogAtThisPhase = false
+  def isPastTyper = false
 
   @deprecated("Give us a reason", "2.10.0")
   def abort(): Nothing = abort("unknown error")
@@ -61,7 +66,7 @@ abstract class SymbolTable extends makro.Universe
 
   private[scala] def printCaller[T](msg: String)(result: T) = {
     Console.err.println("%s: %s\nCalled from: %s".format(msg, result,
-      (new Throwable).getStackTrace.drop(2).take(15).mkString("\n")))
+      (new Throwable).getStackTrace.drop(2).take(50).mkString("\n")))
 
     result
   }
@@ -70,11 +75,13 @@ abstract class SymbolTable extends makro.Universe
     Console.err.println(msg + ": " + result)
     result
   }
-  private[scala] def logResult[T](msg: String)(result: T): T = {
+  @inline
+  final private[scala] def logResult[T](msg: => String)(result: T): T = {
     log(msg + ": " + result)
     result
   }
-  private[scala] def logResultIf[T](msg: String, cond: T => Boolean)(result: T): T = {
+  @inline
+  final private[scala] def logResultIf[T](msg: => String, cond: T => Boolean)(result: T): T = {
     if (cond(result))
       log(msg + ": " + result)
 
@@ -127,7 +134,7 @@ abstract class SymbolTable extends makro.Universe
   type RunId = Int
   final val NoRunId = 0
 
-  // sigh, this has to be public or atPhase doesn't inline.
+  // sigh, this has to be public or enteringPhase doesn't inline.
   var phStack: List[Phase] = Nil
   private[this] var ph: Phase = NoPhase
   private[this] var per = NoPeriod
@@ -190,23 +197,17 @@ abstract class SymbolTable extends makro.Universe
     p != NoPhase && phase.id > p.id
 
   /** Perform given operation at given phase. */
-  @inline final def atPhase[T](ph: Phase)(op: => T): T = {
+  @inline final def enteringPhase[T](ph: Phase)(op: => T): T = {
     val saved = pushPhase(ph)
     try op
     finally popPhase(saved)
   }
 
+  @inline final def exitingPhase[T](ph: Phase)(op: => T): T = enteringPhase(ph.next)(op)
+  @inline final def enteringPrevPhase[T](op: => T): T       = enteringPhase(phase.prev)(op)
 
-  /** Since when it is to be "at" a phase is inherently ambiguous,
-   *  a couple unambiguously named methods.
-   */
-  @inline final def beforePhase[T](ph: Phase)(op: => T): T = atPhase(ph)(op)
-  @inline final def afterPhase[T](ph: Phase)(op: => T): T  = atPhase(ph.next)(op)
-  @inline final def afterCurrentPhase[T](op: => T): T      = atPhase(phase.next)(op)
-  @inline final def beforePrevPhase[T](op: => T): T        = atPhase(phase.prev)(op)
-
-  @inline final def atPhaseNotLaterThan[T](target: Phase)(op: => T): T =
-    if (isAtPhaseAfter(target)) atPhase(target)(op) else op
+  @inline final def enteringPhaseNotLaterThan[T](target: Phase)(op: => T): T =
+    if (isAtPhaseAfter(target)) enteringPhase(target)(op) else op
 
   final def isValid(period: Period): Boolean =
     period != 0 && runId(period) == currentRunId && {
@@ -333,6 +334,11 @@ abstract class SymbolTable extends makro.Universe
   /** Is this symbol table a part of a compiler universe?
    */
   def isCompilerUniverse = false
+
+  @deprecated("Use enteringPhase", "2.10.0")
+  @inline final def atPhase[T](ph: Phase)(op: => T): T = enteringPhase(ph)(op)
+  @deprecated("Use enteringPhaseNotLaterThan", "2.10.0")
+  @inline final def atPhaseNotLaterThan[T](target: Phase)(op: => T): T = enteringPhaseNotLaterThan(target)(op)
 }
 
 object SymbolTableStats {

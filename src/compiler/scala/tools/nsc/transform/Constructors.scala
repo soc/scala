@@ -1,5 +1,5 @@
 /*  NSC -- new Scala compiler
- * Copyright 2005-2011 LAMP/EPFL
+ * Copyright 2005-2012 LAMP/EPFL
  * @author
  */
 
@@ -127,9 +127,10 @@ abstract class Constructors extends Transform with ast.TreeDSL {
         import CODE._
         val result = mkAssign(to, Ident(from))
 
-        if (from.name != nme.OUTER) result
+        if (from.name != nme.OUTER ||
+            from.tpe.typeSymbol.isPrimitiveValueClass) result
         else localTyper.typedPos(to.pos) {
-          IF (from OBJ_EQ NULL) THEN Throw(NullPointerExceptionClass.tpe) ELSE result
+          IF (from OBJ_EQ NULL) THEN Throw(NewFromConstructor(NPEConstructor)) ELSE result
         }
       }
 
@@ -503,14 +504,14 @@ abstract class Constructors extends Transform with ast.TreeDSL {
 
             val applyMethodDef = DefDef(
               sym = applyMethod,
-              vparamss = List(List()),
+              vparamss = ListOfNil,
               rhs = Block(applyMethodStats, gen.mkAttributedRef(BoxedUnit_UNIT)))
 
             ClassDef(
               sym = closureClass,
               constrMods = Modifiers(0),
               vparamss = List(List(outerFieldDef)),
-              argss = List(List()),
+              argss = ListOfNil,
               body = List(applyMethodDef),
               superPos = impl.pos)
           }
