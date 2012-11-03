@@ -170,7 +170,12 @@ class TreeMap[A, +B] private (tree: RB.Tree[A, B])(implicit val ordering: Orderi
    *  @return       a new $coll with the inserted binding, if it wasn't present in the map
    */
   def insert [B1 >: B](key: A, value: B1): TreeMap[A, B1] = {
-    assert(!RB.contains(tree, key))
+    assert(!RedBlackTree.contains(tree, key))
+    // assert(!RB.contains(tree, key))
+    // [scalacfork] /scala/trunk/src/library/scala/collection/immutable/TreeMap.scala:173:
+    //   error: object RB is not a member of package scala.collection.immutable
+    // [scalacfork]     assert(!RB.contains(tree, key))
+    // [scalacfork]           ^
     new TreeMap(RB.update(tree, key, value, true))
   }
 

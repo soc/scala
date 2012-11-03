@@ -121,7 +121,7 @@ class TreeSet[A] private (tree: RB.Tree[A, Unit])(implicit val ordering: Orderin
    *  @return        a new $coll containing `elem` and all the elements of this $coll.
    */
   def insert(elem: A): TreeSet[A] = {
-    assert(!RB.contains(tree, elem))
+    assert(!RedBlackTree.contains(tree, elem))
     newSet(RB.update(tree, elem, (), false))
   }
 
