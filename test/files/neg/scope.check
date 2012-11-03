@@ -1,0 +1,31 @@
+scope.scala:18: error: reference to DoobieBob is ambiguous;
+it is both defined in package foo and imported subsequently by
+import bar._
+    println(DoobieBob(5))
+            ^
+scope.scala:19: error: reference to DoobieBob is ambiguous;
+it is both defined in package foo and imported subsequently by
+import bar._
+    println(new DoobieBob(5))
+                ^
+scope.scala:20: error: reference to Foo is ambiguous;
+it is both defined in package package and imported subsequently by
+import bar._
+    def f(x: Foo) = x.length
+             ^
+scope.scala:21: error: type mismatch;
+ found   : common.A
+ required: common.B
+    val x: B = new A
+               ^
+scope.scala:22: error: reference to bippy is ambiguous;
+it is both defined in package package and imported subsequently by
+import bar._
+    bippy(new A)
+    ^
+scope.scala:23: error: reference to dingus is ambiguous;
+it is both defined in package package and imported subsequently by
+import bar._
+    dingus("hi")
+    ^
+6 errors found
