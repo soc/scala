@@ -164,7 +164,7 @@ trait Imports {
           // If the user entered an import, then just use it; add an import wrapping
           // level if the import might conflict with some other import
           case x: ImportHandler if x.importsWildcard =>
-            wrapBeforeAndAfter(code append s"${x.path}._\n")
+            wrapBeforeAndAfter(code append s"import ${x.path}._\n")
           case x: ImportHandler =>
             maybeWrap(x.importedNames: _*)
             code append (x.member + "\n")
