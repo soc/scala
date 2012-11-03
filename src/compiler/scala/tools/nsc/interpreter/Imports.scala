@@ -160,7 +160,7 @@ trait Imports {
     // loop through previous requests, adding imports for each one
     wrapBeforeAndAfter {
       for (ReqAndHandler(req, handler) <- reqsToUse) {
-        handler match {
+        exitingTyper(handler match {
           // If the user entered an import, then just use it; add an import wrapping
           // level if the import might conflict with some other import
           case x: ImportHandler if x.importsWildcard =>
@@ -181,7 +181,7 @@ trait Imports {
               code append s"import ${x.path}\n"
               currentImps += sym.name
             }
-        }
+        })
       }
     }
 

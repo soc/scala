@@ -832,6 +832,7 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
   /** One line of code submitted by the user for interpretation */
   // private
   class Request(val line: String, val trees: List[Tree]) {
+    repldbg(s"""new Request(line="$line", trees=$trees)""")
     def defines    = defHandlers flatMap (_.definedSymbols)
     def imports    = importedSymbols
     def references = referencedNames map symbolOfName
@@ -852,7 +853,7 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
     val definedNames = handlers flatMap (_.definedNames)
 
     /** list of names used by this expression */
-    val referencedNames: List[Name] = handlers flatMap (_.referencedNames)
+    val referencedNames: List[Name] = debugging("referenced names:")(handlers flatMap (_.referencedNames))
 
     /** def and val names */
     def termNames = handlers flatMap (_.definesTerm)
