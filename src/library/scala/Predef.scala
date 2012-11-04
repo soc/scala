@@ -69,8 +69,8 @@ import scala.language.{implicitConversions, existentials}
  *  functions to Array values. These are described in more detail in the documentation of [[scala.Array]].
  */
 object Predef extends LowPriorityImplicits {
-  val assert  = new org.expecty.Expecty()
-  val require = new org.expecty.Expecty()
+  val assert  = new org.expecty.Expecty(failEarly = false)
+  val require = new org.expecty.Expecty(failEarly = false)
 
   /**
    * Retrieve the runtime representation of a class type. `classOf[T]` is equivalent to
