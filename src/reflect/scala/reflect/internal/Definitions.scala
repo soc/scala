@@ -876,6 +876,10 @@ trait Definitions extends api.StandardDefinitions {
       case _                       => Nil
     }
 
+    def collectSymbols(tp: Type)(p: Symbol => Boolean): List[Symbol] = (
+      tp collect { case t if p(t.typeSymbol) => t.typeSymbol } distinct
+    )
+
     def typeStringNoPackage(tp: Type) =
       "" + tp stripPrefix tp.typeSymbol.enclosingPackage.fullName + "."
 

@@ -3647,13 +3647,8 @@ trait Typers extends Modes with Adaptations with Tags {
       finally if (Statistics.canEnable) Statistics.stopTimer(isReferencedNanos, start)
     }
 
-    def packCaptured(tpe: Type): Type = {
-      val captured = mutable.Set[Symbol]()
-      for (tp <- tpe)
-        if (isCapturedExistential(tp.typeSymbol))
-          captured += tp.typeSymbol
-      existentialAbstraction(captured.toList, tpe)
-    }
+    def packCaptured(tpe: Type): Type =
+      existentialAbstraction(collectSymbols(tpe)(isCapturedExistential), tpe)
 
     /** convert local symbols and skolems to existentials */
     def packedType(tree: Tree, owner: Symbol): Type = {
