@@ -12,7 +12,7 @@ import scala.tools.util.PathResolver
 import scala.collection.{ mutable, immutable }
 import io.{ SourceReader, AbstractFile, Path }
 import reporters.{ Reporter, ConsoleReporter }
-import util.{ Exceptional, ClassPath, MergedClassPath, StatisticsInfo, ScalaClassLoader, returning, stackTraceString }
+import util.{ Exceptional, ClassPath, MergedClassPath, StatisticsInfo, ScalaClassLoader, returning, stackTraceString, stackTraceHeadString }
 import scala.reflect.internal.util.{ NoPosition, OffsetPosition, SourceFile, NoSourceFile, BatchSourceFile, ScriptSourceFile }
 import scala.reflect.internal.pickling.{ PickleBuffer, PickleFormat }
 import symtab.{ Flags, SymbolTable, SymbolLoaders, SymbolTrackers }
@@ -1528,8 +1528,8 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
         val shown = if (settings.verbose.value)
            stackTraceString(ex)
          else
-           ex.getClass.getName
-        // ex.printStackTrace(Console.out) // DEBUG for fsc, note that error stacktraces do not print in fsc
+           stackTraceHeadString(ex) // note that error stacktraces do not print in fsc
+
         globalError(supplementErrorMessage("uncaught exception during compilation: " + shown))
         throw ex
       }
