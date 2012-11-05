@@ -120,7 +120,7 @@ abstract class ClosureElimination extends SubComponent {
 
             case LOAD_FIELD(f, false) /* if accessible(f, m.symbol) */ =>
               def replaceFieldAccess(r: Record) {
-                val Record(cls, bindings) = r
+                val Record(cls, _) = r
                 info.getFieldNonRecordValue(r, f) foreach { v =>
                         bb.replaceInstruction(i, DROP(REFERENCE(cls)) :: valueToInstruction(v) :: Nil)
                         debuglog(s"replaced $i with $v")
@@ -197,16 +197,12 @@ abstract class ClosureElimination extends SubComponent {
 
   /** Peephole optimization. */
   abstract class PeepholeOpt {
-
-    private var method: IMethod = NoIMethod
-
     /** Concrete implementations will perform their optimizations here */
     def peep(bb: BasicBlock, i1: Instruction, i2: Instruction): Option[List[Instruction]]
 
     var liveness: global.icodes.liveness.LivenessAnalysis = null
 
     def apply(m: IMethod): Unit = if (m.hasCode) {
-      method = m
       liveness = new global.icodes.liveness.LivenessAnalysis
       liveness.init(m)
       liveness.run

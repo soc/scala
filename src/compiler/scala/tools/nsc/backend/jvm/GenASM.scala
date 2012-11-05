@@ -32,19 +32,15 @@ abstract class GenASM extends SubComponent with BytecodeWriters {
   /** Create a new phase */
   override def newPhase(p: Phase): Phase = new AsmPhase(p)
 
-  private def outputDirectory(sym: Symbol): AbstractFile =
-    settings.outputDirs outputDirFor enteringFlatten(sym.sourceFile)
+  /** From the reference documentation of the Android SDK:
+   *  The `Parcelable` interface identifies classes whose instances can be written to and restored from a `Parcel`.
+   *  Classes implementing the `Parcelable` interface must also have a static field called `CREATOR`,
+   *  which is an object implementing the `Parcelable.Creator` interface.
+   */
+  private val androidFieldName = newTermName("CREATOR")
 
-  private def getFile(base: AbstractFile, clsName: String, suffix: String): AbstractFile = {
-    var dir = base
-    val pathParts = clsName.split("[./]").toList
-    for (part <- pathParts.init) {
-      dir = dir.subdirectoryNamed(part)
-    }
-    dir.fileNamed(pathParts.last + suffix)
-  }
-  private def getFile(sym: Symbol, clsName: String, suffix: String): AbstractFile =
-    getFile(outputDirectory(sym), clsName, suffix)
+  private lazy val AndroidParcelableInterface = rootMirror.getClassIfDefined("android.os.Parcelable")
+  private lazy val AndroidCreatorClass        = rootMirror.getClassIfDefined("android.os.Parcelable$Creator")
 
   /** JVM code generation phase
    */
@@ -53,7 +49,9 @@ abstract class GenASM extends SubComponent with BytecodeWriters {
     override def erasedTypes = true
     def apply(cls: IClass) = sys.error("no implementation")
 
-    val BeanInfoAttr = rootMirror.getRequiredClass("scala.beans.BeanInfo")
+    // Lazy val; can't have eager vals in Phase constructors which may
+    // cause cycles before Global has finished initialization.
+    lazy val BeanInfoAttr = rootMirror.getRequiredClass("scala.beans.BeanInfo")
 
     def isJavaEntryPoint(icls: IClass) = {
       val sym = icls.symbol
@@ -83,7 +81,6 @@ abstract class GenASM extends SubComponent with BytecodeWriters {
         // Before erasure so we can identify generic mains.
         enteringErasure {
           val companion     = sym.linkedClassOfClass
-          val companionMain = companion.tpe_*.member(nme.main)
 
           if (hasJavaMainMethod(companion))
             failNoForwarder("companion contains its own main method")
@@ -594,7 +591,7 @@ abstract class GenASM extends SubComponent with BytecodeWriters {
 
       collectInnerClass(sym)
 
-      var hasInternalName = (sym.isClass || (sym.isModule && !sym.isMethod))
+      val hasInternalName = (sym.isClass || (sym.isModule && !sym.isMethod))
       val cachedJN = javaNameCache.getOrElseUpdate(sym, {
         if (hasInternalName) { sym.javaBinaryName }
         else                 { sym.javaSimpleName }
@@ -1174,7 +1171,6 @@ abstract class GenASM extends SubComponent with BytecodeWriters {
       debuglog("Dumping mirror class for object: " + moduleClass)
 
       val linkedClass  = moduleClass.companionClass
-      val linkedModule = linkedClass.companionSymbol
       lazy val conflictingNames: Set[Name] = {
         (linkedClass.info.members collect { case sym if sym.name.isTermName => sym.name }).toSet
       }
@@ -1199,16 +1195,6 @@ abstract class GenASM extends SubComponent with BytecodeWriters {
 
   trait JAndroidBuilder {
     self: JPlainBuilder =>
-
-    /** From the reference documentation of the Android SDK:
-     *  The `Parcelable` interface identifies classes whose instances can be written to and restored from a `Parcel`.
-     *  Classes implementing the `Parcelable` interface must also have a static field called `CREATOR`,
-     *  which is an object implementing the `Parcelable.Creator` interface.
-     */
-    private val androidFieldName = newTermName("CREATOR")
-
-    private lazy val AndroidParcelableInterface = rootMirror.getClassIfDefined("android.os.Parcelable")
-    private lazy val AndroidCreatorClass        = rootMirror.getClassIfDefined("android.os.Parcelable$Creator")
 
     def isAndroidParcelableClass(sym: Symbol) =
       (AndroidParcelableInterface != NoSymbol) &&
@@ -2224,7 +2210,7 @@ abstract class GenASM extends SubComponent with BytecodeWriters {
 
           def getMerged(): scala.collection.Map[Local, List[Interval]] = {
             // TODO should but isn't: unbalanced start(s) of scope(s)
-            val shouldBeEmpty = pending filter { p => val Pair(k, st) = p; st.nonEmpty };
+            val shouldBeEmpty = pending filter { p => val Pair(_, st) = p; st.nonEmpty };
             val merged = mutable.Map[Local, List[Interval]]()
             def addToMerged(lv: Local, start: Label, end: Label) {
               val intv   = Interval(start, end)
@@ -2287,7 +2273,7 @@ abstract class GenASM extends SubComponent with BytecodeWriters {
         }
         // quest for deterministic output that Map.toList doesn't provide (so that ant test.stability doesn't complain).
         val srtd = fltnd.sortBy { kr =>
-          val Triple(name: String, local: Local, intrvl: Interval) = kr
+          val Triple(name: String, _, intrvl: Interval) = kr
 
           Triple(intrvl.start, intrvl.end - intrvl.start, name)  // ie sort by (start, length, name)
         }
@@ -2522,7 +2508,7 @@ abstract class GenASM extends SubComponent with BytecodeWriters {
           def genFldsInstr() = (instr: @unchecked) match {
 
             case lf @ LOAD_FIELD(field, isStatic) =>
-              var owner = javaName(lf.hostClass)
+              val owner = javaName(lf.hostClass)
               debuglog("LOAD_FIELD with owner: " + owner + " flags: " + Flags.flagsToString(field.owner.flags))
               val fieldJName = javaName(field)
               val fieldDescr = descriptor(field)
@@ -3355,8 +3341,8 @@ abstract class GenASM extends SubComponent with BytecodeWriters {
       var wasReduced = false
       val entryPoints: List[BasicBlock] = m.startBlock :: (m.exh map (_.startBlock));
 
-      var elided     = mutable.Set.empty[BasicBlock] // debug
-      var newTargets = mutable.Set.empty[BasicBlock] // debug
+      val elided     = mutable.Set.empty[BasicBlock] // debug
+      val newTargets = mutable.Set.empty[BasicBlock] // debug
 
       for (ep <- entryPoints) {
         var reachable = directSuccStar(ep) // this list may contain blocks belonging to jump-chains that we'll skip over

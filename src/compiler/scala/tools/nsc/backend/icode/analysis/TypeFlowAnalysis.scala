@@ -136,7 +136,7 @@ abstract class TypeFlowAnalysis {
       timer.start
       // icodes.lubs0 = 0
       forwardAnalysis(blockTransfer)
-      val t = timer.stop
+      timer.stop
       if (settings.debug.value) {
         linearizer.linearize(method).foreach(b => if (b != method.startBlock)
           assert(visited.contains(b),
@@ -326,7 +326,6 @@ abstract class TypeFlowAnalysis {
 	class TransferFunction(consumed: Int, gens: List[Gen]) extends (lattice.Elem => lattice.Elem) {
 	  def apply(in: lattice.Elem): lattice.Elem = {
         val out = lattice.IState(new VarBinding(in.vars), new TypeStack(in.stack))
-        val bindings = out.vars
         val stack = out.stack
 
         out.stack.pop(consumed)
@@ -389,7 +388,7 @@ abstract class TypeFlowAnalysis {
 
       timer.start
       forwardAnalysis(blockTransfer)
-      val t = timer.stop
+      timer.stop
 
       /* Now that `forwardAnalysis(blockTransfer)` has finished, all inlining candidates can be found in `remainingCALLs`,
          whose keys are callsites and whose values are pieces of information about the typestack just before the callsite in question.
@@ -546,9 +545,6 @@ abstract class TypeFlowAnalysis {
       relevantBBs ++= blocks
     }
 
-    /* the argument is also included in the result */
-    private def transitivePreds(b: BasicBlock): Set[BasicBlock] = { transitivePreds(List(b)) }
-
     /* those BBs in the argument are also included in the result */
     private def transitivePreds(starters: Traversable[BasicBlock]): Set[BasicBlock] = {
       val result = mutable.Set.empty[BasicBlock]
@@ -558,19 +554,6 @@ abstract class TypeFlowAnalysis {
         toVisit = toVisit.tail
         result += h
         for(p <- h.predecessors; if !result(p) && !toVisit.contains(p)) { toVisit = p :: toVisit }
-      }
-      result.toSet
-    }
-
-    /* those BBs in the argument are also included in the result */
-    private def transitiveSuccs(starters: Traversable[BasicBlock]): Set[BasicBlock] = {
-      val result = mutable.Set.empty[BasicBlock]
-      var toVisit: List[BasicBlock] = starters.toList.distinct
-      while(toVisit.nonEmpty) {
-        val h   = toVisit.head
-        toVisit = toVisit.tail
-        result += h
-        for(p <- h.successors; if !result(p) && !toVisit.contains(p)) { toVisit = p :: toVisit }
       }
       result.toSet
     }
@@ -683,12 +666,6 @@ abstract class TypeFlowAnalysis {
     private def enqueue(b: BasicBlock) {
       assert(in(b) ne typeFlowLattice.bottom)
       if(!worklist.contains(b)) { worklist += b }
-    }
-
-    /* this is not a general purpose method to add to the worklist,
-     * because the assert is expected to hold only when called from MTFAGrowable.reinit() */
-    private def enqueue(bs: Traversable[BasicBlock]) {
-      bs foreach enqueue
     }
 
     private def blankOut(blocks: scala.collection.Set[BasicBlock]) {

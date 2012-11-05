@@ -26,8 +26,6 @@ import Flags._
 abstract class Pickler extends SubComponent {
   import global._
 
-  private final val showSig = false
-
   val phaseName = "pickler"
 
   currentRun
@@ -427,7 +425,7 @@ abstract class Pickler extends SubComponent {
      *  argument of some Annotation */
     private def putMods(mods: Modifiers) = if (putEntry(mods)) {
       // annotations in Modifiers are removed by the typechecker
-      val Modifiers(flags, privateWithin, Nil) = mods
+      val Modifiers(_, privateWithin, Nil) = mods
       putEntry(privateWithin)
     }
 
@@ -1000,7 +998,6 @@ abstract class Pickler extends SubComponent {
       }
       def printRefs(refs: List[AnyRef]) { refs foreach printRef }
       def printSymInfo(sym: Symbol) {
-        var posOffset = 0
         printRef(sym.name)
         printRef(localizedOwner(sym))
         print(flagsToString(sym.flags & PickledFlags)+" ")

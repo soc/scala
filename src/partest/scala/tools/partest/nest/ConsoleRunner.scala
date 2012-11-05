@@ -26,8 +26,6 @@ class ConsoleRunner extends DirectRunner {
   private def antFilter(p: Path) = p.isFile && (p endsWith "build.xml")
 
   val testSets = {
-    val pathFilter: Path => Boolean = x => x.isDirectory || (x hasExtension "scala")
-
     List(
       TestSet("pos", stdFilter, "Testing compiler (on files whose compilation should succeed)"),
       TestSet("neg", stdFilter, "Testing compiler (on files whose compilation should fail)"),
@@ -94,8 +92,6 @@ class ConsoleRunner extends DirectRunner {
       else if (parsed isSet "--classpath") new ConsoleFileManager(parsed("--classpath"), true)
       else if (parsed isSet "--pack") new ConsoleFileManager("build/pack")
       else new ConsoleFileManager  // auto detection, see ConsoleFileManager.findLatest
-
-    def argNarrowsTests(x: String) = denotesTestSet(x) || denotesTestPath(x)
 
     NestUI._verbose         = parsed isSet "--verbose"
     fileManager.showDiff    = true

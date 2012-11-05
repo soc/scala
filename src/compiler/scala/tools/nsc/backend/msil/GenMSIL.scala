@@ -258,9 +258,9 @@ abstract class GenMSIL extends SubComponent {
      * and thus shouldn't be added by this method.
      */
     def addAttributes(member: ICustomAttributeSetter, annotations: List[AnnotationInfo]) {
-      val attributes = annotations.map(_.atp.typeSymbol).collect {
-        case definitions.TransientAttr => null // TODO this is just an example
-      }
+      // val attributes = annotations.map(_.atp.typeSymbol).collect {
+      //   case definitions.TransientAttr => null // TODO this is just an example
+      // }
       return // TODO: implement at some point
     }
 
@@ -823,7 +823,7 @@ abstract class GenMSIL extends SubComponent {
       def loadFieldOrAddress(field: Symbol, isStatic: Boolean, msg: String, loadAddr : Boolean) {
         debuglog(msg + " with owner: " + field.owner +
               " flags: " + Flags.flagsToString(field.owner.flags))
-        var fieldInfo = fields.get(field) match {
+        val fieldInfo = fields.get(field) match {
           case Some(fInfo) => fInfo
           case None =>
             val fInfo = getType(field.owner).GetField(msilName(field))
@@ -1254,7 +1254,7 @@ abstract class GenMSIL extends SubComponent {
             mcode.Emit(OpCodes.Stloc, switchLocal)
             var i = 0
             for (l <- tags) {
-              var targetLabel = labels(branches(i))
+              val targetLabel = labels(branches(i))
               for (i <- l) {
                 mcode.Emit(OpCodes.Ldloc, switchLocal)
                 loadI4(i, mcode)
@@ -1871,7 +1871,7 @@ abstract class GenMSIL extends SubComponent {
         val sym = ifield.symbol
         debuglog("Adding field: " + sym.fullName)
 
-        var attributes = msilFieldFlags(sym)
+        val attributes = msilFieldFlags(sym)
         val fieldTypeWithCustomMods =
           new PECustomMod(msilType(sym.tpe),
                           customModifiers(sym.annotations))
@@ -1905,7 +1905,7 @@ abstract class GenMSIL extends SubComponent {
 
         val ownerType = getType(sym.enclClass).asInstanceOf[TypeBuilder]
         assert(mtype == ownerType, "mtype = " + mtype + "; ownerType = " + ownerType)
-        var paramTypes = msilParamTypes(sym)
+        val paramTypes = msilParamTypes(sym)
         val attr = msilMethodFlags(sym)
 
         if (m.symbol.isClassConstructor) {
@@ -1917,7 +1917,7 @@ abstract class GenMSIL extends SubComponent {
           mapConstructor(sym, constr)
           addAttributes(constr, sym.annotations)
         } else {
-          var resType = msilType(m.returnType)
+          val resType = msilType(m.returnType)
           val method =
             ownerType.DefineMethod(msilName(sym), attr, resType, paramTypes)
           for (i <- 0.until(paramTypes.length)) {
@@ -2037,7 +2037,6 @@ abstract class GenMSIL extends SubComponent {
     }
 
     private def generateMirrorClass(sym: Symbol) {
-      val tBuilder = getType(sym)
       assert(sym.isModuleClass, "Can't generate Mirror-Class for the Non-Module class " + sym)
       debuglog("Dumping mirror class for object: " + sym)
       val moduleName = msilName(sym)
@@ -2242,97 +2241,6 @@ abstract class GenMSIL extends SubComponent {
     private def mapMethod(sym: Symbol, mInfo: MethodInfo) {
       assert (mInfo != null, mInfo)
       methods(sym) = mInfo
-    }
-
-    /*
-     * add mapping between sym and method with newName, paramTypes of newClass
-     */
-    private def mapMethod(sym: Symbol, newClass: MsilType, newName: String, paramTypes: Array[MsilType]) {
-      val methodInfo = newClass.GetMethod(newName, paramTypes)
-      assert(methodInfo != null, "Can't find mapping for " + sym + " -> " +
-             newName + "(" + paramTypes + ")")
-      mapMethod(sym, methodInfo)
-      if (methodInfo.IsStatic)
-        dynToStatMapped += sym
-    }
-
-    /*
-     * add mapping between method with name and paramTypes of clazz to
-     * method with newName and newParamTypes of newClass (used for instance
-     * for "wait")
-     */
-    private def mapMethod(
-      clazz: Symbol, name: Name, paramTypes: Array[Type],
-      newClass: MsilType, newName: String, newParamTypes: Array[MsilType]) {
-        val methodSym = lookupMethod(clazz, name, paramTypes)
-        assert(methodSym != null, "cannot find method " + name + "(" +
-               paramTypes + ")" + " in class " + clazz)
-        mapMethod(methodSym, newClass, newName, newParamTypes)
-      }
-
-    /*
-     * add mapping for member with name and paramTypes to member
-     * newName of newClass (same parameters)
-     */
-    private def mapMethod(
-      clazz: Symbol, name: Name, paramTypes: Array[Type],
-      newClass: MsilType, newName: String) {
-        mapMethod(clazz, name, paramTypes, newClass, newName, paramTypes map msilType)
-      }
-
-    /*
-     * add mapping for all methods with name of clazz to the corresponding
-     * method (same parameters) with newName of newClass
-     */
-    private def mapMethod(
-      clazz: Symbol, name: Name,
-      newClass: MsilType, newName: String) {
-        val memberSym: Symbol = clazz.tpe.member(name)
-        memberSym.tpe match {
-          // alternatives: List[Symbol]
-          case OverloadedType(_, alternatives) =>
-            alternatives.foreach(s => mapMethod(s, newClass, newName, msilParamTypes(s)))
-
-          // paramTypes: List[Type], resType: Type
-          case MethodType(params, resType) =>
-            mapMethod(memberSym, newClass, newName, msilParamTypes(memberSym))
-
-          case _ =>
-            abort("member not found: " + clazz + ", " + name)
-        }
-      }
-
-
-    /*
-     * find the method in clazz with name and paramTypes
-     */
-    private def lookupMethod(clazz: Symbol, name: Name, paramTypes: Array[Type]): Symbol = {
-      val memberSym = clazz.tpe.member(name)
-      memberSym.tpe match {
-        case OverloadedType(_, alternatives) =>
-          alternatives.find(s => {
-            var i: Int = 0
-            var typesOK: Boolean = true
-            if (paramTypes.length == s.tpe.paramTypes.length) {
-              while(i < paramTypes.length) {
-                if (paramTypes(i) != s.tpe.paramTypes(i))
-                  typesOK = false
-                i += 1
-              }
-            } else {
-              typesOK = false
-            }
-            typesOK
-          }) match {
-            case Some(sym) => sym
-            case None => abort("member of " + clazz + ", " + name + "(" +
-                               paramTypes + ") not found")
-          }
-
-        case MethodType(_, _) => memberSym
-
-        case _ => abort("member not found: " + name + " of " + clazz)
-      }
     }
 
     private def showsym(sym: Symbol): String = (sym.toString +

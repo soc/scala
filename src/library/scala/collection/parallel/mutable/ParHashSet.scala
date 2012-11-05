@@ -120,9 +120,8 @@ private[mutable] abstract class ParHashSetCombiner[T](private val tableLoadFacto
 extends scala.collection.parallel.BucketCombiner[T, ParHashSet[T], Any, ParHashSetCombiner[T]](ParHashSetCombiner.numblocks)
 with scala.collection.mutable.FlatHashTable.HashUtils[T] {
 //self: EnvironmentPassingCombiner[T, ParHashSet[T]] =>
-  private var mask = ParHashSetCombiner.discriminantmask
-  private var nonmasklen = ParHashSetCombiner.nonmasklength
-  private var seedvalue = 27
+  private val nonmasklen = ParHashSetCombiner.nonmasklength
+  private val seedvalue = 27
 
   def +=(elem: T) = {
     sz += 1
@@ -264,12 +263,12 @@ with scala.collection.mutable.FlatHashTable.HashUtils[T] {
       (elemsIn + leftoversIn, elemsLeft concat leftoversLeft)
     }
     private def insertAll(atPos: Int, beforePos: Int, elems: UnrolledBuffer[Any]): (Int, UnrolledBuffer[Any]) = {
-      var leftovers = new UnrolledBuffer[Any]
+      val leftovers = new UnrolledBuffer[Any]
       var inserted = 0
 
       var unrolled = elems.headPtr
       var i = 0
-      var t = table
+      val t = table
       while (unrolled ne null) {
         val chunkarr = unrolled.array
         val chunksz = unrolled.size

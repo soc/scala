@@ -19,7 +19,7 @@ trait MemberLookup {
   def memberLookup(pos: Position, query: String, inTplOpt: Option[DocTemplateImpl]): LinkTo = {
     assert(modelFinished)
 
-    var members = breakMembers(query)
+    val members = breakMembers(query)
     //println(query + " => " + members)
 
     // (1) First look in the root package, as most of the links are qualified
@@ -48,9 +48,9 @@ trait MemberLookup {
           }
 
           if (sym.isClass || sym.isModule || sym.isTrait || sym.isPackage)
-            findExternalLink(linkName(sym))
+            findExternalLink(sym, linkName(sym))
           else if (owner.isClass || owner.isModule || owner.isTrait || owner.isPackage)
-            findExternalLink(linkName(owner) + "@" + externalSignature(sym))
+            findExternalLink(sym, linkName(owner) + "@" + externalSignature(sym))
           else
             None
         }
