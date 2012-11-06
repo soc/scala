@@ -45,6 +45,8 @@ trait ProfilingAnalyzer extends Analyzer { prof =>
       typing(tree)(super.typed(tree, mode, pt))
     override def typedApply(tree: Apply, mode: Int, pt: Type): Tree =
       typing(tree)(super.typedApply(tree, mode, pt))
+    override def typedBlock(block: Block, mode: Int, pt: Type): Block =
+      typing(block)(super.typedBlock(block, mode, pt))
     override def typedStat(stat: Tree, exprOwner: Symbol): Tree =
       typing(stat)(super.typedStat(stat, exprOwner))
     override def typedClassDef(cdef: ClassDef): ClassDef =

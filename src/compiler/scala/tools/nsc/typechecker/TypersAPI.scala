@@ -22,6 +22,8 @@ trait AnalyzerAPI {
   trait TypedTrees {
     def typed(tree: Tree, mode: Int, pt: Type): Tree
     def typedApply(tree: Apply, mode: Int, pt: Type): Tree
+    def typedBlock(block: Block, mode: Int, pt: Type): Block
+
     def typedClassDef(cdef: ClassDef): ClassDef
     def typedModuleDef(mdef: ModuleDef): ModuleDef
     def typedDefDef(ddef: DefDef): DefDef

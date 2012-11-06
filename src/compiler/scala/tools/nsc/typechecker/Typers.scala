@@ -4545,10 +4545,6 @@ trait Typers extends Modes with Adaptations with Tags {
           UnderscoreEtaError(expr1)
       }
 
-      // def typedApply(tree: Apply) = Typer.this.typedApply(tree, mode, pt)
-      def normalTypedApply(tree: Tree, fun: Tree, args: List[Tree]) = Typer.this.normalTypedApply(tree, fun, args, mode, pt)
-      def tryTypedApply(fun: Tree, args: List[Tree]): Tree = Typer.this.tryTypedApply(tree, fun, args, mode, pt)
-
       def typedSuper(tree: Super) = {
         val mix = tree.mix
         val qual1 = typed(tree.qual)
