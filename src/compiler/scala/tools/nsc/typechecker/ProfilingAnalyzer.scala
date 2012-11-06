@@ -43,10 +43,10 @@ trait ProfilingAnalyzer extends Analyzer { prof =>
   class ProfilingTyper(context0: Context) extends Typer(context0) with TypedTrees {
     override def typed(tree: Tree, mode: Int, pt: Type): Tree =
       typing(tree)(super.typed(tree, mode, pt))
+    override def typedApply(tree: Apply, mode: Int, pt: Type): Tree =
+      typing(tree)(super.typedApply(tree, mode, pt))
     override def typedStat(stat: Tree, exprOwner: Symbol): Tree =
       typing(stat)(super.typedStat(stat, exprOwner))
-    // override def typedStats(stats: List[Tree], exprOwner: Symbol): List[Tree] =
-    //   stats map (s => typing(s)(super.
     override def typedClassDef(cdef: ClassDef): ClassDef =
       typing(cdef)(super.typedClassDef(cdef))
     override def typedModuleDef(mdef: ModuleDef): ModuleDef =

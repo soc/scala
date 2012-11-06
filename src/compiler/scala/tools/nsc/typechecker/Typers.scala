@@ -1776,6 +1776,231 @@ trait Typers extends Modes with Adaptations with Tags {
 
       treeCopy.ModuleDef(mdef, typedMods, mdef.name, impl2).setType(NoType).asInstanceOf[ModuleDef]
     }
+
+    def typedApply(tree: Apply, mode: Int, pt: Type): Tree = {
+      val fun = tree.fun
+      val args = tree.args
+      fun match {
+        case Block(stats, expr) =>
+          typed1(atPos(tree.pos)(Block(stats, Apply(expr, args) setPos tree.pos.makeTransparent)), mode, pt)
+        case _ =>
+          normalTypedApply(tree, fun, args, mode, pt) match {
+            case Apply(Select(New(tpt), name), args)
+            if (tpt.tpe != null &&
+              tpt.tpe.typeSymbol == ArrayClass &&
+              args.length == 1 &&
+              erasure.GenericArray.unapply(tpt.tpe).isDefined) => // !!! todo simplify by using extractor
+              // convert new Array[T](len) to evidence[ClassTag[T]].newArray(len)
+              // convert new Array^N[T](len) for N > 1 to evidence[ClassTag[Array[...Array[T]...]]].newArray(len), where Array HK gets applied (N-1) times
+              // [Eugene] no more MaxArrayDims. ClassTags are flexible enough to allow creation of arrays of arbitrary dimensionality (w.r.t JVM restrictions)
+              val Some((level, componentType)) = erasure.GenericArray.unapply(tpt.tpe)
+              val tagType = List.iterate(componentType, level)(tpe => appliedType(ArrayClass.toTypeConstructor, List(tpe))).last
+              val newArrayApp = atPos(tree.pos) {
+                val tag = resolveClassTag(tree.pos, tagType)
+                if (tag.isEmpty) MissingClassTagError(tree, tagType)
+                else new ApplyToImplicitArgs(Select(tag, nme.newArray), args)
+              }
+              typed(newArrayApp, mode, pt)
+            case Apply(Select(fun, nme.apply), _) if treeInfo.isSuperConstrCall(fun) => //SI-5696
+              TooManyArgumentListsForConstructor(tree)
+            case tree1 =>
+              tree1
+          }
+      }
+    }
+
+    private def normalTypedApply(tree: Tree, fun: Tree, args: List[Tree], mode: Int, pt: Type) = {
+      def isPatternMode = inPatternMode(mode)
+      val stableApplication = (fun.symbol ne null) && fun.symbol.isMethod && fun.symbol.isStable
+      if (stableApplication && isPatternMode) {
+        // treat stable function applications f() as expressions.
+        typed1(tree, mode & ~PATTERNmode | EXPRmode, pt)
+      } else {
+        val funpt = if (isPatternMode) pt else WildcardType
+        val appStart = if (Statistics.canEnable) Statistics.startTimer(failedApplyNanos) else null
+        val opeqStart = if (Statistics.canEnable) Statistics.startTimer(failedOpEqNanos) else null
+
+        def convertToAssignment(fun: Tree, qual: Tree, name: Name, args: List[Tree]): Tree = {
+          val prefix = name.toTermName stripSuffix nme.EQL
+          def mkAssign(vble: Tree): Tree =
+            Assign(
+              vble,
+              Apply(
+                Select(vble.duplicate, prefix) setPos fun.pos.focus, args) setPos tree.pos.makeTransparent
+            ) setPos tree.pos
+
+          def mkUpdate(table: Tree, indices: List[Tree]) = {
+            gen.evalOnceAll(table :: indices, context.owner, context.unit) {
+              case tab :: is =>
+                def mkCall(name: Name, extraArgs: Tree*) = (
+                  Apply(
+                    Select(tab(), name) setPos table.pos,
+                    is.map(i => i()) ++ extraArgs
+                  ) setPos tree.pos
+                )
+                mkCall(
+                  nme.update,
+                  Apply(Select(mkCall(nme.apply), prefix) setPos fun.pos, args) setPos tree.pos
+                )
+              case _ => EmptyTree
+            }
+          }
+
+          val tree1 = qual match {
+            case Ident(_) =>
+              mkAssign(qual)
+
+            case Select(qualqual, vname) =>
+              gen.evalOnce(qualqual, context.owner, context.unit) { qq =>
+                val qq1 = qq()
+                mkAssign(Select(qq1, vname) setPos qual.pos)
+              }
+
+            case Apply(fn, indices) =>
+              treeInfo.methPart(fn) match {
+                case Select(table, nme.apply) => mkUpdate(table, indices)
+                case _                        => UnexpectedTreeAssignmentConversionError(qual)
+              }
+          }
+          typed1(tree1, mode, pt)
+        }
+
+        def onError(reportError: => Tree): Tree = {
+            fun match {
+              case Select(qual, name)
+              if !isPatternMode && nme.isOpAssignmentName(newTermName(name.decode)) =>
+                val qual1 = typedQualifier(qual)
+                if (treeInfo.isVariableOrGetter(qual1)) {
+                  if (Statistics.canEnable) Statistics.stopTimer(failedOpEqNanos, opeqStart)
+                  convertToAssignment(fun, qual1, name, args)
+                } else {
+                  if (Statistics.canEnable) Statistics.stopTimer(failedApplyNanos, appStart)
+                    reportError
+                }
+              case _ =>
+                if (Statistics.canEnable) Statistics.stopTimer(failedApplyNanos, appStart)
+                reportError
+            }
+        }
+        silent(_.typed(fun, forFunMode(mode), funpt),
+               if ((mode & EXPRmode) != 0) false else context.ambiguousErrors,
+               if ((mode & EXPRmode) != 0) tree else context.tree) match {
+          case SilentResultValue(fun1) =>
+            val fun2 = if (stableApplication) stabilizeFun(fun1, mode, pt) else fun1
+            if (Statistics.canEnable) Statistics.incCounter(typedApplyCount)
+            def isImplicitMethod(tpe: Type) = tpe match {
+              case mt: MethodType => mt.isImplicit
+              case _ => false
+            }
+            val useTry = (
+                 !isPastTyper
+              && fun2.isInstanceOf[Select]
+              && !isImplicitMethod(fun2.tpe)
+              && ((fun2.symbol eq null) || !fun2.symbol.isConstructor)
+              && (mode & (EXPRmode | SNDTRYmode)) == EXPRmode
+            )
+            val res =
+              if (useTry) tryTypedApply(tree, fun2, args, mode, pt)
+              else doTypedApply(tree, fun2, args, mode, pt)
+
+          /*
+            if (fun2.hasSymbolField && fun2.symbol.isConstructor && (mode & EXPRmode) != 0) {
+              res.tpe = res.tpe.notNull
+            }
+            */
+            // TODO: In theory we should be able to call:
+            //if (fun2.hasSymbolField && fun2.symbol.name == nme.apply && fun2.symbol.owner == ArrayClass) {
+            // But this causes cyclic reference for Array class in Cleanup. It is easy to overcome this
+            // by calling ArrayClass.info here (or some other place before specialize).
+            if (fun2.symbol == Array_apply && !res.isErrorTyped) {
+              val checked = gen.mkCheckInit(res)
+              // this check is needed to avoid infinite recursion in Duplicators
+              // (calling typed1 more than once for the same tree)
+              if (checked ne res) typed { atPos(tree.pos)(checked) }
+              else res
+            } else
+              res
+          case SilentTypeError(err) =>
+            onError({issue(err); setError(tree)})
+        }
+      }
+    }
+
+    /** Try to apply function to arguments; if it does not work, try to convert Java raw to existentials, or try to
+     *  insert an implicit conversion.
+     */
+    private def tryTypedApply(tree: Tree, fun: Tree, args: List[Tree], mode: Int, pt: Type): Tree = {
+      val start = if (Statistics.canEnable) Statistics.startTimer(failedApplyNanos) else null
+
+      def onError(typeError: AbsTypeError): Tree = {
+        if (Statistics.canEnable) Statistics.stopTimer(failedApplyNanos, start)
+
+        // If the problem is with raw types, copnvert to existentials and try again.
+        // See #4712 for a case where this situation arises,
+        if ((fun.symbol ne null) && fun.symbol.isJavaDefined) {
+          val newtpe = rawToExistential(fun.tpe)
+          if (fun.tpe ne newtpe) {
+            // println("late cooking: "+fun+":"+fun.tpe) // DEBUG
+            return tryTypedApply(tree, fun setType newtpe, args, mode, pt)
+          }
+        }
+
+        def treesInResult(tree: Tree): List[Tree] = tree :: (tree match {
+          case Block(_, r)                        => treesInResult(r)
+          case Match(_, cases)                    => cases
+          case CaseDef(_, _, r)                   => treesInResult(r)
+          case Annotated(_, r)                    => treesInResult(r)
+          case If(_, t, e)                        => treesInResult(t) ++ treesInResult(e)
+          case Try(b, catches, _)                 => treesInResult(b) ++ catches
+          case Typed(r, Function(Nil, EmptyTree)) => treesInResult(r)
+          case _                                  => Nil
+        })
+        def errorInResult(tree: Tree) = treesInResult(tree) exists (_.pos == typeError.errPos)
+        def tryTypedArgs(args: List[Tree], mode: Int): Option[List[Tree]] = {
+          val c = context.makeSilent(false)
+          c.retyping = true
+          try {
+            val res = newTyper(c).typedArgs(args, mode)
+            if (c.hasErrors) None else Some(res)
+          } catch {
+            case ex: CyclicReference =>
+              throw ex
+            case te: TypeError =>
+              // @H some of typer erros can still leak,
+              // for instance in continuations
+              None
+          } finally {
+            c.flushBuffer()
+          }
+        }
+
+        val retry = (typeError.errPos != null) && (fun :: tree :: args exists errorInResult)
+        printTyping {
+          val funStr = ptTree(fun) + " and " + (args map ptTree mkString ", ")
+          if (retry) "second try: " + funStr
+          else "no second try: " + funStr + " because error not in result: " + typeError.errPos+"!="+tree.pos
+        }
+        if (retry) {
+          val Select(qual, name) = fun
+          tryTypedArgs(args, forArgMode(fun, mode)) match {
+            case Some(args1) =>
+              val qual1 =
+                if (!pt.isError) adaptToArguments(qual, name, args1, pt, true, true)
+                else qual
+              if (qual1 ne qual) {
+                val tree1 = Apply(Select(qual1, name) setPos fun.pos, args1) setPos tree.pos
+                return typed1(tree1, mode | SNDTRYmode, pt)
+              }
+            case _ => ()
+          }
+        }
+        issue(typeError)
+        setError(treeCopy.Apply(tree, fun, args))
+      }
+
+      silent(_.doTypedApply(tree, fun, args, mode, pt)) orElse onError
+    }
+
     /** In order to override this in the TreeCheckers Typer so synthetics aren't re-added
      *  all the time, it is exposed here the module/class typing methods go through it.
      *  ...but it turns out it's also the ideal spot for namer/typer coordination for
@@ -4320,233 +4545,9 @@ trait Typers extends Modes with Adaptations with Tags {
           UnderscoreEtaError(expr1)
       }
 
-      /**
-       *  @param args ...
-       *  @return     ...
-       */
-      def tryTypedArgs(args: List[Tree], mode: Int): Option[List[Tree]] = {
-        val c = context.makeSilent(false)
-        c.retyping = true
-        try {
-          val res = newTyper(c).typedArgs(args, mode)
-          if (c.hasErrors) None else Some(res)
-        } catch {
-          case ex: CyclicReference =>
-            throw ex
-          case te: TypeError =>
-            // @H some of typer erros can still leak,
-            // for instance in continuations
-            None
-        } finally {
-          c.flushBuffer()
-        }
-      }
-
-      /** Try to apply function to arguments; if it does not work, try to convert Java raw to existentials, or try to
-       *  insert an implicit conversion.
-       */
-      def tryTypedApply(fun: Tree, args: List[Tree]): Tree = {
-        val start = if (Statistics.canEnable) Statistics.startTimer(failedApplyNanos) else null
-
-        def onError(typeError: AbsTypeError): Tree = {
-            if (Statistics.canEnable) Statistics.stopTimer(failedApplyNanos, start)
-
-            // If the problem is with raw types, copnvert to existentials and try again.
-            // See #4712 for a case where this situation arises,
-            if ((fun.symbol ne null) && fun.symbol.isJavaDefined) {
-              val newtpe = rawToExistential(fun.tpe)
-              if (fun.tpe ne newtpe) {
-                // println("late cooking: "+fun+":"+fun.tpe) // DEBUG
-                return tryTypedApply(fun setType newtpe, args)
-              }
-            }
-
-            def treesInResult(tree: Tree): List[Tree] = tree :: (tree match {
-              case Block(_, r)                        => treesInResult(r)
-              case Match(_, cases)                    => cases
-              case CaseDef(_, _, r)                   => treesInResult(r)
-              case Annotated(_, r)                    => treesInResult(r)
-              case If(_, t, e)                        => treesInResult(t) ++ treesInResult(e)
-              case Try(b, catches, _)                 => treesInResult(b) ++ catches
-              case Typed(r, Function(Nil, EmptyTree)) => treesInResult(r)
-              case _                                  => Nil
-            })
-            def errorInResult(tree: Tree) = treesInResult(tree) exists (_.pos == typeError.errPos)
-
-            val retry = (typeError.errPos != null) && (fun :: tree :: args exists errorInResult)
-            printTyping {
-              val funStr = ptTree(fun) + " and " + (args map ptTree mkString ", ")
-              if (retry) "second try: " + funStr
-              else "no second try: " + funStr + " because error not in result: " + typeError.errPos+"!="+tree.pos
-            }
-            if (retry) {
-              val Select(qual, name) = fun
-              tryTypedArgs(args, forArgMode(fun, mode)) match {
-                case Some(args1) =>
-                  val qual1 =
-                    if (!pt.isError) adaptToArguments(qual, name, args1, pt, true, true)
-                    else qual
-                  if (qual1 ne qual) {
-                    val tree1 = Apply(Select(qual1, name) setPos fun.pos, args1) setPos tree.pos
-                    return typed1(tree1, mode | SNDTRYmode, pt)
-                  }
-                case _ => ()
-              }
-            }
-            issue(typeError)
-            setError(treeCopy.Apply(tree, fun, args))
-        }
-
-        silent(_.doTypedApply(tree, fun, args, mode, pt)) orElse onError
-      }
-
-      def normalTypedApply(tree: Tree, fun: Tree, args: List[Tree]) = {
-        val stableApplication = (fun.symbol ne null) && fun.symbol.isMethod && fun.symbol.isStable
-        if (stableApplication && isPatternMode) {
-          // treat stable function applications f() as expressions.
-          typed1(tree, mode & ~PATTERNmode | EXPRmode, pt)
-        } else {
-          val funpt = if (isPatternMode) pt else WildcardType
-          val appStart = if (Statistics.canEnable) Statistics.startTimer(failedApplyNanos) else null
-          val opeqStart = if (Statistics.canEnable) Statistics.startTimer(failedOpEqNanos) else null
-
-          def onError(reportError: => Tree): Tree = {
-              fun match {
-                case Select(qual, name)
-                if !isPatternMode && nme.isOpAssignmentName(newTermName(name.decode)) =>
-                  val qual1 = typedQualifier(qual)
-                  if (treeInfo.isVariableOrGetter(qual1)) {
-                    if (Statistics.canEnable) Statistics.stopTimer(failedOpEqNanos, opeqStart)
-                    convertToAssignment(fun, qual1, name, args)
-                  } else {
-                    if (Statistics.canEnable) Statistics.stopTimer(failedApplyNanos, appStart)
-                      reportError
-                  }
-                case _ =>
-                  if (Statistics.canEnable) Statistics.stopTimer(failedApplyNanos, appStart)
-                  reportError
-              }
-          }
-          silent(_.typed(fun, forFunMode(mode), funpt),
-                 if ((mode & EXPRmode) != 0) false else context.ambiguousErrors,
-                 if ((mode & EXPRmode) != 0) tree else context.tree) match {
-            case SilentResultValue(fun1) =>
-              val fun2 = if (stableApplication) stabilizeFun(fun1, mode, pt) else fun1
-              if (Statistics.canEnable) Statistics.incCounter(typedApplyCount)
-              def isImplicitMethod(tpe: Type) = tpe match {
-                case mt: MethodType => mt.isImplicit
-                case _ => false
-              }
-              val useTry = (
-                   !isPastTyper
-                && fun2.isInstanceOf[Select]
-                && !isImplicitMethod(fun2.tpe)
-                && ((fun2.symbol eq null) || !fun2.symbol.isConstructor)
-                && (mode & (EXPRmode | SNDTRYmode)) == EXPRmode
-              )
-              val res =
-                if (useTry) tryTypedApply(fun2, args)
-                else doTypedApply(tree, fun2, args, mode, pt)
-
-            /*
-              if (fun2.hasSymbolField && fun2.symbol.isConstructor && (mode & EXPRmode) != 0) {
-                res.tpe = res.tpe.notNull
-              }
-              */
-              // TODO: In theory we should be able to call:
-              //if (fun2.hasSymbolField && fun2.symbol.name == nme.apply && fun2.symbol.owner == ArrayClass) {
-              // But this causes cyclic reference for Array class in Cleanup. It is easy to overcome this
-              // by calling ArrayClass.info here (or some other place before specialize).
-              if (fun2.symbol == Array_apply && !res.isErrorTyped) {
-                val checked = gen.mkCheckInit(res)
-                // this check is needed to avoid infinite recursion in Duplicators
-                // (calling typed1 more than once for the same tree)
-                if (checked ne res) typed { atPos(tree.pos)(checked) }
-                else res
-              } else
-                res
-            case SilentTypeError(err) =>
-              onError({issue(err); setError(tree)})
-          }
-        }
-      }
-
-      def typedApply(tree: Apply) = {
-        val fun = tree.fun
-        val args = tree.args
-        fun match {
-          case Block(stats, expr) =>
-            typed1(atPos(tree.pos)(Block(stats, Apply(expr, args) setPos tree.pos.makeTransparent)), mode, pt)
-          case _ =>
-            normalTypedApply(tree, fun, args) match {
-              case Apply(Select(New(tpt), name), args)
-              if (tpt.tpe != null &&
-                tpt.tpe.typeSymbol == ArrayClass &&
-                args.length == 1 &&
-                erasure.GenericArray.unapply(tpt.tpe).isDefined) => // !!! todo simplify by using extractor
-                // convert new Array[T](len) to evidence[ClassTag[T]].newArray(len)
-                // convert new Array^N[T](len) for N > 1 to evidence[ClassTag[Array[...Array[T]...]]].newArray(len), where Array HK gets applied (N-1) times
-                // [Eugene] no more MaxArrayDims. ClassTags are flexible enough to allow creation of arrays of arbitrary dimensionality (w.r.t JVM restrictions)
-                val Some((level, componentType)) = erasure.GenericArray.unapply(tpt.tpe)
-                val tagType = List.iterate(componentType, level)(tpe => appliedType(ArrayClass.toTypeConstructor, List(tpe))).last
-                val newArrayApp = atPos(tree.pos) {
-                  val tag = resolveClassTag(tree.pos, tagType)
-                  if (tag.isEmpty) MissingClassTagError(tree, tagType)
-                  else new ApplyToImplicitArgs(Select(tag, nme.newArray), args)
-                }
-                typed(newArrayApp, mode, pt)
-              case Apply(Select(fun, nme.apply), _) if treeInfo.isSuperConstrCall(fun) => //SI-5696
-                TooManyArgumentListsForConstructor(tree)
-              case tree1 =>
-                tree1
-            }
-        }
-      }
-
-      def convertToAssignment(fun: Tree, qual: Tree, name: Name, args: List[Tree]): Tree = {
-        val prefix = name.toTermName stripSuffix nme.EQL
-        def mkAssign(vble: Tree): Tree =
-          Assign(
-            vble,
-            Apply(
-              Select(vble.duplicate, prefix) setPos fun.pos.focus, args) setPos tree.pos.makeTransparent
-          ) setPos tree.pos
-
-        def mkUpdate(table: Tree, indices: List[Tree]) = {
-          gen.evalOnceAll(table :: indices, context.owner, context.unit) {
-            case tab :: is =>
-              def mkCall(name: Name, extraArgs: Tree*) = (
-                Apply(
-                  Select(tab(), name) setPos table.pos,
-                  is.map(i => i()) ++ extraArgs
-                ) setPos tree.pos
-              )
-              mkCall(
-                nme.update,
-                Apply(Select(mkCall(nme.apply), prefix) setPos fun.pos, args) setPos tree.pos
-              )
-            case _ => EmptyTree
-          }
-        }
-
-        val tree1 = qual match {
-          case Ident(_) =>
-            mkAssign(qual)
-
-          case Select(qualqual, vname) =>
-            gen.evalOnce(qualqual, context.owner, context.unit) { qq =>
-              val qq1 = qq()
-              mkAssign(Select(qq1, vname) setPos qual.pos)
-            }
-
-          case Apply(fn, indices) =>
-            treeInfo.methPart(fn) match {
-              case Select(table, nme.apply) => mkUpdate(table, indices)
-              case _                        => UnexpectedTreeAssignmentConversionError(qual)
-            }
-        }
-        typed1(tree1, mode, pt)
-      }
+      // def typedApply(tree: Apply) = Typer.this.typedApply(tree, mode, pt)
+      def normalTypedApply(tree: Tree, fun: Tree, args: List[Tree]) = Typer.this.normalTypedApply(tree, fun, args, mode, pt)
+      def tryTypedApply(fun: Tree, args: List[Tree]): Tree = Typer.this.tryTypedApply(tree, fun, args, mode, pt)
 
       def typedSuper(tree: Super) = {
         val mix = tree.mix
@@ -5179,7 +5180,7 @@ trait Typers extends Modes with Adaptations with Tags {
       tree match {
         case tree: Ident                        => typedIdentOrWildcard(tree)
         case tree: Select                       => typedSelectOrSuperCall(tree)
-        case tree: Apply                        => typedApply(tree)
+        case tree: Apply                        => typedApply(tree, mode, pt)
         case tree: TypeTree                     => typedTypeTree(tree)
         case tree: Literal                      => typedLiteral(tree)
         case tree: This                         => typedThis(tree)

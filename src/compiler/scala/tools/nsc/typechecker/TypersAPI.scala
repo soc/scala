@@ -21,22 +21,22 @@ trait AnalyzerAPI {
   // Subset of Typer explicitly exposed
   trait TypedTrees {
     def typed(tree: Tree, mode: Int, pt: Type): Tree
+    def typedApply(tree: Apply, mode: Int, pt: Type): Tree
     def typedClassDef(cdef: ClassDef): ClassDef
     def typedModuleDef(mdef: ModuleDef): ModuleDef
     def typedDefDef(ddef: DefDef): DefDef
     def typedTypeDef(tdef: TypeDef): TypeDef
     def typedValDef(vdef: ValDef): ValDef
     def typedTemplate(templ: Template, parents1: List[Tree]): Template
-    // def typedStats(stats: List[Tree], exprOwner: Symbol): List[Tree]
     def typedStat(stat: Tree, exprOwner: Symbol): Tree
 
     /** Other typer methods
 
     def typed(tree: Tree, mode: Int, pt: Type): Tree
+    def typedApply(fun: Tree, args: List[Tree]): Tree
     def typedArgs(args: List[Tree], mode: Int): List[Tree]
     def typedBlock(block: Block, mode: Int, pt: Type): Block
     def typedStats(stats: List[Tree], exprOwner: Symbol): List[Tree]
-    def typedApply(fun: Tree, args: List[Tree]): Tree
 
     def typedAnnotated(ann: Tree, arg1: Tree): Tree
     def typedAnnotation(ann: Tree, mode: Int, selfsym: Symbol, annClass: Symbol, requireJava: Boolean): AnnotationInfo
