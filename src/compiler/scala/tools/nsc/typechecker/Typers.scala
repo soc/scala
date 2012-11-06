@@ -48,6 +48,10 @@ trait Typers extends Modes with Adaptations with Tags {
     resetContexts()
     resetImplicits()
     transformed.clear()
+    // the log accumulates entries over time, even though it should not (Adriaan, Martin said so).
+    // Lacking a better fix, we clear it here (before the phase is created, meaning for each
+    // compiler run). This is good enough for the resident compiler, which was the most affected.
+    undoLog.clear()
   }
 
   object UnTyper extends Traverser {
@@ -85,8 +89,13 @@ trait Typers extends Modes with Adaptations with Tags {
   case class SilentTypeError(err: AbsTypeError) extends SilentResult[Nothing] { }
   case class SilentResultValue[+T](value: T) extends SilentResult[T] { }
 
+  def finishTyper(): Unit = {
+    // need to clear it after as well or 10K+ accumulated entries are
+    // uncollectable the rest of the way.
+    undoLog.clear()
+  }
   def newTyper(context: Context): Typer = new NormalTyper(context)
-  private class NormalTyper(context : Context) extends Typer(context)
+  private class NormalTyper(context0: Context) extends Typer(context0)
 
   // A transient flag to mark members of anonymous classes
   // that are turned private by typedBlock
@@ -1702,7 +1711,7 @@ trait Typers extends Modes with Adaptations with Tags {
      *  @param cdef ...
      *  @return     ...
      */
-    def typedClassDef(cdef: ClassDef): Tree = {
+    def typedClassDef(cdef: ClassDef): ClassDef = {
 //      attributes(cdef)
       val clazz = cdef.symbol
       val typedMods = typedModifiers(cdef.mods)
@@ -1729,14 +1738,14 @@ trait Typers extends Modes with Adaptations with Tags {
         }
       }
       treeCopy.ClassDef(cdef, typedMods, cdef.name, tparams1, impl2)
-        .setType(NoType)
+        .setType(NoType).asInstanceOf[ClassDef]
     }
 
     /**
      *  @param mdef ...
      *  @return     ...
      */
-    def typedModuleDef(mdef: ModuleDef): Tree = {
+    def typedModuleDef(mdef: ModuleDef): ModuleDef = {
       // initialize all constructors of the linked class: the type completer (Namer.methodSig)
       // might add default getters to this object. example: "object T; class T(x: Int = 1)"
       val linkedClass = companionSymbolOf(mdef.symbol, context)
@@ -1765,7 +1774,7 @@ trait Typers extends Modes with Adaptations with Tags {
       }
       val impl2  = finishMethodSynthesis(impl1, clazz, context)
 
-      treeCopy.ModuleDef(mdef, typedMods, mdef.name, impl2) setType NoType
+      treeCopy.ModuleDef(mdef, typedMods, mdef.name, impl2).setType(NoType).asInstanceOf[ModuleDef]
     }
     /** In order to override this in the TreeCheckers Typer so synthetics aren't re-added
      *  all the time, it is exposed here the module/class typing methods go through it.
@@ -2705,48 +2714,61 @@ trait Typers extends Modes with Adaptations with Tags {
       case _                  => log("unhandled import: "+imp+" in "+unit); imp
     }
 
+    private def includesTargetPos(tree: Tree) = (
+         tree.pos.isRange
+      && context.unit.exists
+      && (tree.pos includes context.unit.targetPos)
+    )
+    private def isIllegalExpression(stat: Tree) = (
+      context.owner.isRefinementClass && !treeInfo.isDeclarationOrTypeDef(stat)
+    )
+
+    def typedStat(stat: Tree, exprOwner: Symbol): Tree = stat match {
+      case imp @ Import(_, _) =>
+        if (imp.symbol.initialize.isError) EmptyTree
+        else {
+          context = context.makeNewImport(imp)
+          typedImport(imp)
+        }
+      case _ =>
+        val reuseTyper = (exprOwner == context.owner) || (stat match {
+          case _: LabelDef => false
+          case _           => stat.isDef
+        })
+        val localTyper = if (reuseTyper) this else newTyper(context.make(stat, exprOwner))
+        // XXX this creates a spurious dead code warning if an exception is thrown
+        // in a constructor, even if it is the only thing in the constructor.
+        val result = checkDead(localTyper.typed(stat, EXPRmode | BYVALmode, WildcardType))
+
+        if (treeInfo.isSelfOrSuperConstrCall(result)) {
+          context.inConstructorSuffix = true
+          if (treeInfo.isSelfConstrCall(result) && result.symbol.pos.pointOrElse(0) >= exprOwner.enclMethod.pos.pointOrElse(0))
+            ConstructorsOrderError(stat)
+        }
+        if (treeInfo.isPureExprForWarningPurposes(result)) context.warning(stat.pos,
+          "a pure expression does nothing in statement position; " +
+          "you may be omitting necessary parentheses"
+        )
+        result
+    }
+
     def typedStats(stats: List[Tree], exprOwner: Symbol): List[Tree] = {
       val inBlock = exprOwner == context.owner
-      def includesTargetPos(tree: Tree) =
-        tree.pos.isRange && context.unit.exists && (tree.pos includes context.unit.targetPos)
       val localTarget = stats exists includesTargetPos
       def typedStat(stat: Tree): Tree = {
-        if (context.owner.isRefinementClass && !treeInfo.isDeclarationOrTypeDef(stat))
+        // skip typechecking of a statement where some other
+        // statement includes the target position
+        def skipTypedStat = stat match {
+          case _: Import => false
+          case t         => localTarget && !includesTargetPos(t)
+        }
+        if (isIllegalExpression(stat))
           OnlyDeclarationsError(stat)
+        // skip typechecking of a statement where some other statement includes the targetposition
+        else if (skipTypedStat)
+          stat
         else
-          stat match {
-            case imp @ Import(_, _) =>
-              imp.symbol.initialize
-              if (!imp.symbol.isError) {
-                context = context.makeNewImport(imp)
-                typedImport(imp)
-              } else EmptyTree
-            case _ =>
-              if (localTarget && !includesTargetPos(stat)) {
-                // skip typechecking of statements in a sequence where some other statement includes
-                // the targetposition
-                stat
-              } else {
-                val localTyper = if (inBlock || (stat.isDef && !stat.isInstanceOf[LabelDef])) {
-                  this
-                } else newTyper(context.make(stat, exprOwner))
-                // XXX this creates a spurious dead code warning if an exception is thrown
-                // in a constructor, even if it is the only thing in the constructor.
-                val result = checkDead(localTyper.typed(stat, EXPRmode | BYVALmode, WildcardType))
-
-                if (treeInfo.isSelfOrSuperConstrCall(result)) {
-                  context.inConstructorSuffix = true
-                  if (treeInfo.isSelfConstrCall(result) && result.symbol.pos.pointOrElse(0) >= exprOwner.enclMethod.pos.pointOrElse(0))
-                    ConstructorsOrderError(stat)
-                }
-
-                if (treeInfo.isPureExprForWarningPurposes(result)) context.warning(stat.pos,
-                  "a pure expression does nothing in statement position; " +
-                  "you may be omitting necessary parentheses"
-                )
-                result
-              }
-          }
+          Typer.this.typedStat(stat, exprOwner)
       }
 
       /** 'accessor' and 'accessed' are so similar it becomes very difficult to

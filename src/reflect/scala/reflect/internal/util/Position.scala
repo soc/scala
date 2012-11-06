@@ -12,13 +12,16 @@ import scala.reflect.macros.Attachments
 object Position {
   val tabInc = 8
 
-  /** Prints the message with the given position indication. */
+  def normalizePosition(posIn: Position): Position = (
+    if (posIn eq null) NoPosition
+    else if (posIn.isDefined) posIn.inUltimateSource(posIn.source)
+    else posIn
+  )
+
+  /** Constructs a String based on the given position and message.
+   */
   def formatMessage(posIn: Position, msg: String, shortenFile: Boolean): String = {
-    val pos = (
-      if (posIn eq null) NoPosition
-      else if (posIn.isDefined) posIn.inUltimateSource(posIn.source)
-      else posIn
-    )
+    val pos    = normalizePosition(posIn)
     def file   = pos.source.file
     def prefix = if (shortenFile) file.name else file.path
 
