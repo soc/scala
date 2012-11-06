@@ -38,16 +38,16 @@ class TreeTracer { tracer =>
     "%5s/%-5s%s%25s".format("(1)", "(2)", "(3)", "(4)"),
     "(5)"
   )
-  def banner = """
+  def banner = s"""
     |(1) Total time spent typing node (in ms)
     |(2) "Own" time (Total time - children's time)
     |(3) Monotonically increasing id assigned to nodes
     |(4) Textual content characterizing AST node
     |(5) Line in source file
     |
-    |%s
-    |%s
-  """.stripMargin.trim.format(headers, "-" * 80)
+    |$headers
+    |${"-" * 80}
+  """.stripMargin.trim
 
   def quieter(s: String) = List(
     """\Qscala.collection.\E""" -> "sc."
