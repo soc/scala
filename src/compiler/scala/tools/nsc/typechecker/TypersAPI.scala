@@ -23,6 +23,7 @@ trait AnalyzerAPI {
     def typed(tree: Tree, mode: Int, pt: Type): Tree
     def typedApply(tree: Apply, mode: Int, pt: Type): Tree
     def typedBlock(block: Block, mode: Int, pt: Type): Block
+    def typedIdent(tree: Ident, mode: Int, pt: Type): Tree
 
     def typedClassDef(cdef: ClassDef): ClassDef
     def typedModuleDef(mdef: ModuleDef): ModuleDef
@@ -54,7 +55,6 @@ trait AnalyzerAPI {
     def typedEta(expr1: Tree): Tree
     def typedFunction(fun: Function, mode: Int, pt: Type): Tree
     def typedHigherKindedType(tree: Tree, mode: Int, pt: Type): Tree
-    def typedIdent(name: Name): Tree
     def typedIf(cond: Tree, thenp: Tree, elsep: Tree): Tree
     def typedImport(imp: Import): Import
     def typedLabelDef(ldef: LabelDef): LabelDef

@@ -1926,6 +1926,84 @@ trait Typers extends Modes with Adaptations with Tags {
       }
     }
 
+    /** Attribute an identifier consisting of a simple name or an outer reference.
+     *
+     *  @param tree      The tree representing the identifier.
+     *  @param name      The name of the identifier.
+     *  Transformations: (1) Prefix class members with this.
+     *                   (2) Change imported symbols to selections
+     */
+    def typedIdent(tree: Ident, mode: Int, pt: Type): Tree = {
+      val name = tree.name
+
+      /** A symbol qualifies if:
+       *  - it exists
+       *  - it is not stale (stale symbols are made to disappear here)
+       *  - if we are in a pattern constructor, method definitions do not qualify
+       *    unless they are stable.  Otherwise, 'case x :: xs' would find the :: method.
+       */
+      def qualifies(sym: Symbol) = (
+           sym.hasRawInfo
+        && reallyExists(sym)
+        && !(inPatternConstructor && sym.isMethod && !sym.isStable)
+      )
+      def isPatternMode = inPatternMode(mode)
+      def inPatternConstructor = inAllModes(mode, PATTERNmode | FUNmode)
+      def isQualifierMode      = (mode & QUALmode) != 0
+
+      // Lookup in the given class using the root mirror.
+      def lookupInOwner(owner: Symbol, name: Name): Symbol =
+        if (isQualifierMode) rootMirror.missingHook(owner, name) else NoSymbol
+
+      // Lookup in the given qualifier.  Used in last-ditch efforts by typedIdent and typedSelect.
+      def lookupInRoot(name: Name): Symbol  = lookupInOwner(rootMirror.RootClass, name)
+      def lookupInEmpty(name: Name): Symbol = lookupInOwner(rootMirror.EmptyPackageClass, name)
+
+      // setting to enable unqualified idents in empty package
+      def inEmptyPackage = if (settings.exposeEmptyPackage.value) lookupInEmpty(name) else NoSymbol
+
+      def issue(err: AbsTypeError) = {
+        // Avoiding some spurious error messages: see SI-2388.
+        val suppress = reporter.hasErrors && (name startsWith tpnme.ANON_CLASS_NAME)
+        if (!suppress)
+          ErrorUtils.issueTypeError(err)
+
+        setError(tree)
+      }
+      // ignore current variable scope in patterns to enforce linearity
+      val startContext = if (inNoModes(mode, PATTERNmode | TYPEPATmode)) context else context.outer
+      val nameLookup   = tree.symbol match {
+        case NoSymbol   => startContext.lookupSymbol(name, qualifies)
+        case sym        => LookupSucceeded(EmptyTree, sym)
+      }
+      import InferErrorGen._
+      nameLookup match {
+        case LookupAmbiguous(msg)         => issue(AmbiguousIdentError(tree, name, msg))
+        case LookupInaccessible(sym, msg) => issue(AccessError(tree, sym, context, msg))
+        case LookupNotFound               =>
+          inEmptyPackage orElse lookupInRoot(name) match {
+            case NoSymbol => issue(SymbolNotFoundError(tree, name, context.owner, startContext))
+            case sym      => typed1(tree setSymbol sym, mode, pt)
+          }
+        case LookupSucceeded(qual, sym)   =>
+          // this -> Foo.this
+          if (sym.isThisSym)
+            typed1(This(sym.owner) setPos tree.pos, mode, pt)
+          // Inferring classOf type parameter from expected type.  Otherwise an
+          // actual call to the stubbed classOf method is generated, returning null.
+          else if (isPredefMemberNamed(sym, nme.classOf) && pt.typeSymbol == ClassClass && pt.typeArgs.nonEmpty)
+            typedClassOf(tree, TypeTree(pt.typeArgs.head))
+          else {
+            val pre1  = if (sym.owner.isPackageClass) sym.owner.thisType else if (qual == EmptyTree) NoPrefix else qual.tpe
+            val tree1 = if (qual == EmptyTree) tree else atPos(tree.pos)(Select(atPos(tree.pos.focusStart)(qual), name))
+            val (tree2, pre2) = makeAccessible(tree1, sym, pre1, qual)
+            // SI-5967 Important to replace param type A* with Seq[A] when seen from from a reference, to avoid
+            //         inference errors in pattern matching.
+            stabilize(tree2, pre2, mode, pt) modifyType dropIllegalStarTypes
+          }
+      }
+    }
+
     /** Try to apply function to arguments; if it does not work, try to convert Java raw to existentials, or try to
      *  insert an implicit conversion.
      */
@@ -4184,22 +4262,6 @@ trait Typers extends Modes with Adaptations with Tags {
       def inPatternConstructor = inAllModes(mode, PATTERNmode | FUNmode)
       def isQualifierMode      = (mode & QUALmode) != 0
 
-      // Lookup in the given class using the root mirror.
-      def lookupInOwner(owner: Symbol, name: Name): Symbol =
-        if (isQualifierMode) rootMirror.missingHook(owner, name) else NoSymbol
-
-      // Lookup in the given qualifier.  Used in last-ditch efforts by typedIdent and typedSelect.
-      def lookupInRoot(name: Name): Symbol  = lookupInOwner(rootMirror.RootClass, name)
-      def lookupInEmpty(name: Name): Symbol = lookupInOwner(rootMirror.EmptyPackageClass, name)
-      def lookupInQualifier(qual: Tree, name: Name): Symbol = (
-        if (name == nme.ERROR || qual.tpe.widen.isErroneous)
-          NoSymbol
-        else lookupInOwner(qual.tpe.typeSymbol, name) orElse {
-          NotAMemberError(tree, qual, name)
-          NoSymbol
-        }
-      )
-
       def typedAnnotated(atd: Annotated): Tree = {
         val ann = atd.annot
         val arg1 = typed(atd.arg, mode, pt)
@@ -4658,6 +4720,18 @@ trait Typers extends Modes with Adaptations with Tags {
               }
               else None
             )
+            def lookupInOwner(owner: Symbol, name: Name): Symbol =
+              if (isQualifierMode) rootMirror.missingHook(owner, name) else NoSymbol
+
+            def lookupInQualifier(qual: Tree, name: Name): Symbol = (
+              if (name == nme.ERROR || qual.tpe.widen.isErroneous)
+                NoSymbol
+              else lookupInOwner(qual.tpe.typeSymbol, name) orElse {
+                NotAMemberError(tree, qual, name)
+                NoSymbol
+              }
+            )
+
             debuglog(s"""
               |qual=$qual:${qual.tpe}
               |symbol=${qual.tpe.termSymbol.defString}
@@ -4771,81 +4845,6 @@ trait Typers extends Modes with Adaptations with Tags {
             if (qual1.hasSymbolWhich(_.isRootPackage)) treeCopy.Ident(tree1, name)
             else tree1
         }
-      }
-
-      /** A symbol qualifies if:
-       *  - it exists
-       *  - it is not stale (stale symbols are made to disappear here)
-       *  - if we are in a pattern constructor, method definitions do not qualify
-       *    unless they are stable.  Otherwise, 'case x :: xs' would find the :: method.
-       */
-      def qualifies(sym: Symbol) = (
-           sym.hasRawInfo
-        && reallyExists(sym)
-        && !(inPatternConstructor && sym.isMethod && !sym.isStable)
-      )
-
-      /** Attribute an identifier consisting of a simple name or an outer reference.
-       *
-       *  @param tree      The tree representing the identifier.
-       *  @param name      The name of the identifier.
-       *  Transformations: (1) Prefix class members with this.
-       *                   (2) Change imported symbols to selections
-       */
-      def typedIdent(tree: Tree, name: Name): Tree = {
-        // setting to enable unqualified idents in empty package
-        def inEmptyPackage = if (settings.exposeEmptyPackage.value) lookupInEmpty(name) else NoSymbol
-
-        def issue(err: AbsTypeError) = {
-          // Avoiding some spurious error messages: see SI-2388.
-          val suppress = reporter.hasErrors && (name startsWith tpnme.ANON_CLASS_NAME)
-          if (!suppress)
-            ErrorUtils.issueTypeError(err)
-
-          setError(tree)
-        }
-        // ignore current variable scope in patterns to enforce linearity
-        val startContext = if (inNoModes(mode, PATTERNmode | TYPEPATmode)) context else context.outer
-        val nameLookup   = tree.symbol match {
-          case NoSymbol   => startContext.lookupSymbol(name, qualifies)
-          case sym        => LookupSucceeded(EmptyTree, sym)
-        }
-        import InferErrorGen._
-        nameLookup match {
-          case LookupAmbiguous(msg)         => issue(AmbiguousIdentError(tree, name, msg))
-          case LookupInaccessible(sym, msg) => issue(AccessError(tree, sym, context, msg))
-          case LookupNotFound               =>
-            inEmptyPackage orElse lookupInRoot(name) match {
-              case NoSymbol => issue(SymbolNotFoundError(tree, name, context.owner, startContext))
-              case sym      => typed1(tree setSymbol sym, mode, pt)
-            }
-          case LookupSucceeded(qual, sym)   =>
-            // this -> Foo.this
-            if (sym.isThisSym)
-              typed1(This(sym.owner) setPos tree.pos, mode, pt)
-            // Inferring classOf type parameter from expected type.  Otherwise an
-            // actual call to the stubbed classOf method is generated, returning null.
-            else if (isPredefMemberNamed(sym, nme.classOf) && pt.typeSymbol == ClassClass && pt.typeArgs.nonEmpty)
-              typedClassOf(tree, TypeTree(pt.typeArgs.head))
-            else {
-              val pre1  = if (sym.owner.isPackageClass) sym.owner.thisType else if (qual == EmptyTree) NoPrefix else qual.tpe
-              val tree1 = if (qual == EmptyTree) tree else atPos(tree.pos)(Select(atPos(tree.pos.focusStart)(qual), name))
-              val (tree2, pre2) = makeAccessible(tree1, sym, pre1, qual)
-              // SI-5967 Important to replace param type A* with Seq[A] when seen from from a reference, to avoid
-              //         inference errors in pattern matching.
-              stabilize(tree2, pre2, mode, pt) modifyType dropIllegalStarTypes
-            }
-        }
-      }
-
-      def typedIdentOrWildcard(tree: Ident) = {
-        val name = tree.name
-        if (Statistics.canEnable) Statistics.incCounter(typedIdentCount)
-        if ((name == nme.WILDCARD && (mode & (PATTERNmode | FUNmode)) == PATTERNmode) ||
-            (name == tpnme.WILDCARD && (mode & TYPEmode) != 0))
-          tree setType makeFullyDefined(pt)
-        else
-          typedIdent(tree, name)
       }
 
       def typedCompoundTypeTree(tree: CompoundTypeTree) = {
@@ -5169,6 +5168,16 @@ trait Typers extends Modes with Adaptations with Tags {
           fun.symbol = context.owner.newAnonymousFunctionValue(fun.pos)
 
         typerWithLocalContext(context.makeNewScope(fun, fun.symbol))(_.typedFunction(fun, mode, pt))
+      }
+
+      def typedIdentOrWildcard(tree: Ident) = {
+        val name = tree.name
+        if (Statistics.canEnable) Statistics.incCounter(typedIdentCount)
+        if ((name == nme.WILDCARD && (mode & (PATTERNmode | FUNmode)) == PATTERNmode) ||
+            (name == tpnme.WILDCARD && (mode & TYPEmode) != 0))
+          tree setType makeFullyDefined(pt)
+        else
+          typedIdent(tree, mode, pt)
       }
 
       // begin typed1
