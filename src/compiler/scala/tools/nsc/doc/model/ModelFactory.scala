@@ -55,7 +55,7 @@ class ModelFactory(val global: Global, val settings: doc.Settings) {
       val rootPackage = modelCreation.createRootPackage
     }
     _modelFinished = true
-    // complete the links between model entities, everthing that couldn't have been done before
+    // complete the links between model entities, everything that couldn't have been done before
     universe.rootPackage.completeModel
 
     Some(universe) filter (_.rootPackage != null)
@@ -158,7 +158,7 @@ class ModelFactory(val global: Global, val settings: doc.Settings) {
       if (!sym.isModule && (sym hasFlag Flags.FINAL)) fgs += Paragraph(Text("final"))
       fgs.toList
     }
-    def deprecation =
+    def deprecation: Option[Body]  =
       if (sym.isDeprecated)
         Some((sym.deprecationMessage, sym.deprecationVersion) match {
           case (Some(msg), Some(ver)) => parseWiki("''(Since version " + ver + ")'' " + msg, NoPosition, Some(inTpl))
@@ -168,8 +168,8 @@ class ModelFactory(val global: Global, val settings: doc.Settings) {
         })
       else
         comment flatMap { _.deprecated }
-    def migration =
-      if(sym.hasMigrationAnnotation)
+    def migration: Option[Body] =
+      if (sym.hasMigrationAnnotation)
         Some((sym.migrationMessage, sym.migrationVersion) match {
           case (Some(msg), Some(ver)) => parseWiki("''(Changed in version " + ver + ")'' " + msg, NoPosition, Some(inTpl))
           case (Some(msg), None) => parseWiki(msg, NoPosition, Some(inTpl))
@@ -178,6 +178,8 @@ class ModelFactory(val global: Global, val settings: doc.Settings) {
         })
       else
         None
+    def throws: List[Body] =
+        sym.throwsAnnotations map {case (exc, msg) => parseWiki(s"''$exc'': $msg\n", NoPosition, Some(inTpl))}
     def inheritedFrom =
       if (inTemplate.sym == this.sym.owner || inTemplate.sym.isPackage) Nil else
         makeTemplate(this.sym.owner) :: (sym.allOverriddenSymbols map { os => makeTemplate(os.owner) })

@@ -27,10 +27,9 @@ trait AnnotationInfos extends api.Annotations { self: SymbolTable =>
     def filterAnnotations(p: AnnotationInfo => Boolean): Self // Retain only annotations meeting the condition.
     def withoutAnnotations: Self                              // Remove all annotations from this type.
 
-    /** Symbols of any @throws annotations on this symbol.
-     */
-    def throwsAnnotations(): List[Symbol] = annotations collect {
-      case ThrownException(exc) => exc
+    /** Symbols of any @throws annotations on this symbol. */
+    def throwsAnnotations: List[(Symbol, String)] = annotations collect {
+      case ThrownException(exc, msg) => (exc, msg)
     }
 
     /** Tests for, get, or remove an annotation */
@@ -39,7 +38,7 @@ trait AnnotationInfos extends api.Annotations { self: SymbolTable =>
       dropOtherAnnotations(annotations, cls).nonEmpty
 
     def getAnnotation(cls: Symbol): Option[AnnotationInfo] =
-      //OPT inlined from exists to save on #closures; was:  annotations find (_ matches cls)
+      //OPT inlined from find to save on #closures; was:  annotations find (_ matches cls)
       dropOtherAnnotations(annotations, cls) match {
         case ann :: _ => Some(ann)
         case _ => None
@@ -332,16 +331,16 @@ trait AnnotationInfos extends api.Annotations { self: SymbolTable =>
     * as well as “new-stye” `@throws[Exception]("cause")` annotations.
     */
   object ThrownException {
-    def unapply(ann: AnnotationInfo): Option[Symbol] = 
+    def unapply(ann: AnnotationInfo): Option[(Symbol, String)] = 
       ann match {
         case AnnotationInfo(tpe, _, _) if tpe.typeSymbol != ThrowsClass =>
           None
         // old-style: @throws(classOf[Exception]) (which is throws[T](classOf[Exception]))
         case AnnotationInfo(_, List(Literal(Constant(tpe: Type))), _) =>
-          Some(tpe.typeSymbol)
+          Some(tpe.typeSymbol, "")
         // new-style: @throws[Exception], @throws[Exception]("cause")
-        case AnnotationInfo(TypeRef(_, _, args), _, _) =>
-          Some(args.head.typeSymbol)
+        case AnnotationInfo(TypeRef(_, _, List(tpe)), List(Literal(Constant(msg: String))), _) =>
+          Some(tpe.typeSymbol, msg)
       }
   }
 }

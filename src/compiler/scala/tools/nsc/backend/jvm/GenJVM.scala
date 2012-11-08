@@ -587,7 +587,7 @@ abstract class GenJVM extends SubComponent with GenJVMUtil with GenAndroid with 
       // put some random value; the actual number is determined at the end
       buf putShort 0xbaba.toShort
 
-      for (ThrownException(exc) <- excs.distinct) {
+      for (ThrownException(exc, _) <- excs.distinct) {
         buf.putShort(
           cpool.addClass(
             javaName(exc)).shortValue)

@@ -838,7 +838,7 @@ abstract class GenASM extends SubComponent with BytecodeWriters {
      * This method returns such list of internal names.
      */
     def getExceptions(excs: List[AnnotationInfo]): List[String] =
-      for (ThrownException(exc) <- excs.distinct)
+      for (ThrownException(exc, _) <- excs.distinct)
       yield javaName(exc)
 
     /** Whether an annotation should be emitted as a Java annotation

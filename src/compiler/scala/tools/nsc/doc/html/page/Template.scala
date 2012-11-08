@@ -505,7 +505,7 @@ class Template(universe: doc.Universe, generator: DiagramGenerator, tpl: DocTemp
 
     val annotations: Seq[scala.xml.Node] = {
       // A list of annotations which don't show their arguments, e. g. because they are shown separately.
-      val annotationsWithHiddenArguments = List("deprecated", "Deprecated", "migration")
+      val annotationsWithHiddenArguments = List("deprecated", "Deprecated", "migration", "throws")
 
       def showArguments(annotation: Annotation) =
         !(annotationsWithHiddenArguments.contains(annotation.qualifiedName))
@@ -532,6 +532,13 @@ class Template(universe: doc.Universe, generator: DiagramGenerator, tpl: DocTemp
         <dd>{ <a href={ dtpl.sourceUrl.get.toString } target="_blank">{ Text(absFile.file.getName) }</a> }</dd>
       case _ => NodeSeq.Empty
     }
+
+    val throws: Seq[scala.xml.Node] =
+      if(mbr.throws.isEmpty || isReduced) NodeSeq.Empty
+      else {
+          <dt>Exceptions thrown (visible in Java)</dt>
+          <dd class="cmt">{ mbr.throws map bodyToHtml }</dd>
+      }
 
     val deprecation: Seq[scala.xml.Node] =
       if (mbr.deprecation.isEmpty || isReduced) NodeSeq.Empty
@@ -617,7 +624,7 @@ class Template(universe: doc.Universe, generator: DiagramGenerator, tpl: DocTemp
     }
     // end attributes block vals ---
 
-    val attributesInfo = implicitInformation ++ attributes ++ definitionClasses ++ fullSignature ++ selfType ++ annotations ++ deprecation ++ migration ++ sourceLink ++ mainComment
+    val attributesInfo = implicitInformation ++ attributes ++ definitionClasses ++ fullSignature ++ selfType ++ annotations ++ throws ++ deprecation ++ migration ++ sourceLink ++ mainComment
     val attributesBlock =
       if (attributesInfo.isEmpty)
         NodeSeq.Empty
