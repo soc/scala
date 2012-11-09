@@ -89,16 +89,16 @@ abstract class ExplicitOuter extends InfoTransform
     else findOrElse(clazz.info.decls)(_.outerSource == clazz)(NoSymbol)
   }
   def newOuterAccessor(clazz: Symbol) = {
-    val accFlags = SYNTHETIC | ARTIFACT | METHOD | STABLE | ( if (clazz.isTrait) DEFERRED else 0 )
-    val sym      = clazz.newMethod(nme.OUTER, clazz.pos, accFlags)
+    val accFlags = SYNTHETIC | ARTIFACT | METHOD | STABLE | ( if (clazz.initialize.isTrait) DEFERRED else 0 )
     val restpe   = if (clazz.isTrait) clazz.outerClass.tpe_* else clazz.outerClass.thisType
+    val sym      = clazz.newMethod(nme.OUTER, clazz.pos, accFlags) setInfo MethodType(Nil, restpe)
 
-    sym expandName clazz
+    sym.initialize expandName clazz
     sym.referenced = clazz
-    sym setInfo MethodType(Nil, restpe)
+    sym
   }
   def newOuterField(clazz: Symbol) = {
-    val accFlags = SYNTHETIC | ARTIFACT | PARAMACCESSOR | ( if (clazz.isEffectivelyFinal) PrivateLocal else PROTECTED )
+    val accFlags = SYNTHETIC | ARTIFACT | PARAMACCESSOR | ( if (clazz.initialize.isEffectivelyFinal) PrivateLocal else PROTECTED )
     val sym      = clazz.newValue(nme.OUTER_LOCAL, clazz.pos, accFlags)
 
     sym setInfo clazz.outerClass.thisType
@@ -158,9 +158,8 @@ abstract class ExplicitOuter extends InfoTransform
       var decls1 = decls
       if (isInner(clazz) && !clazz.isInterface) {
         decls1 = decls.cloneScope
-        val outerAcc = clazz.newMethod(nme.OUTER, clazz.pos) // 3
-        outerAcc expandName clazz
-
+        // val outerAcc = clazz.newMethod(nme.OUTER, clazz.pos) // 3
+        // outerAcc expandName clazz
         decls1 enter newOuterAccessor(clazz)
         if (hasOuterField(clazz)) //2
           decls1 enter newOuterField(clazz)

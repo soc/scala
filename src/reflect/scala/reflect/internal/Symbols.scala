@@ -585,6 +585,8 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
      */
     def isEffectiveRoot = false
 
+    override def isLifted = initialize.hasFlag(LIFTED)
+
     final def isLazyAccessor       = isLazy && lazyAccessor != NoSymbol
     final def isOverridableMember  = !(isClass || isEffectivelyFinal) && (this ne NoSymbol) && owner.isClass
 
@@ -1463,7 +1465,7 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
      */
     def cookJavaRawInfo(): Unit = {
       // only try once...
-      if (this hasFlag TRIEDCOOKING)
+      if (this.initialize hasFlag TRIEDCOOKING)
         return
 
       this setFlag TRIEDCOOKING
@@ -2548,6 +2550,7 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
      */
     override def expandName(base: Symbol) {
       if (!hasFlag(EXPANDEDNAME)) {
+        if (!isInitialized) Console.err.println("!EXPANDEDNAME but !isInitialized too... " + this)
         setFlag(EXPANDEDNAME)
         if (hasAccessorFlag && !isDeferred) {
           accessed.expandName(base)
@@ -2576,12 +2579,12 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
 
     override def owner = {
       if (Statistics.hotEnabled) Statistics.incCounter(ownerCount)
-      if (!isMethod && needsFlatClasses) rawowner.owner
+      if (isInitialized && !isMethod && needsFlatClasses) rawowner.owner
       else rawowner
     }
     override def name: TermName = {
       if (Statistics.hotEnabled) Statistics.incCounter(nameCount)
-      if (!isMethod && needsFlatClasses) {
+      if (isInitialized && !isMethod && needsFlatClasses) {
         if (flatname eq null)
           flatname = nme.flattenedName(rawowner.name, rawname)
 
