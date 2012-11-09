@@ -314,6 +314,9 @@ trait Infer extends Checkable {
         if (context.unit.exists)
           context.unit.depends += sym.enclosingTopLevelClass
 
+        if (!sym.isInitialize)
+          Console.err.println(s"checkAccessible on uninitialized symbol $sym")
+
         var sym1 = sym filter (alt => context.isAccessible(alt, pre, site.isInstanceOf[Super]))
         // Console.println("check acc " + (sym, sym1) + ":" + (sym.tpe, sym1.tpe) + " from " + pre);//DEBUG
         if (sym1 == NoSymbol && sym.isJavaDefined && context.unit.isJava) // don't try to second guess Java; see #4402
