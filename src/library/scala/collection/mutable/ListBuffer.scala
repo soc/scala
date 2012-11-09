@@ -129,6 +129,8 @@ final class ListBuffer[A]
    *  @throws Predef.IndexOutOfBoundsException if `n` is out of bounds.
    */
   def update(n: Int, x: A) {
+    if (n < 0)
+      throw new IndexOutOfBoundsException(n.toString)
     try {
       if (exported) copy()
       if (n == 0) {
@@ -151,7 +153,7 @@ final class ListBuffer[A]
         cursor.asInstanceOf[::[A]].tl = newElem
       }
     } catch {
-      case ex: Exception => throw new IndexOutOfBoundsException(n.toString())
+      case ex: Exception => throw new IndexOutOfBoundsException(n.toString)
     }
   }
 
@@ -212,6 +214,8 @@ final class ListBuffer[A]
    *  @throws Predef.IndexOutOfBoundsException if `n` is out of bounds.
    */
   def insertAll(n: Int, seq: Traversable[A]) {
+    if (n < 0)
+      throw new IndexOutOfBoundsException(n.toString)
     try {
       if (exported) copy()
       var elems = seq.toList.reverse
@@ -239,7 +243,7 @@ final class ListBuffer[A]
       }
     } catch {
       case ex: Exception =>
-        throw new IndexOutOfBoundsException(n.toString())
+        throw new IndexOutOfBoundsException(n.toString)
     }
   }
 
