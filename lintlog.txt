@@ -1,0 +1,789 @@
+Buildfile: /scala/trunk/build.xml
+
+init.jars.check:
+
+init.jars:
+
+init.maven.tasks:
+
+init.maven.jars:
+[artifact:dependencies] There were no dependencies specified
+
+init.hasbuildnum:
+
+init.build.snapshot:
+
+init.build.release:
+
+init.build.nopatch.release:
+
+init.build.patch.release:
+
+init.hasmavensuffix:
+
+init.osgi.suffix:
+
+init.osgi.suffix.final:
+
+init.osgi.suffix.snapshot:
+
+init.build.suffix.done:
+
+init.version.git:
+
+init.version.release:
+
+init.version.snapshot:
+
+init.version.done:
+
+init.testjava6:
+
+init.fail.bad.jdk:
+
+init.warn.jdk7:
+     [echo]  You are using JDK7 for this build.  While this will be able to build most of Scala, it will
+     [echo]        not build the Swing project.   You will be unable to create a distribution.
+     [echo]      
+
+init.extra.tasks:
+[artifact:dependencies] [WARNING] POM for 'biz.aQute:bndlib:pom:1.43.0:compile' is invalid.
+[artifact:dependencies] 
+[artifact:dependencies] Its dependencies (if any) will NOT be available to the current build.
+
+init:
+     [echo]        build time: 7 November 2012, 17:01:52
+     [echo]      java version: Java HotSpot(TM) 64-Bit Server VM 1.7.0_05 (1.7)
+     [echo]         java args: -Xmx3g -Xms3g -Xss2m -XX:MaxPermSize=384m -XX:+UseParallelGC  
+     [echo]        javac args: 
+     [echo]       scalac args: -Yreify-copypaste -Xlint 
+     [echo] scalac quick args: -Yreify-copypaste -Xlint  
+     [echo]          git date: 20121107-161512
+     [echo]          git hash: 4f98d50bc2
+     [echo]     maven version: 2.11.0-SNAPSHOT
+     [echo]      OSGi version: 2.11.0.v20121107-161512-4f98d50bc2
+     [echo] canonical version: 2.11.0-20121107-161512-4f98d50bc2
+
+asm.start:
+
+asm.lib:
+    [mkdir] Created dir: /scala/trunk/build/asm/classes
+    [javac] Compiling 77 source files to /scala/trunk/build/asm/classes
+    [javac] warning: [options] bootstrap class path not set in conjunction with -source 1.5
+    [javac] Note: Some input files use unchecked or unsafe operations.
+    [javac] Note: Recompile with -Xlint:unchecked for details.
+    [javac] 1 warning
+[stopwatch] [asm.lib.timer: 2.575 sec]
+
+asm.done:
+
+forkjoin.start:
+
+forkjoin.lib:
+    [mkdir] Created dir: /scala/trunk/build/libs/classes/forkjoin
+    [javac] Compiling 10 source files to /scala/trunk/build/libs/classes/forkjoin
+    [javac] warning: [options] bootstrap class path not set in conjunction with -source 1.5
+    [javac] 1 warning
+    [javac] Creating empty /scala/trunk/build/libs/classes/forkjoin/scala/concurrent/forkjoin/package-info.class
+[stopwatch] [forkjoin.lib.timer: 2.203 sec]
+
+forkjoin.pack:
+      [jar] Building jar: /scala/trunk/build/libs/forkjoin.jar
+
+forkjoin.done:
+
+fjbg.init:
+
+fjbg.lib:
+    [mkdir] Created dir: /scala/trunk/build/libs/classes/fjbg
+    [javac] Compiling 33 source files to /scala/trunk/build/libs/classes/fjbg
+    [javac] warning: [options] bootstrap class path not set in conjunction with -source 1.4
+    [javac] 1 warning
+[stopwatch] [fjbg.lib.timer: 0.610 sec]
+
+fjbg.pack:
+      [jar] Building jar: /scala/trunk/build/libs/fjbg.jar
+
+fjbg.done:
+
+locker.start:
+
+locker.pre-lib:
+
+locker.lib:
+
+locker.pre-reflect:
+
+locker.reflect:
+
+locker.pre-comp:
+
+locker.comp:
+
+locker.done:
+
+quick.start:
+
+quick.pre-lib:
+
+quick.lib:
+    [mkdir] Created dir: /scala/trunk/build/quick/classes/library
+    [javac] Compiling 32 source files to /scala/trunk/build/quick/classes/library
+    [javac] warning: [options] bootstrap class path not set in conjunction with -source 1.5
+    [javac] Note: /scala/trunk/src/library/scala/collection/concurrent/MainNode.java uses unchecked or unsafe operations.
+    [javac] Note: Recompile with -Xlint:unchecked for details.
+    [javac] 1 warning
+    [javac] Compiling 41 source files to /scala/trunk/build/quick/classes/library
+    [javac] warning: [options] bootstrap class path not set in conjunction with -source 1.5
+    [javac] Note: Some input files use unchecked or unsafe operations.
+    [javac] Note: Recompile with -Xlint:unchecked for details.
+    [javac] 1 warning
+[scalacfork] Compiling 720 files to /scala/trunk/build/quick/classes/library
+[scalacfork] /scala/trunk/src/library/scala/collection/immutable/StringOps.scala:31: warning: Implementation of hashCode inherited from trait IndexedSeqLike overridden in class StringOps to enforce value class semantics
+[scalacfork] final class StringOps(override val repr: String) extends AnyVal with StringLike[String] {
+[scalacfork]             ^
+[scalacfork] /scala/trunk/src/library/scala/collection/mutable/ArrayOps.scala:105: warning: Implementation of hashCode inherited from trait IndexedSeqLike overridden in class ofRef to enforce value class semantics
+[scalacfork]   final class ofRef[T <: AnyRef](override val repr: Array[T]) extends AnyVal with ArrayOps[T] with ArrayLike[T, Array[T]] {
+[scalacfork]               ^
+[scalacfork] /scala/trunk/src/library/scala/collection/mutable/ArrayOps.scala:117: warning: Implementation of hashCode inherited from trait IndexedSeqLike overridden in class ofByte to enforce value class semantics
+[scalacfork] final class ofByte(override val repr: Array[Byte]) extends AnyVal with ArrayOps[Byte] with ArrayLike[Byte, Array[Byte]] {
+[scalacfork]             ^
+[scalacfork] /scala/trunk/src/library/scala/collection/mutable/ArrayOps.scala:129: warning: Implementation of hashCode inherited from trait IndexedSeqLike overridden in class ofShort to enforce value class semantics
+[scalacfork] final class ofShort(override val repr: Array[Short]) extends AnyVal with ArrayOps[Short] with ArrayLike[Short, Array[Short]] {
+[scalacfork]             ^
+[scalacfork] /scala/trunk/src/library/scala/collection/mutable/ArrayOps.scala:141: warning: Implementation of hashCode inherited from trait IndexedSeqLike overridden in class ofChar to enforce value class semantics
+[scalacfork] final class ofChar(override val repr: Array[Char]) extends AnyVal with ArrayOps[Char] with ArrayLike[Char, Array[Char]] {
+[scalacfork]             ^
+[scalacfork] /scala/trunk/src/library/scala/collection/mutable/ArrayOps.scala:153: warning: Implementation of hashCode inherited from trait IndexedSeqLike overridden in class ofInt to enforce value class semantics
+[scalacfork] final class ofInt(override val repr: Array[Int]) extends AnyVal with ArrayOps[Int] with ArrayLike[Int, Array[Int]] {
+[scalacfork]             ^
+[scalacfork] /scala/trunk/src/library/scala/collection/mutable/ArrayOps.scala:165: warning: Implementation of hashCode inherited from trait IndexedSeqLike overridden in class ofLong to enforce value class semantics
+[scalacfork] final class ofLong(override val repr: Array[Long]) extends AnyVal with ArrayOps[Long] with ArrayLike[Long, Array[Long]] {
+[scalacfork]             ^
+[scalacfork] /scala/trunk/src/library/scala/collection/mutable/ArrayOps.scala:177: warning: Implementation of hashCode inherited from trait IndexedSeqLike overridden in class ofFloat to enforce value class semantics
+[scalacfork] final class ofFloat(override val repr: Array[Float]) extends AnyVal with ArrayOps[Float] with ArrayLike[Float, Array[Float]] {
+[scalacfork]             ^
+[scalacfork] /scala/trunk/src/library/scala/collection/mutable/ArrayOps.scala:189: warning: Implementation of hashCode inherited from trait IndexedSeqLike overridden in class ofDouble to enforce value class semantics
+[scalacfork] final class ofDouble(override val repr: Array[Double]) extends AnyVal with ArrayOps[Double] with ArrayLike[Double, Array[Double]] {
+[scalacfork]             ^
+[scalacfork] /scala/trunk/src/library/scala/collection/mutable/ArrayOps.scala:201: warning: Implementation of hashCode inherited from trait IndexedSeqLike overridden in class ofBoolean to enforce value class semantics
+[scalacfork] final class ofBoolean(override val repr: Array[Boolean]) extends AnyVal with ArrayOps[Boolean] with ArrayLike[Boolean, Array[Boolean]] {
+[scalacfork]             ^
+[scalacfork] /scala/trunk/src/library/scala/collection/mutable/ArrayOps.scala:213: warning: Implementation of hashCode inherited from trait IndexedSeqLike overridden in class ofUnit to enforce value class semantics
+[scalacfork] final class ofUnit(override val repr: Array[Unit]) extends AnyVal with ArrayOps[Unit] with ArrayLike[Unit, Array[Unit]] {
+[scalacfork]             ^
+[scalacfork] /scala/trunk/src/library/scala/runtime/RichBoolean.scala:11: warning: Implementation of hashCode inherited from trait Proxy overridden in class RichBoolean to enforce value class semantics
+[scalacfork] final class RichBoolean(val self: Boolean) extends AnyVal with OrderedProxy[Boolean] {
+[scalacfork]             ^
+[scalacfork] /scala/trunk/src/library/scala/runtime/RichByte.scala:11: warning: Implementation of hashCode inherited from trait Proxy overridden in class RichByte to enforce value class semantics
+[scalacfork] final class RichByte(val self: Byte) extends AnyVal with ScalaWholeNumberProxy[Byte] {
+[scalacfork]             ^
+[scalacfork] /scala/trunk/src/library/scala/runtime/RichChar.scala:13: warning: Implementation of hashCode inherited from trait Proxy overridden in class RichChar to enforce value class semantics
+[scalacfork] final class RichChar(val self: Char) extends AnyVal with IntegralProxy[Char] {
+[scalacfork]             ^
+[scalacfork] /scala/trunk/src/library/scala/runtime/RichDouble.scala:12: warning: Implementation of hashCode inherited from trait Proxy overridden in class RichDouble to enforce value class semantics
+[scalacfork] final class RichDouble(val self: Double) extends AnyVal with FractionalProxy[Double] {
+[scalacfork]             ^
+[scalacfork] /scala/trunk/src/library/scala/runtime/RichFloat.scala:12: warning: Implementation of hashCode inherited from trait Proxy overridden in class RichFloat to enforce value class semantics
+[scalacfork] final class RichFloat(val self: Float) extends AnyVal with FractionalProxy[Float] {
+[scalacfork]             ^
+[scalacfork] /scala/trunk/src/library/scala/runtime/RichInt.scala:15: warning: Implementation of hashCode inherited from trait Proxy overridden in class RichInt to enforce value class semantics
+[scalacfork] final class RichInt(val self: Int) extends AnyVal with ScalaNumberProxy[Int] with RangedProxy[Int] {
+[scalacfork]             ^
+[scalacfork] /scala/trunk/src/library/scala/runtime/RichLong.scala:11: warning: Implementation of hashCode inherited from trait Proxy overridden in class RichLong to enforce value class semantics
+[scalacfork] final class RichLong(val self: Long) extends AnyVal with IntegralProxy[Long] {
+[scalacfork]             ^
+[scalacfork] /scala/trunk/src/library/scala/runtime/RichShort.scala:11: warning: Implementation of hashCode inherited from trait Proxy overridden in class RichShort to enforce value class semantics
+[scalacfork] final class RichShort(val self: Short) extends AnyVal with ScalaWholeNumberProxy[Short] {
+[scalacfork]             ^
+[scalacfork] /scala/trunk/src/library/scala/Boolean.scala:13: warning: Unused import
+[scalacfork] import scala.language.implicitConversions
+[scalacfork]                       ^
+[scalacfork] /scala/trunk/src/library/scala/Double.scala:13: warning: Unused import
+[scalacfork] import scala.language.implicitConversions
+[scalacfork]                       ^
+[scalacfork] /scala/trunk/src/library/scala/Unit.scala:13: warning: Unused import
+[scalacfork] import scala.language.implicitConversions
+[scalacfork]                       ^
+[scalacfork] /scala/trunk/src/library/scala/collection/BitSetLike.scala:14: warning: Unused import
+[scalacfork] import generic._
+[scalacfork]                ^
+[scalacfork] /scala/trunk/src/library/scala/collection/DefaultMap.scala:13: warning: Unused import
+[scalacfork] import generic._
+[scalacfork]                ^
+[scalacfork] /scala/trunk/src/library/scala/collection/GenIterableLike.scala:11: warning: Unused import
+[scalacfork] import generic.{ CanBuildFrom => CBF, _ }
+[scalacfork]                                       ^
+[scalacfork] /scala/trunk/src/library/scala/collection/GenIterableView.scala:12: warning: Unused import
+[scalacfork] import generic._
+[scalacfork]                ^
+[scalacfork] /scala/trunk/src/library/scala/collection/GenIterableViewLike.scala:13: warning: Unused import
+[scalacfork] import generic._
+[scalacfork]                ^
+[scalacfork] /scala/trunk/src/library/scala/collection/GenIterableViewLike.scala:14: warning: Unused import
+[scalacfork] import TraversableView.NoBuilder
+[scalacfork]                        ^
+[scalacfork] /scala/trunk/src/library/scala/collection/GenSeqView.scala:12: warning: Unused import
+[scalacfork] import generic._
+[scalacfork]                ^
+[scalacfork] /scala/trunk/src/library/scala/collection/GenTraversableView.scala:12: warning: Unused import
+[scalacfork] import generic._
+[scalacfork]                ^
+[scalacfork] /scala/trunk/src/library/scala/collection/GenTraversableViewLike.scala:14: warning: Unused import
+[scalacfork] import TraversableView.NoBuilder
+[scalacfork]                        ^
+[scalacfork] /scala/trunk/src/library/scala/collection/IndexedSeqLike.scala:11: warning: Unused import
+[scalacfork] import generic._
+[scalacfork]                ^
+[scalacfork] /scala/trunk/src/library/scala/collection/Iterable.scala:14: warning: Unused import
+[scalacfork] import scala.util.control.Breaks._
+[scalacfork]                                  ^
+[scalacfork] /scala/trunk/src/library/scala/collection/IterableProxy.scala:11: warning: Unused import
+[scalacfork] import generic._
+[scalacfork]                ^
+[scalacfork] /scala/trunk/src/library/scala/collection/IterableViewLike.scala:12: warning: Unused import
+[scalacfork] import TraversableView.NoBuilder
+[scalacfork]                        ^
+[scalacfork] /scala/trunk/src/library/scala/collection/JavaConversions.scala:11: warning: Unused import
+[scalacfork] import java.{ lang => jl, util => ju }, java.util.{ concurrent => juc }
+[scalacfork]               ^
+[scalacfork] /scala/trunk/src/library/scala/collection/JavaConversions.scala:11: warning: Unused import
+[scalacfork] import java.{ lang => jl, util => ju }, java.util.{ concurrent => juc }
+[scalacfork]                           ^
+[scalacfork] /scala/trunk/src/library/scala/collection/JavaConversions.scala:11: warning: Unused import
+[scalacfork] import java.{ lang => jl, util => ju }, java.util.{ concurrent => juc }
+[scalacfork]                                                     ^
+[scalacfork] /scala/trunk/src/library/scala/collection/JavaConverters.scala:11: warning: Unused import
+[scalacfork] import java.{ lang => jl, util => ju }, java.util.{ concurrent => juc }
+[scalacfork]               ^
+[scalacfork] /scala/trunk/src/library/scala/collection/JavaConverters.scala:11: warning: Unused import
+[scalacfork] import java.{ lang => jl, util => ju }, java.util.{ concurrent => juc }
+[scalacfork]                           ^
+[scalacfork] /scala/trunk/src/library/scala/collection/JavaConverters.scala:11: warning: Unused import
+[scalacfork] import java.{ lang => jl, util => ju }, java.util.{ concurrent => juc }
+[scalacfork]                                                     ^
+[scalacfork] /scala/trunk/src/library/scala/collection/LinearSeqLike.scala:12: warning: Unused import
+[scalacfork] import generic._
+[scalacfork]                ^
+[scalacfork] /scala/trunk/src/library/scala/collection/LinearSeqLike.scala:13: warning: Unused import
+[scalacfork] import mutable.ListBuffer
+[scalacfork]                ^
+[scalacfork] /scala/trunk/src/library/scala/collection/LinearSeqLike.scala:15: warning: Unused import
+[scalacfork] import scala.util.control.Breaks._
+[scalacfork]                                  ^
+[scalacfork] /scala/trunk/src/library/scala/collection/LinearSeqOptimized.scala:11: warning: Unused import
+[scalacfork] import generic._
+[scalacfork]                ^
+[scalacfork] /scala/trunk/src/library/scala/collection/LinearSeqOptimized.scala:14: warning: Unused import
+[scalacfork] import scala.util.control.Breaks._
+[scalacfork]                                  ^
+[scalacfork] /scala/trunk/src/library/scala/collection/MapProxyLike.scala:11: warning: Unused import
+[scalacfork] import generic._
+[scalacfork]                ^
+[scalacfork] /scala/trunk/src/library/scala/collection/SeqViewLike.scala:13: warning: Unused import
+[scalacfork] import TraversableView.NoBuilder
+[scalacfork]                        ^
+[scalacfork] /scala/trunk/src/library/scala/collection/SetProxyLike.scala:12: warning: Unused import
+[scalacfork] import generic._
+[scalacfork]                ^
+[scalacfork] /scala/trunk/src/library/scala/collection/Traversable.scala:14: warning: Unused import
+[scalacfork] import mutable.{Builder, Buffer, ArrayBuffer, ListBuffer}
+[scalacfork]                          ^
+[scalacfork] /scala/trunk/src/library/scala/collection/Traversable.scala:14: warning: Unused import
+[scalacfork] import mutable.{Builder, Buffer, ArrayBuffer, ListBuffer}
+[scalacfork]                                  ^
+[scalacfork] /scala/trunk/src/library/scala/collection/Traversable.scala:14: warning: Unused import
+[scalacfork] import mutable.{Builder, Buffer, ArrayBuffer, ListBuffer}
+[scalacfork]                                               ^
+[scalacfork] /scala/trunk/src/library/scala/collection/TraversableView.scala:13: warning: Unused import
+[scalacfork] import TraversableView.NoBuilder
+[scalacfork]                        ^
+[scalacfork] /scala/trunk/src/library/scala/collection/TraversableViewLike.scala:13: warning: Unused import
+[scalacfork] import TraversableView.NoBuilder
+[scalacfork]                        ^
+[scalacfork] /scala/trunk/src/library/scala/collection/convert/Decorators.scala:12: warning: Unused import
+[scalacfork] import java.{ lang => jl, util => ju }, java.util.{ concurrent => juc }
+[scalacfork]               ^
+[scalacfork] /scala/trunk/src/library/scala/collection/convert/Decorators.scala:12: warning: Unused import
+[scalacfork] import java.{ lang => jl, util => ju }, java.util.{ concurrent => juc }
+[scalacfork]                                                     ^
+[scalacfork] /scala/trunk/src/library/scala/collection/generic/IterableForwarder.scala:14: warning: Unused import
+[scalacfork] import scala.collection.mutable.Buffer
+[scalacfork]                                 ^
+[scalacfork] /scala/trunk/src/library/scala/collection/immutable/DefaultMap.scala:14: warning: Unused import
+[scalacfork] import generic._
+[scalacfork]                ^
+[scalacfork] /scala/trunk/src/library/scala/collection/immutable/List.scala:390: warning: Unused import
+[scalacfork]   import scala.collection.{Iterable, Seq, IndexedSeq}
+[scalacfork]                            ^
+[scalacfork] /scala/trunk/src/library/scala/collection/immutable/List.scala:390: warning: Unused import
+[scalacfork]   import scala.collection.{Iterable, Seq, IndexedSeq}
+[scalacfork]                                      ^
+[scalacfork] /scala/trunk/src/library/scala/collection/immutable/List.scala:390: warning: Unused import
+[scalacfork]   import scala.collection.{Iterable, Seq, IndexedSeq}
+[scalacfork]                                           ^
+[scalacfork] /scala/trunk/src/library/scala/collection/immutable/LongMap.scala:80: warning: Unused import
+[scalacfork] import LongMap._
+[scalacfork]                ^
+[scalacfork] /scala/trunk/src/library/scala/collection/immutable/NumericRange.scala:14: warning: Unused import
+[scalacfork] import generic._
+[scalacfork]                ^
+[scalacfork] /scala/trunk/src/library/scala/collection/immutable/NumericRange.scala:179: warning: Unused import
+[scalacfork]     import num.Ops
+[scalacfork]                ^
+[scalacfork] /scala/trunk/src/library/scala/collection/immutable/StringLike.scala:12: warning: Unused import
+[scalacfork] import generic._
+[scalacfork]                ^
+[scalacfork] /scala/trunk/src/library/scala/collection/mutable/ArrayBuilder.scala:14: warning: Unused import
+[scalacfork] import generic._
+[scalacfork]                ^
+[scalacfork] /scala/trunk/src/library/scala/collection/mutable/ArrayLike.scala:13: warning: Unused import
+[scalacfork] import generic._
+[scalacfork]                ^
+[scalacfork] /scala/trunk/src/library/scala/collection/mutable/BufferProxy.scala:14: warning: Unused import
+[scalacfork] import generic._
+[scalacfork]                ^
+[scalacfork] /scala/trunk/src/library/scala/collection/mutable/IndexedSeqLike.scala:13: warning: Unused import
+[scalacfork] import generic._
+[scalacfork]                ^
+[scalacfork] /scala/trunk/src/library/scala/collection/mutable/IndexedSeqOptimized.scala:13: warning: Unused import
+[scalacfork] import generic._
+[scalacfork]                ^
+[scalacfork] /scala/trunk/src/library/scala/collection/mutable/LinkedListLike.scala:14: warning: Unused import
+[scalacfork] import generic._
+[scalacfork]                ^
+[scalacfork] /scala/trunk/src/library/scala/collection/mutable/MapLike.scala:14: warning: Unused import
+[scalacfork] import scala.annotation.{migration, bridge}
+[scalacfork]                                     ^
+[scalacfork] /scala/trunk/src/library/scala/collection/mutable/MapLike.scala:53: warning: Unused import
+[scalacfork]   import scala.collection.Traversable
+[scalacfork]                           ^
+[scalacfork] /scala/trunk/src/library/scala/collection/mutable/SeqLike.scala:12: warning: Unused import
+[scalacfork] import generic._
+[scalacfork]                ^
+[scalacfork] /scala/trunk/src/library/scala/collection/mutable/SetBuilder.scala:13: warning: Unused import
+[scalacfork] import generic._
+[scalacfork]                ^
+[scalacfork] /scala/trunk/src/library/scala/collection/mutable/SetLike.scala:14: warning: Unused import
+[scalacfork] import scala.annotation.{ migration, bridge }
+[scalacfork]                                      ^
+[scalacfork] /scala/trunk/src/library/scala/collection/mutable/SynchronizedQueue.scala:28: warning: Unused import
+[scalacfork]   import scala.collection.Traversable
+[scalacfork]                           ^
+[scalacfork] /scala/trunk/src/library/scala/collection/mutable/SynchronizedSet.scala:27: warning: Unused import
+[scalacfork]   import scala.collection.Traversable
+[scalacfork]                           ^
+[scalacfork] /scala/trunk/src/library/scala/collection/mutable/WrappedArrayBuilder.scala:14: warning: Unused import
+[scalacfork] import generic._
+[scalacfork]                ^
+[scalacfork] /scala/trunk/src/library/scala/collection/parallel/ParIterable.scala:14: warning: Unused import
+[scalacfork] import scala.collection.parallel.mutable.ParArray
+[scalacfork]                                          ^
+[scalacfork] /scala/trunk/src/library/scala/collection/parallel/ParSeq.scala:21: warning: Unused import
+[scalacfork] import scala.collection.parallel.mutable.ParArray
+[scalacfork]                                          ^
+[scalacfork] /scala/trunk/src/library/scala/collection/parallel/ParSeqView.scala:12: warning: Unused import
+[scalacfork] import scala.collection.{ TraversableView, SeqView, Parallel, Iterator }
+[scalacfork]                           ^
+[scalacfork] /scala/trunk/src/library/scala/collection/parallel/ParSet.scala:20: warning: Unused import
+[scalacfork] import scala.collection.mutable.Builder
+[scalacfork]                                 ^
+[scalacfork] /scala/trunk/src/library/scala/collection/parallel/ParSetLike.scala:18: warning: Unused import
+[scalacfork] import scala.collection.mutable.Builder
+[scalacfork]                                 ^
+[scalacfork] /scala/trunk/src/library/scala/collection/parallel/immutable/ParIterable.scala:18: warning: Unused import
+[scalacfork] import scala.collection.GenIterable
+[scalacfork]                         ^
+[scalacfork] /scala/trunk/src/library/scala/collection/parallel/immutable/ParRange.scala:15: warning: Unused import
+[scalacfork] import scala.collection.parallel.IterableSplitter
+[scalacfork]                                  ^
+[scalacfork] /scala/trunk/src/library/scala/collection/parallel/immutable/ParSeq.scala:21: warning: Unused import
+[scalacfork] import scala.collection.GenSeq
+[scalacfork]                         ^
+[scalacfork] /scala/trunk/src/library/scala/collection/parallel/immutable/ParSet.scala:12: warning: Unused import
+[scalacfork] import scala.collection.GenSet
+[scalacfork]                         ^
+[scalacfork] /scala/trunk/src/library/scala/collection/parallel/mutable/ParIterable.scala:15: warning: Unused import
+[scalacfork] import scala.collection.GenIterable
+[scalacfork]                         ^
+[scalacfork] /scala/trunk/src/library/scala/collection/parallel/mutable/ParMapLike.scala:15: warning: Unused import
+[scalacfork] import scala.collection.mutable.Builder
+[scalacfork]                                 ^
+[scalacfork] /scala/trunk/src/library/scala/collection/parallel/mutable/ParSeq.scala:20: warning: Unused import
+[scalacfork] import scala.collection.GenSeq
+[scalacfork]                         ^
+[scalacfork] /scala/trunk/src/library/scala/collection/parallel/mutable/ParSet.scala:16: warning: Unused import
+[scalacfork] import scala.collection.GenSet
+[scalacfork]                         ^
+[scalacfork] /scala/trunk/src/library/scala/collection/parallel/mutable/ParSetLike.scala:15: warning: Unused import
+[scalacfork] import scala.collection.mutable.Set
+[scalacfork]                                 ^
+[scalacfork] /scala/trunk/src/library/scala/collection/parallel/mutable/ParSetLike.scala:16: warning: Unused import
+[scalacfork] import scala.collection.mutable.Builder
+[scalacfork]                                 ^
+[scalacfork] /scala/trunk/src/library/scala/concurrent/impl/Future.scala:15: warning: Unused import
+[scalacfork] import scala.util.{Try, Success, Failure}
+[scalacfork]                    ^
+[scalacfork] /scala/trunk/src/library/scala/math/ScalaNumericConversions.scala:11: warning: Unused import
+[scalacfork] import java.{ lang => jl }
+[scalacfork]               ^
+[scalacfork] /scala/trunk/src/library/scala/util/automata/WordBerrySethi.scala:24: warning: Unused import
+[scalacfork]   import lang.{ Alt, Eps, Letter, Meta, RegExp, Sequ, Star, _labelT }
+[scalacfork]                                   ^
+[scalacfork] /scala/trunk/src/library/scala/util/parsing/combinator/PackratParsers.scala:11: warning: Unused import
+[scalacfork] import scala.util.parsing.combinator._
+[scalacfork]                                      ^
+[scalacfork] /scala/trunk/src/library/scala/util/parsing/combinator/lexical/Scanners.scala:15: warning: Unused import
+[scalacfork] import token._
+[scalacfork]              ^
+[scalacfork] /scala/trunk/src/library/scala/util/parsing/combinator/testing/Tester.scala:10: warning: Unused import
+[scalacfork] import scala.util.parsing.combinator._
+[scalacfork]                                      ^
+[scalacfork] /scala/trunk/src/library/scala/util/parsing/json/JSON.scala:10: warning: Unused import
+[scalacfork] import scala.util.parsing.combinator._
+[scalacfork]                                      ^
+[scalacfork] /scala/trunk/src/library/scala/util/parsing/json/JSON.scala:11: warning: Unused import
+[scalacfork] import scala.util.parsing.combinator.syntactical._
+[scalacfork]                                                  ^
+[scalacfork] /scala/trunk/src/library/scala/util/parsing/json/JSON.scala:12: warning: Unused import
+[scalacfork] import scala.util.parsing.combinator.lexical._
+[scalacfork]                                              ^
+[scalacfork] /scala/trunk/src/library/scala/util/parsing/json/Lexer.scala:14: warning: Unused import
+[scalacfork] import scala.util.parsing.combinator.syntactical._
+[scalacfork]                                                  ^
+[scalacfork] /scala/trunk/src/library/scala/util/parsing/json/Parser.scala:15: warning: Unused import
+[scalacfork] import scala.util.parsing.combinator.lexical._
+[scalacfork]                                              ^
+[scalacfork] /scala/trunk/src/library/scala/xml/XML.scala:48: warning: Unused import
+[scalacfork] import Source._
+[scalacfork]               ^
+[scalacfork] /scala/trunk/src/library/scala/xml/factory/XMLLoader.scala:15: warning: Unused import
+[scalacfork] import java.io.{ InputStream, Reader, StringReader, File, FileDescriptor, FileInputStream }
+[scalacfork]                                       ^
+[scalacfork] /scala/trunk/src/library/scala/xml/factory/XMLLoader.scala:15: warning: Unused import
+[scalacfork] import java.io.{ InputStream, Reader, StringReader, File, FileDescriptor, FileInputStream }
+[scalacfork]                                                                           ^
+[scalacfork] /scala/trunk/src/library/scala/xml/include/sax/EncodingHeuristics.scala:12: warning: Unused import
+[scalacfork] import scala.xml.include._
+[scalacfork]                          ^
+[scalacfork] /scala/trunk/src/library/scala/xml/include/sax/XIncluder.scala:13: warning: Unused import
+[scalacfork] import scala.xml.include._
+[scalacfork]                          ^
+[scalacfork] /scala/trunk/src/library/scala/xml/parsing/MarkupParserCommon.scala:13: warning: Unused import
+[scalacfork] import scala.xml.dtd._
+[scalacfork]                      ^
+[scalacfork] warning: there were 78 deprecation warnings; re-run with -deprecation for details
+[scalacfork] warning: there were 4 feature warnings; re-run with -feature for details
+[scalacfork] 113 warnings found
+[scalacfork] Compiling 49 files to /scala/trunk/build/quick/classes/library
+[scalacfork] /scala/trunk/src/actors/scala/actors/Scheduler.scala:12: warning: Unused import
+[scalacfork] import java.util.concurrent._
+[scalacfork]                             ^
+[scalacfork] warning: there were 26 deprecation warnings; re-run with -deprecation for details
+[scalacfork] two warnings found
+[propertyfile] Creating new property file: /scala/trunk/build/quick/classes/library/library.properties
+
+quick.swing:
+
+quick.lib.done:
+[stopwatch] [quick.lib.timer: 1:44.964 sec]
+
+quick.pre-reflect:
+
+quick.reflect:
+    [mkdir] Created dir: /scala/trunk/build/quick/classes/reflect
+[scalacfork] Compiling 122 files to /scala/trunk/build/quick/classes/reflect
+[scalacfork] /scala/trunk/src/reflect/scala/reflect/internal/util/TraceSymbolActivity.scala:15: warning: private type Set in trait TraceSymbolActivity is never used
+[scalacfork]   private type Set[T] = scala.collection.immutable.Set[T]
+[scalacfork]                ^
+[scalacfork] /scala/trunk/src/reflect/scala/reflect/internal/AnnotationInfos.scala:9: warning: Unused import
+[scalacfork] import util._
+[scalacfork]             ^
+[scalacfork] /scala/trunk/src/reflect/scala/reflect/internal/BuildUtils.scala:4: warning: Unused import
+[scalacfork] import Flags._
+[scalacfork]              ^
+[scalacfork] /scala/trunk/src/reflect/scala/reflect/internal/Definitions.scala:12: warning: Unused import
+[scalacfork] import PartialFunction._
+[scalacfork]                        ^
+[scalacfork] /scala/trunk/src/reflect/scala/reflect/internal/ExistentialsAndSkolems.scala:10: warning: Unused import
+[scalacfork] import util._
+[scalacfork]             ^
+[scalacfork] /scala/trunk/src/reflect/scala/reflect/internal/SymbolTable.scala:295: warning: Unused import
+[scalacfork]     import scala.runtime.ScalaRunTime.stringOf
+[scalacfork]                                       ^
+[scalacfork] /scala/trunk/src/reflect/scala/reflect/internal/TypeDebugging.scala:12: warning: Unused import
+[scalacfork]   import definitions._
+[scalacfork]                      ^
+[scalacfork] /scala/trunk/src/reflect/scala/reflect/internal/util/Origins.scala:9: warning: Unused import
+[scalacfork] import NameTransformer._
+[scalacfork]                        ^
+[scalacfork] /scala/trunk/src/reflect/scala/reflect/internal/util/Origins.scala:11: warning: Unused import
+[scalacfork] import Origins._
+[scalacfork]                ^
+[scalacfork] /scala/trunk/src/reflect/scala/reflect/internal/util/SourceFile.scala:94: warning: Unused import
+[scalacfork] import ScriptSourceFile._
+[scalacfork]                         ^
+[scalacfork] /scala/trunk/src/reflect/scala/reflect/internal/util/WeakHashSet.scala:4: warning: Unused import
+[scalacfork] import scala.collection.mutable.ArrayBuffer
+[scalacfork]                                 ^
+[scalacfork] /scala/trunk/src/reflect/scala/reflect/internal/util/WeakHashSet.scala:5: warning: Unused import
+[scalacfork] import scala.collection.mutable.Builder
+[scalacfork]                                 ^
+[scalacfork] /scala/trunk/src/reflect/scala/reflect/internal/util/WeakHashSet.scala:6: warning: Unused import
+[scalacfork] import scala.collection.mutable.SetBuilder
+[scalacfork]                                 ^
+[scalacfork] /scala/trunk/src/reflect/scala/reflect/io/Directory.scala:33: warning: Unused import
+[scalacfork] import Path._
+[scalacfork]             ^
+[scalacfork] /scala/trunk/src/reflect/scala/reflect/io/PlainFile.scala:11: warning: Unused import
+[scalacfork] import PartialFunction._
+[scalacfork]                        ^
+[scalacfork] /scala/trunk/src/reflect/scala/reflect/macros/TreeBuilder.scala:14: warning: Unused import
+[scalacfork]   import definitions._
+[scalacfork]                      ^
+[scalacfork] /scala/trunk/src/reflect/scala/reflect/runtime/JavaMirrors.scala:25: warning: Unused import
+[scalacfork] import scala.reflect.internal.util.Collections._
+[scalacfork]                                                ^
+[scalacfork] /scala/trunk/src/reflect/scala/reflect/runtime/JavaUniverse.scala:4: warning: Unused import
+[scalacfork] import internal.{SomePhase, NoPhase, Phase, TreeGen}
+[scalacfork]                             ^
+[scalacfork] /scala/trunk/src/reflect/scala/reflect/runtime/JavaUniverse.scala:4: warning: Unused import
+[scalacfork] import internal.{SomePhase, NoPhase, Phase, TreeGen}
+[scalacfork]                                      ^
+[scalacfork] /scala/trunk/src/reflect/scala/reflect/runtime/JavaUniverse.scala:4: warning: Unused import
+[scalacfork] import internal.{SomePhase, NoPhase, Phase, TreeGen}
+[scalacfork]                                             ^
+[scalacfork] /scala/trunk/src/reflect/scala/reflect/runtime/ReflectSetup.scala:4: warning: Unused import
+[scalacfork] import internal.{SomePhase, NoPhase, Phase, TreeGen}
+[scalacfork]                                             ^
+[scalacfork] warning: there were 13 deprecation warnings; re-run with -deprecation for details
+[scalacfork] warning: there were 1 unchecked warnings; re-run with -unchecked for details
+[scalacfork] warning: there were 4 feature warnings; re-run with -feature for details
+[scalacfork] 24 warnings found
+[propertyfile] Creating new property file: /scala/trunk/build/quick/classes/reflect/reflect.properties
+[stopwatch] [quick.reflect.timer: 57.672 sec]
+
+quick.pre-comp:
+
+quick.comp:
+    [mkdir] Created dir: /scala/trunk/build/quick/classes/compiler
+    [javac] Compiling 40 source files to /scala/trunk/build/quick/classes/compiler
+    [javac] warning: [options] bootstrap class path not set in conjunction with -source 1.4
+    [javac] 1 warning
+[scalacfork] Compiling 18 files to /scala/trunk/build/quick/classes/compiler
+[scalacfork] /scala/trunk/src/msil/ch/epfl/lamp/compiler/msil/emit/FieldBuilder.scala:10: warning: Unused import
+[scalacfork] import ch.epfl.lamp.compiler.msil.FieldAttributes
+[scalacfork]                                   ^
+[scalacfork] /scala/trunk/src/msil/ch/epfl/lamp/compiler/msil/emit/ILPrinterVisitor.scala:28: warning: Unused import
+[scalacfork]     import OpCode._
+[scalacfork]                   ^
+[scalacfork] /scala/trunk/src/msil/ch/epfl/lamp/compiler/msil/emit/OpCode.scala:16: warning: Unused import
+[scalacfork]     import OpCode._
+[scalacfork]                   ^
+[scalacfork] three warnings found
+[scalacfork] Compiling 403 files to /scala/trunk/build/quick/classes/compiler
+[scalacfork] /scala/trunk/src/compiler/scala/tools/ant/ScalaTool.scala:67: warning: private setter in class ScalaTool is never used
+[scalacfork]   private var classpathPath: Path = emptyPath
+[scalacfork]               ^
+[scalacfork] /scala/trunk/src/compiler/scala/tools/nsc/typechecker/PatternMatching.scala:2037: warning: private val in trait CNF is never used
+[scalacfork]     private implicit val formulaTag: scala.reflect.ClassTag[Formula] = new scala.reflect.ClassTag[Formula] {
+[scalacfork]                          ^
+[scalacfork] /scala/trunk/src/compiler/scala/tools/reflect/ToolBoxFactory.scala:121: warning: local var freeTerms in method transformDuringTyper is never set - it could be a val
+[scalacfork]         var (expr, freeTerms) = extractFreeTerms(expr0, wrapFreeTermRefs = false)
+[scalacfork]                    ^
+[scalacfork] /scala/trunk/src/compiler/scala/tools/reflect/ToolBoxFactory.scala:142: warning: local var dummies1 in method transformDuringTyper is never set - it could be a val
+[scalacfork]         var (dummies1, unwrapped) = expr1 match {
+[scalacfork]              ^
+[scalacfork] /scala/trunk/src/compiler/scala/tools/util/Javap.scala:137: warning: private object in class JpOptions is never used
+[scalacfork]     private object Access {
+[scalacfork]                    ^
+[scalacfork] /scala/trunk/src/compiler/scala/tools/ant/Scaladoc.scala:20: warning: Unused import
+[scalacfork] import scala.tools.nsc.reporters.{Reporter, ConsoleReporter}
+[scalacfork]                                   ^
+[scalacfork] /scala/trunk/src/compiler/scala/tools/ant/sabbus/Settings.scala:13: warning: Unused import
+[scalacfork] import org.apache.tools.ant.types.{Path, Reference}
+[scalacfork]                                          ^
+[scalacfork] /scala/trunk/src/compiler/scala/tools/nsc/interactive/Global.scala:12: warning: Unused import
+[scalacfork] import scala.tools.nsc.io.{ AbstractFile, LogReplay, Logger, NullLogger, Replayer }
+[scalacfork]                                           ^
+[scalacfork] /scala/trunk/src/compiler/scala/tools/util/PathResolver.scala:10: warning: Unused import
+[scalacfork] import nsc.{ Settings, GenericRunnerSettings }
+[scalacfork]                        ^
+[scalacfork] /scala/trunk/src/compiler/scala/tools/nsc/typechecker/Contexts.scala:912: warning: side-effecting nullary methods are discouraged: suggest defining as `def imp1wins()` instead
+[scalacfork]           def imp1wins = { imports = imp1 :: imports.tail.tail }
+[scalacfork]               ^
+[scalacfork] /scala/trunk/src/compiler/scala/tools/nsc/typechecker/Contexts.scala:913: warning: side-effecting nullary methods are discouraged: suggest defining as `def imp2wins()` instead
+[scalacfork]           def imp2wins = { impSym = other ; imports = imports.tail }
+[scalacfork]               ^
+[scalacfork] /scala/trunk/src/compiler/scala/tools/nsc/typechecker/Macros.scala:725: warning: catch block may intercept non-local return from method macroExpand1
+[scalacfork]     withInfoLevel(nodePrinters.InfoLevel.Quiet) {
+[scalacfork]                                                 ^
+[scalacfork] warning: there were 33 deprecation warnings; re-run with -deprecation for details
+[scalacfork] warning: there were 4 unchecked warnings; re-run with -unchecked for details
+[scalacfork] warning: there were 1 feature warnings; re-run with -feature for details
+[scalacfork] 15 warnings found
+[propertyfile] Creating new property file: /scala/trunk/build/quick/classes/compiler/compiler.properties
+     [copy] Copying 72 files to /scala/trunk/build/quick/classes/compiler
+[stopwatch] [quick.comp.timer: 2:17.016 sec]
+
+quick.pre-plugins:
+
+quick.plugins:
+    [mkdir] Created dir: /scala/trunk/build/quick/classes/continuations-plugin
+[scalacfork] Compiling 5 files to /scala/trunk/build/quick/classes/continuations-plugin
+[scalacfork] /scala/trunk/src/continuations/plugin/scala/tools/selectivecps/CPSUtils.scala:10: warning: Unused import
+[scalacfork]   import definitions._
+[scalacfork]                      ^
+[scalacfork] /scala/trunk/src/continuations/plugin/scala/tools/selectivecps/SelectiveANFTransform.scala:5: warning: Unused import
+[scalacfork] import scala.tools.nsc._
+[scalacfork]                        ^
+[scalacfork] /scala/trunk/src/continuations/plugin/scala/tools/selectivecps/SelectiveANFTransform.scala:10: warning: Unused import
+[scalacfork] import scala.tools.nsc.ast._
+[scalacfork]                            ^
+[scalacfork] /scala/trunk/src/continuations/plugin/scala/tools/selectivecps/SelectiveCPSPlugin.scala:6: warning: Unused import
+[scalacfork] import scala.tools.nsc.typechecker._
+[scalacfork]                                    ^
+[scalacfork] /scala/trunk/src/continuations/plugin/scala/tools/selectivecps/SelectiveCPSPlugin.scala:8: warning: Unused import
+[scalacfork] import nsc.Phase
+[scalacfork]            ^
+[scalacfork] /scala/trunk/src/continuations/plugin/scala/tools/selectivecps/SelectiveCPSPlugin.scala:13: warning: Unused import
+[scalacfork]   import global._
+[scalacfork]                 ^
+[scalacfork] /scala/trunk/src/continuations/plugin/scala/tools/selectivecps/SelectiveCPSTransform.scala:5: warning: Unused import
+[scalacfork] import scala.collection._
+[scalacfork]                         ^
+[scalacfork] /scala/trunk/src/continuations/plugin/scala/tools/selectivecps/SelectiveCPSTransform.scala:7: warning: Unused import
+[scalacfork] import scala.tools.nsc._
+[scalacfork]                        ^
+[scalacfork] 8 warnings found
+     [copy] Copying 1 file to /scala/trunk/build/quick/classes/continuations-plugin
+    [mkdir] Created dir: /scala/trunk/build/quick/misc/scala-devel/plugins
+      [jar] Building jar: /scala/trunk/build/quick/misc/scala-devel/plugins/continuations.jar
+[scalacfork] Compiling 2 files to /scala/trunk/build/quick/classes/library
+[scalacfork] /scala/trunk/src/continuations/library/scala/util/continuations/ControlContext.scala:233: warning: local val in value $anonfun is never used
+[scalacfork]         val thr: Exception => B = { t: Exception =>
+[scalacfork]             ^
+[scalacfork] one warning found
+[stopwatch] [quick.plugins.timer: 25.439 sec]
+
+quick.pre-scalacheck:
+
+quick.scalacheck:
+    [mkdir] Created dir: /scala/trunk/build/quick/classes/scalacheck
+[scalacfork] Compiling 14 files to /scala/trunk/build/quick/classes/scalacheck
+[stopwatch] [quick.scalacheck.timer: 26.495 sec]
+
+quick.pre-scalap:
+
+quick.scalap:
+    [mkdir] Created dir: /scala/trunk/build/quick/classes/scalap
+[scalacfork] Compiling 28 files to /scala/trunk/build/quick/classes/scalap
+[scalacfork] /scala/trunk/src/scalap/scala/tools/scalap/ByteArrayReader.scala:13: warning: Unused import
+[scalacfork]   import java.io._
+[scalacfork]                  ^
+[scalacfork] /scala/trunk/src/scalap/scala/tools/scalap/MetaParser.scala:11: warning: Unused import
+[scalacfork] import java.io._
+[scalacfork]                ^
+[scalacfork] two warnings found
+[stopwatch] [quick.scalap.timer: 27.098 sec]
+
+quick.pre-partest:
+
+quick.partest:
+    [mkdir] Created dir: /scala/trunk/build/quick/classes/partest
+    [javac] Compiling 6 source files to /scala/trunk/build/quick/classes/partest
+    [javac] warning: [options] bootstrap class path not set in conjunction with -source 1.5
+    [javac] 1 warning
+[scalacfork] Compiling 29 files to /scala/trunk/build/quick/classes/partest
+[scalacfork] /scala/trunk/src/partest/scala/tools/partest/ScaladocModelTest.scala:90: warning: local val in method newDocFactory is never used
+[scalacfork]     val command = new ScalaDoc.Command((CommandLineParser tokenize (args)), settings)
+[scalacfork]         ^
+[scalacfork] /scala/trunk/src/partest/scala/tools/partest/ScaladocModelTest.scala:8: warning: Unused import
+[scalacfork] import scala.tools.partest._
+[scalacfork]                            ^
+[scalacfork] /scala/trunk/src/partest/scala/tools/partest/ScaladocModelTest.scala:9: warning: Unused import
+[scalacfork] import java.io._
+[scalacfork]                ^
+[scalacfork] /scala/trunk/src/partest/scala/tools/partest/nest/ConsoleFileManager.scala:21: warning: Unused import
+[scalacfork] import RunnerUtils._
+[scalacfork]                    ^
+[scalacfork] /scala/trunk/src/partest/scala/tools/partest/nest/ConsoleRunner.scala:14: warning: Unused import
+[scalacfork] import RunnerUtils._
+[scalacfork]                    ^
+[scalacfork] /scala/trunk/src/partest/scala/tools/partest/nest/DirectRunner.scala:17: warning: Unused import
+[scalacfork] import scala.collection.convert.decorateAll._
+[scalacfork]                                             ^
+[scalacfork] /scala/trunk/src/partest/scala/tools/partest/nest/FileManager.scala:16: warning: Unused import
+[scalacfork] import scala.sys.process._
+[scalacfork]                          ^
+[scalacfork] /scala/trunk/src/partest/scala/tools/partest/nest/PathSettings.scala:12: warning: Unused import
+[scalacfork] import RunnerUtils._
+[scalacfork]                    ^
+[scalacfork] warning: there were 3 deprecation warnings; re-run with -deprecation for details
+[scalacfork] 9 warnings found
+[propertyfile] Creating new property file: /scala/trunk/build/quick/classes/partest/partest.properties
+     [copy] Copying 1 file to /scala/trunk/build/quick/classes/partest
+[stopwatch] [quick.partest.timer: 25.408 sec]
+
+quick.pre-bin:
+
+quick.bin:
+    [mkdir] Created dir: /scala/trunk/build/quick/bin
+
+quick.done:
+
+pack.start:
+
+pack.pre-lib:
+
+pack.lib:
+    [mkdir] Created dir: /scala/trunk/build/pack/lib
+      [jar] Building jar: /scala/trunk/build/pack/lib/scala-library.jar
+      [jar] Building jar: /scala/trunk/build/pack/lib/scala-actors.jar
+
+pack.swing:
+
+pack.pre-reflect:
+
+pack.reflect:
+      [jar] Building jar: /scala/trunk/build/pack/lib/scala-reflect.jar
+
+pack.pre-comp:
+
+pack.comp:
+    [mkdir] Created dir: /scala/trunk/build/pack/META-INF
+     [copy] Copying 1 file to /scala/trunk/build/pack/META-INF
+      [jar] Building jar: /scala/trunk/build/pack/lib/scala-compiler.jar
+     [copy] Copying 1 file to /scala/trunk/build/pack/lib
+
+pack.pre-plugins:
+
+pack.plugins:
+    [mkdir] Created dir: /scala/trunk/build/pack/misc/scala-devel/plugins
+      [jar] Building jar: /scala/trunk/build/pack/misc/scala-devel/plugins/continuations.jar
+
+pack.scalacheck:
+      [jar] Building jar: /scala/trunk/build/pack/lib/scalacheck.jar
+
+pack.pre-partest:
+
+pack.partest:
+      [jar] Building jar: /scala/trunk/build/pack/lib/scala-partest.jar
+      [jar] Building jar: /scala/trunk/build/pack/lib/scala-partest-javaagent.jar
+
+pack.pre-scalap:
+
+pack.scalap:
+      [jar] Building jar: /scala/trunk/build/pack/lib/scalap.jar
+
+pack.pre-bin:
+
+pack.bin:
+    [mkdir] Created dir: /scala/trunk/build/pack/bin
+
+pack.done:
+
+build:
+
+BUILD SUCCESSFUL
+Total time: 7 minutes 7 seconds
