@@ -646,8 +646,8 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
     )
     final def getFlag(mask: Long): Long = {
       if (flagsNeedInit(mask)) initialize
-      Recorder(s"getFlag(${Flags.flagsToString(mask)})", this)(s => (s.flags & mask))
-      // flags & mask
+      // Recorder(s"getFlag(${Flags.flagsToString(mask)})", this)(s => (s.flags & mask))
+      flags & mask
     }
     /** Does symbol have ANY flag in `mask` set? */
     final def hasFlag(mask: Long): Boolean = {
@@ -660,7 +660,8 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
     /** Does symbol have ALL the flags in `mask` set? */
     final def hasAllFlags(mask: Long): Boolean = {
       if (flagsNeedInit(mask)) initialize
-      Recorder(s"hasAllFlags(${Flags.flagsToString(mask)})", this)(s => (s.flags & mask) == mask)
+      (flags & mask) == mask
+      // Recorder(s"hasAllFlags(${Flags.flagsToString(mask)})", this)(s => (s.flags & mask) == mask)
       // if (!isInitialized && mask != TRIEDCOOKING)
       //   Recorder(s"hasAllFlags(${Flags.flagsToString(mask)})", this)(s => (s.flags & mask) == mask)
       // else
