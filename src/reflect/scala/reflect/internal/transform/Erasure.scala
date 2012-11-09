@@ -192,7 +192,7 @@ trait Erasure {
    *   - for all other types, the type itself (with any sub-components erased)
    */
   def erasure(sym: Symbol): ErasureMap =
-    if (sym == NoSymbol || !sym.enclClass.isJavaDefined) scalaErasure
+    if (sym.initialize == NoSymbol || !sym.enclClass.isJavaDefined) scalaErasure
     else if (verifyJavaErasure && sym.isMethod) verifiedJavaErasure
     else javaErasure
 
