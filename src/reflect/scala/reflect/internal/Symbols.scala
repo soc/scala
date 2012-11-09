@@ -626,7 +626,7 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
     def isEffectiveRoot = false
 
     override def isLifted = initialize.hasFlag(LIFTED)
-    override def isPublic = !(nextOverriddenSymbol == NoSymbol && owner.isAnonymousClass) && super.isPublic
+    // override def isPublic = !(nextOverriddenSymbol == NoSymbol && owner.isAnonymousClass) && super.isPublic
 
     // ( if (nextOverriddenSymbol == NoSymbol) ! && super.isPublic
 
