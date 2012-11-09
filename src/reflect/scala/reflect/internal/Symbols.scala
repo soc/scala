@@ -45,6 +45,46 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
     m
   }
 
+  object Recorder {
+    val recorded = ListBuffer[ThenAndNow[_]]()
+    val getId = { var id = 1; () => try id finally id += 1 }
+
+    class ThenAndNow[T](label: String, sym: Symbol, f: Symbol => T) {
+      val throwable = new Throwable
+      def frames    = throwable.getStackTrace.drop(2).take(5).map(_.toString)
+      val id        = getId()
+      val phaseThen = phase
+      val valueThen = f(sym)
+      def valueNow  = atPhase(phaseThen)(f(sym))
+      def changed   = valueThen != valueNow
+      override def toString = f"$id%8d [$phaseThen%-15s] $label%-25s $sym%-25s $valueThen%-15s   $valueNow%-15s"
+    }
+
+    var recording = false
+    def apply[T](label: String, sym: Symbol)(f: Symbol => T): T = {
+      if (recording || sym.isInitialized) f(sym) else {
+        recording = true
+        try {
+          val tn = new ThenAndNow(label, sym, f)
+          recorded += tn
+          tn.valueThen
+        }
+        finally recording = false
+      }
+    }
+
+    scala.sys addShutdownHook {
+      val frames = mutable.Map[String, Int]() withDefaultValue 0
+
+      for (tn <- recorded.toList ; if tn.changed) {
+        tn.frames foreach (s => frames(s) += 1)
+        println(tn)
+      }
+      frames.toList.sortBy(-_._2).map(_.swap) foreach { case (num, what) => println(f"$num%10d $what%s") }
+    }
+  }
+
+
   /** Create a new free term.  Its owner is NoSymbol.
    */
   def newFreeTermSymbol(name: TermName, value: => Any, flags: Long = 0L, origin: String): FreeTermSymbol =
