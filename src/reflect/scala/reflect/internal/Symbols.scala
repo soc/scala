@@ -652,7 +652,8 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
     /** Does symbol have ANY flag in `mask` set? */
     final def hasFlag(mask: Long): Boolean = {
       if (flagsNeedInit(mask)) initialize
-      Recorder(s"hasFlag(${Flags.flagsToString(mask)})", this)(s => (s.flags & mask) != 0)
+      (flags & mask) != 0
+      // Recorder(s"hasFlag(${Flags.flagsToString(mask)})", this)(s => (s.flags & mask) != 0)
       // if (!isInitialized && mask != TRIEDCOOKING)
       // else
       //   (flags & mask) != 0
