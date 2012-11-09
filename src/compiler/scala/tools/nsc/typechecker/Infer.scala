@@ -314,8 +314,15 @@ trait Infer extends Checkable {
         if (context.unit.exists)
           context.unit.depends += sym.enclosingTopLevelClass
 
-        if (!sym.isInitialize)
-          Console.err.println(s"checkAccessible on uninitialized symbol $sym")
+        if (!sym.isInitialized && (sym.isGetter || sym.isSetter)) {
+          val old = flagsToString(sym.flags)
+          sym.initialize
+          val now = flagsToString(sym.flags)
+          if (old != now) {
+            Console.err.println(s"checkAccessible on uninitialized symbol (tree ${tree.shortClass}) $sym")
+            Console.err.println(s"flags: $old  ==>  $now")
+          }
+        }
 
         var sym1 = sym filter (alt => context.isAccessible(alt, pre, site.isInstanceOf[Super]))
         // Console.println("check acc " + (sym, sym1) + ":" + (sym.tpe, sym1.tpe) + " from " + pre);//DEBUG
