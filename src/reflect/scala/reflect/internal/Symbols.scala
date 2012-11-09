@@ -625,8 +625,13 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
      */
     def isEffectiveRoot = false
 
+    override def isLifted = initialize.hasFlag(LIFTED)
+
     final def isLazyAccessor       = isLazy && lazyAccessor != NoSymbol
     final def isOverridableMember  = !(isClass || isEffectivelyFinal) && (this ne NoSymbol) && owner.isClass
+
+    private def flagsNeedInit(mask: Long) =
+      !isCompilerUniverse && needsInitialize(isFlagRelated = true, mask = mask)
 
     /** Does this symbol denote a wrapper created by the repl? */
     final def isInterpreterWrapper = (
@@ -635,17 +640,20 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
       && nme.isReplWrapperName(name)
     )
     final def getFlag(mask: Long): Long = {
-      if (!isCompilerUniverse && needsInitialize(isFlagRelated = true, mask = mask)) initialize
+      if (flagsNeedInit(mask)) initialize
+      // Recorder(s"getFlag(${Flags.flagsToString(mask)})", this)(s => (s.flags & mask))
       flags & mask
     }
     /** Does symbol have ANY flag in `mask` set? */
     final def hasFlag(mask: Long): Boolean = {
-      if (!isCompilerUniverse && needsInitialize(isFlagRelated = true, mask = mask)) initialize
+      if (flagsNeedInit(mask)) initialize
+      // Recorder(s"hasFlag(${Flags.flagsToString(mask)})", this)(s => (s.flags & mask) != 0)
       (flags & mask) != 0
     }
     /** Does symbol have ALL the flags in `mask` set? */
     final def hasAllFlags(mask: Long): Boolean = {
-      if (!isCompilerUniverse && needsInitialize(isFlagRelated = true, mask = mask)) initialize
+      if (flagsNeedInit(mask)) initialize
+      // Recorder(s"hasAllFlags(${Flags.flagsToString(mask)})", this)(s => (s.flags & mask) == mask)
       (flags & mask) == mask
     }
 
@@ -1477,8 +1485,11 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
      *  expose to reflection users. Therefore a proposed solution is to check whether we're in a
      *  runtime reflection universe and if yes then to commence initialization.
      */
-    protected def needsInitialize(isFlagRelated: Boolean, mask: Long) =
-      !isInitialized && (flags & LOCKED) == 0 && shouldTriggerCompleter(this, if (infos ne null) infos.info else null, isFlagRelated, mask)
+    protected def needsInitialize(isFlagRelated: Boolean, mask: Long) = (
+         !isInitialized
+      && (flags & LOCKED) == 0
+      && shouldTriggerCompleter(this, if (infos ne null) infos.info else null, isFlagRelated, mask)
+    )
 
     /** Was symbol's type updated during given phase? */
     final def isUpdatedAt(pid: Phase#Id): Boolean = {
@@ -1503,7 +1514,7 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
      */
     def cookJavaRawInfo(): Unit = {
       // only try once...
-      if (this hasFlag TRIEDCOOKING)
+      if (this.initialize hasFlag TRIEDCOOKING)
         return
 
       this setFlag TRIEDCOOKING
@@ -2616,12 +2627,12 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
 
     override def owner = {
       if (Statistics.hotEnabled) Statistics.incCounter(ownerCount)
-      if (!isMethod && needsFlatClasses) rawowner.owner
+      if (isInitialized && !isMethod && needsFlatClasses) rawowner.owner
       else rawowner
     }
     override def name: TermName = {
       if (Statistics.hotEnabled) Statistics.incCounter(nameCount)
-      if (!isMethod && needsFlatClasses) {
+      if (isInitialized && !isMethod && needsFlatClasses) {
         if (flatname eq null)
           flatname = nme.flattenedName(rawowner.name, rawname)
 

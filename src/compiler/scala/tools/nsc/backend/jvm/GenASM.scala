@@ -348,8 +348,8 @@ abstract class GenASM extends SubComponent with BytecodeWriters {
   }
 
   def jsymbol(sym: Symbol): Symbol = {
-    if(sym.isJavaDefined && sym.isModuleClass) sym.linkedClassOfClass
-    else if(sym.isModule) sym.moduleClass
+    if (sym.initialize.isJavaDefined && sym.isModuleClass) sym.linkedClassOfClass
+    else if (sym.isModule) sym.moduleClass
     else sym // we track only module-classes and plain-classes
   }
 

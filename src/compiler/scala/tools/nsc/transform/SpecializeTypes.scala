@@ -766,10 +766,10 @@ abstract class SpecializeTypes extends InfoTransform with TypingTransformers {
       sClass
     }
 
-    val decls1 = clazz.info.decls.toList flatMap { m: Symbol =>
+    val decls1 = clazz.initialize.info.decls.toList flatMap { m: Symbol =>
       if (m.isAnonymousClass) List(m) else {
         normalizeMember(m.owner, m, outerEnv) flatMap { normalizedMember =>
-          val ms = specializeMember(m.owner, normalizedMember, outerEnv, clazz.info.typeParams)
+          val ms = specializeMember(m.owner, normalizedMember.initialize, outerEnv, clazz.info.typeParams)
           // interface traits have concrete members now
           if (ms.nonEmpty && clazz.isTrait && clazz.isInterface)
             clazz.resetFlag(INTERFACE)
@@ -814,7 +814,7 @@ abstract class SpecializeTypes extends InfoTransform with TypingTransformers {
    *     // etc.
    */
   private def normalizeMember(owner: Symbol, sym: Symbol, outerEnv: TypeEnv): List[Symbol] = {
-    sym :: (
+    sym.initialize :: (
       if (!sym.isMethod || enteringTyper(sym.typeParams.isEmpty)) Nil
       else {
         // debuglog("normalizeMember: " + sym.fullNameAsName('.').decode)
