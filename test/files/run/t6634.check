@@ -1,0 +1,5 @@
+java.lang.IndexOutOfBoundsException: index (5) greater than size of buffer (5)
+java.lang.IndexOutOfBoundsException: index (6) greater than size of buffer (5)
+java.lang.IndexOutOfBoundsException: sum of index (1) and number of elements to remove (9) is larger than size of buffer (5)
+java.lang.IndexOutOfBoundsException: index (-1) is negative
+java.lang.IllegalArgumentException: number of elements to remove (-1) is negative

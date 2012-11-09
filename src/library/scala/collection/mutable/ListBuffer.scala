@@ -250,12 +250,20 @@ final class ListBuffer[A]
    *  @param count     the number of elements to remove.
    */
   override def remove(n: Int, count: Int) {
+    // We check the bounds early, so that we don't trigger copying.
+    if (n < 0) 
+      throw new IndexOutOfBoundsException(s"index ($n) is negative")
+    if (n >= len) 
+      throw new IndexOutOfBoundsException(s"index ($n) greater than size of buffer ($len)")
+    if (count < 0)
+      throw new IllegalArgumentException(s"number of elements to remove ($count) is negative")
+    val idxCnt = n + count
+    if (idxCnt > len) 
+      throw new IndexOutOfBoundsException(s"sum of index ($n) and number of elements to remove ($count) is larger than size of buffer ($len)")
     if (exported) copy()
-    val n1 = n max 0
-    val count1 = count min (len - n1)
     var old = start.head
-    if (n1 == 0) {
-      var c = count1
+    if (n == 0) {
+      var c = count
       while (c > 0) {
         start = start.tail
         c -= 1
@@ -263,18 +271,18 @@ final class ListBuffer[A]
     } else {
       var cursor = start
       var i = 1
-      while (i < n1) {
+      while (i < n) {
         cursor = cursor.tail
         i += 1
       }
-      var c = count1
+      var c = count
       while (c > 0) {
         if (last0 eq cursor.tail) last0 = cursor.asInstanceOf[::[A]]
         cursor.asInstanceOf[::[A]].tl = cursor.tail.tail
         c -= 1
       }
     }
-    len -= count1
+    len -= count
   }
 
 // Implementation of abstract method in Builder
@@ -315,7 +323,7 @@ final class ListBuffer[A]
    *  @throws Predef.IndexOutOfBoundsException if `n` is out of bounds.
    */
   def remove(n: Int): A = {
-    if (n < 0 || n >= len) throw new IndexOutOfBoundsException(n.toString())
+    if (n < 0 || n >= len) throw new IndexOutOfBoundsException(n.toString)
     if (exported) copy()
     var old = start.head
     if (n == 0) {
