@@ -266,8 +266,8 @@ abstract class Mixin extends InfoTransform with ast.TreeDSL {
 
     /** Mix in members of implementation class mixinClass into class clazz */
     def mixinImplClassMembers(mixinClass: Symbol, mixinInterface: Symbol) {
-      assert(mixinClass.isImplClass, "Not an impl class:" +
-        ((mixinClass.debugLocationString, mixinInterface.debugLocationString)))
+      if (!mixinClass.isImplClass)
+        log(s"!!! Not an impl class: ${mixinClass.debugLocationString}, ${mixinInterface.debugLocationString}")
 
       for (member <- mixinClass.info.decls ; if isForwarded(member)) {
         val imember = member overriddenSymbol mixinInterface
