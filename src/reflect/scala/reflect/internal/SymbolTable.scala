@@ -64,6 +64,8 @@ abstract class SymbolTable extends macros.Universe
   /** Overridden when we know more about what was happening during a failure. */
   def supplementErrorMessage(msg: String): String = msg
 
+  def checkSingleTreeLifetime(t: Tree): Boolean = true
+
   private[scala] def printCaller[T](msg: String)(result: T) = {
     Console.err.println("%s: %s\nCalled from: %s".format(msg, result,
       (new Throwable).getStackTrace.drop(2).take(50).mkString("\n")))

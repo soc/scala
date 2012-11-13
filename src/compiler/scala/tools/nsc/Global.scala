@@ -215,6 +215,40 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
    */
   def registerTopLevelSym(sym: Symbol) {}
 
+  lazy val treesSeen: Map[Phase, mutable.Set[String]] = {
+    try { phaseDescriptors map (p => (p.ownPhase, mutable.Set[String]())) toMap }
+    finally sys addShutdownHook {
+      val allSeen = treesSeen.toList.flatMap(_._2.toList).distinct.sorted
+      val data    = treesSeen.toList.sortBy(_._1.id)
+      def mkSeq(xs: List[Int]): String = xs match {
+        case Nil                           => ""
+        case x :: Nil                      => "" + x
+        case x1 :: x2 :: _ if x1 + 1 != x2 => x1 + " " + mkSeq(xs.tail)
+        case _ =>
+          val start = xs.head
+          var cur   = xs drop 1 head
+          var rest  = xs drop 2
+
+          while (rest.nonEmpty && cur + 1 == rest.head) {
+            cur += 1
+            rest = rest.tail
+          }
+          s"$start-$cur " + mkSeq(rest)
+      }
+
+      allSeen foreach { treeClass =>
+        val seenIn = phaseDescriptors map (_.ownPhase) filter (p => treesSeen(p)(treeClass))
+        val str    = mkSeq(seenIn.map(_.id).sorted)
+        println(f"$treeClass%20s $str")
+      }
+
+      // foreach { case (ph, seen) =>
+      //   val str = allSeen filterNot seen map ("-" + _) mkString " "
+      //   println(f"$ph%15s $str")
+      // }
+    }
+  }
+
 // ------------------ Reporting -------------------------------------
 
   // not deprecated yet, but a method called "error" imported into
@@ -980,6 +1014,89 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
 
   // ----------- Runs ---------------------------------------
 
+  //              phase name  id  description
+  //              ----------  --  -----------
+  //                  parser   1  parse source into ASTs, perform simple desugaring
+  //                   namer   2  resolve names, attach symbols to named trees
+  //          packageobjects   3  load package objects
+  //                   typer   4  the meat and potatoes: type the trees
+  //                  patmat   5  translate match expressions
+  //          superaccessors   6  add super accessors in traits and nested classes
+  //              extmethods   7  add extension methods for inline classes
+  //                 pickler   8  serialize symbol tables
+  //               refchecks   9  reference/override checking, translate nested objects
+  //                 uncurry  12  uncurry, translate function values to anonymous classes
+  //               tailcalls  13  replace tail calls by jumps
+  //              specialize  14  @specialized-driven class and method specialization
+  //           explicitouter  15  this refs to outer pointers, translate patterns
+  //                 erasure  16  erase types, add interfaces for traits
+  //             posterasure  17  clean up erased inline classes
+  //                lazyvals  18  allocate bitmaps, translate lazy vals into lazified defs
+  //              lambdalift  19  move nested functions to top level
+  //            constructors  20  move field definitions into constructors
+  //                 flatten  21  eliminate inner classes
+  //                   mixin  22  mixin composition
+  //                 cleanup  23  platform-specific cleanups, generate reflective calls
+  //                   icode  24  generate portable intermediate code
+  //                     jvm  29  generate JVM bytecode
+  //                terminal  30  The last phase in the compiler chain
+  def eliminatedBy(t: Tree): Phase = {
+    val run = currentRun
+    import run._
+
+    // def is[T: TypeTag](t: Tree) = {
+    //   t.tpe != null && t.tpe <:< typeOf[T]
+    // }
+
+    def isThrowable(tpt: Tree) = (
+      tpt.tpe != null && (tpt.tpe.typeSymbol isSubClass definitions.ThrowableClass)
+    )
+
+    def isLatePattern(tree: Tree): Boolean = tree match {
+      case CaseDef(pat, _, _)        => isLatePattern(pat)
+      case Alternative(alts)         => alts forall isLatePattern
+      case Bind(_, tree)             => isLatePattern(tree)
+      case Ident(nme.WILDCARD)       => true                      // defaults for both
+      case Literal(Constant(_: Int)) => true                      // switch
+      case Typed(_, tpt)             => isThrowable(tpt)          // exception handlers
+      case _                         => false
+    }
+
+    // Dropped: Import
+    // Dropped: Typed
+    // Changed: CaseDef
+    if (isLatePattern(t)) NoPhase else t match {
+      case _: Parens                                                         => parserPhase         // 1
+      case _: Annotated | _: AssignOrNamedArg | _: DocDef                    => typerPhase          // 4   // lost Import
+      case _: ModuleDef | _: TypeTreeWithDeferredRefCheck                    => refchecksPhase      // 9
+      case _: AppliedTypeTree | _: CompoundTypeTree | _: ExistentialTypeTree => uncurryPhase        // 12
+      case _: SelectFromTypeTree | _: SingletonTypeTree | _: TypeBoundsTree  => uncurryPhase        // 12
+      case _: Alternative | _: Bind | _: Star | _: UnApply                   => explicitouterPhase  // 15
+      case _: CaseDef                                                        => erasurePhase
+      case _: TypeDef                                                        => erasurePhase        // 16    // lost Typed
+      case _: SelectFromArray                                                => erasurePhase        // 16
+      case _: Function                                                       => lambdaliftPhase     // 19
+      case _: ApplyDynamic                                                   => cleanupPhase        // 23
+      case _                                                                 => NoPhase             // --
+    }
+  }
+  override def checkSingleTreeLifetime(t: Tree): Boolean = {
+    val last = eliminatedBy(t)
+    (last eq NoPhase) || (phase.id <= last.id) || {
+      val frames = (new Throwable).getStackTrace.take(30)
+      if (frames exists (f => f.toString contains "TreeCopier")) ()
+      else {
+        Console.err.println(s"${t.shortClass}#${t.id} (created: ${t.creationPhase}) should be eliminated in $last, but now in $phase: $t")
+        frames foreach println
+      }
+      false
+    }
+  }
+
+  def checkTreeLifetime(tree: Tree) {
+    tree foreach checkSingleTreeLifetime
+  }
+
   private var curRun: Run = null
   private var curRunId = 0
 
@@ -1375,6 +1492,7 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
     val dcePhase                     = phaseNamed("dce")
     val jvmPhase                     = phaseNamed("jvm")
     // val msilPhase                    = phaseNamed("msil")
+    val terminalPhase                = phaseNamed("terminal")
 
     def runIsAt(ph: Phase)   = globalPhase.id == ph.id
     def runIsPast(ph: Phase) = globalPhase.id > ph.id
@@ -1446,6 +1564,10 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
         else treeChecker.checkTrees
       }
     }
+    // def treeLifetimes() {
+    //   val checker = new treeChecker.TreeLifetimes
+    //   units foreach (checker check _)
+    // }
 
     private def showMembers() = {
       // Allows for syntax like scalac -Xshow-class Random@erasure,typer
@@ -1581,6 +1703,13 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
         // run tree/icode checkers
         if (settings.check containsPhase globalPhase.prev)
           runCheckers()
+
+        for (unit <- units; t <- unit.body) {
+          treesSeen(phase) += t.shortClass
+          if (!checkSingleTreeLifetime(t))
+            unit.warning(t.pos, "WARNING")
+        }
+        // treeLifetimes()
 
         // output collected statistics
         if (settings.Ystatistics.value)

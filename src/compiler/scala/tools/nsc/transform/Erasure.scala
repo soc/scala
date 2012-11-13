@@ -1005,7 +1005,8 @@ abstract class Erasure extends AddInterfaces
           (fn: @unchecked) match {
             case TypeApply(Select(qual, _), List(targ)) =>
               if (qual.tpe <:< targ.tpe)
-                atPos(tree.pos) { Typed(qual, TypeTree(targ.tpe)) }
+                qual setType targ.tpe
+                // atPos(tree.pos) { Typed(qual, TypeTree(targ.tpe)) }
               else if (isNumericValueClass(qual.tpe.typeSymbol) && isNumericValueClass(targ.tpe.typeSymbol))
                 atPos(tree.pos)(numericConversion(qual, targ.tpe.typeSymbol))
               else
@@ -1213,7 +1214,8 @@ abstract class Erasure extends AddInterfaces
           treeCopy.Template(tree, parents, emptyValDef, addBridges(body, currentOwner))
 
         case Match(selector, cases) =>
-          Match(Typed(selector, TypeTree(selector.tpe)), cases)
+          tree
+          // Match(Typed(selector, TypeTree(selector.tpe)), cases)
 
         case Literal(ct) if ct.tag == ClazzTag
                          && ct.typeValue.typeSymbol != definitions.UnitClass =>

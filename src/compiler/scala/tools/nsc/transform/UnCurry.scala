@@ -271,7 +271,6 @@ abstract class UnCurry extends InfoTransform
               List(ClassDef(anonClass, NoMods, ListOfNil, ListOfNil, List(applyMethodDef), fun.pos)),
               Typed(New(anonClass.tpe), TypeTree(fun.tpe)))
           }
-
       }
 
     /** Transform a function node (x => body) of type PartialFunction[T, R] where

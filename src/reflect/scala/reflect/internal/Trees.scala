@@ -24,6 +24,9 @@ trait Trees extends api.Trees { self: SymbolTable =>
 
     private[this] var rawtpe: Type = _
     final def tpe = rawtpe
+
+    val creationPhase = phase
+
     def tpe_=(t: Type) = rawtpe = t
     def setType(tp: Type): this.type = { rawtpe = tp; this }
     def defineType(tp: Type): this.type = setType(tp)
