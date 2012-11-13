@@ -280,14 +280,6 @@ trait BasicBlocks {
       }
     }
 
-    /** Insert instructions in 'is' immediately after index 'idx'. */
-    def insertAfter(idx: Int, is: List[Instruction]) {
-      assert(closed, "Instructions can be replaced only after the basic block is closed")
-
-      instrs = instrs.patch(idx + 1, is, 0)
-      code.touched = true
-    }
-
     /** Removes instructions found at the given positions.
      *
      *  @param positions ...
@@ -339,10 +331,6 @@ trait BasicBlocks {
      *  is closed, which sets the DIRTYSUCCS flag.
      */
     def emit(instr: Instruction, pos: Position) {
-/*      if (closed) {
-        print()
-        Console.println("trying to emit: " + instr)
-      } */
       assert(!closed || ignore, this)
 
       if (ignore) {
@@ -436,11 +424,6 @@ trait BasicBlocks {
       ignore = true
     }
 
-    def exitIgnoreMode() {
-      assert(ignore, "Exit ignore mode when not in ignore mode: " + this)
-      ignore = false
-    }
-
     /** Return the last instruction of this basic block. */
     def lastInstruction =
       if (closed) instrs(instrs.length - 1)
@@ -496,17 +479,6 @@ trait BasicBlocks {
     }
 
     override def hashCode = label * 41 + code.hashCode
-
-    // Instead of it, rather use a printer
-    def print() { print(java.lang.System.out) }
-
-    def print(out: java.io.PrintStream) {
-      out.println("block #"+label+" :")
-      foreach(i => out.println("  " + i))
-      out.print("Successors: ")
-      successors.foreach((x: BasicBlock) => out.print(" "+x.label.toString()))
-      out.println()
-    }
 
     private def succString = if (successors.isEmpty) "[S: N/A]" else successors.distinct.mkString("[S: ", ", ", "]")
     private def predString = if (predecessors.isEmpty) "[P: N/A]" else predecessors.distinct.mkString("[P: ", ", ", "]")
