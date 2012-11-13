@@ -37,6 +37,14 @@ trait TypeDiagnostics {
   import global._
   import definitions._
 
+  /** The common situation of making sure nothing is erroneous could be
+   *  nicer if Symbols, Types, and Trees all implemented some common interface
+   *  in which isErroneous and similar would be placed.
+   */
+  // def noErroneousTypes(tps: Type*)    = tps forall (x => !x.isErroneous)
+  // def noErroneousSyms(syms: Symbol*)  = syms forall (x => !x.isErroneous)
+  // def noErroneousTrees(trees: Tree*)  = trees forall (x => !x.isErroneous)
+
   /** For errors which are artifacts of the implementation: such messages
    *  indicate that the restriction may be lifted in the future.
    */
@@ -50,6 +58,64 @@ trait TypeDiagnostics {
    */
   private val addendums = perRunCaches.newMap[Position, () => String]()
   private var isTyperInPattern = false
+
+  private val compiledDefns   = mutable.Map[CompilationUnit, List[MemberDef]]()
+  private val compiledByBase  = mutable.Map[Symbol, List[(CompilationUnit, MemberDef)]]() withDefaultValue Nil
+  private val compiledTargets = mutable.ListBuffer[Symbol]()
+
+  private def neverUsedStr(m: Symbol, what: String) = {
+    val why = if (m.isPrivate) "private " else if (m.isLocal) "local " else "under closed world assumption, "
+    s"$why$what is never used"
+  }
+  def checkUnusedClosedWorld() = {
+    val targets = compiledTargets.toList map (_.lastOverriddenSymbol) filterNot (_ eq NoSymbol)
+    targets foreach (_.initialize)
+
+    // Exclude these for now, they are difficult to report usefully.
+    def isDeferredOrImplementsDeferred(m: Symbol) = m.overrideChain exists (_.isDeferred)
+
+    def isAntReflection(m: Symbol) = (
+         m.isMethod
+      && (m.info.resultType.typeSymbol == UnitClass)
+      && (m.info.paramss.flatten.length == 1)
+      && (m.enclClass.typeOfThis.baseClasses.exists(_.fullName.toString == "org.apache.tools.ant.Task"))
+    )
+
+    def isSerializationMethod(m: Symbol) = {
+      val names = List[TermName]("readResolve", "readObject", "writeObject", "writeReplace").toSet[Name]
+      names(m.name)
+    }
+    // Constant inlining leaves us in the dark about whether some members
+    // were ever used.
+    def isConstOrContainsConst(m: Symbol) = {
+      def isConst(m: Symbol) = isConstantType(m.info.resultType)
+
+      isConst(m) || (m.info.decls exists isConst)
+    }
+    // Main methods are entry points, assumed used.
+    def isMainOrHasMain(m: Symbol) = (
+      isJavaMainMethod(m) || hasJavaMainMethod(m)
+    )
+    def isUnused(m: Symbol) = (
+         m.isTerm
+      && !m.isSynthetic
+      && !(targets contains m)
+      && !(m.name == nme.WILDCARD)  // e.g. val _ = foo
+      && !m.isConstructor
+      && !m.isDeprecated
+      && !isUniversalMemberOrOverride(m)
+      && !isConstOrContainsConst(m)
+      && !isDeferredOrImplementsDeferred(m)
+      && !isMainOrHasMain(m)
+      && !isSerializationMethod(m)
+      && !isAntReflection(m)
+    )
+
+    for ((base, pairs) <- compiledByBase.toList.sortBy(_._1.name) ; if isUnused(base) ; (unit, defn) <- pairs) {
+      val m = defn.symbol
+      unit.warning(defn.pos, neverUsedStr(m, m.fullLocationString))
+    }
+  }
 
   /** Devising new ways of communicating error info out of
    *  desperation to work on error messages.  This is used
@@ -286,6 +352,7 @@ trait TypeDiagnostics {
     // distinguished from the other types in the same error message
     private val savedName = sym.name
     def restoreName()     = sym.name = savedName
+    // def isAltered         = sym.name != savedName
     def modifyName(f: String => String) = sym setName newTypeName(f(sym.name.toString))
 
     /** Prepend java.lang, scala., or Predef. if this type originated
@@ -417,18 +484,21 @@ trait TypeDiagnostics {
 
     object checkUnused {
       val ignoreNames = Set[TermName]("readResolve", "readObject", "writeObject", "writeReplace")
-
       class UnusedPrivates extends Traverser {
         val defnTrees = ListBuffer[MemberDef]()
         val targets   = mutable.Set[Symbol]()
         val setVars   = mutable.Set[Symbol]()
         val treeTypes = mutable.Set[Type]()
 
+        private def isPrivateEnough(m: Symbol) = (
+             m.isPrivate
+          || m.isLocal
+        )
         def defnSymbols = defnTrees.toList map (_.symbol)
         def localVars   = defnSymbols filter (t => t.isLocal && t.isVar)
 
         def qualifiesTerm(sym: Symbol) = (
-             (sym.isModule || sym.isMethod || sym.isPrivateLocal || sym.isLocal)
+             (sym.isModule || sym.isMethod || isPrivateEnough(sym))
           && !nme.isLocalName(sym.name)
           && !sym.isParameter
           && !sym.isParamAccessor       // could improve this, but it's a pain
@@ -469,15 +539,19 @@ trait TypeDiagnostics {
           }
           super.traverse(t)
         }
+        // def isUnused(t: Tree): Boolean = (
+        //   if (t.symbol.isTerm) isUnusedTerm(t.symbol)
+        //   else isUnusedType(t.symbol)
+        // )
         def isUnusedType(m: Symbol): Boolean = (
               m.isType
           && !m.isTypeParameterOrSkolem // would be nice to improve this
-          && (m.isPrivate || m.isLocal)
+          && isPrivateEnough(m)
           && !(treeTypes.exists(tp => tp exists (t => t.typeSymbolDirect == m)))
         )
-        def isUnusedTerm(m: Symbol): Boolean = (
-             (m.isTerm)
-          && (m.isPrivate || m.isLocal)
+        def isUnusedTerm(m: Symbol): Boolean = logResult(s"isUnusedTerm($m)")(
+             m.isTerm
+          && isPrivateEnough(m)
           && !targets(m)
           && !(m.name == nme.WILDCARD)              // e.g. val _ = foo
           && !ignoreNames(m.name)                   // serialization methods
@@ -505,7 +579,6 @@ trait TypeDiagnostics {
               case _               => NoPosition
             }
           )
-          val why = if (sym.isPrivate) "private" else "local"
           val what = (
             if (isDefaultGetter) "default argument"
             else if (sym.isConstructor) "constructor"
@@ -516,15 +589,24 @@ trait TypeDiagnostics {
             else if (sym.isModule) "object"
             else "term"
           )
-          unit.warning(pos, s"$why $what in ${sym.owner} is never used")
+          unit.warning(pos, neverUsedStr(sym, s"$what in ${sym.owner}"))
         }
         p.unsetVars foreach { v =>
           unit.warning(v.pos, s"local var ${v.name} in ${v.owner} is never set - it could be a val")
         }
         p.unusedTypes foreach { t =>
-          val sym = t.symbol
-          val why = if (sym.isPrivate) "private" else "local"
-          unit.warning(t.pos, s"$why ${sym.fullLocationString} is never used")
+          unit.warning(t.pos, neverUsedStr(t.symbol, t.symbol.fullLocationString))
+        }
+        if (isClosedWorld) {
+          // compiledTargets ++= p.targets
+          compiledTargets ++= p.targets.flatMap(_.overrideChain).filterNot(compiledTargets contains _)
+        }
+
+        if (isClosedUnit(unit)) {
+          compiledDefns(unit) = p.defnTrees.toList
+          p.defnTrees.toList foreach { defn =>
+            compiledByBase(defn.symbol.lastOverriddenSymbol) ::= ((unit, defn))
+          }
         }
       }
     }
