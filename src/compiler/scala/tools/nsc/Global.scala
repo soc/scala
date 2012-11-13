@@ -9,6 +9,7 @@ import java.io.{ File, FileOutputStream, PrintWriter, IOException, FileNotFoundE
 import java.nio.charset.{ Charset, CharsetDecoder, IllegalCharsetNameException, UnsupportedCharsetException }
 import scala.compat.Platform.currentTime
 import scala.collection.{ mutable, immutable }
+import scala.reflect.io.NoAbstractFile
 import io.{ SourceReader, AbstractFile, Path }
 import reporters.{ Reporter, ConsoleReporter }
 import util.{ ClassPath, MergedClassPath, StatisticsInfo, returning, stackTraceString, stackTraceHeadString }
@@ -1198,6 +1199,13 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
 
     /** A map from compiled top-level symbols to their picklers */
     val symData = new mutable.HashMap[Symbol, PickleBuffer]
+
+    def symbolSourceFile(s: Symbol): AbstractFile = {
+      for (s1 <- s.enclClassChain.iterator ++ s.enclClassChain.iterator.map(_.sourceModule)) {
+        currentRun.symSource get s1 foreach (f => return f)
+      }
+      NoAbstractFile
+    }
 
     private var phasec: Int       = 0   // phases completed
     private var unitc: Int        = 0   // units completed this phase

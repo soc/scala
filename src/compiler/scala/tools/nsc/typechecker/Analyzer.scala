@@ -7,6 +7,7 @@ package scala.tools.nsc
 package typechecker
 
 import scala.reflect.internal.util.Statistics
+import scala.reflect.io.NoAbstractFile
 
 /** The main attribution phase.
  */
@@ -77,6 +78,38 @@ trait Analyzer extends AnyRef
     val phaseName = "typer"
     val runsAfter = List[String]()
     val runsRightAfter = Some("packageobjects")
+
+    def isIndependent(unit: CompilationUnit): Boolean = {
+      def tops(t: Tree): List[MemberDef] = t match {
+        case PackageDef(_, stats) => stats flatMap tops
+        case md: MemberDef        => md :: Nil
+        case _                    => Nil
+      }
+      def where(s: Symbol) = currentRun symbolSourceFile s match {
+        case NoAbstractFile => "" + s
+        case f              => s"$s in $f"
+      }
+      val toplevel = tops(unit.body) map (_.symbol)
+      // println("toplevel: " + toplevel)
+      val bases = toplevel flatMap (_.ancestors)
+      val bases1 = bases filter (currentRun compiles _)
+      // println("bases1 = " + bases1)
+      val bases2 = bases1 filterNot (currentRun.symSource get _ contains unit.source.file)
+      // println("bases2 = " + bases2)
+      toplevel foreach { sym =>
+        val deps = sym.ancestors filter (b => (currentRun compiles b) && !(currentRun.symSource get b contains unit.source.file))
+        if (deps.isEmpty)
+          println(s"$sym is independent.")
+        else {
+          // val deps_s = deps map (s => currentRun.symSource.get(s).fold("" + s)("" + s + " in " + _)) mkString "\n  "
+          val deps_s = deps map where mkString "\n  "
+          println(s"$sym depends on:\n  $deps_s")
+        }
+        // deps
+      }
+      bases2.isEmpty
+    }
+
     def newPhase(_prev: Phase): StdPhase = new StdPhase(_prev) {
       override def keepsTypeParams = false
       resetTyper()
@@ -87,7 +120,12 @@ trait Analyzer extends AnyRef
       override def run() {
         val start = if (Statistics.canEnable) Statistics.startTimer(typerNanos) else null
         global.echoPhaseSummary(this)
-        for (unit <- currentRun.units) {
+        val units = currentRun.units.toList
+        // units foreach (unit => unit.body foreach (t => println(t.symbol)))
+        val (independent, dependent) = units partition isIndependent
+        // println("dependent: " + dependent)
+        // println("independent: " + independent)
+        for (unit <- units) {
           applyPhase(unit)
           undoLog.clear()
         }
