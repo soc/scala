@@ -53,6 +53,11 @@ trait Function1[@specialized(scala.Int, scala.Long, scala.Float, scala.Double/*,
    *  @return       a new function `f` such that `f(x) == g(apply(x))`
    */
   @annotation.unspecialized def andThen[A](g: R => A): T1 => A = { x => g(apply(x)) }
+  
+  @annotation.unspecialized def map[A](g: R => A): T1 => A = andThen(g)
+    
+  @annotation.unspecialized def flatMap[A](g: R => (T1 => A)): (T1 => A) =
+    t1 => g(apply(t1)) apply t1
 
   override def toString() = "<function1>"
 }
