@@ -233,7 +233,6 @@ trait SyntheticMethods extends ast.TreeDSL {
       List(
         Product_productPrefix   -> (() => constantNullary(nme.productPrefix, clazz.name.decode)),
         Product_productArity    -> (() => constantNullary(nme.productArity, arity)),
-        Product_productElement  -> (() => perElementMethod(nme.productElement, accessorLub)(mkThisSelect)),
         Product_iterator        -> (() => productIteratorMethod),
         Product_canEqual        -> (() => canEqualMethod)
         // This is disabled pending a reimplementation which doesn't add any
@@ -241,6 +240,11 @@ trait SyntheticMethods extends ast.TreeDSL {
         // Product_productElementName  -> (() => productElementNameMethod(accessors)),
       )
     }
+    def productElementForClass = perElementMethod(nme.productElement, accessorLub)(mkThisSelect)
+    def productElementForObject = (
+      createMethod(nme.productElement, List(IntClass.tpe), AnyClass.tpe)(m =>
+        Throw(IndexOutOfBoundsExceptionClass.tpe, Ident(m.firstParam).TOSTRING()))
+    )
 
     def hashcodeImplementation(sym: Symbol): Tree = {
       sym.tpe.finalResultType.typeSymbol match {
@@ -284,16 +288,18 @@ trait SyntheticMethods extends ast.TreeDSL {
     def caseClassMethods = productMethods ++ /*productNMethods ++*/ Seq(
       Object_hashCode -> (() => chooseHashcode),
       Object_toString -> (() => forwardToRuntime(Object_toString)),
-      Object_equals   -> (() => equalsCaseClassMethod)
+      Object_equals   -> (() => equalsCaseClassMethod),
+      Product_productElement -> (() => productElementForClass)
     )
 
     def valueCaseClassMethods = productMethods ++ /*productNMethods ++*/ valueClassMethods ++ Seq(
-      Any_toString -> (() => forwardToRuntime(Object_toString))
+      Any_toString -> (() => forwardToRuntime(Object_toString)),
+      Product_productElement -> (() => productElementForClass)
     )
-
     def caseObjectMethods = productMethods ++ Seq(
       Object_hashCode -> (() => constantMethod(nme.hashCode_, clazz.name.decode.hashCode)),
-      Object_toString -> (() => constantMethod(nme.toString_, clazz.name.decode))
+      Object_toString -> (() => constantMethod(nme.toString_, clazz.name.decode)),
+      Product_productElement -> (() => productElementForObject)
       // Not needed, as reference equality is the default.
       // Object_equals   -> (() => createMethod(Object_equals)(m => This(clazz) ANY_EQ Ident(m.firstParam)))
     )
