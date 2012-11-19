@@ -2052,6 +2052,15 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
       }
       NoSymbol
     }
+    // If this symbol overrides any other symbol, the last symbol in the
+    // override chain, i.e. the earliest definition; otherwise, this symbol.
+    def lastOverriddenSymbol: Symbol = (
+      if (this eq NoSymbol) NoSymbol
+      else allOverriddenSymbols match {
+        case Nil => this
+        case xs  => xs.last
+      }
+    )
 
     /** Returns all symbols overridden by this symbol, plus all matching symbols
      *  defined in parents of the selftype.
