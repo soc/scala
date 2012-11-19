@@ -99,8 +99,6 @@ trait Analyzer extends AnyRef
           unit.body = typer.typed(unit.body)
           if (global.settings.Yrangepos.value && !global.reporter.hasErrors) global.validatePositions(unit.body)
           for (workItem <- unit.toCheck) workItem()
-          if (settings.lint.value)
-            typer checkUnused unit
         }
         finally {
           unit.toCheck.clear()

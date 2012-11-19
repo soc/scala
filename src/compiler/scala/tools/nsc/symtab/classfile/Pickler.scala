@@ -38,6 +38,7 @@ abstract class Pickler extends SubComponent {
       // yet performed the necessary symbol lookup, leading to
       // spurious claims of unusedness.
       if (settings.lint.value) {
+        staticAnalyzer.checkUnused(currentRun.units.toList)
         log("Clearing recorded import selectors.")
         analyzer.clearUnusedImports()
       }

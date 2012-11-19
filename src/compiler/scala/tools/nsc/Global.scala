@@ -651,6 +651,10 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
 
   object icodeChecker extends icodeCheckers.ICodeChecker()
 
+  object staticAnalyzer extends {
+    val global: Global.this.type = Global.this
+  } with typechecker.StaticAnalysis
+
   object typer extends analyzer.Typer(
     analyzer.NoContext.make(EmptyTree, RootClass, newScope)
   )

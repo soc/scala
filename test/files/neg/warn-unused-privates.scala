@@ -1,6 +1,13 @@
+class User {
+  new Accessors { }
+  new DefaultArgs { }
+  new Outer
+  new Locals { }
+}
+
 class Bippy(a: Int, b: Int) {
   private def this(c: Int) = this(c, c)           // warn
-  private def bippy(x: Int): Int      = bippy(x)  // TODO: could warn
+  private def bippy(x: Int): Int      = bippy(x)  // warn - used only recursively
   private def boop(x: Int)            = x+a+b     // warn
   final private val MILLIS1           = 2000      // no warn, might have been inlined
   final private val MILLIS2: Int      = 1000      // warn
