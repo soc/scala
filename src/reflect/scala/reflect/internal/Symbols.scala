@@ -21,6 +21,8 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
 
   protected def nextId() = { ids += 1; ids }
 
+  private val openInits = mutable.Set[Symbol]()
+
   /** Used for deciding in the IDE whether we can interrupt the compiler */
   //protected var activeLocks = 0
 
@@ -580,6 +582,33 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
     /** Does symbol have ANY flag in `mask` set? */
     final def hasFlag(mask: Long): Boolean = {
       if (!isCompilerUniverse && needsInitialize(isFlagRelated = true, mask = mask)) initialize
+      if (!openInits(this)) {
+        openInits += this
+        try {
+          val initMe = (
+               isPastTyper && isTerm && !isInitialized
+            && !nme.isConstructorName(rawname)
+            && (infos ne null)
+            && (rawname.toTermName != nme.PACKAGE)
+            && (this.isInstanceOf[MethodSymbol])
+            && {
+              def rawOwnerChain(s: Symbol): List[Symbol] = if (s eq NoSymbol) Nil else s :: rawOwnerChain(s.rawowner)
+              val chain = rawOwnerChain(this)
+              def encls = chain drop 1 takeWhile (x => !x.isInstanceOf[PackageClassSymbol])
+
+              ( !chain.contains(JavaLangPackageClass.owner) &&
+                !encls.exists(s => s.isInitialized && s.isJavaDefined)
+              )
+            }
+          )
+          if (initMe) {
+            println(s"[$phase] Opportunistic initialization of ${this.rawname}in ${rawowner.rawname}")
+            maybeInitialize
+            // initialize
+          }
+        }
+        finally openInits -= this
+      }
       (flags & mask) != 0
     }
     /** Does symbol have ALL the flags in `mask` set? */
@@ -1210,8 +1239,8 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
       var cnt = 0
       while (validTo == NoPeriod) {
         //if (settings.debug.value) System.out.println("completing " + this);//DEBUG
-        assert(infos ne null, this.name)
-        assert(infos.prev eq null, this.name)
+        assert(infos ne null, this.debugLocationString)
+        assert(infos.prev eq null, this.debugLocationString)
         val tp = infos.info
         //if (settings.debug.value) System.out.println("completing " + this.rawname + tp.getClass());//debug
 

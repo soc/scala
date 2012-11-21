@@ -400,12 +400,31 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
       if (settings.debug.value && (settings.verbose.value || currentRun.size < 5))
         inform("[running phase " + name + " on " + unit + "]")
 
+      val seen = mutable.Set[Symbol]()
+      def checkOne(s: Symbol) {
+        if (s == null || seen(s)) return
+        seen += s
+        if (!s.isInitialized) {
+          println(s"[uninitialized/$this] $s ${s.debugLocationString} ${s.defString}")
+        }
+      }
+      def checkInit(s: Symbol) {
+        checkOne(s)
+        if (s != null && s.isInitialized) {
+          s.typeParams foreach checkOne
+          s.paramss.flatten foreach checkOne
+          checkOne(s.companionSymbol)
+          checkOne(s.info.typeSymbolDirect)
+        }
+      }
+
       val unit0 = currentUnit
       try {
         currentRun.currentUnit = unit
         if (!cancelled(unit)) {
           currentRun.informUnitStarting(this, unit)
           apply(unit)
+          unit.body foreach (t => checkInit(t.symbol))
         }
         currentRun.advanceUnit
       } finally {
@@ -996,16 +1015,22 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
 
   /** The currently active run
    */
-  def currentRun: Run              = curRun
+  def currentRun: Run              = {
+    if (curRun != null) _globalInitialized = true
+    curRun
+  }
   def currentUnit: CompilationUnit = if (currentRun eq null) NoCompilationUnit else currentRun.currentUnit
   def currentSource: SourceFile    = if (currentUnit.exists) currentUnit.source else lastSeenSourceFile
 
+  private var _globalInitialized = false
   def isGlobalInitialized = (
-       definitions.isDefinitionsInitialized
+       _globalInitialized
+    && definitions.isDefinitionsInitialized
     && rootMirror.isMirrorInitialized
   )
   override def isPastTyper = (
-       (curRun ne null)
+       _globalInitialized
+    && (curRun ne null)
     && isGlobalInitialized // defense against init order issues
     && (globalPhase.id > currentRun.typerPhase.id)
   )
