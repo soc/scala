@@ -147,14 +147,19 @@ trait StaticAnalysis {
 
     def isUsed(m: Symbol)   = usedSyms(m)
     def isUnused(m: Symbol) = !isUsed(m)
-    def isGot(m: Symbol)    = accesses(m) exists (_.isGetter)
-    def isSet(m: Symbol)    = accesses(m) exists (_.isSetter)
+    def isGot(m: Symbol)    = accesses(m) exists (s => (s eq m) || s.isGetter)
+    def isSet(m: Symbol)    = accesses(m) exists (s => (s eq m) || s.isSetter)
 
     def check() {
       for ((defn, unit) <- defns) {
-        val m = defn.symbol
+        val m  = defn.symbol
         val m1 = m.accessedOrSelf
-        if (m1.isVar && !m1.isLazy && isGot(m1) && !isSet(m1)) // FIXME - isLazy is workaround for .isVar bug
+        println(s"m/m1 $m $m1 ${accesses.getOrElse(m1, Nil)}")
+        val isVar = (
+             m1.isMutable && m1.isLocal
+          || m1.isVar && !m1.isLazy
+        )
+        if (isVar && isGot(m1) && !isSet(m1)) // FIXME - isLazy is workaround for .isVar bug
           unit.warning(defn.pos, s"var ${m.name} in ${m.owner} is never set - it could be a val")
         else if (isUnused(m) && !m.isSetter)
           warnUnused(unit, defn)
@@ -185,10 +190,16 @@ trait StaticAnalysis {
         )
       }
       def add(sym: Symbol) {
+        println(s"[add] $sym ${sym.initialize.debugFlagString}")
         if ((sym != null) && (sym != NoSymbol) && !isWithinDefinition(sym.initialize)) {
           usedSyms += sym
-          if (sym.isGetter || sym.isSetter)
+          if (sym.isMutable && sym.isLocal) {
+            accesses(sym) ::= sym
+          }
+          else if (sym.isGetter || sym.isSetter) {
+            println(s"getter/setter: $sym/${sym.debugFlagString} ${sym.accessed}/${sym.accessed.debugFlagString}")
             accesses(sym.accessed) ::= sym
+          }
         }
       }
       private var labelStack: List[LabelDef] = Nil
@@ -201,8 +212,10 @@ trait StaticAnalysis {
         def isPatternVar = labelStack.nonEmpty && t.symbol.isVal
         def shouldAdd    = definitionQualifies(t) && (patternVars || !isPatternVar)
 
-        if (shouldAdd)
+        if (shouldAdd) {
+          println(s"[defn] ${t.symbol} ${t.symbol.initialize.debugFlagString}")
           defnTrees += t
+        }
       }
       override def traverse(t: Tree): Unit = {
         t match {
@@ -210,7 +223,11 @@ trait StaticAnalysis {
           case t: MemberDef     => addMemberDef(t)
           case t: RefTree       => t.symbol.overrideChain foreach add
           case Assign(lhs, rhs) =>
-            add(lhs.symbol)
+            lhs.symbol.initialize
+            lhs.symbol.accessedOrSelf.initialize
+            println(s"lhs=${lhs.symbol} ${lhs.symbol.debugFlagString}")
+            // accesses(lhs.symbol.accessedOrSelf) ::= lhs.symbol
+            // add(lhs.symbol)
             add(rhs.symbol)
           case _                                    =>
         }

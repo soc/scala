@@ -85,6 +85,10 @@ trait Locals {
     var x = 100 // warn about it being a var
     x
   }
+
+  f0
+  f1
+  f2
 }
 
 object Types {
