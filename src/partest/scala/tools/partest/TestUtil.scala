@@ -23,14 +23,6 @@ trait TestUtil {
     (nanos, result)
   }
   def nanos(body: => Unit): Long = alsoNanos(body)._1
-
-  def intercept[T <: Exception : ClassTag](code: => Unit): Unit =
-    try {
-      code
-      assert(false, "did not throw " + classTag[T])
-    } catch {
-      case ex: Exception if classTag[T].runtimeClass isInstance ex =>
-    }
 }
 
 // Used in tests.

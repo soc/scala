@@ -32,73 +32,27 @@ class ReflectiveRunner {
   }
 
   def main(args: String) {
-    val argList = (args.split("\\s")).toList
+    val argList     = (args.split("\\s")).toList
+    val buildPath   = searchPath("--buildpath", argList)
+    val classPath   = searchPath("--classpath", argList)
+    val fileManager = new ConsoleFileManager(buildPath getOrElse (classPath getOrElse "build/pack"))
+    val sepLoader   = fileManager.newLoader()
 
-    if (isPartestDebug)
-      showAllJVMInfo
+    // val sepUrls      = PathSettings.srcCodeLib.toURL +: fileManager.latestLibs.toArray
+    // val sepLoader    = new URLClassLoader(sepUrls, null)
+    // val newClasspath = ClassPath.fromURLs(sepUrls: _*)
 
-    // find out which build to test
-    val buildPath = searchPath("--buildpath", argList)
-    val classPath = searchPath("--classpath", argList)
-    val fileManager =
-      if (!buildPath.isEmpty)
-        new ConsoleFileManager(buildPath.get)
-      else if (!classPath.isEmpty)
-        new ConsoleFileManager(classPath.get, true)
-      else if (argList contains "--pack")
-        new ConsoleFileManager("build/pack")
-      else // auto detection
-        new ConsoleFileManager
+    // setProp("java.class.path", newClasspath)
+    // setProp("scala.home", "")
+    // if (isPartestDebug)
+    //   for (prop <- List("java.class.path", "sun.boot.class.path", "java.ext.dirs"))
+    //     println(prop + ": " + propOrEmpty(prop))
 
-    import fileManager.
-      { latestCompFile, latestReflectFile, latestLibFile, latestPartestFile, latestFjbgFile, latestScalapFile, latestActorsFile }
-    val files =
-      Array(latestCompFile, latestReflectFile, latestLibFile, latestPartestFile, latestFjbgFile, latestScalapFile, latestActorsFile) map (x => io.File(x))
+    val sepRunnerClass  = sepLoader loadClass sepRunnerClassName
+    val sepRunner       = sepRunnerClass.newInstance()
+    val sepMainMethod   = sepRunnerClass.getMethod("main", Array(classOf[String]): _*)
+    val cargs: Array[AnyRef] = Array(args)
 
-    val sepUrls   = files map (_.toURL)
-    var sepLoader = new URLClassLoader(sepUrls, null)
-
-    // this is a workaround for https://issues.scala-lang.org/browse/SI-5433
-    // when that bug is fixed, this paragraph of code can be safely removed
-    // we hack into the classloader that will become parent classloader for scalac
-    // this way we ensure that reflective macro lookup will pick correct Code.lift
-    sepLoader = new URLClassLoader((PathSettings.srcCodeLib +: files) map (_.toURL), null)
-
-    if (isPartestDebug)
-      println("Loading classes from:\n" + sepUrls.mkString("\n"))
-
-    // @partest maintainer: it seems to me that commented lines are incorrect
-    // if classPath is not empty, then it has been provided by the --classpath option
-    // which points to the root of Scala home (see ConsoleFileManager's testClasses and the true flag in the ctor for more information)
-    // this doesn't mean that we had custom Java classpath set, so we don't have to override latestXXXFiles from the file manager
-    //
-    //val paths = classPath match {
-    //  case Some(cp) => Nil
-    //  case _        => files.toList map (_.path)
-    //}
-    val paths = files.toList map (_.path)
-
-    val newClasspath = ClassPath.join(paths: _*)
-
-    setProp("java.class.path", newClasspath)
-    setProp("scala.home", "")
-
-    if (isPartestDebug)
-      for (prop <- List("java.class.path", "sun.boot.class.path", "java.ext.dirs"))
-        println(prop + ": " + propOrEmpty(prop))
-
-    try {
-      val sepRunnerClass  = sepLoader loadClass sepRunnerClassName
-      val sepRunner       = sepRunnerClass.newInstance()
-      val sepMainMethod   = sepRunnerClass.getMethod("main", Array(classOf[String]): _*)
-      val cargs: Array[AnyRef] = Array(args)
-      sepMainMethod.invoke(sepRunner, cargs: _*)
-    }
-    catch {
-      case cnfe: ClassNotFoundException =>
-        cnfe.printStackTrace()
-        NestUI.failure(sepRunnerClassName +" could not be loaded from:\n")
-        sepUrls foreach (x => NestUI.failure(x + "\n"))
-    }
+    blockingSystemExit({ sepMainMethod.invoke(sepRunner, cargs: _*) ; true })
   }
 }

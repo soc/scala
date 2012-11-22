@@ -49,6 +49,10 @@ object ClassPath {
   /** Split the classpath, apply a transformation function, and reassemble it. */
   def map(cp: String, f: String => String): String = join(split(cp) map f: _*)
 
+  /** Join the paths as a classpath */
+  def fromPaths(paths: Path*): String = join(paths map (_.path): _*)
+  def fromURLs(urls: URL*): String = fromPaths(urls map (x => Path(x.getPath)) : _*)
+
   /** Expand path and possibly expanding stars */
   def expandPath(path: String, expandStar: Boolean = true): List[String] =
     if (expandStar) split(path) flatMap expandS

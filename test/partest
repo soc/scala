@@ -1,101 +1,127 @@
-#!/bin/sh
-
-##############################################################################
-# Scala test runner 2.8.0
-##############################################################################
-# (c) 2002-2011 LAMP/EPFL
+#!/usr/bin/env bash
 #
-# This is free software; see the distribution for copying conditions.
-# There is NO warranty; not even for MERCHANTABILITY or FITNESS FOR A
-# PARTICULAR PURPOSE.
-##############################################################################
 
-cygwin=false;
-darwin=false;
-case "`uname`" in
-    CYGWIN*) cygwin=true ;;
-    Darwin*) darwin=true ;;
-esac
+unset debug
 
-# Finding the root folder for this Scala distribution
-SOURCE=$0;
-SCRIPT=`basename "$SOURCE"`;
-while [ -h "$SOURCE" ]; do
-    SCRIPT=`basename "$SOURCE"`;
-    LOOKUP=`ls -ld "$SOURCE"`;
-    TARGET=`expr "$LOOKUP" : '.*-> \(.*\)$'`;
-    if expr "${TARGET:-.}/" : '/.*/$' > /dev/null; then
-        SOURCE=${TARGET:-.};
-    else
-        SOURCE=`dirname "$SOURCE"`/${TARGET:-.};
-    fi;
-done;
+JAVA_OPTS="$JAVA_OPTS -Xmx2g"
 
-# see #2092
-SCALA_HOME=`dirname "$SOURCE"`
-SCALA_HOME=`cd "$SCALA_HOME"; pwd -P`
-SCALA_HOME=`cd "$SCALA_HOME"/..; pwd`
+echoerr () {
+  echo 1>&2 "$@"
+}
+dlog () {
+  [[ $debug ]] && echoerr "$@"
+}
+run () {
+  dlog "[run] " "$@"
+  "$@"
+}
 
-if $cygwin; then
-    SCALA_HOME=`cygpath --windows --short-name "$SCALA_HOME"`
-    SCALA_HOME=`cygpath --unix "$SCALA_HOME"`
+usage () {
+  cat <<EOM
+Usage: $0 [options]
+
+  -h | -help         print this message
+  -v | -verbose      this runner is chattier
+  -d | -debug        this runner is chattier yet
+  -f | -failed       run tests which failed on previous test run
+  -g | -grep         run tests whose sources or checkfile matches regexp
+  -u | -update       update checkfiles to match test output
+
+  -scala-home <path>     use the scala build at the specified directory
+  -java-home <path>      alternate JAVA_HOME
+
+  # jvm options and output control
+  JAVA_OPTS     environment variable holding jvm args
+  -Dkey=val     pass -Dkey=val directly to the jvm
+  -J-X          pass option -X directly to the jvm (-J is stripped)
+  -S-X          pass -X to scalac when compiling tests (-S is stripped)
+
+EOM
+}
+
+# pull -J/-D options for java and -S options for scala.
+declare -a residual_args
+declare -a java_args
+declare -a javac_args
+declare -a scalac_args
+
+addJava () {
+  dlog "[addJava] arg = '$1'"
+  java_args=( "${java_args[@]}" "$1" )
+}
+addScalac () {
+  dlog "[addScalac] arg = '$1'"
+  scalac_args=( "${scalac_args[@]}" "$1" )
+}
+addResidual () {
+  dlog "[residual] arg = '$1'"
+  residual_args=( "${residual_args[@]}" "$1" )
+}
+
+# Use tput to detect color-capable terminal.
+term_colors=$(tput colors 2>/dev/null)
+if [[ $? == 0 ]] && [[ $term_colors -gt 2 ]]; then
+  gitargs='--word-diff'
+  JAVA_OPTS="$JAVA_OPTS -Dpartest.colors=$term_colors"
+  JAVA_OPTS="$JAVA_OPTS -Dpartest.git_diff_options=$gitargs"
+else
+  JAVA_OPTS="$JAVA_OPTS -Dpartest.git_diff_options='--nocolor'"
 fi
 
-# Constructing the extension classpath
-EXT_CLASSPATH=""
-if [ -z "$EXT_CLASSPATH" ] ; then
-    if [ -f "$SCALA_HOME/lib/scala-partest.jar" ] ; then
-        for ext in "$SCALA_HOME"/lib/* ; do
-            if [ -z "$EXT_CLASSPATH" ] ; then
-                EXT_CLASSPATH="$ext"
-            else
-                EXT_CLASSPATH="$EXT_CLASSPATH:$ext"
-            fi
-        done
-    elif [ -f "$SCALA_HOME/build/pack/lib/scala-partest.jar" ] ; then
-        for lib in `echo "partest library reflect compiler"`; do
-            ext="$SCALA_HOME/build/pack/lib/scala-$lib.jar"
-            if [ -z "$EXT_CLASSPATH" ] ; then
-                EXT_CLASSPATH="$ext"
-            else
-                EXT_CLASSPATH="$EXT_CLASSPATH:$ext"
-            fi
-        done
-    fi
-fi
+partestRoot="$(dirname $BASH_SOURCE)"
+findHome () {
+  if [[ -d ../build/pack ]]; then
+    ( cd ../build/pack && pwd )
+  elif [[ -d ../build/quick ]]; then
+    ( cd ../build/quick && pwd )
+  else
+    ( cd .. && pwd )
+  fi
+}
+scalaHome="$(cd "$partestRoot" && findHome)"
 
-if $cygwin; then
-    if [ "$OS" = "Windows_NT" ] && cygpath -m .>/dev/null 2>/dev/null ; then
-        format=mixed
-    else
-        format=windows
-    fi
-    if [ -n "${JAVA_HOME}" ] ; then
-        JAVA_HOME=`cygpath --$format "$JAVA_HOME"`
-    fi
-    if [ -n "${JAVACMD}" ] ; then
-        JAVACMD=`cygpath --$format "$JAVACMD"`
-    fi
-    SCALA_HOME=`cygpath --$format "$SCALA_HOME"`
-    EXT_CLASSPATH=`cygpath --path --$format "$EXT_CLASSPATH"`
-fi
+process_args ()
+{
+  require_arg () {
+    local type="$1"
+    local opt="$2"
+    local arg="$3"
 
-# last arg wins, so if JAVA_OPTS already contains -Xmx or -Xms the
-# supplied argument will be used.
-JAVA_OPTS="-Xmx1024M -Xms64M $JAVA_OPTS"
-[ -n "$SCALAC_OPTS" ] || SCALAC_OPTS="-deprecation"
+    if [[ -z "$arg" ]] || [[ "${arg:0:1}" == "-" ]]; then
+      die "$opt requires <$type> argument"
+    fi
+  }
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+       -h|-help) usage; exit 0 ;;
+      -d|-debug) debug=1 && addJava "-Dpartest.debug" && shift ;;
+    -v|-verbose) addResidual "--verbose" && shift ;;
+     -f|-failed) addResidual "--failed" && shift ;;
+     -u|-update) addResidual "--update-check" && shift ;;
+       -g|-grep) require_arg regex "$1" "$2" && addResidual "--grep" && addResidual "$2" && shift 2 ;;
+    -scala-home) require_arg path "$1" "$2" && scalaHome="$2" && shift 2 ;;
+     -java-home) require_arg path "$1" "$2" && java_cmd="$2/bin/java" && shift 2 ;;
 
-partestDebugStr=""
-if [ ! -z "${PARTEST_DEBUG}" ] ; then
-  partestDebugStr="-Dpartest.debug=${PARTEST_DEBUG}"
-fi
+            -D*) addJava "$1" && shift ;;
+            -J*) addJava "${1:2}" && shift ;;
+            -S*) addScalac "${1:2}" && shift ;;
+              *) addResidual "$1" && shift ;;
+    esac
+  done
+}
 
-"${JAVACMD:=java}" \
-  $JAVA_OPTS -cp "$EXT_CLASSPATH" \
-  ${partestDebugStr} \
-  -Dscala.home="${SCALA_HOME}" \
-  -Dpartest.javacmd="${JAVACMD}" \
-  -Dpartest.java_opts="${JAVA_OPTS}" \
-  -Dpartest.scalac_opts="${SCALAC_OPTS}" \
-  -Dpartest.javac_cmd="${JAVA_HOME}/bin/javac" \
-  scala.tools.partest.nest.NestRunner "$@"
+process_args "$@"
+
+extClasspath="$( IFS=: && set $scalaHome/lib/* && echo "$*" )"
+
+run java \
+  $JAVA_OPTS \
+  -cp $extClasspath \
+  -Dscala.home="$scalaHome" \
+  -Dpartest.root="$partestRoot" \
+  -Dpartest.javacmd=java \
+  -Dpartest.javac_cmd="$JAVA_HOME/bin/javac" \
+  -Dpartest.java_opts="${java_args[@]}" \
+  -Dpartest.scalac_opts="${scalac_args[@]}" \
+  scala.tools.partest.nest.NestRunner \
+  "${residual_args[@]}"

@@ -3,75 +3,68 @@
  * @author Philipp Haller
  */
 
-// $Id$
-
 package scala.tools.partest
 package nest
 
-import java.io.{File, FilenameFilter, IOException, StringWriter,
+import java.io.{ FilenameFilter, IOException,
                 FileInputStream, FileOutputStream, BufferedReader,
                 FileReader, PrintWriter, FileWriter}
 import java.net.URI
 import scala.tools.nsc.io.{ Path, Directory, File => SFile }
 import scala.collection.mutable
+import scala.tools.nsc.util.{ ScalaClassLoader, Exceptional }
+import ClassPath.join
 
-trait FileUtil {
-  /**
-   * Compares two files using a Java implementation of the GNU diff
-   * available at http://www.bmsi.com/java/#diff.
-   *
-   * @param  f1  the first file to be compared
-   * @param  f2  the second file to be compared
-   * @return the text difference between the compared files
-   */
-  def compareFiles(f1: File, f2: File): String = {
-    val diffWriter = new StringWriter
-    val args = Array(f1.getAbsolutePath(), f2.getAbsolutePath())
+trait FileManager extends PartestPaths {
+  private lazy val parentLoader = ScalaClassLoader.fromURLs(allLibs)
+  def buildPrefix: String
 
-    DiffPrint.doDiff(args, diffWriter)
-    val res = diffWriter.toString
-    if (res startsWith "No") "" else res
-  }
-  def compareContents(lines1: Seq[String], lines2: Seq[String]): String = {
-    val xs1 = lines1.toArray[AnyRef]
-    val xs2 = lines2.toArray[AnyRef]
+  // def repoRoot     = testRootDir.parent.toAbsolute
+  // def testRootDir  = Directory(testRootName).toAbsolute
+  // def testRootName = propOrNone("partest.root") getOrElse sys.error("Not set: partest.root")
+  // def srcDirName   = propOrElse("partest.srcdir", "files")
 
-    val diff   = new Diff(xs1, xs2)
-    val change = diff.diff_2(false)
-    val writer = new StringWriter
-    val p      = new DiffPrint.NormalPrint(xs1, xs2, writer)
+  override def toString = s"FileManager(libOrClassesDir=$libOrClassesDir, root=$testRootDir)"
 
-    p.print_script(change)
-    val res = writer.toString
-    if (res startsWith "No ") ""
-    else res
-  }
-}
-object FileUtil extends FileUtil { }
+  def libOrClassesDir = (
+    List("lib", "classes")
+      map (s => Directory(repoRoot / buildPrefix / s))
+      collectFirst { case d: Directory if d.isDirectory => d }
+      getOrElse sys.error("No build found")
+  )
+  def latestLibs = libOrClassesDir.list.toList collect { case p if p.isDirectory || p.hasExtension("jar") => p.toURL }
 
-trait FileManager extends FileUtil {
+  def javaClassPath = PathResolver.Environment.javaUserClassPath
+  def universalLibs = extraTestLibs
+  private def isName(url: URL, name: String) = (url.getPath endsWith s"scala-$name.jar") || (url.getPath endsWith "/" + name)
+  def latestLib     = latestLibs find (url => isName(url, "library")) orNull
+  def latestReflect = latestLibs find (url => isName(url, "reflect")) orNull
+  // def actualDir = (
+  //   List("lib", "classes")
+  //     map (s => Directory(repoRoot / buildPrefix / s))
+  //     find (_.isDirectory)
+  // )
+  // def finishClassGrouping(name: String): URL = {
+  //   val actual = actualDir getOrElse { return null }
+  //   def lib = actual / s"scala-$name.jar"
+  //   def dir = actual / name
 
-  def testRootDir: Directory
-  def testRootPath: String
-
-  var JAVACMD: String
-  var JAVAC_CMD: String
-
-  var CLASSPATH: String
-  var LATEST_LIB: String
-  var LATEST_REFLECT: String
-  var LATEST_COMP: String
-  var LATEST_PARTEST: String
-  var LATEST_ACTORS: String
-
-  var showDiff = false
+  //   if (lib.isFile) lib.toURL else dir.toURL
+  // }
   var updateCheck = false
-  var showLog = false
   var failed = false
 
-  var SCALAC_OPTS = PartestDefaults.scalacOpts.split(' ').toSeq
-  var JAVA_OPTS   = PartestDefaults.javaOpts
-  var timeout     = PartestDefaults.timeout
+  def javaCmd: String        = propOrElse("partest.javacmd", "java")
+  def javacCmd: String       = propOrElse("partest.javac_cmd", "javac")
+  def javaOptsProp: String   = propOrElse("partest.java_opts", "")
+  def scalacOptsProp: String = propOrElse("partest.scalac_opts", "")
+
+  final def allLibs         = universalLibs ++ latestLibs
+  def newLoader(urls: URL*) = ScalaClassLoader.fromURLs(urls.toList, parentLoader)
+
+  def javaOpts: List[String]   = words(javaOptsProp)
+  def scalacOpts: List[String] = words(scalacOptsProp)
+  def universalClasspath       = join(ClassPath.fromURLs(allLibs: _*), javaClassPath)
 
   /** Only when --debug is given. */
   lazy val testTimings = new mutable.HashMap[String, Long]
@@ -103,18 +96,8 @@ trait FileManager extends FileUtil {
     }
     else {
       val to = if (dest.isDirectory) new File(dest, from.getName) else dest
-
-      try {
-        SFile(to) writeAll SFile(from).slurp()
-        true
-      }
+      try { to writeAll from.fileContents ; true }
       catch { case _: IOException => false }
     }
-  }
-
-  def mapFile(file: File, replace: String => String) {
-    val f = SFile(file)
-
-    f.printlnAll(f.lines.toList map replace: _*)
   }
 }
