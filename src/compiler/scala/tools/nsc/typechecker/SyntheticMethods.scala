@@ -130,11 +130,6 @@ trait SyntheticMethods extends ast.TreeDSL {
         case _                                                => default
       }
     }
-    def productIteratorMethod = {
-      createMethod(nme.productIterator, iteratorOfType(accessorLub))(_ =>
-        gen.mkMethodCall(ScalaRunTimeModule, nme.typedProductIterator, List(accessorLub), List(mkThis))
-      )
-    }
     def projectionMethod(accessor: Symbol, num: Int) = {
       createMethod(nme.productAccessorName(num), accessor.tpe.resultType)(_ => REF(accessor))
     }
@@ -239,7 +234,6 @@ trait SyntheticMethods extends ast.TreeDSL {
       List(
         Product_productPrefix   -> (() => constantNullary(nme.productPrefix, clazz.name.decode)),
         Product_productArity    -> (() => constantNullary(nme.productArity, arity)),
-        Product_iterator        -> (() => productIteratorMethod),
         Product_canEqual        -> (() => canEqualMethod)
         // This is disabled pending a reimplementation which doesn't add any
         // weight to case classes (i.e. inspects the bytecode.)
@@ -247,10 +241,18 @@ trait SyntheticMethods extends ast.TreeDSL {
       )
     }
     def productElementForClass = perElementMethod(nme.productElement, accessorLub)(mkThisSelect)
+    def productIteratorForClass = {
+      createMethod(nme.productIterator, iteratorOfType(accessorLub))(_ =>
+        gen.mkMethodCall(ScalaRunTimeModule, nme.typedProductIterator, List(accessorLub), List(mkThis))
+      )
+    }
     def productElementForObject = (
       createMethod(nme.productElement, List(IntClass.tpe), AnyClass.tpe)(m =>
         Throw(IndexOutOfBoundsExceptionClass.tpe, Ident(m.firstParam).TOSTRING()))
     )
+    def productIteratorForObject = {
+      createMethod(nme.productIterator, iteratorOfType(AnyClass.tpe))(_ => Select(REF(IteratorModule), nme.empty))
+    }
 
     def hashcodeImplementation(sym: Symbol): Tree = {
       sym.tpe.finalResultType.typeSymbol match {
@@ -291,21 +293,25 @@ trait SyntheticMethods extends ast.TreeDSL {
       Any_equals -> (() => equalsDerivedValueClassMethod)
     )
 
-    def caseClassMethods = productMethods ++ /*productNMethods ++*/ Seq(
-      Object_hashCode -> (() => chooseHashcode),
-      Object_toString -> (() => forwardToRuntime(Object_toString)),
-      Object_equals   -> (() => equalsCaseClassMethod),
+    def classMethods = List(
+      Product_iterator -> (() => productIteratorForClass),
       Product_productElement -> (() => productElementForClass)
     )
 
-    def valueCaseClassMethods = productMethods ++ /*productNMethods ++*/ valueClassMethods ++ Seq(
-      Any_toString -> (() => forwardToRuntime(Object_toString)),
-      Product_productElement -> (() => productElementForClass)
+    def caseClassMethods = productMethods ++ /*productNMethods ++*/ classMethods ++ Seq(
+      Object_hashCode -> (() => chooseHashcode),
+      Object_toString -> (() => forwardToRuntime(Object_toString)),
+      Object_equals   -> (() => equalsCaseClassMethod)
+    )
+
+    def valueCaseClassMethods = productMethods ++ /*productNMethods ++*/ valueClassMethods ++ classMethods ++ Seq(
+      Any_toString -> (() => forwardToRuntime(Object_toString))
     )
     def caseObjectMethods = productMethods ++ Seq(
       Object_hashCode -> (() => constantMethod(nme.hashCode_, clazz.name.decode.hashCode)),
       Object_toString -> (() => constantMethod(nme.toString_, clazz.name.decode)),
-      Product_productElement -> (() => productElementForObject)
+      Product_productElement -> (() => productElementForObject),
+      Product_iterator -> (() => productIteratorForObject)
       // Not needed, as reference equality is the default.
       // Object_equals   -> (() => createMethod(Object_equals)(m => This(clazz) ANY_EQ Ident(m.firstParam)))
     )

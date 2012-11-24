@@ -659,6 +659,7 @@ trait StdNames {
     val delayedInitArg: NameType       = "delayedInit$body"
     val drop: NameType                 = "drop"
     val elem: NameType                 = "elem"
+    val empty: NameType                = "empty"
     val emptyValDef: NameType          = "emptyValDef"
     val ensureAccessible : NameType    = "ensureAccessible"
     val eq: NameType                   = "eq"
