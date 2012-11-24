@@ -50,6 +50,17 @@ abstract class TreeInfo {
     case _ => false
   }
 
+  def needsNoInitialization(tree: Tree): Boolean = (
+    isInterfaceMember(tree) || (tree match {
+      case DefDef(mods, _, _, _, _, __)  => true
+      case ValDef(mods, _, _, _)         => mods.isLazy
+      case ClassDef(_, _, _, _)          => true
+      case ModuleDef(_, _, _)            => true
+      case Block(stats, expr)            => expr :: stats forall needsNoInitialization
+      case _                             => false
+    })
+  )
+
   /** Is tree a pure (i.e. non-side-effecting) definition?
    */
   def isPureDef(tree: Tree): Boolean = tree match {
