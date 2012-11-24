@@ -2498,7 +2498,7 @@ abstract class GenASM extends SubComponent with BytecodeWriters {
 
             case BOX(kind) =>
               val MethodNameAndType(mname, mdesc) = jBoxTo(kind)
-              jcode.invokestatic(BoxesRunTime, mname, mdesc)
+              jcode.invokestatic(classLiteral(kind).getInternalName, "valueOf", mdesc)
 
             case UNBOX(kind) =>
               val MethodNameAndType(mname, mdesc) = jUnboxTo(kind)
