@@ -11,7 +11,7 @@ package scala
 
 
 /** A function of 1 parameter.
- *  
+ *
  *  In the following example, the definition of succ is a
  *  shorthand for the anonymous class definition anonfun1:
  *
@@ -55,4 +55,31 @@ trait Function1[@specialized(scala.Int, scala.Long, scala.Float, scala.Double/*,
   @annotation.unspecialized def andThen[A](g: R => A): T1 => A = { x => g(apply(x)) }
 
   override def toString() = "<function1>"
+
+  if (!Count.locked) {
+    Count.locked = true
+    try {
+      if (Count.map ne null) {
+        val name = this.getClass.getName
+        val count = Option(Count.map.get(name)).fold(1)(_ + 1)
+
+        Count.map.put(name, count)
+      }
+    }
+    finally Count.locked = false
+  }
+}
+
+object Count {
+  var locked = false
+  val map = new java.util.HashMap[String, Int]()
+  scala.sys addShutdownHook {
+    locked = true
+    import scala.collection.JavaConverters._
+    val pairs = map.asScala.toList.filter(_._2 >= 100).sortBy(-_._2)
+    println("Total Function1s: " + pairs.map(_._2).sum)
+    pairs foreach {
+      case (k, v) => println(f"$k%10s $v")
+    }
+  }
 }
