@@ -1497,7 +1497,7 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
           writeICode()
         } else if ((settings.Xprint containsPhase globalPhase) || settings.printLate.value && runIsAt(cleanupPhase)) {
           // print trees
-          if (settings.Xshowtrees.value || settings.XshowtreesCompact.value || settings.XshowtreesStringified.value) nodePrinters.printAll()
+          if (settings.showTrees) nodePrinters.printAll()
           else printAllUnits()
         }
 

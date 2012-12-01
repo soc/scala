@@ -13,13 +13,6 @@ trait Phases extends Reshape
 
   private var alreadyRun = false
 
-  private def treeString(t: Tree): String = (
-    if (settings.Xshowtrees.value || settings.XshowtreesCompact.value || settings.XshowtreesStringified.value)
-      "\n" + nodePrinters.nodeToString(t).trim
-    else
-      t.toString
-  )
-
   lazy val mkReificationPipeline: Tree => Tree = tree0 => {
     assert(!alreadyRun, "reifier instance cannot be used more than once")
     alreadyRun = true
@@ -32,7 +25,7 @@ trait Phases extends Reshape
     reifyLog("[reshape phase]")
     tree = reshape.transform(tree)
 
-    reifyLog(List("[interlude]", "reifee = " + treeString(tree), "[calculate phase]") mkString "\n")
+    reifyLog(List("[interlude]", "reifee = " + reifeeString(tree), "[calculate phase]") mkString "\n")
     calculate.traverse(tree)
 
     reifyLog("[metalevels phase]")

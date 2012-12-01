@@ -47,6 +47,8 @@ trait ScalaSettings extends AbsScalaSettings
   }
   private implicit def installEnableSettings[T <: BooleanSetting](s: T) = new EnableSettings(s)
 
+  def showTrees = Xshowtrees.value || XshowtreesCompact.value || XshowtreesStringified.value
+
   /** Disable a setting */
   def disable(s: Setting) = allSettings -= s
 
