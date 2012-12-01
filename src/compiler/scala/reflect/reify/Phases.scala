@@ -13,31 +13,32 @@ trait Phases extends Reshape
 
   private var alreadyRun = false
 
+  private def treeString(t: Tree): String = (
+    if (settings.Xshowtrees.value || settings.XshowtreesCompact.value || settings.XshowtreesStringified.value)
+      "\n" + nodePrinters.nodeToString(t).trim
+    else
+      t.toString
+  )
+
   lazy val mkReificationPipeline: Tree => Tree = tree0 => {
     assert(!alreadyRun, "reifier instance cannot be used more than once")
     alreadyRun = true
 
     var tree = tree0
 
-    if (reifyDebug) println("[calculate phase]")
+    reifyLog("[calculate phase]")
     calculate.traverse(tree)
 
-    if (reifyDebug) println("[reshape phase]")
+    reifyLog("[reshape phase]")
     tree = reshape.transform(tree)
-    if (reifyDebug) println("[interlude]")
-    if (reifyDebug) println("reifee = " + (if (settings.Xshowtrees.value || settings.XshowtreesCompact.value || settings.XshowtreesStringified.value) "\n" + nodePrinters.nodeToString(tree).trim else tree.toString))
 
-    if (reifyDebug) println("[calculate phase]")
+    reifyLog(List("[interlude]", "reifee = " + treeString(tree), "[calculate phase]") mkString "\n")
     calculate.traverse(tree)
 
-    if (reifyDebug) println("[metalevels phase]")
+    reifyLog("[metalevels phase]")
     tree = metalevels.transform(tree)
-    if (reifyDebug) println("[interlude]")
-    if (reifyDebug) println(symtab.debugString)
+    reifyLog(List("[interlude]", symtab.debugString, "[reify phase]") mkString "\n")
 
-    if (reifyDebug) println("[reify phase]")
-    val result = reify(tree)
-
-    result
+    reify(tree)
   }
 }

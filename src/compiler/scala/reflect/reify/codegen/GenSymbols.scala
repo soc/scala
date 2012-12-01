@@ -75,7 +75,7 @@ trait GenSymbols {
         val resolver = if (sym.isType) nme.staticClass else nme.staticModule
         mirrorMirrorCall(resolver, reify(sym.fullName))
       } else {
-        if (reifyDebug) println("Locatable: %s (%s) owned by %s (%s) at %s".format(sym, sym.accurateKindString, sym.owner, sym.owner.accurateKindString, sym.owner.fullNameString))
+        reifyLog("Locatable: %s (%s) owned by %s (%s) at %s".format(sym, sym.accurateKindString, sym.owner, sym.owner.accurateKindString, sym.owner.fullNameString))
         val rowner = reify(sym.owner)
         val rname = reify(sym.name.toString)
         if (sym.isType)
@@ -97,7 +97,7 @@ trait GenSymbols {
 
   def reifyFreeTerm(binding: Tree): Tree =
     reifyIntoSymtab(binding.symbol) { sym =>
-      if (reifyDebug) println("Free term" + (if (sym.isCapturedVariable) " (captured)" else "") + ": " + sym + "(" + sym.accurateKindString + ")")
+      reifyLog("Free term" + (if (sym.isCapturedVariable) " (captured)" else "") + ": " + sym + "(" + sym.accurateKindString + ")")
       val name = newTermName(nme.REIFY_FREE_PREFIX + sym.name + (if (sym.isType) nme.REIFY_FREE_THIS_SUFFIX else ""))
       if (sym.isCapturedVariable) {
         assert(binding.isInstanceOf[Ident], showRaw(binding))
@@ -110,7 +110,7 @@ trait GenSymbols {
 
   def reifyFreeType(binding: Tree): Tree =
     reifyIntoSymtab(binding.symbol) { sym =>
-      if (reifyDebug) println("Free type: %s (%s)".format(sym, sym.accurateKindString))
+      reifyLog("Free type: %s (%s)".format(sym, sym.accurateKindString))
       state.reificationIsConcrete = false
       val name = newTermName(nme.REIFY_FREE_PREFIX + sym.name)
       Reification(name, binding, mirrorBuildCall(nme.newFreeType, reify(sym.name.toString), mirrorBuildCall(nme.flagsFromBits, reify(sym.flags)), reify(origin(sym))))
@@ -118,7 +118,7 @@ trait GenSymbols {
 
   def reifySymDef(sym: Symbol): Tree =
     reifyIntoSymtab(sym) { sym =>
-      if (reifyDebug) println("Sym def: %s (%s)".format(sym, sym.accurateKindString))
+      reifyLog("Sym def: %s (%s)".format(sym, sym.accurateKindString))
       val name = newTermName(nme.REIFY_SYMDEF_PREFIX + sym.name)
       def reifiedOwner = if (sym.owner.isLocatable) reify(sym.owner) else reifySymDef(sym.owner)
       Reification(name, Ident(sym), mirrorBuildCall(nme.newNestedSymbol, reifiedOwner, reify(sym.name), reify(sym.pos), mirrorBuildCall(nme.flagsFromBits, reify(sym.flags)), reify(sym.isClass)))

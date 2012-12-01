@@ -69,37 +69,32 @@ trait GenTypes {
   def reificationIsConcrete: Boolean = state.reificationIsConcrete
 
   def spliceType(tpe: Type): Tree = {
-    val quantified = currentQuantified
-    if (tpe.isSpliceable && !(quantified contains tpe.typeSymbol)) {
-      if (reifyDebug) println("splicing " + tpe)
-
-      val tagFlavor = if (concrete) tpnme.TypeTag.toString else tpnme.WeakTypeTag.toString
-      // if this fails, it might produce the dreaded "erroneous or inaccessible type" error
-      // to find out the whereabouts of the error run scalac with -Ydebug
-      if (reifyDebug) println("launching implicit search for %s.%s[%s]".format(universe, tagFlavor, tpe))
-      val result =
-        typer.resolveTypeTag(defaultErrorPosition, universe.tpe, tpe, concrete = concrete, allowMaterialization = false) match {
-          case failure if failure.isEmpty =>
-            if (reifyDebug) println("implicit search was fruitless")
-            if (reifyDebug) println("trying to splice as manifest")
-            val splicedAsManifest = spliceAsManifest(tpe)
-            if (splicedAsManifest.isEmpty) {
-              if (reifyDebug) println("no manifest in scope")
-              EmptyTree
-            } else {
-              if (reifyDebug) println("successfully spliced as manifest: " + splicedAsManifest)
-              splicedAsManifest
-            }
-          case success =>
-            if (reifyDebug) println("implicit search has produced a result: " + success)
-            state.reificationIsConcrete &= concrete || success.tpe <:< TypeTagClass.toTypeConstructor
-            Select(Apply(Select(success, nme.in), List(Ident(nme.MIRROR_SHORT))), nme.tpe)
-        }
-      if (result != EmptyTree) return result
-      state.reificationIsConcrete = false
+    def trySplicingManifest() = spliceAsManifest(tpe) match {
+      case EmptyTree =>
+        reifyLog("implicit search was fruitless, and there is no manifest in scope")
+        state.reificationIsConcrete = false
+        EmptyTree
+      case spliced =>
+        reifyLog("implicit search was fruitless, but successfully spliced as manifest: " + spliced)
+        spliced
     }
 
-    EmptyTree
+    if (!tpe.isSpliceable || (currentQuantified contains tpe.typeSymbol))
+      EmptyTree
+    else {
+      reifyLog("splicing " + tpe)
+      val tagFlavor = if (concrete) tpnme.TypeTag else tpnme.WeakTypeTag
+      // if this fails, it might produce the dreaded "erroneous or inaccessible type" error
+      // to find out the whereabouts of the error run scalac with -Ydebug
+      reifyLog(s"launching implicit search for $universe.$tagFlavor[$tpe]")
+      typer.resolveTypeTag(defaultErrorPosition, universe.tpe, tpe, concrete = concrete, allowMaterialization = false) match {
+        case EmptyTree => trySplicingManifest()
+        case success   =>
+          reifyLog("implicit search has produced a result: " + success)
+          state.reificationIsConcrete &= concrete || success.tpe <:< TypeTagClass.toTypeConstructor
+          Select(Apply(Select(success, nme.in), List(Ident(nme.MIRROR_SHORT))), nme.tpe)
+      }
+    }
   }
 
   private def spliceAsManifest(tpe: Type): Tree = {
@@ -167,7 +162,7 @@ trait GenTypes {
 
   /** Reify a tough type, i.e. the one that leads to creation of auxiliary symbols */
   private def reifyToughType(tpe: Type): Tree = {
-    if (reifyDebug) println("tough type: %s (%s)".format(tpe, tpe.kind))
+    reifyLog("tough type: %s (%s)".format(tpe, tpe.kind))
 
     def reifyScope(scope: Scope): Tree = {
       scope foreach reifySymDef

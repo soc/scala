@@ -18,4 +18,9 @@ trait Utils extends NodePrinters
   val reifyDebug = global.settings.Yreifydebug.value
   val reifyCopypaste = global.settings.Yreifycopypaste.value
   val reifyTrace = scala.tools.nsc.util.trace when reifyDebug
+
+  @inline final def reifyLog(msg: => Any) {
+    if (reifyDebug)
+      Console.err.println("" + msg)
+  }
 }

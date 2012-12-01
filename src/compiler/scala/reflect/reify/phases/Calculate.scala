@@ -38,7 +38,7 @@ trait Calculate {
         try super.traverse(tree)
         finally currMetalevel += 1
       case tree if tree.isDef =>
-        if (reifyDebug) println("boundSym: %s of type %s".format(tree.symbol, (tree.productIterator.toList collect { case tt: TypeTree => tt }).headOption.getOrElse(TypeTree(tree.tpe))))
+        reifyLog("boundSym: %s of type %s".format(tree.symbol, (tree.productIterator.toList collect { case tt: TypeTree => tt }).headOption.getOrElse(TypeTree(tree.tpe))))
         registerLocalSymbol(tree.symbol, currMetalevel)
 
         bindRelatedSymbol(tree.symbol.sourceModule, "sourceModule")
@@ -49,7 +49,7 @@ trait Calculate {
         Some(tree) collect { case labelDef: LabelDef => labelDef.params foreach (param => bindRelatedSymbol(param.symbol, "labelParam")) }
         def bindRelatedSymbol(related: Symbol, name: String): Unit =
           if (related != null && related != NoSymbol) {
-            if (reifyDebug) println("boundSym (" + name + "): " + related)
+            reifyLog("boundSym (" + name + "): " + related)
             registerLocalSymbol(related, currMetalevel)
           }
         super.traverse(tree)

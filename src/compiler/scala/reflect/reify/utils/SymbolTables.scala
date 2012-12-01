@@ -153,7 +153,7 @@ trait SymbolTables {
         val cumulativeAliases = mutable.ArrayBuffer[(Symbol, TermName)](symtab0.aliases: _*)
 
         def fillInSymbol(sym: Symbol): Tree = {
-          if (reifyDebug) println("Filling in: %s (%s)".format(sym, sym.accurateKindString))
+          reifyLog("Filling in: %s (%s)".format(sym, sym.accurateKindString))
           val isFreeTerm = FreeTermDef.unapply(currtab.symDef(sym)).isDefined
           // SI-6204 don't reify signatures for incomplete symbols, because this might lead to cyclic reference errors
           val signature =
