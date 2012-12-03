@@ -2248,18 +2248,19 @@ self =>
      *  }}}
      */
     def typeBounds(): TypeBoundsTree = {
-      def mkNothing = atPos(o2p(in.lastOffset))(rootScalaDot(tpnme.Nothing)) setType definitions.NothingClass.tpe
-      def mkAny     = atPos(o2p(in.lastOffset))(rootScalaDot(tpnme.Any)) setType definitions.AnyClass.tpe
       val lo  = if (in.token == SUPERTYPE) { in.nextToken(); typ() } else null
       val hi  = if (in.token == SUBTYPE) { in.nextToken() ; typ() } else null
-      val lo1 = if (lo eq null) mkNothing else lo
-      val hi1 = if (hi eq null) mkAny else hi
-      val t   = TypeBoundsTree(lo1, hi1)
 
-      if ((lo eq null) && (hi eq null))
-        t setType TypeBounds.empty
-
-      t setPos wrappingPos(List(t.hi, t.lo))
+      if (lo eq null) {
+        if (hi eq null)
+          emptyTypeBoundsTree
+        else
+          TypeBoundsTree(emptyLowerBoundTree, hi) setPos hi.pos
+      }
+      else if (hi eq null)
+        TypeBoundsTree(lo, emptyUpperBoundTree) setPos lo.pos
+      else
+        TypeBoundsTree(lo, hi) setPos wrappingPos(List(lo, hi))
     }
 
 /* -------- DEFS ------------------------------------------- */
