@@ -13,7 +13,6 @@ import util.Statistics
 trait Trees extends api.Trees { self: SymbolTable =>
 
   private[scala] var nodeCount = 0
-  import definitions.{NothingClass, AnyClass}
 
   abstract class Tree extends TreeContextApiImpl with Attachable with Product {
     val id = nodeCount // TODO: add to attachment?
@@ -491,17 +490,6 @@ trait Trees extends api.Trees { self: SymbolTable =>
   lazy val emptyLowerBoundTree = gen.rootScalaDot(tpnme.Nothing) setPos NoPosition
   lazy val emptyUpperBoundTree = gen.rootScalaDot(tpnme.Any) setPos NoPosition
   lazy val emptyTypeBoundsTree = TypeBoundsTree(emptyLowerBoundTree, emptyUpperBoundTree) setPos NoPosition
-
-  // object NothingTypeTree extends TypeTree(NothingClass.tpe) { }
-  // object AnyTypeTree extends TypeTree(AnyClass.tpe) { }
-  // object NothingTypeTree extends TypeTree(NothingClass.tpe) { }
-  // object AnyTypeTree extends TypeTree(AnyClass.tpe) { }
-  // TypeBoundsTree(rootScalaDot(tpnme.Nothing), rootScalaDot(tpnme.Any)) {/
-  // object emptyTypeBoundsTree extends TypeBoundsTree(SyntheticNothingTypeTree, SyntheticAnyTypeTree) {
-  //   super.setPos(NoPosition)
-  //   super.setType(TypeBounds.empty)
-  //   override def setPos(pos: Position) = { assert(false); this }
-  // }
 
   case class ExistentialTypeTree(tpt: Tree, whereClauses: List[Tree])
        extends TypTree with ExistentialTypeTreeApi
