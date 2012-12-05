@@ -1690,7 +1690,7 @@ trait PatternMatching extends Transform with TypingTransformers with ast.TreeDSL
       // the type of the binder passed to the first invocation
       // determines the type of the tree that'll be returned for that binder as of then
       final def binderToUniqueTree(b: Symbol) =
-        unique(accumSubst(normalize(CODE.REF(b))), b.tpe)
+        unique(accumSubst(normalize(CODE.REF(b))), b.tpe.dealias)
 
       def /\(conds: Iterable[Cond]) = if (conds.isEmpty) TrueCond else conds.reduceLeft(AndCond(_, _))
       def \/(conds: Iterable[Cond]) = if (conds.isEmpty) FalseCond else conds.reduceLeft(OrCond(_, _))
