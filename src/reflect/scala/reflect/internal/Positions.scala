@@ -27,7 +27,9 @@ trait Positions extends api.Positions { self: SymbolTable =>
    *  shortening the range, assigning TransparentPositions
    *  to some of the nodes in `tree` or focusing on the position.
    */
-  def ensureNonOverlapping(tree: Tree, others: List[Tree]){ ensureNonOverlapping(tree, others, true) }
+  def ensureNonOverlapping(tree: Tree, others: List[Tree]) {
+    ensureNonOverlapping(tree, others, focus = true)
+  }
   def ensureNonOverlapping(tree: Tree, others: List[Tree], focus: Boolean) {}
 
   trait PosAssigner extends Traverser {

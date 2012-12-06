@@ -86,6 +86,8 @@ abstract class Position extends scala.reflect.api.Position { self =>
 
   def pos: Position = this
 
+  def data: PositionData = ???
+
   def withPos(newPos: Position): Attachments { type Pos = self.Pos } = newPos
 
   /** An optional value containing the source file referred to by this position, or
@@ -97,6 +99,7 @@ abstract class Position extends scala.reflect.api.Position { self =>
    *  If isDefined is true, offset and source are both defined.
    */
   def isDefined: Boolean = false
+  // data != PositionData.NoPositionData
 
   /** Is this position a transparent position? */
   def isTransparent: Boolean = false
@@ -192,15 +195,21 @@ abstract class Position extends scala.reflect.api.Position { self =>
    *  This holds if both positions are ranges and there is an interval of
    *  non-zero length that is shared by both position ranges.
    */
-  def overlaps(pos: Position): Boolean =
-    isRange && pos.isRange &&
-    ((pos.start < end && start < pos.end) || (start < pos.end && pos.start < end))
+  def overlaps(pos: Position): Boolean = printResult(s"$this.overlaps($pos)")(
+       isRange
+    && pos.isRange
+    && ((pos.start < end && start < pos.end) || (start < pos.end && pos.start < end))
+    // && (data overlaps pos.data)
+  )
 
   /** Does this position cover the same range as that position?
    *  Holds only if both position are ranges
    */
-  def sameRange(pos: Position): Boolean =
-    isRange && pos.isRange && start == pos.start && end == pos.end
+  def sameRange(pos: Position): Boolean = printResult(s"$this.sameRange($pos)")(
+       isRange
+    && pos.isRange
+    && (start == pos.start && end == pos.end)
+  )
 
   def line: Int = throw new UnsupportedOperationException("Position.line")
 
@@ -223,18 +232,33 @@ abstract class Position extends scala.reflect.api.Position { self =>
   def dbgString: String = toString
   def safeLine: Int = try line catch { case _: UnsupportedOperationException => -1 }
 
-  def show: String = "["+toString+"]"
+  def show: String = toString
+  override def toString = "[" + data + "]"
+
+  // "["+toString+"]"
+
+  private def printResult[T](msg: String)(x: T): T = {
+    // println(msg + ": " + x)
+    x
+  }
 }
 
 case object NoPosition extends Position {
+  override def data = PositionData.NoPositionData
+  override def isDefined = false
   override def dbgString = toString
 }
 
 case class FakePos(msg: String) extends Position {
+  override def data = PositionData.NoPositionData
+  override def isDefined = false
   override def toString = msg
 }
 
 class OffsetPosition(override val source: SourceFile, override val point: Int) extends Position {
+  override def startOrPoint = point
+  override def endOrPoint = point
+  override def data = PositionData(point, point, point)
   override def isDefined = true
   override def pointOrElse(default: Int): Int = point
   override def withPoint(off: Int) = new OffsetPosition(source, off)
@@ -245,7 +269,7 @@ class OffsetPosition(override val source: SourceFile, override val point: Int) e
   override def column: Int = {
     var idx = source.lineToOffset(source.offsetToLine(point))
     var col = 0
-    while (idx != point) {
+    while (idx != point && idx < source.content.length) {
       col += (if (source.content(idx) == '\t') Position.tabInc - col % Position.tabInc else 1)
       idx += 1
     }
@@ -268,27 +292,50 @@ class OffsetPosition(override val source: SourceFile, override val point: Int) e
 }
 
 /** new for position ranges */
-class RangePosition(source: SourceFile, override val start: Int, point: Int, override val end: Int)
-extends OffsetPosition(source, point) {
-  if (start > end) sys.error("bad position: "+show)
+class RangePosition(source: SourceFile, override val data: PositionData) extends OffsetPosition(source, data.point) {
+  def this(source: SourceFile, start: Int, point: Int, end: Int) = this(source, PositionData(source, start, point, end))
+
+  override def start = data.start
+  override def end   = data.end
   override def isRange: Boolean = true
-  override def isOpaqueRange: Boolean = true
   override def startOrPoint: Int = start
   override def endOrPoint: Int = end
-  override def withStart(off: Int) = new RangePosition(source, off, point, end)
-  override def withEnd(off: Int) = new RangePosition(source, start, point, off)
-  override def withPoint(off: Int) = new RangePosition(source, start, off, end)
-  override def withSource(source: SourceFile, shift: Int) = new RangePosition(source, start + shift, point + shift, end + shift)
-  override def focusStart = new OffsetPosition(source, start)
+
+  // override def line: Int = {
+  //   val res = super.line
+  //   println(s"line: $source.offsetToLine($point) + 1 == $res")
+  //   res
+  // }
+
+  private def focusAt(point1: Int) = new OffsetPosition(source, point1)
+  private def withData(data1: PositionData) = if (data == data1) this else new RangePosition(source, data1)
+  override def withStart(off: Int) = withData(data.withStart(off))
+  override def withEnd(off: Int)   = withData(data.withEnd(off))
+  override def withPoint(off: Int) = withData(data.withPoint(off))
+  override def withSource(source: SourceFile, shift: Int) = withData(data shiftBy shift)
+  override def focusStart = focusAt(start)
   override def focus = {
-    if (focusCache eq NoPosition) focusCache = new OffsetPosition(source, point)
+    if (focusCache eq NoPosition) focusCache = focusAt(point)
     focusCache
   }
-  override def focusEnd = new OffsetPosition(source, end)
-  override def makeTransparent = new TransparentPosition(source, start, point, end)
+  override def focusEnd = focusAt(end)
+  // override def includes(pos: Position) = pos.isDefined && (data includes pos.data)
   override def includes(pos: Position) = pos.isDefined && start <= pos.startOrPoint && pos.endOrPoint <= end
-  override def union(pos: Position): Position =
-    if (pos.isRange) new RangePosition(source, start min pos.start, point, end max pos.end) else this
+
+  override def isOpaqueRange = data.isOpaqueRange
+  override def isTransparent = data.isTransparent
+  override def makeTransparent = {
+    val res = if (isOpaqueRange) withData(data.makeTransparent) else this
+    // val res = withData(data.makeTransparent)
+    println(s"$this.makeTransparent = $res")
+    res
+  }
+  // isRange && !isTransparent
+
+  // override def makeTransparent = new TransparentPosition(source, start, point, end)
+  // override def includes(pos: Position) = pos.isDefined && start <= pos.startOrPoint && pos.endOrPoint <= end
+  override def union(pos: Position): Position = if (pos.isRange) new RangePosition(source, data union pos.data) else this
+    // if (pos.isRange) new RangePosition(source, start min pos.start, point, end max pos.end) else this
 
   override def toSingleLine: Position = source match {
     case bs: BatchSourceFile
@@ -298,14 +345,16 @@ extends OffsetPosition(source, point) {
     case _ => this
   }
 
-  override def toString = "RangePosition("+source.file.canonicalPath+", "+start+", "+point+", "+end+")"
-  override def show = "["+start+":"+end+"]"
+  private def delims    = if (isTransparent) "<>" else "[]"
+  override def toString = s"RangePos(${source.file.canonicalPath},$data)"
+  override def show     = delims mkString data.toString
+
   private var focusCache: Position = NoPosition
 }
 
-class TransparentPosition(source: SourceFile, start: Int, point: Int, end: Int) extends RangePosition(source, start, point, end) {
-  override def isOpaqueRange: Boolean = false
-  override def isTransparent = true
-  override def makeTransparent = this
-  override def show = "<"+start+":"+end+">"
-}
+// class TransparentPosition(source: SourceFile, start: Int, point: Int, end: Int) extends RangePosition(source, start, point, end) {
+//   // override def isOpaqueRange: Boolean = false
+//   // override def isTransparent = true
+//   // override def makeTransparent = this
+//   // override def show = "<"+start+":"+end+">"
+// }

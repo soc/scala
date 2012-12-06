@@ -49,13 +49,13 @@ abstract class SourceFile {
 /** An object representing a missing source file.
  */
 object NoSourceFile extends SourceFile {
-  def content                   = Array()
+  def content                   = sys.error("NoSourceFile") // Array()
   def file                      = NoFile
   def isLineBreak(idx: Int)     = false
   def isSelfContained           = true
-  def length                    = -1
-  def offsetToLine(offset: Int) = -1
-  def lineToOffset(index : Int) = -1
+  def length                    = sys.error("NoSourceFile") // -1
+  def offsetToLine(offset: Int) = sys.error("NoSourceFile") // -1
+  def lineToOffset(index : Int) = sys.error("NoSourceFile") // -1
   override def toString = "<no source file>"
 }
 
@@ -149,10 +149,14 @@ class BatchSourceFile(val file : AbstractFile, val content0: Array[Char]) extend
    */
   def offsetToLine(offset: Int): Int = {
     val lines = lineIndices
-    def findLine(lo: Int, hi: Int, mid: Int): Int =
-      if (offset < lines(mid)) findLine(lo, mid - 1, (lo + mid - 1) / 2)
-      else if (offset >= lines(mid + 1)) findLine(mid + 1, hi, (mid + 1 + hi) / 2)
-      else mid
+    def findLine(lo: Int, hi: Int, mid: Int): Int = (
+      if (offset < lines(mid))
+        findLine(lo, mid - 1, (lo + mid - 1) / 2)
+      else if ((mid + 1 < lines.length) && offset >= lines(mid + 1))
+        findLine(mid + 1, hi, (mid + 1 + hi) / 2)
+      else
+        mid
+    )
     lastLine = findLine(0, lines.length, lastLine)
     lastLine
   }

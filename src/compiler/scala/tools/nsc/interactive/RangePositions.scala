@@ -7,7 +7,7 @@ package interactive
 
 import ast.Trees
 import ast.Positions
-import scala.reflect.internal.util.{SourceFile, Position, RangePosition, NoPosition}
+import scala.reflect.internal.util.{SourceFile, Position, RangePosition, NoPosition, PositionData}
 import scala.collection.mutable.ListBuffer
 
 /** Handling range positions
@@ -45,7 +45,21 @@ self: scala.tools.nsc.Global =>
   override def wrappingPos(default: Position, trees: List[Tree], focus: Boolean): Position = {
     val ranged = trees filter (_.pos.isRange)
     if (ranged.isEmpty) if (focus) default.focus else default
-    else new RangePosition(default.source, (ranged map (_.pos.start)).min, default.point, (ranged map (_.pos.end)).max)
+    else {
+      val start = ranged.map(_.pos.start).min max 0
+      val point = default.point
+      val end   = ranged.map(_.pos.end).max
+
+      // new RangePosition(default.source, start, point, end)
+
+      // val r1 = new RangePosition(default.source, start, point, end)
+      val r2 = new RangePosition(default.source, (ranged map (_.pos.start)).min, default.point, (ranged map (_.pos.end)).max)
+
+      // println(s"wrappingPos($default, $trees, $focus) == r1=$r1 r2=$r2")
+      // println("... " + ((start, point, end)))
+      // println("... " + ((ranged map (_.pos.start)).min, default.point, (ranged map (_.pos.end)).max))
+      r2
+    }
   }
 
   /** A position that wraps a non-empty set of trees.
@@ -66,28 +80,42 @@ self: scala.tools.nsc.Global =>
    *  to some of the nodes in `tree` or focusing on the position.
    */
   override def ensureNonOverlapping(tree: Tree, others: List[Tree], focus: Boolean) {
+    inform(s"ensureNonOverlapping(${tree.shortClass}, ${others.length} others, focus=$focus)")
+    inform("others = " + others + " w/pos = " + others.map(_.pos))
+
     def isOverlapping(pos: Position) =
       pos.isRange && (others exists (pos overlaps _.pos))
+
     if (isOverlapping(tree.pos)) {
+
       val children = tree.children
       children foreach (ensureNonOverlapping(_, others, focus))
       if (tree.pos.isOpaqueRange) {
         val wpos = wrappingPos(tree.pos, children, focus)
-        tree setPos (if (isOverlapping(wpos)) tree.pos.makeTransparent else wpos)
+        val newpos = if (isOverlapping(wpos)) tree.pos.makeTransparent else wpos
+
+        // inform(s"newpos=$newpos")
+        tree setPos newpos
       }
     }
   }
 
   def solidDescendants(tree: Tree): List[Tree] =
-    if (tree.pos.isTransparent) tree.children flatMap solidDescendants
+    if (tree.pos.isTransparent) {
+      println("Skipping transparent tree " + tree + " at " + tree.pos)
+      tree.children flatMap solidDescendants
+    }
     else List(tree)
 
   /** A free range from `lo` to `hi` */
-  private def free(lo: Int, hi: Int): Range =
+  private def free(lo: Int, hi: Int): Range = {
+    // Console.err.println(s"free($lo, $hi)")
     Range(new RangePosition(null, lo, lo, hi), EmptyTree)
+  }
 
   /** The maximal free range */
-  private lazy val maxFree: Range = free(0, Int.MaxValue)
+  private lazy val maxFree: Range = free(0, PositionData.MaxAbsolutePos)
+    // Int.MaxValue)
 
   /** A singleton list of a non-empty range from `lo` to `hi`, or else the empty List */
   private def maybeFree(lo: Int, hi: Int) =
@@ -99,7 +127,10 @@ self: scala.tools.nsc.Global =>
    */
   private def insert(rs: List[Range], t: Tree, conflicting: ListBuffer[Tree]): List[Range] = rs match {
     case List() =>
-      assert(conflicting.nonEmpty)
+      if (conflicting.isEmpty) {
+        Console.err.println(s"Failed assert: conflict.isEmpty / insert(Nil, ${t.shortClass}, Nil)")
+      }
+      // assert(conflicting.nonEmpty)
       rs
     case r :: rs1 =>
       assert(!t.pos.isTransparent)
@@ -183,9 +214,13 @@ self: scala.tools.nsc.Global =>
   override def validatePositions(tree: Tree) {
     def reportTree(prefix : String, tree : Tree) {
       val source = if (tree.pos.isDefined) tree.pos.source else ""
+      val content = if (tree.pos.isDefined) tree.pos.source.content.slice(tree.pos.start, tree.pos.end).mkString else ""
+
       inform("== "+prefix+" tree ["+tree.id+"] of type "+tree.productPrefix+" at "+tree.pos.show+source)
       inform("")
       inform(treeStatus(tree))
+      inform("Tree contains:\n" + content.lines.mkString(" ").take(80) + "\n")
+      // inform("Tree contents:\n" + content + "\n")
       inform("")
     }
 
@@ -197,7 +232,9 @@ self: scala.tools.nsc.Global =>
       inform("\nChildren:")
       tree.children map (t => "  " + treeStatus(t, tree)) foreach inform
       inform("=======")
-      throw new ValidateException(msg)
+      println(new ValidateException(msg))
+      ()
+      // throw new ValidateException(msg)
     }
 
     def validate(tree: Tree, encltree: Tree): Unit = {
@@ -218,16 +255,19 @@ self: scala.tools.nsc.Global =>
             reportTree("Enclosing", encltree)
             reportTree("Enclosed", tree)
             }
-          if (!(encltree.pos includes tree.pos))
-            positionError("Enclosing tree ["+encltree.id+"] does not include tree ["+tree.id+"]") {
+          if (!(encltree.pos includes tree.pos)) {
+            def t_s(t: Tree) = s"[${t.shortClass}/${t.pos.data}]"
+            val str = s"Enclosing tree ${t_s(encltree)} does not include ${t_s(tree)}"
+            positionError(str) {
               reportTree("Enclosing", encltree)
               reportTree("Enclosed", tree)
             }
+          }
 
           findOverlapping(tree.children flatMap solidDescendants) match {
             case List() => ;
             case xs => {
-              positionError("Overlapping trees "+xs.map { case (x, y) => (x.id, y.id) }.mkString("", ", ", "")) {
+              positionError("Overlapping trees "+xs.map { case (x, y) => (x.id + "/" + x.pos, y.id + "/" + y.pos) }.mkString("", ", ", "")) {
                 reportTree("Ancestor", tree)
                 for((x, y) <- xs) {
                   reportTree("First overlapping", x)

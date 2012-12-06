@@ -9,7 +9,7 @@ import util.InterruptReq
 import scala.reflect.internal.util.{ SourceFile, BatchSourceFile }
 import io.{ AbstractFile, PlainFile, Pickler, CondPickler }
 import util.EmptyAction
-import scala.reflect.internal.util.{ RangePosition, OffsetPosition, TransparentPosition }
+import scala.reflect.internal.util.{ RangePosition, OffsetPosition } //, TransparentPosition }
 import io.Pickler._
 import scala.collection.mutable
 import mutable.ListBuffer
@@ -75,14 +75,14 @@ trait Picklers { self: Global =>
       .wrapped { case source ~ start ~ point ~ end => new RangePosition(source, start, point, end) } { p => p.source ~ p.start ~ p.point ~ p.end }
       .asClass (classOf[RangePosition])
 
-  lazy val transparentPosition: CondPickler[TransparentPosition] =
-    (pkl[SourceFile] ~ pkl[Int] ~ pkl[Int] ~ pkl[Int])
-      .wrapped { case source ~ start ~ point ~ end => new TransparentPosition(source, start, point, end) } { p => p.source ~ p.start ~ p.point ~ p.end }
-      .asClass (classOf[TransparentPosition])
+  // lazy val transparentPosition: CondPickler[TransparentPosition] =
+  //   (pkl[SourceFile] ~ pkl[Int] ~ pkl[Int] ~ pkl[Int])
+  //     .wrapped { case source ~ start ~ point ~ end => new TransparentPosition(source, start, point, end) } { p => p.source ~ p.start ~ p.point ~ p.end }
+  //     .asClass (classOf[TransparentPosition])
 
   lazy val noPosition = singletonPickler(NoPosition)
 
-  implicit lazy val position: Pickler[Position] = transparentPosition | rangePosition | offsetPosition | noPosition
+  implicit lazy val position: Pickler[Position] = /*transparentPosition |*/ rangePosition | offsetPosition | noPosition
 
   implicit lazy val namePickler: Pickler[Name] =
     pkl[String] .wrapped[Name] {
