@@ -2682,14 +2682,39 @@ trait Types extends api.Types { self: SymbolTable =>
 
   object PolyType extends PolyTypeExtractor
 
+  def legitParents(tp: Type): List[Type] = tp match {
+    case RefinedType(parents, _) => parents flatMap legitParents
+    case _                       => tp.parents
+  }
+
   /** A creator for existential types which flattens nested existentials.
    */
-  def newExistentialType(quantified: List[Symbol], underlying: Type): Type =
-    if (quantified.isEmpty) underlying
+  def newExistentialType(quantified: List[Symbol], underlying: Type): Type = {
+    println(s"newExistentialType($quantified, $underlying)")
+    (underlying.typeConstructor.typeParams, underlying.typeArgs).zipped foreach { (p, a) =>
+      val hi = p.info.bounds.hi
+      if ((hi =:= a) || (a =:= AnyClass.tpe)) ()
+      else {
+        val intersect = intersectionType(legitParents(intersectionType(List(hi, a))))
+        println("intersect: " + intersect)
+        intersect.parents foreach (t => println("  " + t.getClass + " " + t))
+        p setInfo TypeBounds(p.info.bounds.lo, intersect)
+      }
+    }
+    //  foreach (tparam => println(s"$tparam.info.bounds.hi = ${tparam.info.bounds.hi}"))
+    // quantified foreach (q => println(s"quantified: $q.info.bounds.hi = ${q.info.bounds.hi}"))
+    val res = if (quantified.isEmpty) underlying
     else underlying match {
       case ExistentialType(qs, restpe) => newExistentialType(quantified ::: qs, restpe)
       case _                           => ExistentialType(quantified, underlying)
     }
+    println("res = " + res)
+    res match {
+      case ExistentialType(qs, restpe) => println("qs " + qs)
+      case _ =>
+    }
+    res
+  }
 
   case class ExistentialType(quantified: List[Symbol],
                              override val underlying: Type) extends RewrappingTypeProxy with ExistentialTypeApi
