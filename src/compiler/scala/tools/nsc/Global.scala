@@ -366,12 +366,58 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
 
   val phaseWithId: Array[Phase] = Array.fill(MaxPhases)(NoPhase)
 
+  private val sharedTrees = perRunCaches.newMap[Int, List[Tree]]() withDefaultValue Nil
+
+  // currentRun.units foreach { unit =>
+  //   unit.body foreach { t =>
+  //     if (t != EmptyTree)
+  //       trees(t.##) ::= t
+  //   }
+  // }
+
+
   abstract class GlobalPhase(prev: Phase) extends Phase(prev) {
     phaseWithId(id) = this
 
     def run() {
       echoPhaseSummary(this)
       currentRun.units foreach applyPhase
+
+      val trees = mutable.Map[Tree, List[(Position, Position)]]() withDefaultValue Nil
+      currentRun.units foreach { unit =>
+        var poses: List[Position] = Nil
+        var alltrees: List[Tree] = List(EmptyTree)
+        var prevPos: Position = NoPosition
+        var curPos: Position = NoPosition
+        unit.body foreach { t =>
+          poses ::= t.pos
+          val recentPoses = (poses take 10).distinct match {
+            case p1 :: p2 :: _ => ((p1, p2))
+            case p1 :: Nil     => ((p1, NoPosition))
+            case _             => ((NoPosition, NoPosition))
+          }
+          val prevT = alltrees.head
+          // prevPos = curPos
+          // curPos = t.pos
+          // val both = ((prevPos, curPos))
+          def s(ps: (Position, Position)) = "" + ((ps._1.show, ps._2.show))
+
+          if (!t.isEmpty && (trees contains t)) {
+            val sstr = t.symbol match {
+              case null | NoSymbol => ""
+              case sym             => s"(${sym.debugLocationString})"
+            }
+            Console.err.println(s"[$this] shared tree ${t.shortClass}/$t$sstr")
+            // Console.err.println(s"previous: ${prevT.shortClass}/$prevT")
+            // Console.err.println("  pos1: " + s(trees(t).head))
+            // Console.err.println("  pos2: " + s(recentPoses))
+            // Console.err.println("")
+            t.markShared()
+          }
+          trees(t) ::= recentPoses
+          alltrees ::= t
+        }
+      }
     }
 
     def apply(unit: CompilationUnit): Unit

@@ -20,17 +20,31 @@ trait Trees extends api.Trees { self: SymbolTable =>
 
     if (Statistics.canEnable) Statistics.incCounter(TreesStats.nodeByType, getClass)
 
+    override def setPos(newpos: Position): this.type = mutate(s"$this setPos $newpos (was: $pos)")(super.setPos(newpos))
+    override def pos_=(pos: Position): Unit = mutate(s"$this.pos = $pos (was: ${this.pos})")(super.pos_=(pos))
+
     final override def pos: Position = rawatt.pos
 
+    private[this] var sharedMutations = 0
+    private[this] var shared = false
+    def markShared() = shared = true
+    def mutate(what: => String)(body: => Unit): this.type = {
+      if (shared) {
+        sharedMutations += 1
+        Console.err.println(s"Shared mutation $id/#$sharedMutations   $what")
+      }
+      body
+      this
+    }
     private[this] var rawtpe: Type = _
     final def tpe = rawtpe
-    def tpe_=(t: Type) = rawtpe = t
-    def setType(tp: Type): this.type = { rawtpe = tp; this }
+    def tpe_=(t: Type) = mutate(s"$this.tpe = $t (was: $rawtpe)")(rawtpe = t)
+    def setType(tp: Type): this.type = mutate(s"$this setType $tp (was: $rawtpe)")({ rawtpe = tp })
     def defineType(tp: Type): this.type = setType(tp)
 
     def symbol: Symbol = null //!!!OPT!!! symbol is about 3% of hot compile times -- megamorphic dispatch?
     def symbol_=(sym: Symbol) { throw new UnsupportedOperationException("symbol_= inapplicable for " + this) }
-    def setSymbol(sym: Symbol): this.type = { symbol = sym; this }
+    def setSymbol(sym: Symbol): this.type = mutate(s"$this.symbol = $sym (was: $symbol)")({ symbol = sym })
     def hasSymbolField = false
     @deprecated("Use hasSymbolField", "2.11.0") def hasSymbol = hasSymbolField
 
@@ -60,18 +74,21 @@ trait Trees extends api.Trees { self: SymbolTable =>
       case _                 => false
     }
 
-    private[scala] def copyAttrs(tree: Tree): this.type = {
+    private[scala] def copyAttrs(tree: Tree): this.type = mutate("copyAttrs") {
       rawatt = tree.rawatt
       tpe = tree.tpe
       if (hasSymbolField) symbol = tree.symbol
-      this
     }
 
     override def hashCode(): Int = System.identityHashCode(this)
     override def equals(that: Any) = this eq that.asInstanceOf[AnyRef]
 
-    override def duplicate: this.type =
+    override def duplicate: this.type = {
+      if (shared)
+        Console.err.println(s"PANIC! Duplicating already shared tree $this")
+
       (duplicator transform this).asInstanceOf[this.type]
+    }
   }
 
   abstract class TreeContextApiImpl extends TreeContextApi { this: Tree =>
@@ -212,7 +229,9 @@ trait Trees extends api.Trees { self: SymbolTable =>
 
   abstract class SymTree extends Tree with SymTreeContextApi {
     override def hasSymbolField = true
-    override var symbol: Symbol = NoSymbol
+    private[this] var symbolField: Symbol = NoSymbol
+    override def symbol = symbolField
+    override def symbol_=(x: Symbol): Unit = mutate(s"$this.symbol = $x")(symbolField = x)
   }
 
   trait NameTree extends Tree with NameTreeApi {
@@ -232,6 +251,7 @@ trait Trees extends api.Trees { self: SymbolTable =>
   case object EmptyTree extends TermTree {
     val asList = List(this)
     super.tpe_=(NoType)
+    override def markShared() = ()
     override def tpe_=(t: Type) =
       if (t != NoType) throw new UnsupportedOperationException("tpe_=("+t+") inapplicable for <empty>")
     override def isEmpty = true
