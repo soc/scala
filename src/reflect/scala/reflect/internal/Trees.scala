@@ -7,10 +7,152 @@ package scala.reflect
 package internal
 
 import Flags._
-import scala.collection.mutable.{ListBuffer, LinkedHashSet}
+import scala.collection.mutable
+import mutable.{ ListBuffer, LinkedHashSet }
 import util.Statistics
 
-trait Trees extends api.Trees { self: SymbolTable =>
+trait TreeOwners {
+  self: SymbolTable =>
+
+  // private val treeOwners = perRunCaches.newMap[Tree, List[Tree]]() withDefaultValue Nil
+  private val infosBanner = """
+==============  KEY  ==============
+<flags> <tree class>  @  <pos>  #<tree id> <tree>    #<symbol id>  <symbol>
+
+ flag  S   : synthetic tree or synthetic symbol
+ flag  *   : tree appears at multiple ast locations
+  pos MMxNN: line MM, column NN
+  pos  --  : same position as parent tree
+===================================
+  """.trim
+
+  private lazy val treeInfos = {
+    println(infosBanner + "\n")
+    perRunCaches.newMap[CompilationUnit, TreeInfo]()
+  }
+
+  def updateTreeInfos(units: List[CompilationUnit]) {
+    units foreach { unit =>
+      val oldInfo = treeInfos remove unit
+      val newInfo = new TreeInfo(unit)
+      val oldKeys = oldInfo.fold(Set[Tree]())(_.keys.toSet)
+      val newKeys = newInfo.keys.toSet
+      val plus = newKeys filterNot oldKeys
+      val minus = oldKeys filterNot newKeys
+      val plusShared = plus filter (newInfo.shared contains _)
+      val minusShared = minus filterNot (newInfo.shared contains _)
+      val changeSize = newKeys.size - oldKeys.size
+
+      treeInfos(unit) = new TreeInfo(unit)
+
+      if (changeSize != 0) {
+        val plus = if (changeSize > 0) "+" else "-"
+        val size_str = math.abs(changeSize)
+        val old_str = oldInfo getOrElse ""
+        val sharedChains = newInfo.sharedParentsStrings mkString "\n\n"
+        val numShared = newInfo.shared.size
+        val sharedStr = if (numShared == 0) "" else s", $numShared shared\n$sharedChains\n\n"
+        val phaseStr = "->" + phase take 13
+
+        println(f"""[$phaseStr%13s] $plus$size_str%-5d trees in $unit$sharedStr""")
+      }
+    }
+  }
+
+  class TreeInfo(val unit: CompilationUnit) {
+    private val parents = {
+      val map = mutable.Map[Tree, List[Tree]]() withDefaultValue Nil
+      for (tree <- unit.body ; parent <- tree ; child <- parent.children; if !child.isEmpty) {
+        map(child) ::= parent
+      }
+      map.keys foreach (k => map(k) = map(k).distinct)
+      map.toMap
+    }
+    private val sharedTrees = parents collect { case (k, _ :: _ :: _) => k }
+
+    def keys = parents.keys
+    def size = parents.size
+    def shared = sharedTrees.toSet
+    def sharedSize = shared.size
+    def treeParents(t: Tree): List[Tree] = {
+      parents.getOrElse(t, Nil)
+    }
+    def parentChains(t: Tree): List[List[Tree]] = {
+      treeParents(t) match {
+        case Nil => List(t :: Nil)
+        case ps  => ps flatMap parentChains map (t :: _)
+      }
+
+      // val parentParentChains = treeParents(t) flatMap parentChains
+      // parentParentChains map (t :: _)
+    }
+    def parentChainString(ts: List[Tree]): String = {
+      val poses = ts.reverse.map(_.pos).toIndexedSeq
+      def skip(idx: Int) = idx >= poses.length || {
+        idx > 0 && poses(idx - 1).lineAndColumn == poses(idx).lineAndColumn
+      }
+
+      def trunc(s: String, max: Int): String = {
+        val fmt = "%-" + (max + 3) + "s"
+        val s1 = if (s.length > max) (s take max) + "..." else s
+
+        fmt format s1
+      }
+
+      val lines = ts.reverse.zipWithIndex map { case (t, idx) =>
+        val mark1 = if (shared(t)) "*" else " "
+        val mark2 = t match {
+          case t: MemberDef if t.mods.isSynthetic            => "S"
+          case t if t.symbol != null && t.symbol.isSynthetic => "S"
+          case _                                             => " "
+        }
+        val marker = mark1 + mark2
+
+        val sp = "  " * idx
+        val posfmt = "@%4sx%-4s"
+        val nopos = "    " + "--" + "    "
+        val errpos = "    " + "??" + "    "
+        val pos0 = (
+          if (skip(idx)) nopos
+          else try "@%4sx%-4s".format(t.pos.line, t.pos.column)
+          catch { case _: UnsupportedOperationException => errpos }
+        )
+        def tid = "#" + t.id
+        def sid = "#" + t.symbol.id
+
+        val tree0 = trunc(t.toString, 40).replaceAll("\\n", " ")
+        val tree1 = f"$tid%-8s $tree0"
+
+        def sym0 = f"$sid%-8s ${t.symbol} in ${t.symbol.owner} ${t.symbol.flagString}"
+        def sym1 =  if (t.symbol == null || t.symbol == NoSymbol) "" else trunc(sym0, 60)
+        // val sym0 = if (t.symbol == null || t.symbol == NoSymbol) "" else sid + " " + t.symbol + " in " + t.symbol.owner + " " + t.symbol.flagString
+        // val sym1 = trunc(sym0, 50)
+
+        val part1 = "%-40s" format (marker + sp + t.shortClass)
+        val part2 = s" $pos0    $tree1    $sym1"
+
+        part1 + part2
+      }
+
+      lines mkString "\n"
+    }
+    def sharedParentsStrings = {
+      shared flatMap parentChains map parentChainString
+
+      // val chains = shared flatMap parentChains
+      // // val sharedps = shared flatMap treeParents
+      // // println("sharedps = " + sharedps)
+      // // val chains = sharedps flatMap parentChains
+      // val strs   = chains map parentChainString
+
+      // strs
+    }
+
+    override def toString = s"$size trees ($sharedSize shared)"
+  }
+}
+
+trait Trees extends api.Trees with TreeOwners { self: SymbolTable =>
 
   private[scala] var nodeCount = 0
 

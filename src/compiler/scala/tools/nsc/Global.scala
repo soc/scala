@@ -372,6 +372,7 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
     def run() {
       echoPhaseSummary(this)
       currentRun.units foreach applyPhase
+      updateTreeInfos(currentRun.units.toList)
     }
 
     def apply(unit: CompilationUnit): Unit

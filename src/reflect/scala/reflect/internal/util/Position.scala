@@ -208,6 +208,8 @@ abstract class Position extends scala.reflect.api.Position { self =>
   /** Convert this to a position around `point` that spans a single source line */
   def toSingleLine: Position = this
 
+  def lineAndColumn = try s"$line+$column" catch { case _: UnsupportedOperationException => "" }
+
   def lineContent: String =
     if (isDefined) source.lineToString(line - 1)
     else "NO_LINE"
