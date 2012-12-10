@@ -6,13 +6,8 @@
 package scala.tools.nsc
 package ast
 
-import scala.reflect.internal.Flags.BYNAMEPARAM
-import scala.reflect.internal.Flags.DEFAULTPARAM
-import scala.reflect.internal.Flags.IMPLICIT
-import scala.reflect.internal.Flags.PARAM
-import scala.reflect.internal.Flags.PARAMACCESSOR
-import scala.reflect.internal.Flags.PRESUPER
-import scala.reflect.internal.Flags.TRAIT
+import scala.reflect.internal.Flags.{ DEFAULTPARAM, PARAM, PARAMACCESSOR, PRESUPER, TRAIT }
+import scala.reflect.internal.Flags.ConstrParamFlags
 import scala.compat.Platform.EOL
 
 trait Trees extends scala.reflect.internal.Trees { self: Global =>
@@ -86,12 +81,11 @@ trait Trees extends scala.reflect.internal.Trees { self: Global =>
     /* Add constructor to template */
 
     // create parameters for <init> as synthetic trees.
-    var vparamss1 = mmap(vparamss) { vd =>
-      atPos(vd.pos.focus) {
-        val mods = Modifiers(vd.mods.flags & (IMPLICIT | DEFAULTPARAM | BYNAMEPARAM) | PARAM | PARAMACCESSOR)
-        ValDef(mods withAnnotations vd.mods.annotations, vd.name, vd.tpt.duplicate, vd.rhs.duplicate)
-      }
-    }
+    var vparamss1 = mmap(vparamss)(vd =>
+      atPos(vd.pos.focus)(copyValDef(vd)(//mods = vd.mods.copy(ConstrParamFlags | PARAM | PARAMACCESSOR, tpnme.EMPTY)))
+        mods = Modifiers(vd.mods.flags & ConstrParamFlags | PARAM | PARAMACCESSOR)  withAnnotations vd.mods.annotations
+      ))
+    )
     val (edefs, rest) = body span treeInfo.isEarlyDef
     val (evdefs, etdefs) = edefs partition treeInfo.isEarlyValDef
     val gvdefs = evdefs map {

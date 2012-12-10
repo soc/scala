@@ -296,6 +296,9 @@ class Flags extends ModifierFlags {
    */
   final val ConstrFlags = JAVA
 
+  /** Flags which are allowed on constructor parameters. */
+  final val ConstrParamFlags = IMPLICIT | DEFAULTPARAM | BYNAMEPARAM
+
   /** Module flags inherited by their module-class */
   final val ModuleToClassFlags = AccessFlags | TopLevelCreationFlags | CASE | SYNTHETIC
 
