@@ -637,223 +637,180 @@ trait Trees extends api.Trees { self: SymbolTable =>
     def ExistentialTypeTree(tree: Tree, tpt: Tree, whereClauses: List[Tree]) =
       new ExistentialTypeTree(tpt, whereClauses).copyAttrs(tree)
   }
-
+  // Generated code.
   class LazyTreeCopier extends InternalTreeCopierOps {
     val treeCopy: TreeCopier = newStrictTreeCopier
-    def ClassDef(tree: Tree, mods: Modifiers, name: Name, tparams: List[TypeDef], impl: Template) = tree match {
-      case t @ ClassDef(mods0, name0, tparams0, impl0)
-      if (mods0 == mods) && (name0 == name) && (tparams0 == tparams) && (impl0 == impl) => t
-      case _ => treeCopy.ClassDef(tree, mods, name, tparams, impl)
+    def Alternative(tree: Tree, Trees: List[Tree]): Alternative = tree match {
+      case t @ Alternative(Trees) => t
+      case _                      => treeCopy.Alternative(tree, Trees)
     }
-    def PackageDef(tree: Tree, pid: RefTree, stats: List[Tree]) = tree match {
-      case t @ PackageDef(pid0, stats0)
-      if (pid0 == pid) && (stats0 == stats) => t
-      case _ => treeCopy.PackageDef(tree, pid, stats)
+    def Annotated(tree: Tree, Annot: Tree, Arg: Tree): Annotated = tree match {
+      case t @ Annotated(Annot, Arg) => t
+      case _                         => treeCopy.Annotated(tree, Annot, Arg)
     }
-    def ModuleDef(tree: Tree, mods: Modifiers, name: Name, impl: Template) = tree match {
-      case t @ ModuleDef(mods0, name0, impl0)
-      if (mods0 == mods) && (name0 == name) && (impl0 == impl) => t
-      case _ => treeCopy.ModuleDef(tree, mods, name, impl)
+    def AppliedTypeTree(tree: Tree, Tpt: Tree, Args: List[Tree]): AppliedTypeTree = tree match {
+      case t @ AppliedTypeTree(Tpt, Args) => t
+      case _                              => treeCopy.AppliedTypeTree(tree, Tpt, Args)
     }
-    def ValDef(tree: Tree, mods: Modifiers, name: Name, tpt: Tree, rhs: Tree) = tree match {
-      case t @ ValDef(mods0, name0, tpt0, rhs0)
-      if (mods0 == mods) && (name0 == name) && (tpt0 == tpt) && (rhs0 == rhs) => t
-      case _ => treeCopy.ValDef(tree, mods, name, tpt, rhs)
+    def Apply(tree: Tree, Fun: Tree, Args: List[Tree]): Apply = tree match {
+      case t @ Apply(Fun, Args) => t
+      case _                    => treeCopy.Apply(tree, Fun, Args)
     }
-    def DefDef(tree: Tree, mods: Modifiers, name: Name, tparams: List[TypeDef], vparamss: List[List[ValDef]], tpt: Tree, rhs: Tree) = tree match {
-      case t @ DefDef(mods0, name0, tparams0, vparamss0, tpt0, rhs0)
-      if (mods0 == mods) && (name0 == name) && (tparams0 == tparams) &&
-         (vparamss0 == vparamss) && (tpt0 == tpt) && (rhs == rhs0) => t
-      case _ => treeCopy.DefDef(tree, mods, name, tparams, vparamss, tpt, rhs)
+    def ApplyDynamic(tree: Tree, Qual: Tree, Args: List[Tree]): ApplyDynamic = tree match {
+      case t @ ApplyDynamic(Qual, Args) => t
+      case _                            => treeCopy.ApplyDynamic(tree, Qual, Args)
     }
-    def TypeDef(tree: Tree, mods: Modifiers, name: Name, tparams: List[TypeDef], rhs: Tree) = tree match {
-      case t @ TypeDef(mods0, name0, tparams0, rhs0)
-      if (mods0 == mods) && (name0 == name) && (tparams0 == tparams) && (rhs0 == rhs) => t
-      case _ => treeCopy.TypeDef(tree, mods, name, tparams, rhs)
+    def ArrayValue(tree: Tree, Elemtpt: Tree, Elems: List[Tree]): ArrayValue = tree match {
+      case t @ ArrayValue(Elemtpt, Elems) => t
+      case _                              => treeCopy.ArrayValue(tree, Elemtpt, Elems)
     }
-    def LabelDef(tree: Tree, name: Name, params: List[Ident], rhs: Tree) = tree match {
-      case t @ LabelDef(name0, params0, rhs0)
-      if (name0 == name) && (params0 == params) && (rhs0 == rhs) => t
-      case _ => treeCopy.LabelDef(tree, name, params, rhs)
+    def Assign(tree: Tree, Lhs: Tree, Rhs: Tree): Assign = tree match {
+      case t @ Assign(Lhs, Rhs) => t
+      case _                    => treeCopy.Assign(tree, Lhs, Rhs)
     }
-    def Import(tree: Tree, expr: Tree, selectors: List[ImportSelector]) = tree match {
-      case t @ Import(expr0, selectors0)
-      if (expr0 == expr) && (selectors0 == selectors) => t
-      case _ => treeCopy.Import(tree, expr, selectors)
+    def AssignOrNamedArg(tree: Tree, Lhs: Tree, Rhs: Tree): AssignOrNamedArg = tree match {
+      case t @ AssignOrNamedArg(Lhs, Rhs) => t
+      case _                              => treeCopy.AssignOrNamedArg(tree, Lhs, Rhs)
     }
-    def Template(tree: Tree, parents: List[Tree], self: ValDef, body: List[Tree]) = tree match {
-      case t @ Template(parents0, self0, body0)
-      if (parents0 == parents) && (self0 == self) && (body0 == body) => t
-      case _ => treeCopy.Template(tree, parents, self, body)
+    def Bind(tree: Tree, Name: Name, Body: Tree): Bind = tree match {
+      case t @ Bind(Name, Body) => t
+      case _                    => treeCopy.Bind(tree, Name, Body)
     }
-    def Block(tree: Tree, stats: List[Tree], expr: Tree) = tree match {
-      case t @ Block(stats0, expr0)
-      if ((stats0 == stats) && (expr0 == expr)) => t
-      case _ => treeCopy.Block(tree, stats, expr)
+    def Block(tree: Tree, Stats: List[Tree], Expr: Tree): Block = tree match {
+      case t @ Block(Stats, Expr) => t
+      case _                      => treeCopy.Block(tree, Stats, Expr)
     }
-    def CaseDef(tree: Tree, pat: Tree, guard: Tree, body: Tree) = tree match {
-      case t @ CaseDef(pat0, guard0, body0)
-      if (pat0 == pat) && (guard0 == guard) && (body0 == body) => t
-      case _ => treeCopy.CaseDef(tree, pat, guard, body)
+    def CaseDef(tree: Tree, Pat: Tree, Guard: Tree, Body: Tree): CaseDef = tree match {
+      case t @ CaseDef(Pat, Guard, Body) => t
+      case _                             => treeCopy.CaseDef(tree, Pat, Guard, Body)
     }
-    def Alternative(tree: Tree, trees: List[Tree]) = tree match {
-      case t @ Alternative(trees0)
-      if trees0 == trees => t
-      case _ => treeCopy.Alternative(tree, trees)
+    def ClassDef(tree: Tree, Mods: Modifiers, Name: Name, Tparams: List[TypeDef], Impl: Template): ClassDef = tree match {
+      case t @ ClassDef(Mods, Name, Tparams, Impl) => t
+      case _                                       => treeCopy.ClassDef(tree, Mods, Name, Tparams, Impl)
     }
-    def Star(tree: Tree, elem: Tree) = tree match {
-      case t @ Star(elem0)
-      if elem0 == elem => t
-      case _ => treeCopy.Star(tree, elem)
+    def CompoundTypeTree(tree: Tree, Templ: Template): CompoundTypeTree = tree match {
+      case t @ CompoundTypeTree(Templ) => t
+      case _                           => treeCopy.CompoundTypeTree(tree, Templ)
     }
-    def Bind(tree: Tree, name: Name, body: Tree) = tree match {
-      case t @ Bind(name0, body0)
-      if (name0 == name) && (body0 == body) => t
-      case _ => treeCopy.Bind(tree, name, body)
+    def DefDef(tree: Tree, Mods: Modifiers, Name: Name, Tparams: List[TypeDef], Vparamss: List[List[ValDef]], Tpt: Tree, Rhs: Tree): DefDef = tree match {
+      case t @ DefDef(Mods, Name, Tparams, Vparamss, Tpt, Rhs) => t
+      case _                                                   => treeCopy.DefDef(tree, Mods, Name, Tparams, Vparamss, Tpt, Rhs)
     }
-    def UnApply(tree: Tree, fun: Tree, args: List[Tree]) = tree match {
-      case t @ UnApply(fun0, args0)
-      if (fun0 == fun) && (args0 == args) => t
-      case _ => treeCopy.UnApply(tree, fun, args)
+    def ExistentialTypeTree(tree: Tree, Tpt: Tree, WhereClauses: List[Tree]): ExistentialTypeTree = tree match {
+      case t @ ExistentialTypeTree(Tpt, WhereClauses) => t
+      case _                                          => treeCopy.ExistentialTypeTree(tree, Tpt, WhereClauses)
     }
-    def ArrayValue(tree: Tree, elemtpt: Tree, trees: List[Tree]) = tree match {
-      case t @ ArrayValue(elemtpt0, trees0)
-      if (elemtpt0 == elemtpt) && (trees0 == trees) => t
-      case _ => treeCopy.ArrayValue(tree, elemtpt, trees)
+    def Function(tree: Tree, Vparams: List[ValDef], Body: Tree): Function = tree match {
+      case t @ Function(Vparams, Body) => t
+      case _                           => treeCopy.Function(tree, Vparams, Body)
     }
-    def Function(tree: Tree, vparams: List[ValDef], body: Tree) = tree match {
-      case t @ Function(vparams0, body0)
-      if (vparams0 == vparams) && (body0 == body) => t
-      case _ => treeCopy.Function(tree, vparams, body)
+    def Ident(tree: Tree, Name: Name): Ident = tree match {
+      case t @ Ident(Name) => t
+      case _               => treeCopy.Ident(tree, Name)
     }
-    def Assign(tree: Tree, lhs: Tree, rhs: Tree) = tree match {
-      case t @ Assign(lhs0, rhs0)
-      if (lhs0 == lhs) && (rhs0 == rhs) => t
-      case _ => treeCopy.Assign(tree, lhs, rhs)
+    def If(tree: Tree, Cond: Tree, Thenp: Tree, Elsep: Tree): If = tree match {
+      case t @ If(Cond, Thenp, Elsep) => t
+      case _                          => treeCopy.If(tree, Cond, Thenp, Elsep)
     }
-    def AssignOrNamedArg(tree: Tree, lhs: Tree, rhs: Tree) = tree match {
-      case t @ AssignOrNamedArg(lhs0, rhs0)
-      if (lhs0 == lhs) && (rhs0 == rhs) => t
-      case _ => treeCopy.AssignOrNamedArg(tree, lhs, rhs)
+    def Import(tree: Tree, Expr: Tree, Selectors: List[ImportSelector]): Import = tree match {
+      case t @ Import(Expr, Selectors) => t
+      case _                           => treeCopy.Import(tree, Expr, Selectors)
     }
-    def If(tree: Tree, cond: Tree, thenp: Tree, elsep: Tree) = tree match {
-      case t @ If(cond0, thenp0, elsep0)
-      if (cond0 == cond) && (thenp0 == thenp) && (elsep0 == elsep) => t
-      case _ => treeCopy.If(tree, cond, thenp, elsep)
+    def LabelDef(tree: Tree, Name: Name, Params: List[Ident], Rhs: Tree): LabelDef = tree match {
+      case t @ LabelDef(Name, Params, Rhs) => t
+      case _                               => treeCopy.LabelDef(tree, Name, Params, Rhs)
     }
-    def Match(tree: Tree, selector: Tree, cases: List[CaseDef]) =  tree match {
-      case t @ Match(selector0, cases0)
-      if (selector0 == selector) && (cases0 == cases) => t
-      case _ => treeCopy.Match(tree, selector, cases)
+    def Literal(tree: Tree, Value: Constant): Literal = tree match {
+      case t @ Literal(Value) => t
+      case _                  => treeCopy.Literal(tree, Value)
     }
-    def Return(tree: Tree, expr: Tree) = tree match {
-      case t @ Return(expr0)
-      if expr0 == expr => t
-      case _ => treeCopy.Return(tree, expr)
+    def Match(tree: Tree, Selector: Tree, Cases: List[CaseDef]): Match = tree match {
+      case t @ Match(Selector, Cases) => t
+      case _                          => treeCopy.Match(tree, Selector, Cases)
     }
-    def Try(tree: Tree, block: Tree, catches: List[CaseDef], finalizer: Tree) = tree match {
-      case t @ Try(block0, catches0, finalizer0)
-      if (block0 == block) && (catches0 == catches) && (finalizer0 == finalizer) => t
-      case _ => treeCopy.Try(tree, block, catches, finalizer)
+    def ModuleDef(tree: Tree, Mods: Modifiers, Name: Name, Impl: Template): ModuleDef = tree match {
+      case t @ ModuleDef(Mods, Name, Impl) => t
+      case _                               => treeCopy.ModuleDef(tree, Mods, Name, Impl)
     }
-    def Throw(tree: Tree, expr: Tree) = tree match {
-      case t @ Throw(expr0)
-      if expr0 == expr => t
-      case _ => treeCopy.Throw(tree, expr)
+    def New(tree: Tree, Tpt: Tree): New = tree match {
+      case t @ New(Tpt) => t
+      case _            => treeCopy.New(tree, Tpt)
     }
-    def New(tree: Tree, tpt: Tree) = tree match {
-      case t @ New(tpt0)
-      if tpt0 == tpt => t
-      case _ => treeCopy.New(tree, tpt)
+    def PackageDef(tree: Tree, Pid: RefTree, Stats: List[Tree]): PackageDef = tree match {
+      case t @ PackageDef(Pid, Stats) => t
+      case _                          => treeCopy.PackageDef(tree, Pid, Stats)
     }
-    def Typed(tree: Tree, expr: Tree, tpt: Tree) = tree match {
-      case t @ Typed(expr0, tpt0)
-      if (expr0 == expr) && (tpt0 == tpt) => t
-      case _ => treeCopy.Typed(tree, expr, tpt)
+    def ReferenceToBoxed(tree: Tree, Ident: Ident): ReferenceToBoxed = tree match {
+      case t @ ReferenceToBoxed(Ident) => t
+      case _                           => treeCopy.ReferenceToBoxed(tree, Ident)
     }
-    def TypeApply(tree: Tree, fun: Tree, args: List[Tree]) = tree match {
-      case t @ TypeApply(fun0, args0)
-      if (fun0 == fun) && (args0 == args) => t
-      case _ => treeCopy.TypeApply(tree, fun, args)
+    def Return(tree: Tree, Expr: Tree): Return = tree match {
+      case t @ Return(Expr) => t
+      case _                => treeCopy.Return(tree, Expr)
     }
-    def Apply(tree: Tree, fun: Tree, args: List[Tree]) = tree match {
-      case t @ Apply(fun0, args0)
-      if (fun0 == fun) && (args0 == args) => t
-      case _ => treeCopy.Apply(tree, fun, args)
+    def Select(tree: Tree, Qualifier: Tree, Name: Name): Select = tree match {
+      case t @ Select(Qualifier, Name) => t
+      case _                           => treeCopy.Select(tree, Qualifier, Name)
     }
-    def ApplyDynamic(tree: Tree, qual: Tree, args: List[Tree]) = tree match {
-      case t @ ApplyDynamic(qual0, args0)
-      if (qual0 == qual) && (args0 == args) => t
-      case _ => treeCopy.ApplyDynamic(tree, qual, args)
+    def SelectFromTypeTree(tree: Tree, Qualifier: Tree, Name: Name): SelectFromTypeTree = tree match {
+      case t @ SelectFromTypeTree(Qualifier, Name) => t
+      case _                                       => treeCopy.SelectFromTypeTree(tree, Qualifier, Name)
     }
-    def Super(tree: Tree, qual: Tree, mix: TypeName) = tree match {
-      case t @ Super(qual0, mix0)
-      if (qual0 == qual) && (mix0 == mix) => t
-      case _ => treeCopy.Super(tree, qual, mix)
+    def SingletonTypeTree(tree: Tree, Ref: Tree): SingletonTypeTree = tree match {
+      case t @ SingletonTypeTree(Ref) => t
+      case _                          => treeCopy.SingletonTypeTree(tree, Ref)
     }
-    def This(tree: Tree, qual: Name) = tree match {
-      case t @ This(qual0)
-      if qual0 == qual => t
-      case _ => treeCopy.This(tree, qual)
+    def Star(tree: Tree, Elem: Tree): Star = tree match {
+      case t @ Star(Elem) => t
+      case _              => treeCopy.Star(tree, Elem)
     }
-    def Select(tree: Tree, qualifier: Tree, selector: Name) = tree match {
-      case t @ Select(qualifier0, selector0)
-      if (qualifier0 == qualifier) && (selector0 == selector) => t
-      case _ => treeCopy.Select(tree, qualifier, selector)
+    def Super(tree: Tree, Qual: Tree, Mix: TypeName): Super = tree match {
+      case t @ Super(Qual, Mix) => t
+      case _                    => treeCopy.Super(tree, Qual, Mix)
     }
-    def Ident(tree: Tree, name: Name) = tree match {
-      case t @ Ident(name0)
-      if name0 == name => t
-      case _ => treeCopy.Ident(tree, name)
+    def Template(tree: Tree, Parents: List[Tree], Self: ValDef, Body: List[Tree]): Template = tree match {
+      case t @ Template(Parents, Self, Body) => t
+      case _                                 => treeCopy.Template(tree, Parents, Self, Body)
     }
-    def ReferenceToBoxed(tree: Tree, idt: Ident) = tree match {
-      case t @ ReferenceToBoxed(idt0)
-      if (idt0 == idt) => t
-      case _ => this.treeCopy.ReferenceToBoxed(tree, idt)
+    def This(tree: Tree, Qual: Name): This = tree match {
+      case t @ This(Qual) => t
+      case _              => treeCopy.This(tree, Qual)
     }
-    def Literal(tree: Tree, value: Constant) = tree match {
-      case t @ Literal(value0)
-      if value0 == value => t
-      case _ => treeCopy.Literal(tree, value)
+    def Throw(tree: Tree, Expr: Tree): Throw = tree match {
+      case t @ Throw(Expr) => t
+      case _               => treeCopy.Throw(tree, Expr)
     }
-    def TypeTree(tree: Tree) = tree match {
+    def Try(tree: Tree, Block: Tree, Catches: List[CaseDef], Finalizer: Tree): Try = tree match {
+      case t @ Try(Block, Catches, Finalizer) => t
+      case _                                  => treeCopy.Try(tree, Block, Catches, Finalizer)
+    }
+    def TypeApply(tree: Tree, Fun: Tree, Args: List[Tree]): TypeApply = tree match {
+      case t @ TypeApply(Fun, Args) => t
+      case _                        => treeCopy.TypeApply(tree, Fun, Args)
+    }
+    def TypeBoundsTree(tree: Tree, Lo: Tree, Hi: Tree): TypeBoundsTree = tree match {
+      case t @ TypeBoundsTree(Lo, Hi) => t
+      case _                          => treeCopy.TypeBoundsTree(tree, Lo, Hi)
+    }
+    def TypeDef(tree: Tree, Mods: Modifiers, Name: Name, Tparams: List[TypeDef], Rhs: Tree): TypeDef = tree match {
+      case t @ TypeDef(Mods, Name, Tparams, Rhs) => t
+      case _                                     => treeCopy.TypeDef(tree, Mods, Name, Tparams, Rhs)
+    }
+    def TypeTree(tree: Tree): TypeTree = tree match {
       case t @ TypeTree() => t
-      case _ => treeCopy.TypeTree(tree)
+      case _              => treeCopy.TypeTree(tree)
     }
-    def Annotated(tree: Tree, annot: Tree, arg: Tree) = tree match {
-      case t @ Annotated(annot0, arg0)
-      if (annot0==annot) => t
-      case _ => treeCopy.Annotated(tree, annot, arg)
+    def Typed(tree: Tree, Expr: Tree, Tpt: Tree): Typed = tree match {
+      case t @ Typed(Expr, Tpt) => t
+      case _                    => treeCopy.Typed(tree, Expr, Tpt)
     }
-    def SingletonTypeTree(tree: Tree, ref: Tree) = tree match {
-      case t @ SingletonTypeTree(ref0)
-      if ref0 == ref => t
-      case _ => treeCopy.SingletonTypeTree(tree, ref)
+    def UnApply(tree: Tree, Fun: Tree, Args: List[Tree]): UnApply = tree match {
+      case t @ UnApply(Fun, Args) => t
+      case _                      => treeCopy.UnApply(tree, Fun, Args)
     }
-    def SelectFromTypeTree(tree: Tree, qualifier: Tree, selector: Name) = tree match {
-      case t @ SelectFromTypeTree(qualifier0, selector0)
-      if (qualifier0 == qualifier) && (selector0 == selector) => t
-      case _ => treeCopy.SelectFromTypeTree(tree, qualifier, selector)
-    }
-    def CompoundTypeTree(tree: Tree, templ: Template) = tree match {
-      case t @ CompoundTypeTree(templ0)
-      if templ0 == templ => t
-      case _ => treeCopy.CompoundTypeTree(tree, templ)
-    }
-    def AppliedTypeTree(tree: Tree, tpt: Tree, args: List[Tree]) = tree match {
-      case t @ AppliedTypeTree(tpt0, args0)
-      if (tpt0 == tpt) && (args0 == args) => t
-      case _ => treeCopy.AppliedTypeTree(tree, tpt, args)
-    }
-    def TypeBoundsTree(tree: Tree, lo: Tree, hi: Tree) = tree match {
-      case t @ TypeBoundsTree(lo0, hi0)
-      if (lo0 == lo) && (hi0 == hi) => t
-      case _ => treeCopy.TypeBoundsTree(tree, lo, hi)
-    }
-    def ExistentialTypeTree(tree: Tree, tpt: Tree, whereClauses: List[Tree]) = tree match {
-      case t @ ExistentialTypeTree(tpt0, whereClauses0)
-      if (tpt0 == tpt) && (whereClauses0 == whereClauses) => t
-      case _ => treeCopy.ExistentialTypeTree(tree, tpt, whereClauses)
+    def ValDef(tree: Tree, Mods: Modifiers, Name: Name, Tpt: Tree, Rhs: Tree): ValDef = tree match {
+      case t @ ValDef(Mods, Name, Tpt, Rhs) => t
+      case _                                => treeCopy.ValDef(tree, Mods, Name, Tpt, Rhs)
     }
   }
 
