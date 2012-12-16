@@ -1371,29 +1371,15 @@ trait Namers extends MethodSynthesis {
         try getSig
         catch typeErrorHandler(tree, ErrorType)
 
-      // println("result: " + result.getClass + " " + result)
-
-      // result.substSym(
-
-
-      //         thisMethodType(resultPt).substSym(tparams map (_.symbol), tparamSyms)
-
       val toDeskolemize = result match {
         case TypeRef(_, sym, _) if sym.isTypeParameterOrSkolem           => sym.deSkolemize :: Nil
         case PolyType(tparams @ (tparam :: _), _) if tparam.owner.isTerm => tparams
         case _                                                           => Nil
       }
-      val result1 = toDeskolemize match {
+      toDeskolemize match {
         case Nil     => result
         case tparams => deskolemizeTypeParams(tparams)(result)
       }
-      // val result1 = result match {
-      //   case TypeRef(pre, sym, args) if sym.owner.isTerm                  => deskolemizeTypeParams(sym.deSkolemize :: Nil)(result)
-      //   case PolyType(tparams @ (tparam :: _), _) if tparam.owner.isTerm  => deskolemizeTypeParams(tparams)(result)
-      //   case tp                                                           => tp
-      // }
-      println("result1 = " + result1.getClass + " " + result1)
-      result1
     }
 
     def includeParent(tpe: Type, parent: Symbol): Type = tpe match {
