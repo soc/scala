@@ -52,20 +52,6 @@ trait SyntheticMethods extends ast.TreeDSL {
   /** Add the synthetic methods to case classes.
    */
   def addSyntheticMethods(templ: Template, clazz0: Symbol, context: Context): Template = {
-
-    val MyTypeName: TypeName = "MyType"
-    // def mapMyType(stat: Tree) = stat match {
-    //   case td @ TypeDef(mods, MyTypeName, Nil, rhs) =>
-    //     clazz0.info.decls lookup MyTypeName andAlso (clazz0.info.decls unlink _)
-    //     val upperBound = typeRef(clazz0.thisPrefix, clazz0.typeOfThis.typeSymbol, Nil)
-    //     // val tbounds = typer typed TypeBoundsTree(TypeTree(NothingClass.tpe), TypeTree(clazz0.typeOfThis))
-    //     val bounds = typer typed TypeBoundsTree(TypeTree(NothingClass.tpe), TypeTree(upperBound))
-    //     val sym = clazz0.newAbstractType(MyTypeName, clazz0.pos) setInfoAndEnter bounds.tpe
-    //     typer typed (treeCopy.TypeDef(td, mods, MyTypeName, Nil, bounds) setSymbol sym)
-    //     // typer typed TypeDef(sym, tbounds)
-    //   case stat => stat
-    // }
-
     val syntheticsOk = (phase.id <= currentRun.typerPhase.id) && {
       symbolsToSynthesize(clazz0) filter (_ matchingSymbol clazz0.info isSynthetic) match {
         case Nil  => true
@@ -392,13 +378,11 @@ trait SyntheticMethods extends ast.TreeDSL {
     }
 
     deriveTemplate(templ)(body =>
-      (
-        if (clazz.isCase) caseTemplateBody()
-        else synthesize() match {
-          case Nil  => body // avoiding unnecessary copy
-          case ms   => body ++ ms
-        }
-      ) //map mapMyType
+      if (clazz.isCase) caseTemplateBody()
+      else synthesize() match {
+        case Nil  => body // avoiding unnecessary copy
+        case ms   => body ++ ms
+      }
     )
   }
 }
