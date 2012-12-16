@@ -2790,7 +2790,7 @@ self =>
       )
       val tstart0 = if (body.isEmpty && in.lastOffset < tstart) in.lastOffset else tstart
       val primitive = inScalaRootPackage && ScalaValueClassNames.contains(name)
-      def upperBound(n: TypeName) = TypeBoundsTree(bound(SUPERTYPE, tpnme.Nothing), bound(SUBTYPE, n))
+      def upperBound(n: TypeName) = TypeBoundsTree(bound(SUPERTYPE, tpnme.Nothing), This(n))
       val myType = name match {
         case _: TermName => Nil
         case n: TypeName => TypeDef(Modifiers(Flag.DEFERRED), "MyType", Nil, upperBound(n)) :: Nil
