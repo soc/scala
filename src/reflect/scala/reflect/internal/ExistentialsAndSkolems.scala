@@ -32,10 +32,6 @@ trait ExistentialsAndSkolems {
     (new Deskolemizer).typeSkolems
   }
 
-  // def deskolemizeHOTparam(tparam: Symbol)(tp: Type): Type = printResult(s"deskolemizeHOTparam($tparam)($tp)") {
-
-  // }
-
   /** Convert to corresponding type parameters all skolems of method
    *  parameters which appear in `tparams`.
    */
