@@ -2789,13 +2789,20 @@ self =>
         DefDef(NoMods, nme.CONSTRUCTOR, Nil, ListOfNil, TypeTree(), Block(Nil, Literal(Constant())))
       )
       val tstart0 = if (body.isEmpty && in.lastOffset < tstart) in.lastOffset else tstart
+      val primitive = inScalaRootPackage && ScalaValueClassNames.contains(name)
+      def upperBound(n: TypeName) = TypeBoundsTree(bound(SUPERTYPE, tpnme.Nothing), bound(SUBTYPE, n))
+      val myType = name match {
+        case _: TermName => Nil
+        case n: TypeName => TypeDef(Modifiers(Flag.DEFERRED), "MyType", Nil, upperBound(n)) :: Nil
+      }
+      val body1 = myType ::: ( if (primitive) anyvalConstructor :: body else body )
 
       atPos(tstart0) {
         // Exclude only the 9 primitives plus AnyVal.
-        if (inScalaRootPackage && ScalaValueClassNames.contains(name))
-          Template(parents0, self, anyvalConstructor :: body)
+        if (primitive)
+          Template(parents0, self, body1)
         else
-          Template(anyrefParents, self, constrMods, vparamss, body, o2p(tstart))
+          Template(anyrefParents, self, constrMods, vparamss, body1, o2p(tstart))
       }
     }
 
