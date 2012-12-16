@@ -4802,7 +4802,7 @@ trait Typers extends Modes with Adaptations with Tags {
         }
       }
 
-      def typedAppliedTypeTree(tree: AppliedTypeTree) = printResult(s"typedAppliedTypeTree($tree)") {
+      def typedAppliedTypeTree(tree: AppliedTypeTree) = /*printResult(s"typedAppliedTypeTree($tree)") */ {
         val tpt = tree.tpt
         val args = tree.args
         val tpt1 = typed1(tpt, mode | FUNmode | TAPPmode, WildcardType)
@@ -4820,7 +4820,7 @@ trait Typers extends Modes with Adaptations with Tags {
                 // if symbol hasn't been fully loaded, can't check kind-arity
               else map2Conserve(args, tparams) { (arg, tparam) =>
                 //@M! the polytype denotes the expected kind
-                typedHigherKindedType(arg, mode, GenPolyType(tparam.typeParams, WildcardType))
+                typedHigherKindedType(arg, mode, GenPolyType(tparam.typeParams, AnyClass.tpe)) // WildcardType))
               }
             val argtypes = args1 map (_.tpe)
 
