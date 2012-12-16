@@ -564,16 +564,15 @@ trait Namers extends MethodSynthesis {
     def completerOf(tree: Tree): TypeCompleter = completerOf(tree, treeInfo.typeParameters(tree))
     def completerOf(tree: Tree, tparams: List[TypeDef]): TypeCompleter = {
       val mono = namerOf(tree.symbol) monoTypeCompleter tree
-      if (tparams.isEmpty) mono
-      else {
-        //@M! TypeDef's type params are handled differently
-        //@M e.g., in [A[x <: B], B], A and B are entered first as both are in scope in the definition of x
-        //@M x is only in scope in `A[x <: B]'
-        if (!tree.symbol.isAbstractType) //@M TODO: change to isTypeMember ?
-          createNamer(tree) enterSyms tparams
-
-        new PolyTypeCompleter(tparams, mono, tree, context) //@M
-      }
+      //@M! TypeDef's type params are handled differently
+      //@M e.g., in [A[x <: B], B], A and B are entered first as both are in scope in the definition of x
+      //@M x is only in scope in `A[x <: B]'
+      if (tparams.isEmpty)
+        mono
+      else if (tree.symbol.isAbstractType) //@M TODO: change to isTypeMember ?
+        new PolyAbstractTypeCompleter(tparams, mono, newNamerFor(context, tree))
+      else
+        new PolyCompleter(tparams, mono, createNamer(tree))
     }
 
     def enterIfNotThere(sym: Symbol) {
@@ -921,7 +920,7 @@ trait Namers extends MethodSynthesis {
       ClassInfoType(parents, decls, clazz)
     }
 
-    private def classSig(tparams: List[TypeDef], impl: Template): Type = {
+    private def classSig(tparams: List[TypeDef], impl: Template): Type = /*printResult(s"classSig($tparams, _")*/ {
       val tparams0   = typer.reenterTypeParams(tparams)
       val resultType = templateSig(impl)
 
@@ -929,7 +928,8 @@ trait Namers extends MethodSynthesis {
     }
 
     private def methodSig(ddef: DefDef, mods: Modifiers, tparams: List[TypeDef],
-                          vparamss: List[List[ValDef]], tpt: Tree, rhs: Tree): Type = {
+                          vparamss: List[List[ValDef]], tpt: Tree, rhs: Tree): Type =
+    /*printResult(s"methodSig(${ddef.name}, $mods, $tparams, $vparamss, $tpt, _)")*/ {
       val meth  = owner
       val clazz = meth.owner
       // enters the skolemized version into scope, returns the deSkolemized symbols
@@ -1371,10 +1371,29 @@ trait Namers extends MethodSynthesis {
         try getSig
         catch typeErrorHandler(tree, ErrorType)
 
-      result match {
-        case PolyType(tparams @ (tp :: _), _) if tp.owner.isTerm => deskolemizeTypeParams(tparams)(result)
-        case _                                                   => result
+      // println("result: " + result.getClass + " " + result)
+
+      // result.substSym(
+
+
+      //         thisMethodType(resultPt).substSym(tparams map (_.symbol), tparamSyms)
+
+      val toDeskolemize = result match {
+        case TypeRef(_, sym, _) if sym.isTypeParameterOrSkolem           => sym.deSkolemize :: Nil
+        case PolyType(tparams @ (tparam :: _), _) if tparam.owner.isTerm => tparams
+        case _                                                           => Nil
       }
+      val result1 = toDeskolemize match {
+        case Nil     => result
+        case tparams => deskolemizeTypeParams(tparams)(result)
+      }
+      // val result1 = result match {
+      //   case TypeRef(pre, sym, args) if sym.owner.isTerm                  => deskolemizeTypeParams(sym.deSkolemize :: Nil)(result)
+      //   case PolyType(tparams @ (tparam :: _), _) if tparam.owner.isTerm  => deskolemizeTypeParams(tparams)(result)
+      //   case tp                                                           => tp
+      // }
+      println("result1 = " + result1.getClass + " " + result1)
+      result1
     }
 
     def includeParent(tpe: Type, parent: Symbol): Type = tpe match {
@@ -1526,22 +1545,43 @@ trait Namers extends MethodSynthesis {
 
   /** A class representing a lazy type with known type parameters.
    */
-  class PolyTypeCompleter(tparams: List[TypeDef], restp: TypeCompleter, owner: Tree, ctx: Context) extends LockingTypeCompleter with FlagAgnosticCompleter {
-    private val ownerSym    = owner.symbol
-    override val typeParams = tparams map (_.symbol) //@M
-    override val tree       = restp.tree
+  abstract class AbstractPolyCompleter(tparams: List[TypeDef], restp: TypeCompleter) extends {
+    override val tree = restp.tree
+  } with LockingTypeCompleter with FlagAgnosticCompleter {
+    override def typeParams = tparams map (_.symbol) //@M
+    def completeImpl(sym: Symbol) = restp complete sym
+  }
 
-    if (ownerSym.isTerm) {
-      val skolems = deriveFreshSkolems(tparams map (_.symbol))
-      map2(tparams, skolems)(_ setSymbol _)
+  /** @pre: owner.symbol.isAbstractType */
+  class PolyAbstractTypeCompleter(tparams: List[TypeDef], restp: TypeCompleter, namer: => Namer)
+  extends AbstractPolyCompleter(tparams, restp) {
+    override def completeImpl(sym: Symbol) = {
+      namer enterSyms tparams
+      super.completeImpl(sym)
     }
+  }
 
-    def completeImpl(sym: Symbol) = {
-      // @M an abstract type's type parameters are entered.
-      // TODO: change to isTypeMember ?
-      if (ownerSym.isAbstractType)
-        newNamerFor(ctx, owner) enterSyms tparams //@M
-      restp complete sym
+  /** @pre: tree.symbol.{isTerm,isClass} */
+  class PolyCompleter(tparams: List[TypeDef], restp: TypeCompleter, namer: Namer) extends AbstractPolyCompleter(tparams, restp) {
+    private val isMethod = namer.context.tree.isTerm
+    namer enterSyms tparams
+    if (isMethod)
+      skolemize()
+
+    private lazy val originals = typeParams
+    private lazy val skolems = deriveFreshSkolems(originals)
+
+    private def skolemize(): Unit = foreach2(tparams, skolems)(_ setSymbol _)
+    private def deskolemize(): Unit = foreach2(tparams, originals)((tree, sym) =>
+      if (tree.symbol ne sym) {
+        devWarning(s"Restoring symbol of $tree to $sym")
+        tree setSymbol sym
+      }
+    )
+    override def completeImpl(sym: Symbol) = {
+      super.completeImpl(sym)
+      if (isMethod)
+        deskolemize()
     }
   }
 

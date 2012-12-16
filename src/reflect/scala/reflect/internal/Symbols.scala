@@ -373,8 +373,9 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
      *  with name `T` in its typeParams list. While type checking the parameters, result type and
      *  body of the method, there's a local copy of `T` which is a TypeSkolem.
      */
-    final def newTypeSkolem: TypeSkolem =
+    final def newTypeSkolem: TypeSkolem = printResult(s"$this.newTypeSkolem") {
       owner.newTypeSkolemSymbol(name.toTypeName, this, pos, flags)
+    }
 
     final def newClass(name: TypeName, pos: Position = NoPosition, newFlags: Long = 0L): ClassSymbol =
       newClassSymbol(name, pos, newFlags)
