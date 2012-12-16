@@ -19,7 +19,7 @@ trait ExistentialsAndSkolems {
    *  representation of a bound variable when viewed inside its scope.)
    *  !!!Adriaan: this does not work for hk types.
    */
-  def deriveFreshSkolems(tparams: List[Symbol]): List[Symbol] = printResult(s"deriveFreshSkolems($tparams)") {
+  def deriveFreshSkolems(tparams: List[Symbol]): List[Symbol] = {
     class Deskolemizer extends LazyType {
       override val typeParams = tparams
       val typeSkolems  = typeParams map (_.newTypeSkolem setInfo this)
@@ -39,18 +39,11 @@ trait ExistentialsAndSkolems {
   /** Convert to corresponding type parameters all skolems of method
    *  parameters which appear in `tparams`.
    */
-  def deskolemizeTypeParams(tparams: List[Symbol])(tp: Type): Type = printResult(s"deskolemizeTypeParams($tparams)($tp / ${tp.getClass}})") {
+  def deskolemizeTypeParams(tparams: List[Symbol])(tp: Type): Type = {
     class DeSkolemizeMap extends TypeMap {
       def apply(tp: Type): Type = tp match {
         case TypeRef(pre, sym, args) if sym.isTypeSkolem && (tparams contains sym.deSkolemize) =>
-          printResult(s"DeSkolemizeMap(TypeRef($pre, $sym, $args)")(mapOver(copyTypeRef(tp, pre, sym.deSkolemize, args)))
-
-          // printResult(s"DeSkolemizeMap(TypeRef($pre, $sym, $args) w/ tparams=$tparams, sym.deSkolemize=${sym.deSkolemize}") {
-          //   if (tparams contains sym.deSkolemize)
-          //     mapOver(typeRef(NoPrefix, sym.deSkolemize, args))
-          //   else
-          //     mapOver(tp)
-          // }
+          mapOver(copyTypeRef(tp, pre, sym.deSkolemize, args))
         case _ =>
           mapOver(tp)
       }
