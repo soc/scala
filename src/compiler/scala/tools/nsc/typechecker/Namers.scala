@@ -1551,7 +1551,12 @@ trait Namers extends MethodSynthesis {
     )
     private def unskolems = skolems map (_.deSkolemize)
 
-    def deskolemize(tp: Type): Type = tp.substSym(skolems, unskolems)
+    def deskolemizeTree(t: Tree): Tree = (
+      t.substituteSymbols(skolems, unskolems).substituteTypes(skolems, tparams map (_.tpe))
+    )
+    def deskolemizeType(tp: Type): Type = (
+      tp.substSym(skolems, unskolems)
+    )
     def deskolemize(): Unit = foreach2(tparams, unskolems)(_ setSymbol _)
   }
 
