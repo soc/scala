@@ -51,6 +51,7 @@ trait Namers extends MethodSynthesis {
     newNamer(context.makeNewScope(tree, tree.symbol))
 
   abstract class Namer(val context: Context) extends MethodSynth with NamerContextErrors { thisNamer =>
+    override def toString = s"Namer(${context.tree.symbol})"
 
     import NamerErrorGen._
     val typer = newTyper(context)
@@ -920,7 +921,7 @@ trait Namers extends MethodSynthesis {
       ClassInfoType(parents, decls, clazz)
     }
 
-    private def classSig(tparams: List[TypeDef], impl: Template): Type = /*printResult(s"classSig($tparams, _")*/ {
+    private def classSig(tparams: List[TypeDef], impl: Template): Type = {
       val tparams0   = typer.reenterTypeParams(tparams)
       val resultType = templateSig(impl)
 
@@ -928,8 +929,7 @@ trait Namers extends MethodSynthesis {
     }
 
     private def methodSig(ddef: DefDef, mods: Modifiers, tparams: List[TypeDef],
-                          vparamss: List[List[ValDef]], tpt: Tree, rhs: Tree): Type =
-    /*printResult(s"methodSig(${ddef.name}, $mods, $tparams, $vparamss, $tpt, _)")*/ {
+                          vparamss: List[List[ValDef]], tpt: Tree, rhs: Tree): Type = {
       val meth  = owner
       val clazz = meth.owner
       // enters the skolemized version into scope, returns the deSkolemized symbols
@@ -1367,19 +1367,74 @@ trait Namers extends MethodSynthesis {
           }
       }
 
-      val result =
+      val result0 =
         try getSig
         catch typeErrorHandler(tree, ErrorType)
 
-      val toDeskolemize = result match {
-        case TypeRef(_, sym, _) if sym.isTypeParameterOrSkolem           => sym.deSkolemize :: Nil
-        case PolyType(tparams @ (tparam :: _), _) if tparam.owner.isTerm => tparams
-        case _                                                           => Nil
+      // if (sym ne NoSymbol)
+      // sym.info match {
+      //   case pc: PolyCompleter if pc.isMethod => pc.deskolemize()
+      //   case _                                =>
+      // }
+
+      // result
+
+      // val tparams = result.typeConstructor.typeParams map (_.deSkolemize)
+
+      // logResult(s"typeSig($tree)/tparams=$tparams")(
+      //   deskolemizeTypeParams(tparams)(result)
+      // )
+
+      def allSkolems(tp: Type): List[Symbol] = {
+        var seen: Set[Symbol] = Set()
+        var skolems: List[Symbol] = Nil
+
+        def loop(tp: Type) {
+          val sym = tp.typeSymbol
+          if (seen(sym)) () else {
+            seen += sym
+            if (sym.isTypeSkolem)
+              skolems ::= sym
+          }
+        }
+        tp foreach {
+          case MethodType(params, restpe) =>
+            params foreach (p => loop(p.tpe))
+            loop(restpe)
+          case tp =>
+            loop(tp)
+        }
+        skolems.distinct
       }
-      toDeskolemize match {
-        case Nil     => result
-        case tparams => deskolemizeTypeParams(tparams)(result)
-      }
+      val allsk = allSkolems(result0)
+      if (allsk.nonEmpty)
+        println("allsk = " + allsk)
+      val result = result0.substSym(allsk, allsk map (_.deSkolemize))
+      result
+
+      // val toDeskolemize0 = result collect {
+      //   case TypeRef(_, sym, _) if sym.isTypeParameterOrSkolem           => sym.deSkolemize :: Nil
+      //   case PolyType(tparams @ (tparam :: _), _) if tparam.owner.isTerm => tparams
+      //   case _                                                           => Nil
+      // }
+      // val toDeskolemize = toDeskolemize0.flatten.distinct
+
+
+      // val result = result0.substSym(tparams map (_.symbol), tparamSyms)
+
+      // thisMethodType(resultPt).substSym(tparams map (_.symbol), tparamSyms)
+
+
+      // val toDeskolemize = result match {
+      //   case TypeRef(_, sym, _) if sym.isTypeParameterOrSkolem           => sym.deSkolemize :: Nil
+      //   case PolyType(tparams @ (tparam :: _), _) if tparam.owner.isTerm => tparams
+      //   case _                                                           => Nil
+      // }
+      // result
+      // logResult(s"typeSig($tree,toDeskolemize=$toDeskolemize)")(toDeskolemize match {
+      //   case Nil     => result
+      //   case tparams => deskolemizeTypeParams(tparams)(result)
+      // })
     }
 
     def includeParent(tpe: Type, parent: Symbol): Type = tpe match {
@@ -1536,6 +1591,7 @@ trait Namers extends MethodSynthesis {
   } with LockingTypeCompleter with FlagAgnosticCompleter {
     override def typeParams = tparams map (_.symbol) //@M
     def completeImpl(sym: Symbol) = restp complete sym
+    override def toString = s"AbstractPolyCompleter($tparams, $restp)"
   }
 
   /** @pre: owner.symbol.isAbstractType */
@@ -1549,16 +1605,24 @@ trait Namers extends MethodSynthesis {
 
   /** @pre: tree.symbol.{isTerm,isClass} */
   class PolyCompleter(tparams: List[TypeDef], restp: TypeCompleter, namer: Namer) extends AbstractPolyCompleter(tparams, restp) {
-    private val isMethod = namer.context.tree.isTerm
+    val isMethod = namer.context.tree.symbol.isTerm
     namer enterSyms tparams
-    if (isMethod)
-      skolemize()
 
-    private lazy val originals = typeParams
-    private lazy val skolems = deriveFreshSkolems(originals)
+    private val originals = typeParams
+    private val skolems = if (isMethod) deriveFreshSkolems(originals) else null
+
+    log(this)
+    // log(s"PolyCompleter($tparams, $restp, $namer)")
+
+    if (isMethod) {
+      // log("Skolemizing " + tparams.mkString(", "))
+      skolemize()
+    }
+
 
     private def skolemize(): Unit = foreach2(tparams, skolems)(_ setSymbol _)
-    private def deskolemize(): Unit = foreach2(tparams, originals)((tree, sym) =>
+
+    def deskolemize(): Unit = foreach2(tparams, originals)((tree, sym) =>
       if (tree.symbol ne sym) {
         devWarning(s"Restoring symbol of $tree to $sym")
         tree setSymbol sym
@@ -1566,9 +1630,12 @@ trait Namers extends MethodSynthesis {
     )
     override def completeImpl(sym: Symbol) = {
       super.completeImpl(sym)
-      if (isMethod)
-        deskolemize()
+      // if (isMethod) {
+      //   log("Deskolemizing " + tparams.mkString(", "))
+      //   deskolemize()
+      // }
     }
+    override def toString = s"PolyCompleter($tparams, $restp, $namer)/isMethod=$isMethod"
   }
 
   // Can we relax these restrictions? For motivation, see

@@ -38,6 +38,7 @@ trait ExistentialsAndSkolems {
   def deskolemizeTypeParams(tparams: List[Symbol])(tp: Type): Type = {
     class DeSkolemizeMap extends TypeMap {
       def apply(tp: Type): Type = tp match {
+        // case ClassInfoType(parents, decls, clazz) =>
         case TypeRef(pre, sym, args) if sym.isTypeSkolem && (tparams contains sym.deSkolemize) =>
           mapOver(copyTypeRef(tp, pre, sym.deSkolemize, args))
         case _ =>
