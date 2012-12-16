@@ -377,12 +377,39 @@ trait SyntheticMethods extends ast.TreeDSL {
       (lb ++= templ.body ++= synthesize()).toList
     }
 
-    deriveTemplate(templ)(body =>
-      if (clazz.isCase) caseTemplateBody()
-      else synthesize() match {
-        case Nil  => body // avoiding unnecessary copy
-        case ms   => body ++ ms
+    def mkBody(body: List[Tree]): List[Tree] = {
+      val MyTypeName: TypeName = "MyType"
+      val inherited = (clazz.info member MyTypeName).allOverriddenSymbols
+      println(clazz + ".info.decls = " + clazz.info.decls.toList)
+      println("inherited = " + inherited)
+      println("... " + inherited.map(_.debugFlagString))
+      println("... " + inherited.map(_.fullLocationString))
+      println("... " + (clazz.info member MyTypeName))
+      val dropIt = inherited exists (m => !m.isDeferred)
+      // clazz.ancestors exists (base => (base.info decl MyTypeName filter (!_.isDeferred)).exists)
+      val body1 = (
+        if (clazz.isCase) caseTemplateBody()
+        else synthesize() match {
+          case Nil  => body // avoiding unnecessary copy
+          case ms   => body ++ ms
+        }
+      )
+      body1 flatMap {
+        case td @ TypeDef(_, MyTypeName, _, _) if dropIt =>
+          val sym = clazz.info.decls lookup MyTypeName
+          clazz.info.decls unlink sym
+          Nil
+        case td @ TypeDef(mods, MyTypeName, Nil, rhs) => td :: Nil
+          // println("td = " + td)
+          // clazz.info.decls lookup MyTypeName andAlso (clazz.info.decls unlink _)
+          // val upperBound = clazz.typeOfThis.widen//  clazz.  classBound //.typeSymbol.tpe
+          // val bounds = typer typed TypeBoundsTree(TypeTree(NothingClass.tpe), TypeTree(upperBound))
+          // val sym = clazz0.newAbstractType(MyTypeName, clazz0.pos) setInfoAndEnter bounds.tpe
+          // typer typed (treeCopy.TypeDef(td, mods, MyTypeName, Nil, bounds) setSymbol sym)
+        case stat => stat :: Nil
       }
-    )
+    }
+
+    deriveTemplate(templ)(mkBody)
   }
 }
