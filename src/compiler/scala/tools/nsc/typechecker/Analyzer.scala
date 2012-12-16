@@ -72,6 +72,57 @@ trait Analyzer extends AnyRef
   }
 
   object typerFactory extends SubComponent {
+    object NoSkolems extends TypeMap {
+      override def apply(tp: Type): Type = tp match {
+        case TypeRef(pre, sym, args) if sym.isTypeSkolem               => mapOver(copyTypeRef(tp, pre, sym.deSkolemize, args))
+        case PolyType(tparams, res) if tparams exists (_.isTypeSkolem) => mapOver(polyType(tparams map (_.deSkolemize), res))
+        case _                                                         => mapOver(tp)
+      }
+    }
+    def removeSymbolSkolems(sym: Symbol) {
+      if (sym eq null) return
+      sym.info.paramss.flatten foreach (_ modifyInfo NoSkolems)
+      sym.info.typeParams foreach (_ modifyInfo NoSkolems)
+      sym modifyInfo NoSkolems
+    }
+
+    // object TreeNoSkolems extends Transformer {
+    //   override def apply(tree: Tree): Tree = tree match {
+    //     case TypeRef(pre, sym, args) if sym.isTypeSkolem               => mapOver(copyTypeRef(tp, pre, sym.deSkolemize, args))
+    //     case PolyType(tparams, res) if tparams exists (_.isTypeSkolem) => mapOver(polyType(tparams map (_.deSkolemize), res))
+    //     case _                                                         => mapOver(tp)
+    //   }
+    // }
+
+    def removeAllSkolems(tree: Tree): Tree = {
+      for (t <- tree) {
+        removeSymbolSkolems(t.symbol)
+
+        val old = t.tpe
+        t modifyType NoSkolems
+        if (t.tpe ne old)
+          println(s"$old => ${t.tpe}")
+
+        // if (t.symbol != null) {
+        //   if (t.symbol.isTypeSkolem) {
+        //     val old = t.symbol
+        //     try t setSymbol t.symbol.deSkolemize
+        //     catch { case _: UnsupportedOperationException => }
+        //     println(s"$old => ${t.symbol}")
+        //   }
+        //   val oldInfo = t.symbol.info
+        //   t.symbol modifyInfo NoSkolems
+        //   if (oldInfo ne t.symbol.info)
+        //     println(s"$oldInfo => ${t.symbol.info}")
+        // }
+        // val old = t.tpe
+        // t modifyType NoSkolems
+        // if (t.tpe ne old)
+        //   println(s"$old => ${t.tpe}")
+      }
+      tree
+    }
+
     import scala.reflect.internal.TypesStats.typerNanos
     val global: Analyzer.this.global.type = Analyzer.this.global
     val phaseName = "typer"
@@ -92,6 +143,8 @@ trait Analyzer extends AnyRef
           undoLog.clear()
         }
         if (Statistics.canEnable) Statistics.stopTimer(typerNanos, start)
+        for (unit <- currentRun.units)
+          removeAllSkolems(unit.body)
       }
       def apply(unit: CompilationUnit) {
         try {
@@ -101,6 +154,8 @@ trait Analyzer extends AnyRef
           for (workItem <- unit.toCheck) workItem()
           if (settings.lint.value)
             typer checkUnused unit
+
+          unit.body = removeAllSkolems(unit.body)
         }
         finally {
           unit.toCheck.clear()
