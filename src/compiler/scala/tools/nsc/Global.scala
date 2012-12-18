@@ -127,6 +127,8 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
     val global: Global.this.type = Global.this
   } with OverridingPairs
 
+  type SymbolPair = overridingPairs.SymbolPair
+
   // Optimizer components
 
   /** ICode analysis for optimization */
