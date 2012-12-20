@@ -1,0 +1,32 @@
+def <init>(): object extest.Test
+    Class[_ <: object extest.Test]
+
+final object X$3 extends object X$7
+    Class[_ <: object X$7]
+
+val h0: Object with extest.Test.MisterX with ScalaObject
+    Class[_ <: extest.Test.MisterX]
+
+val h1: List[Object with extest.Test.MisterX with ScalaObject]
+    Class[_ <: List[Object with extest.Test.MisterX with ScalaObject]]
+
+val h2: () => Object with extest.Test.MisterX with ScalaObject
+    Class[_ <: () => Object with extest.Test.MisterX with ScalaObject]
+
+val h3: Int => (AnyRef{def bippy(y: Int): Int} => Int)
+    Class[_ <: Int => (AnyRef{def bippy(y: Int): Int} => Int)]
+
+val s0: Object with extest.Test.MisterX with ScalaObject
+    Class[_ <: extest.Test.MisterX]
+
+val s1: List[Object with extest.Test.MisterX with ScalaObject]
+    Class[_ <: List[Object with extest.Test.MisterX with ScalaObject]]
+
+val s2: () => Object with extest.Test.MisterX with ScalaObject
+    Class[_ <: () => Object with extest.Test.MisterX with ScalaObject]
+
+val s3: Int => (AnyRef{def bippy(y: Int): Int} => Int)
+    Class[_ <: Int => (AnyRef{def bippy(y: Int): Int} => Int)]
+
+implicit def show[T](x: T)(implicit evidence$1: Manifest[T]): T
+    Class[_ <: T]

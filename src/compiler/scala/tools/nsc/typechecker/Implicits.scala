@@ -332,35 +332,37 @@ trait Implicits {
     def isPlausiblyCompatible(tp: Type, pt: Type) = checkCompatibility(fast = true, tp, pt)
     def normSubType(tp: Type, pt: Type) = checkCompatibility(fast = false, tp, pt)
 
-    /** Does type `dtor` dominate type `dted`?
-     *  This is the case if the stripped cores `dtor1` and `dted1` of both types are
-     *  the same wrt `=:=`, or if they overlap and the complexity of `dtor1` is higher
-     *  than the complexity of `dted1`.
-     *  The _stripped core_ of a type is the type where
+    /** The _stripped core_ of a type is the type where
      *   - all refinements and annotations are dropped,
      *   - all universal and existential quantification is eliminated
      *     by replacing variables by their upper bounds,
      *   - all remaining free type parameters in the type are replaced by WildcardType.
+     */
+    private def strippedCore(tp0: Type): Type = {
+      def core(tp: Type): Type = tp.normalize match {
+        case RefinedType(parents, _)          => intersectionType(parents map core, tp.typeSymbol.owner)
+        case AnnotatedType(_, tp, _)          => core(tp)
+        case ExistentialType(tparams, result) => core(result).subst(tparams, tparams map (t => core(t.info.bounds.hi)))
+        case PolyType(tparams, result)        => core(result).subst(tparams, tparams map (t => core(t.info.bounds.hi)))
+        case _                                => tp
+      }
+      // `t.typeSymbol` returns the symbol of the normalized type. If that normalized type
+      // is a `PolyType`, the symbol of the result type is collected. This is precisely
+      // what we require for SI-5318.
+      val syms = for (t <- tp0; if t.typeSymbol.isTypeParameter) yield t.typeSymbol
+      deriveTypeWithWildcards(syms.distinct)(tp0)
+    }
+
+    /** Does type `dtor` dominate type `dted`?
+     *  This is the case if the stripped cores `dtor1` and `dted1` of both types are
+     *  the same wrt `=:=`, or if they overlap and the complexity of `dtor1` is higher
+     *  than the complexity of `dted1`.
      *  The _complexity_ of a stripped core type corresponds roughly to the number of
      *  nodes in its ast, except that singleton types are widened before taking the complexity.
      *  Two types overlap if they have the same type symbol, or
      *  if one or both are intersection types with a pair of overlapping parent types.
      */
     private def dominates(dtor: Type, dted: Type): Boolean = {
-      def core(tp: Type): Type = tp.normalize match {
-        case RefinedType(parents, defs) => intersectionType(parents map core, tp.typeSymbol.owner)
-        case AnnotatedType(annots, tp, selfsym) => core(tp)
-        case ExistentialType(tparams, result) => core(result).subst(tparams, tparams map (t => core(t.info.bounds.hi)))
-        case PolyType(tparams, result) => core(result).subst(tparams, tparams map (t => core(t.info.bounds.hi)))
-        case _ => tp
-      }
-      def stripped(tp: Type): Type = {
-        // `t.typeSymbol` returns the symbol of the normalized type. If that normalized type
-        // is a `PolyType`, the symbol of the result type is collected. This is precisely
-        // what we require for SI-5318.
-        val syms = for (t <- tp; if t.typeSymbol.isTypeParameter) yield t.typeSymbol
-        deriveTypeWithWildcards(syms.distinct)(tp)
-      }
       def sum(xs: List[Int]) = (0 /: xs)(_ + _)
       def complexity(tp: Type): Int = tp.normalize match {
         case NoPrefix =>
@@ -379,8 +381,8 @@ trait Implicits {
         case (_, RefinedType(parents, _)) => parents exists (overlaps(tp1, _))
         case _ => tp1.typeSymbol == tp2.typeSymbol
       }
-      val dtor1 = stripped(core(dtor))
-      val dted1 = stripped(core(dted))
+      val dtor1 = strippedCore(dtor)
+      val dted1 = strippedCore(dted)
       overlaps(dtor1, dted1) && (dtor1 =:= dted1 || complexity(dtor1) > complexity(dted1))
     }
 

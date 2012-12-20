@@ -2687,9 +2687,18 @@ trait Types extends api.Types { self: SymbolTable =>
   def newExistentialType(quantified: List[Symbol], underlying: Type): Type =
     if (quantified.isEmpty) underlying
     else underlying match {
-      case ExistentialType(qs, restpe) => newExistentialType(quantified ::: qs, restpe)
+      case ExistentialType(qs, restpe) => newExistentialType(quantified ::: qs distinct, restpe)
       case _                           => ExistentialType(quantified, underlying)
     }
+
+  object flattenExistentialTypes extends TypeMap {
+    def apply(tp: Type): Type = tp match {
+      case ExistentialType(tps1, underlying) =>
+        mapOver(newExistentialType(tps1, underlying))
+      case _ =>
+        mapOver(tp)
+    }
+  }
 
   case class ExistentialType(quantified: List[Symbol],
                              override val underlying: Type) extends RewrappingTypeProxy with ExistentialTypeApi
@@ -3687,14 +3696,12 @@ trait Types extends api.Types { self: SymbolTable =>
     }
   }
 
-  /** Remove any occurrence of type <singleton> from this type and its parents */
-  object dropSingletonType extends TypeMap {
+  class DropParentsMap(p: Type => Boolean) extends TypeMap {
     def apply(tp: Type): Type = {
-      tp match {
-        case TypeRef(_, SingletonClass, _) =>
-          AnyClass.tpe
+      if (p(tp)) AnyClass.tpe
+      else tp match {
         case tp1 @ RefinedType(parents, decls) =>
-          parents filter (_.typeSymbol != SingletonClass) match {
+          parents filterNot p match {
             case Nil                       => AnyClass.tpe
             case p :: Nil if decls.isEmpty => mapOver(p)
             case ps                        => mapOver(copyRefinedType(tp1, ps, decls))
@@ -3702,6 +3709,28 @@ trait Types extends api.Types { self: SymbolTable =>
         case tp1 =>
           mapOver(tp1)
       }
+    }
+  }
+
+  /** Remove any occurrence of type <singleton> from this type and its parents */
+  object dropSingletonType extends DropParentsMap(_.typeSymbol eq SingletonClass)
+
+  object dropRefinements extends TypeMap {
+    def apply(tp: Type): Type = tp match {
+      case x: RefinedType => mapOver(copyRefinedType(x, x.parents, EmptyScope))
+      case _              => mapOver(tp)
+    }
+  }
+
+  /** Substitutes the empty scope for any non-empty decls in the type. */
+  object dropAllRefinements extends TypeMap {
+    def apply(tp: Type): Type = tp match {
+      case rt @ RefinedType(parents, decls) if !decls.isEmpty =>
+        mapOver(copyRefinedType(rt, parents, EmptyScope))
+      case ClassInfoType(parents, decls, clazz) if !decls.isEmpty =>
+        mapOver(ClassInfoType(parents, EmptyScope, clazz))
+      case _ =>
+        mapOver(tp)
     }
   }
 
@@ -4257,6 +4286,8 @@ trait Types extends api.Types { self: SymbolTable =>
       val tp1 = mapOver(tp)
       if (variance == 0) tp1
       else tp1 match {
+        case SingleType(pre, sym) =>
+          apply(TypeRef(pre, sym, Nil))
         case TypeRef(pre, sym, args) if tparams contains sym =>
           val repl = if (variance == 1) dropSingletonType(tp1.bounds.hi) else tp1.bounds.lo
           //println("eliminate "+sym+"/"+repl+"/"+occurCount(sym)+"/"+(tparams exists (repl.contains)))//DEBUG
@@ -4635,7 +4666,7 @@ trait Types extends api.Types { self: SymbolTable =>
       def unapply(param: Symbol) = Arg unapply param map actuals filter (tp =>
         tp.isStable && (tp.typeSymbol != NothingClass)
       )
-    }
+      }
     private object Arg {
       def unapply(param: Symbol) = Some(params indexOf param) filter (_ >= 0)
     }
@@ -4647,12 +4678,12 @@ trait Types extends api.Types { self: SymbolTable =>
       // see depmet_implicit_oopsla* test cases -- typically, `param.isImplicit`
       case tp1 @ TypeRef(SingleType(NoPrefix, Arg(pid)), sym, targs) =>
         val arg = actuals(pid)
-        val res = typeRef(arg, sym, targs)
+          val res = typeRef(arg, sym, targs)
         if (res.typeSymbolDirect.isAliasType) res.dealias else tp1
       // don't return the original `tp`, which may be different from `tp1`,
       // due to dropping annotations
       case tp1 => tp1
-    }
+      }
 
     /* Return the type symbol for referencing a parameter inside the existential quantifier.
      * (Only needed if the actual is unstable.)
@@ -4666,7 +4697,7 @@ trait Types extends api.Types { self: SymbolTable =>
         )
       }
       existentials(pid)
-    }
+      }
 
     //AM propagate more info to annotations -- this seems a bit ad-hoc... (based on code by spoon)
     override def mapOver(arg: Tree, giveup: ()=>Nothing): Tree = {
@@ -4697,11 +4728,11 @@ trait Types extends api.Types { self: SymbolTable =>
             Ident(sym) copyAttrs tree setType typeRef(NoPrefix, sym, Nil)
           case _ =>
             super.transform(tree)
-        }
-      }
+              }
+          }
       treeTrans transform arg
-    }
-  }
+        }
+          }
 
   /** A map to convert every occurrence of a wildcard type to a fresh
    *  type variable */
@@ -5942,7 +5973,7 @@ trait Types extends api.Types { self: SymbolTable =>
             if ((tparams1 corresponds tparams2)(_ eq _))
               matchesType(res1, res2, alwaysMatchSimple)
             else
-              matchesQuantified(tparams1, tparams2, res1, res2)
+            matchesQuantified(tparams1, tparams2, res1, res2)
           case ExistentialType(_, res2) =>
             alwaysMatchSimple && matchesType(tp1, res2, true)
           case _ =>
