@@ -1068,8 +1068,26 @@ abstract class GenASM extends SubComponent with BytecodeWriters with GenJVMASM {
         if (m.isDeferred) null else {
           val clazz = module.linkedClassOfClass
           val m1 = (
-            if ((clazz.info member m.name) eq NoSymbol)
-              enteringErasure(m.cloneSymbol(clazz, Flags.METHOD | Flags.STATIC))
+            if ((clazz.info member m.name) eq NoSymbol) {
+              val res = enteringErasure(m.cloneSymbol(clazz, Flags.METHOD | Flags.STATIC))
+              clazz.info.decls enter res
+              val resInfo = enteringErasure(clazz.thisType.memberInfo(res))
+              val oldSig = getGenericSignature(m, clazz)
+              val sig = erasure.javaSig(res, resInfo).orNull
+
+              if (oldSig != sig) {
+                log(s"Updating asm/recalculate: $oldSig  <becomes>  $sig")
+              }
+              // val memberTpe = enteringErasure(owner.thisType.memberInfo(sym))
+              // val resInfo = enteringErasure(res.info)
+              // val mInfo = enteringErasure(m.info)
+              // val resString = getGenericSignature(res,
+              // exitingPostErasure {
+              //   if (m.info =:= res.info) ()
+              //   else log(s"Updating with cloned symbol to recalculate signature: ${m.defString}  <becomes>  ${res.defString} / $sig")
+              // }
+              res
+            }
             else m
           )
           getGenericSignature(m1, clazz)

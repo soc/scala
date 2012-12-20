@@ -171,6 +171,47 @@ abstract class Mixin extends InfoTransform with ast.TreeDSL {
     addMember(clazz, cloneBeforeErasure(mixinClass, mixinMember, clazz))
 
   def cloneBeforeErasure(mixinClass: Symbol, mixinMember: Symbol, clazz: Symbol): Symbol = {
+    clazz.info
+    mixinClass.info
+    val impl = implClass(mixinClass)
+    impl.info
+
+    // println(s"cloneBeforeErasure($mixinClass, $mixinMember, $clazz)")
+    def infos = List(
+      mixinMember.info,
+      impl.info memberType mixinMember,
+      mixinClass.info memberType mixinMember,
+      clazz.info memberType mixinMember
+    ).distinct
+
+    def sig(info: Type) = "  " + erasure.javaSig(mixinMember, info) + "\n"
+
+    val infos1 = infos map sig//("  " + _ + "\n")
+    val infos2 = enteringErasure(infos) map sig//("  " + _ + "\n")
+    if (infos1.size == 1 && infos2.size == 1) () else {
+      val str = ("now:\n" :: infos1) ++ ("then:\n" ++ infos2) mkString ""
+
+      println(s"cloneBeforeErasure($mixinClass, $mixinMember, $clazz)\n" + str)
+    }
+
+    // val lines = s"""$now:${infos.mkString("\n  ")}"""
+
+     // "\n  then:\n  ", enteringErasure(infos).mkString("\n  "))
+
+    // println(s"cloneBeforeErasure($mixinClass, $mixinMember, $clazz)" :: lines mkString "\n  ")
+    // println(s"cloneBeforeErasure($mixinClass, $mixinMember, $clazz)\n  " + strres + "\n")
+    // println("")
+
+    // def inf1 = mixinMember.info
+    // def inf2 = enteringErasure(mixinMember.info)
+    // def inf3 = impl.info memberType mixinMember
+    // def inf4 = enteringErasure(inf3)
+    // def inf5 = mixinClass.info memberType mixinMember
+    // def inf6 = enteringErasure(inf5)
+    // def inf7 = clazz.info memberType mixinMember
+    // def inf8 = enteringErasure(inf7)
+    // println(List(inf1, inf2, inf3, inf4, inf5, inf6, inf7, inf8) mkString ("  ", "\n  ", "\n"))
+
     val newSym = enteringErasure {
       // since we used `mixinMember` from the interface that represents the trait that's
       // being mixed in, have to instantiate the interface type params (that may occur in mixinMember's
@@ -179,9 +220,42 @@ abstract class Mixin extends InfoTransform with ast.TreeDSL {
       // know its info at the beginning of erasure anymore.
       //   Optimize: no need if mixinClass has no typeparams.
       val sym = mixinMember cloneSymbol clazz
-      // Optimize: no need if mixinClass has no typeparams.
-      if (mixinClass.typeParams.isEmpty) sym
-      else sym modifyInfo (_.asSeenFrom(clazz.thisType, clazz))
+
+      {
+        val info1 = sym.info.asSeenFrom(clazz.thisType, clazz)
+        val info2 = sym.info.asSeenFrom(clazz.thisType, impl)
+        val info3 = exitingPostErasure(sym.info.asSeenFrom(clazz.thisType, clazz))
+        val info4 = exitingPostErasure(sym.info.asSeenFrom(clazz.thisType, impl))
+
+        if (!(info1 =:= info2))
+          println(List(s"1/ ${sym.fullLocationString} forwards from $clazz to $impl", info1, info2)mkString("\n  "))
+
+        if (!(info3 =:= info4))
+          println(List(s"2/ ${sym.fullLocationString} forwards from $clazz to $impl", info3, info4)mkString("\n  "))
+      }
+      {
+        val info1 = mixinMember.info.asSeenFrom(clazz.thisType, clazz)
+        val info2 = mixinMember.info.asSeenFrom(clazz.thisType, impl)
+        val info3 = exitingPostErasure(mixinMember.info.asSeenFrom(clazz.thisType, clazz))
+        val info4 = exitingPostErasure(mixinMember.info.asSeenFrom(clazz.thisType, impl))
+
+        if (!(info1 =:= info2))
+          println(List(s"3/ ${mixinMember.fullLocationString} forwards from $clazz to $impl", info1, info2)mkString("\n  "))
+
+        if (!(info3 =:= info4))
+          println(List(s"4/ ${mixinMember.fullLocationString} forwards from $clazz to $impl", info3, info4)mkString("\n  "))
+      }
+
+      // sym modifyInfo (_.asSeenFrom(clazz.thisType, clazz))
+      val info = sym.info.asSeenFrom(clazz.thisType, mixinClass)
+      exitingPostErasure {
+        if (info =:= sym.info) ()
+        else log(s"Updating ${sym.info}  <becomes>  $info")
+      }
+      sym modifyInfo (_ => info)
+      // if (mixinClass.typeParams.isEmpty) sym
+      // else sym updateInfo sym.info.asSeenFrom(clazz.thisType, clazz)
+      // else sym modifyInfo (_.asSeenFrom(clazz.thisType, clazz))
     }
     // clone before erasure got rid of type info we'll need to generate a javaSig
     // now we'll have the type info at (the beginning of) erasure in our history,
