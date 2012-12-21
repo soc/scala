@@ -1624,9 +1624,10 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
      *  (this isNestedIn that) holds iff this symbol is defined within
      *  a class or method defining that symbol
      */
-    final def isNestedIn(that: Symbol): Boolean =
-      owner == that || owner != NoSymbol && (owner isNestedIn that)
-
+    final def isNestedIn(that: Symbol): Boolean = (this ne NoSymbol) && (
+         (owner == that)
+      || (owner isNestedIn that)
+    )
     /** Is this class symbol a subclass of that symbol,
      *  and is this class symbol also different from Null or Nothing? */
     def isNonBottomSubClass(that: Symbol): Boolean = false

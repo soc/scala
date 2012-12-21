@@ -3740,13 +3740,10 @@ trait Typers extends Modes with Adaptations with Tags {
       /** Check that `tpt` refers to a non-refinement class type */
       val checkClassType = isNonRefinementClassType(tpe1) || errorNotClass(tpt, tpe1)
       if (checkClassType)
-        atPos(tree.pos)(gen.mkClassOf(TypeTree(classOfExpressionType(context.owner, tpe1))))
+        atPos(tree.pos)(gen.mkClassOf(classOfExpressionType(context.owner, tpe1)))
       else
         tpt
     }
-
-      if (!checkClassType(tpt) && noGen) tpt
-      else atPos(tree.pos)(gen.mkClassOf(tpt.tpe))
 
     protected def typedExistentialTypeTree(tree: ExistentialTypeTree, mode: Int): Tree = {
       for (wc <- tree.whereClauses)
