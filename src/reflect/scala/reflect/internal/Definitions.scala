@@ -737,23 +737,82 @@ trait Definitions extends api.StandardDefinitions {
     //
     // TODO: If T is final, return type could be Class[T].  Should it?
     def getClassReturnType(tp: Type): Type = {
-      val sym     = tp.typeSymbol
+      val sym = tp.typeSymbol
+      def upperBound = (
+        if (isPhantomClass(sym)) AnyClass.tpe
+        else if (sym.isLocalClass) erasure.intersectionDominator(tp.parents)
+        else tp.widen
+      )
 
       if (phase.erasedTypes) ClassClass.tpe
       else if (isPrimitiveValueClass(sym)) ClassType(tp.widen)
-      else {
-        val eparams    = typeParamsToExistentials(ClassClass, ClassClass.typeParams)
-        val upperBound = (
-          if (isPhantomClass(sym)) AnyClass.tpe
-          else if (sym.isLocalClass) erasure.intersectionDominator(tp.parents)
-          else tp.widen
-        )
+      else boundedClassType(upperBound)
 
+        val eparams    = typeParamsToExistentials(ClassClass, ClassClass.typeParams)
         existentialAbstraction(
           eparams,
           ClassType((eparams.head setInfo TypeBounds.upper(upperBound)).tpe)
         )
       }
+    }
+    /** Eliminate from list of types all elements which are a supertype
+     *  of some other element of the list. */
+    def eliminateSupertypes(tps: List[Type]): List[Type] = tps match {
+      case Nil      => Nil
+      case t :: Nil => t
+      case t :: ts =>
+        val rest = eliminateSupertypes(ts1 filter (t1 => !(t <:< t1)))
+        if (rest exists (t1 => t1 <:< t)) rest else t :: rest
+    }
+
+    def weakeningMap(qualifies: Symbol => Boolean): TypeMap = {
+      object weaken extends TypeMap {
+        def merge(tps: List[Type]): Type = eliminateSupertypes(tps) match {
+          case Nil      => AnyClass.tpe
+          case t :: Nil => t
+          case ts       => intersectionType(ts)
+        }
+        def apply(tp: Type): Type = {
+          if (qualifies(tp.typeSymbol)) mapOver(tp)
+          else tp.parents match {
+            case Nil => AnyClass.tpe
+            case ps  => mapOver(merge(ps map weaken))
+          }
+        }
+      }
+      weaken
+    }
+
+    def widenEnclosedClasses(owner: Symbol, tp: Type): Type = {
+      weakeningMap(s => !(s isNestedIn owner))(tp)
+    }
+
+    /** Determine the return type of a X.getClass() expression.
+     */
+    def getClassExpressionType(owner: Symbol, tp: Type): Type = {
+      if (phase.erasedTypes) ClassClass.tpe
+      else if (isScalaValueType(tp)) ClassType(tp.widen)
+      else if (isPhantomClass(tp.typeSymbol)) boundedClassType(AnyClass)
+      else boundedClassType(widenEnclosedClasses(owner, tp))
+    }
+    /** Determine the return type of a classOf[X] expression.
+     *  It is a constant type unless it references a locally
+     *  defined class.
+     */
+    def classOfExpressionType(owner: Symbol, tp: Type): Type = {
+      val newtp = widenEnclosedClasses(owner, tp)
+      if (tp eq newtp) ConstantType(Constant(newtp))
+      else boundedClassType(newtp)
+    }
+
+    /** Given type U, creates a Type representing Class[_ <: U].
+     */
+    def boundedClassType(upperBound: Type) = {
+      val eparams = typeParamsToExistentials(ClassClass, ClassClass.typeParams)
+      existentialAbstraction(
+        eparams,
+        ClassType(eparams.head setInfo TypeBounds.upper(dropRefinements(upperBound)) tpe)
+      )
     }
 
     /** Remove references to class Object (other than the head) in a list of parents */
