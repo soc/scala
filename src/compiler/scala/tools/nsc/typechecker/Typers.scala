@@ -3739,8 +3739,9 @@ trait Typers extends Modes with Adaptations with Tags {
       val tpe1 = unwrapToClass(tpt.tpe)
       /** Check that `tpt` refers to a non-refinement class type */
       val checkClassType = isNonRefinementClassType(tpe1) || errorNotClass(tpt, tpe1)
+      val tpe2 = widenEnclosedClasses(context.owner, tpe1)
       if (checkClassType)
-        atPos(tree.pos)(gen.mkClassOf(classOfExpressionType(context.owner, tpe1)))
+        atPos(tree.pos)(gen.mkClassOf(tpe2))
       else
         tpt
     }
