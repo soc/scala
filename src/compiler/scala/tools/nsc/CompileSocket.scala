@@ -1,19 +1,15 @@
 /* NSC -- new Scala compiler
- * Copyright 2005-2011 LAMP/EPFL
+ * Copyright 2005-2013 LAMP/EPFL
  * @author  Martin Odersky
  */
 
 package scala.tools.nsc
 
-import java.io.{ IOException, FileNotFoundException, PrintWriter, FileOutputStream }
-import java.io.{ BufferedReader, FileReader }
-import java.util.regex.Pattern
-import java.net._
+import java.io.{ FileNotFoundException, PrintWriter, FileOutputStream }
 import java.security.SecureRandom
 import io.{ File, Path, Directory, Socket }
-import scala.util.control.Exception.catching
 import scala.tools.util.CompileOutputCommon
-import scala.tools.util.StringOps.splitWhere
+import scala.reflect.internal.util.StringOps.splitWhere
 import scala.sys.process._
 
 trait HasCompileSocket {

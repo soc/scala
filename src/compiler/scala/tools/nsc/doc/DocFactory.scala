@@ -1,5 +1,5 @@
 /* NSC -- new Scala compiler
- * Copyright 2007-2011 LAMP/EPFL
+ * Copyright 2007-2013 LAMP/EPFL
  * @author  David Bernard, Manohar Jonnalagedda
  */
 
@@ -8,9 +8,7 @@ package doc
 
 import scala.util.control.ControlThrowable
 import reporters.Reporter
-import util.{ NoPosition, BatchSourceFile}
-import io.{ File, Directory }
-import DocParser.Parsed
+import scala.reflect.internal.util.BatchSourceFile
 
 /** A documentation processor controls the process of generating Scala
   * documentation, which is as follows.
@@ -39,17 +37,14 @@ class DocFactory(val reporter: Reporter, val settings: doc.Settings) { processor
       phasesSet += analyzer.namerFactory
       phasesSet += analyzer.packageObjects
       phasesSet += analyzer.typerFactory
-      phasesSet += superAccessors
-      phasesSet += pickler
-      phasesSet += refChecks
     }
     override def forScaladoc = true
   }
 
   /** Creates a scaladoc site for all symbols defined in this call's `source`,
     * as well as those defined in `sources` of previous calls to the same processor.
-    * @param files The list of paths (relative to the compiler's source path,
-    *        or absolute) of files to document. */
+    * @param source The list of paths (relative to the compiler's source path,
+    *        or absolute) of files to document or the source code. */
   def makeUniverse(source: Either[List[String], String]): Option[Universe] = {
     assert(settings.docformat.value == "html")
     source match {
@@ -81,23 +76,26 @@ class DocFactory(val reporter: Reporter, val settings: doc.Settings) { processor
       new { override val global: compiler.type = compiler }
         with model.ModelFactory(compiler, settings)
         with model.ModelFactoryImplicitSupport
-        with model.comment.CommentFactory
-        with model.TreeFactory {
-          override def templateShouldDocument(sym: compiler.Symbol) =
-            extraTemplatesToDocument(sym) || super.templateShouldDocument(sym)
+        with model.ModelFactoryTypeSupport
+        with model.diagram.DiagramFactory
+        with model.CommentFactory
+        with model.TreeFactory
+        with model.MemberLookup {
+          override def templateShouldDocument(sym: compiler.Symbol, inTpl: DocTemplateImpl) =
+            extraTemplatesToDocument(sym) || super.templateShouldDocument(sym, inTpl)
         }
     )
 
     modelFactory.makeModel match {
       case Some(madeModel) =>
-        if (settings.reportModel)
+        if (!settings.scaladocQuietRun)
           println("model contains " + modelFactory.templatesCount + " documentable templates")
         Some(madeModel)
       case None =>
-        println("no documentable class found in compilation units")
+        if (!settings.scaladocQuietRun)
+          println("no documentable class found in compilation units")
         None
     }
-
   }
 
   object NoCompilerRunException extends ControlThrowable { }

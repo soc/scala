@@ -1,5 +1,5 @@
 /* NSC -- new Scala compiler
- * Copyright 2009-2011 Scala Solutions and LAMP/EPFL
+ * Copyright 2009-2013 Typesafe/Scala Solutions and LAMP/EPFL
  * @author Martin Odersky
  */
 package scala.tools.nsc
@@ -8,9 +8,6 @@ package interactive
 import scala.collection._
 
 import scala.tools.nsc.reporters.{Reporter, ConsoleReporter}
-import dependencies._
-
-import util.FakePos
 import io.AbstractFile
 
 /** A simple build manager, using the default scalac dependency tracker.

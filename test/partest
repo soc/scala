@@ -53,7 +53,7 @@ if [ -z "$EXT_CLASSPATH" ] ; then
             fi
         done
     elif [ -f "$SCALA_HOME/build/pack/lib/scala-partest.jar" ] ; then
-        for lib in `echo "partest library compiler"`; do
+        for lib in `echo "partest library reflect compiler"`; do
             ext="$SCALA_HOME/build/pack/lib/scala-$lib.jar"
             if [ -z "$EXT_CLASSPATH" ] ; then
                 EXT_CLASSPATH="$ext"
@@ -70,6 +70,12 @@ if $cygwin; then
     else
         format=windows
     fi
+    if [ -n "${JAVA_HOME}" ] ; then
+        JAVA_HOME=`cygpath --$format "$JAVA_HOME"`
+    fi
+    if [ -n "${JAVACMD}" ] ; then
+        JAVACMD=`cygpath --$format "$JAVACMD"`
+    fi
     SCALA_HOME=`cygpath --$format "$SCALA_HOME"`
     EXT_CLASSPATH=`cygpath --path --$format "$EXT_CLASSPATH"`
 fi
@@ -84,7 +90,7 @@ if [ ! -z "${PARTEST_DEBUG}" ] ; then
   partestDebugStr="-Dpartest.debug=${PARTEST_DEBUG}"
 fi
 
-${JAVACMD:=java} \
+"${JAVACMD:=java}" \
   $JAVA_OPTS -cp "$EXT_CLASSPATH" \
   ${partestDebugStr} \
   -Dscala.home="${SCALA_HOME}" \

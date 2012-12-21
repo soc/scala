@@ -1,8 +1,8 @@
-import scala.reflect.makro.Context
+import scala.reflect.macros.Context
 
 object Impls {
   def impl(c: Context) = {
-    import c.mirror._
+    import c.universe._
     println(c.fresh())
     println(c.fresh("qwe"))
     println(c.fresh(newTypeName("qwe")))

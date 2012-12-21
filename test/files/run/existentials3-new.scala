@@ -1,3 +1,5 @@
+import scala.reflect.runtime.universe._
+
 object Test {
   trait ToS { final override def toString = getClass.getName }
 
@@ -31,36 +33,36 @@ object Test {
   val g11 = { abstract class A extends Seq[Int] ; List[A]() }
   val g12 = { abstract class A extends Seq[U forSome { type U <: Int }] ; List[A]() }
 
-  def printTag(t: TypeTag[_]) = {
-    val s = if (t.sym.isFreeType) t.sym.typeSignature.toString else t.sym.toString
-    println("%s, t=%s, s=%s".format(t, t.tpe.kind, s))
+  def printTpe(t: Type) = {
+    val s = if (t.typeSymbol.isFreeType) t.typeSymbol.typeSignature.toString else t.typeSymbol.toString
+    println("%s, t=%s, s=%s".format(t, t.asInstanceOf[Product].productPrefix, s))
   }
-  def m[T: ConcreteTypeTag](x: T) = printTag(concreteTypeTag[T])
-  def m2[T: TypeTag](x: T) = printTag(typeTag[T])
+  def m[T: TypeTag](x: T) = printTpe(typeOf[T])
+  def m2[T: WeakTypeTag](x: T) = printTpe(implicitly[WeakTypeTag[T]].tpe)
 
   // tags do work for f10/g10
   def main(args: Array[String]): Unit = {
-    m(f1)
-    m(f2)
+    m2(f1)
+    m2(f2)
     m(f3)
     m(f4)
     m(f5)
     m(f6)
     m(f7)
-    m(f8)
-    m(f9)
+    m2(f8)
+    m2(f9)
     m2(f10)
     m(f11)
     m(f12)
-    m(g1)
-    m(g2)
+    m2(g1)
+    m2(g2)
     m(g3)
     m(g4)
     m(g5)
     m(g6)
     m(g7)
-    m(g8)
-    m(g9)
+    m2(g8)
+    m2(g9)
     m2(g10)
     m(g11)
     m(g12)

@@ -1,12 +1,12 @@
 /* NSC -- new Scala compiler
- * Copyright 2007-2011 LAMP/EPFL
+ * Copyright 2007-2013 LAMP/EPFL
  * @author Lex Spoon
  */
 
 package scala.tools.nsc
 package plugins
 
-import scala.xml.{Node,NodeSeq}
+import scala.xml.Node
 
 /** A description of a compiler plugin, suitable for serialization
  *  to XML for inclusion in the plugin's .jar file.
@@ -26,7 +26,7 @@ abstract class PluginDescription {
   val classname: String
 
   /** An XML representation of this description.  It can be
-   *  read back using <code>PluginDescription.fromXML</code>.
+   *  read back using `PluginDescription.fromXML`.
    *  It should be stored inside the jar archive file.
    */
   def toXML: Node = {

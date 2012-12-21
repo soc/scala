@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2002-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2002-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://www.scala-lang.org/           **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -61,7 +61,7 @@ class ElementValidator() extends Function1[Node,Boolean] {
    */
   def check(md: MetaData): Boolean = {
     val len: Int = exc.length
-    var ok = new mutable.BitSet(adecls.length)
+    val ok = new mutable.BitSet(adecls.length)
 
     for (attr <- md) {
       def attrStr = attr.value.toString
@@ -115,6 +115,7 @@ class ElementValidator() extends Function1[Node,Boolean] {
           (dfa delta q).getOrElse(e, throw ValidationException("element %s not allowed here" format e))
         }
       }
+    case _ => false
   }
 
   /** applies various validations - accumulates error messages in exc

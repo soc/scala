@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2005-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2005-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -8,7 +8,8 @@
 
 
 
-package scala.collection
+package scala
+package collection
 package immutable
 
 /** Old base class that was used by previous implementations of `TreeMaps` and `TreeSets`.
@@ -17,7 +18,7 @@ package immutable
  *
  *  @since 2.3
  */
-@deprecated("use `TreeMap` or `TreeSet` instead", "2.10")
+@deprecated("use `TreeMap` or `TreeSet` instead", "2.10.0")
 @SerialVersionUID(8691885935445612921L)
 abstract class RedBlack[A] extends Serializable {
 

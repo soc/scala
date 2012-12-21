@@ -1,11 +1,11 @@
 /* NSC -- new Scala compiler
- * Copyright 2010-2011 LAMP/EPFL
+ * Copyright 2010-2013 LAMP/EPFL
  * @author  Stephane Micheloud
  */
 
 package scala.tools.nsc.doc.html
 
-import xml.NodeSeq
+import scala.xml.NodeSeq
 
 /** Highlight the syntax of Scala code appearing in a `{{{` wiki block
   * (see method `HtmlPage.blockToHtml`).
@@ -40,8 +40,8 @@ private[html] object SyntaxHigh {
 
   /** Standard library classes/objects, sorted alphabetically */
   val standards = Array (
-    "Any", "AnyRef", "AnyVal", "App", "Application", "Array",
-    "Boolean", "Byte", "Char", "Class", "ClassTag", "ClassManifest", "ConcreteTypeTag",
+    "WeakTypeTag", "Any", "AnyRef", "AnyVal", "App", "Array",
+    "Boolean", "Byte", "Char", "Class", "ClassTag", "ClassManifest",
     "Console", "Double", "Enumeration", "Float", "Function", "Int",
     "List", "Long", "Manifest", "Map",
     "NoManifest", "None", "Nothing", "Null", "Object", "Option", "OptManifest",
@@ -281,6 +281,6 @@ private[html] object SyntaxHigh {
     }
 
     parse("", 0)
-    xml.Unparsed(out.toString)
+    scala.xml.Unparsed(out.toString)
   }
 }

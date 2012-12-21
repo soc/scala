@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2003-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2003-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -25,6 +25,7 @@ package scala.testing
  *  where `&lt;result&gt;` is the result of evaluating the call.
  *
  */
+@deprecated("This class will be removed.", "2.10.0")
 trait Show {
 
   /** An implicit definition that adds an apply method to Symbol which forwards to `test`. 
@@ -36,7 +37,7 @@ trait Show {
     }
   }
 
-  @deprecated("use SymApply instead", "2.10")
+  @deprecated("use SymApply instead", "2.10.0")
   def symApply(sym: Symbol): SymApply = new SymApply(sym)
 
   /** Apply method with name of given symbol `f` to given arguments and return

@@ -1,32 +1,25 @@
 /* NSC -- new Scala compiler
- * Copyright 2006-2011 LAMP/EPFL
+ * Copyright 2006-2013 LAMP/EPFL
  * @author  Paul Phillips
  */
 
 package scala.tools
 package util
 
-import java.net.{ URL, MalformedURLException }
 import scala.tools.reflect.WrappedProperties.AccessControl
 import nsc.{ Settings, GenericRunnerSettings }
 import nsc.util.{ ClassPath, JavaClassPath, ScalaClassLoader }
 import nsc.io.{ File, Directory, Path, AbstractFile }
 import ClassPath.{ JavaContext, DefaultJavaContext, join, split }
 import PartialFunction.condOpt
+import scala.language.postfixOps
 
 // Loosely based on the draft specification at:
 // https://wiki.scala-lang.org/display/SW/Classpath
 
 object PathResolver {
-  // Imports property/environment functions which suppress
-  // security exceptions.
+  // Imports property/environment functions which suppress security exceptions.
   import AccessControl._
-
-  def firstNonEmpty(xs: String*)            = xs find (_ != "") getOrElse ""
-
-  /** Map all classpath elements to absolute paths and reconstruct the classpath.
-    */
-  def makeAbsolute(cp: String) = ClassPath.map(cp, x => Path(x).toAbsolute.path)
 
   /** pretty print class path */
   def ppcp(s: String) = split(s) match {
@@ -45,7 +38,6 @@ object PathResolver {
     /** Environment variables which java pays attention to so it
      *  seems we do as well.
      */
-    def classPathEnv        =  envOrElse("CLASSPATH", "")
     def sourcePathEnv       =  envOrElse("SOURCEPATH", "")
 
     def javaBootClassPath   = propOrElse("sun.boot.class.path", searchForBootClasspath)
@@ -85,7 +77,6 @@ object PathResolver {
 
     def scalaHome         = Environment.scalaHome
     def scalaHomeDir      = Directory(scalaHome)
-    def scalaHomeExists   = scalaHomeDir.isDirectory
     def scalaLibDir       = Directory(scalaHomeDir / "lib")
     def scalaClassesDir   = Directory(scalaHomeDir / "classes")
 
@@ -108,15 +99,7 @@ object PathResolver {
     // classpath as set up by the runner (or regular classpath under -nobootcp)
     // and then again here.
     def scalaBootClassPath  = ""
-    // scalaLibDirFound match {
-    //   case Some(dir) if scalaHomeExists =>
-    //     val paths = ClassPath expandDir dir.path
-    //     join(paths: _*)
-    //   case _                            => ""
-    // }
-
     def scalaExtDirs = Environment.scalaExtDirs
-
     def scalaPluginPath = (scalaHomeDir / "misc" / "scala-devel" / "plugins").path
 
     override def toString = """
@@ -135,7 +118,7 @@ object PathResolver {
       )
   }
 
-  def fromPathString(path: String, context: JavaContext = DefaultJavaContext): JavaClassPath = {
+  def fromPathString(path: String, context: JavaContext = DefaultJavaContext): JavaClassPath = { // called from scalap
     val s = new Settings()
     s.classpath.value = path
     new PathResolver(s, context) result
@@ -160,7 +143,7 @@ object PathResolver {
     }
   }
 }
-import PathResolver.{ Defaults, Environment, firstNonEmpty, ppcp }
+import PathResolver.{ Defaults, Environment, ppcp }
 
 class PathResolver(settings: Settings, context: JavaContext) {
   def this(settings: Settings) = this(settings, if (settings.inline.value) new JavaContext else DefaultJavaContext)
@@ -192,7 +175,15 @@ class PathResolver(settings: Settings, context: JavaContext) {
     def javaUserClassPath   = if (useJavaClassPath) Defaults.javaUserClassPath else ""
     def scalaBootClassPath  = cmdLineOrElse("bootclasspath", Defaults.scalaBootClassPath)
     def scalaExtDirs        = cmdLineOrElse("extdirs", Defaults.scalaExtDirs)
-    def sourcePath          = cmdLineOrElse("sourcepath", Defaults.scalaSourcePath)
+    /** Scaladoc doesn't need any bootstrapping, otherwise will create errors such as:
+     * [scaladoc] ../scala-trunk/src/reflect/scala/reflect/macros/Reifiers.scala:89: error: object api is not a member of package reflect
+     * [scaladoc] case class ReificationException(val pos: reflect.api.PositionApi, val msg: String) extends Throwable(msg)
+     * [scaladoc]                                              ^
+     * because the bootstrapping will look at the sourcepath and create package "reflect" in "<root>"
+     * and then when typing relative names, instead of picking <root>.scala.relect, typedIdentifier will pick up the
+     * <root>.reflect package created by the bootstrapping. Thus, no bootstrapping for scaladoc!
+     * TODO: we should refactor this as a separate -bootstrap option to have a clean implementation, no? */
+    def sourcePath          = if (!settings.isScaladoc) cmdLineOrElse("sourcepath", Defaults.scalaSourcePath) else ""
 
     /** Against my better judgment, giving in to martin here and allowing
      *  CLASSPATH to be used automatically.  So for the user-specified part

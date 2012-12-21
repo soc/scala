@@ -1,5 +1,6 @@
-import scala.reflect.makro.{Context => Ctx}
+import scala.reflect.macros.{Context => Ctx}
+import scala.reflect.runtime.{universe => ru}
 
 object Impls {
-  def foo(c: Ctx) = scala.reflect.mirror.Literal(scala.reflect.mirror.Constant(42))
+  def foo(c: Ctx) = ru.Literal(ru.Constant(42))
 }

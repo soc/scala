@@ -1,14 +1,14 @@
 /* NSC -- new Scala compiler
- * Copyright 2005-2011 LAMP/EPFL
+ * Copyright 2005-2013 LAMP/EPFL
  * @author  Martin Odersky
  */
 
 package scala.tools.nsc
 package ast
 
-import compat.Platform.EOL
+import scala.compat.Platform.EOL
 import symtab.Flags._
-import language.postfixOps
+import scala.language.postfixOps
 
 /** The object `nodePrinter` converts the internal tree
  *  representation to a string.
@@ -102,7 +102,7 @@ abstract class NodePrinters {
       buf.clear()
       if (settings.XshowtreesStringified.value) buf.append(tree.toString + EOL)
       if (settings.XshowtreesCompact.value) {
-        buf.append(showRaw(tree))
+        buf.append(showRaw(tree, printIds = settings.uniqid.value, printTypes = settings.printtypes.value))
       } else {
         level = 0
         traverse(tree)
@@ -145,6 +145,7 @@ abstract class NodePrinters {
       str.toString
     }
     def printModifiers(tree: MemberDef) {
+      // SI-5885: by default this won't print annotations of not yet initialized symbols
       val annots0 = tree.symbol.annotations match {
         case Nil  => tree.mods.annotations
         case xs   => xs map annotationInfoToString
@@ -167,7 +168,7 @@ abstract class NodePrinters {
       }
     }
 
-    def treePrefix(tree: Tree) = showPosition(tree) + tree.printingPrefix
+    def treePrefix(tree: Tree) = showPosition(tree) + tree.productPrefix
     def printMultiline(tree: Tree)(body: => Unit) {
       printMultiline(treePrefix(tree), showAttributes(tree))(body)
     }

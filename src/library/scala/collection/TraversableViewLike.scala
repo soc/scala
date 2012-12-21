@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2003-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2003-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -10,9 +10,8 @@ package scala.collection
 
 import generic._
 import mutable.{ Builder, ArrayBuffer }
-import TraversableView.NoBuilder
-import annotation.migration
-import language.implicitConversions
+import scala.annotation.migration
+import scala.language.implicitConversions
 
 trait ViewMkString[+A] {
   self: Traversable[A] =>
@@ -59,7 +58,7 @@ trait ViewMkString[+A] {
  *  $viewInfo
  *
  *  All views for traversable collections are defined by creating a new `foreach` method.
- *  
+ *
  *  @author Martin Odersky
  *  @version 2.8
  *  @since   2.8
@@ -117,7 +116,7 @@ trait TraversableViewLike[+A,
   }
 
   /** Explicit instantiation of the `Transformed` trait to reduce class file size in subclasses. */
-  private[collection] abstract class AbstractTransformed[+B] extends Transformed[B]
+  private[collection] abstract class AbstractTransformed[+B] extends Traversable[B] with Transformed[B]
 
   trait EmptyView extends Transformed[Nothing] with super.EmptyView
 
@@ -162,7 +161,7 @@ trait TraversableViewLike[+A,
 //     if (b.isInstanceOf[NoBuilder[_]]) newFlatMapped(f).asInstanceOf[That]
 //    else super.flatMap[B, That](f)(bf)
   }
-  override def flatten[B](implicit asTraversable: A => /*<:<!!!*/ GenTraversableOnce[B]) = 
+  override def flatten[B](implicit asTraversable: A => /*<:<!!!*/ GenTraversableOnce[B]) =
     newFlatMapped(asTraversable)
   private[this] implicit def asThis(xs: Transformed[A]): This = xs.asInstanceOf[This]
 

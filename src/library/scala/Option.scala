@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2002-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2002-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -10,7 +10,7 @@ package scala
 
 object Option {
 
-  import language.implicitConversions
+  import scala.language.implicitConversions
 
   /** An implicit conversion that converts an option to an iterable value
    */
@@ -196,7 +196,7 @@ sealed abstract class Option[+A] extends Product with Serializable {
   /** Necessary to keep $option from being implicitly converted to
    *  [[scala.collection.Iterable]] in `for` comprehensions.
    */
-  def withFilter(p: A => Boolean): WithFilter = new WithFilter(p)
+  @inline final def withFilter(p: A => Boolean): WithFilter = new WithFilter(p)
 
   /** We need a whole WithFilter class to honor the "doesn't create a new
    *  collection" contract even though it seems unlikely to matter much in a
@@ -208,6 +208,15 @@ sealed abstract class Option[+A] extends Product with Serializable {
     def foreach[U](f: A => U): Unit = self filter p foreach f
     def withFilter(q: A => Boolean): WithFilter = new WithFilter(x => p(x) && q(x))
   }
+
+  /** Tests whether the option contains a given value as an element.
+   * 
+   *  @param elem the element to test.
+   *  @return `true` if the option has an element that is equal (as
+   *  determined by `==`) to `elem`, `false` otherwise.
+   */
+  final def contains[A1 >: A](elem: A1): Boolean =
+    !isEmpty && this.get == elem
 
   /** Returns true if this option is nonempty '''and''' the predicate
    * $p returns true when applied to this $option's value.
@@ -246,8 +255,8 @@ sealed abstract class Option[+A] extends Product with Serializable {
    *  @return the result of applying `pf` to this $option's
    *  value (if possible), or $none.
    */
-  def collect[B](pf: PartialFunction[A, B]): Option[B] =
-    if (!isEmpty && pf.isDefinedAt(this.get)) Some(pf(this.get)) else None
+  @inline final def collect[B](pf: PartialFunction[A, B]): Option[B] =
+    if (!isEmpty) pf.lift(this.get) else None
 
   /** Returns this $option if it is nonempty,
    *  otherwise return the result of evaluating `alternative`.
@@ -266,11 +275,11 @@ sealed abstract class Option[+A] extends Product with Serializable {
    * if it is nonempty, or the empty list if the $option is empty.
    */
   def toList: List[A] =
-    if (isEmpty) List() else List(this.get)
+    if (isEmpty) List() else new ::(this.get, Nil)
 
-  /** Returns a [[scala.Left]] containing the given
+  /** Returns a [[scala.util.Left]] containing the given
    * argument `left` if this $option is empty, or
-   * a [[scala.Right]] containing this $option's value if
+   * a [[scala.util.Right]] containing this $option's value if
    * this is nonempty.
    *
    * @param left the expression to evaluate and return if this is empty
@@ -279,9 +288,9 @@ sealed abstract class Option[+A] extends Product with Serializable {
   @inline final def toRight[X](left: => X) =
     if (isEmpty) Left(left) else Right(this.get)
 
-  /** Returns a [[scala.Right]] containing the given
+  /** Returns a [[scala.util.Right]] containing the given
    * argument `right` if this is empty, or
-   * a [[scala.Left]] containing this $option's value
+   * a [[scala.util.Left]] containing this $option's value
    * if this $option is nonempty.
    *
    * @param right the expression to evaluate and return if this is empty

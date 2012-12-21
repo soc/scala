@@ -2,15 +2,16 @@
 
 
 import scala.concurrent._
-import scala.concurrent.util.duration._
-import scala.concurrent.util.Duration.Inf
+import scala.concurrent.duration._
+import scala.concurrent.duration.Duration.Inf
 import scala.collection._
 import scala.runtime.NonLocalReturnControl
-
+import scala.util.{Try,Success,Failure}
 
 
 object PromiseTests extends MinimalScalaTest {
-  
+  import ExecutionContext.Implicits._
+
   val defaultTimeout = Inf
   
   /* promise specification */
@@ -20,11 +21,13 @@ object PromiseTests extends MinimalScalaTest {
     "not be completed" in {
       val p = Promise()
       p.future.isCompleted mustBe (false)
+      p.isCompleted mustBe (false)
     }
     
     "have no value" in {
       val p = Promise()
       p.future.value mustBe (None)
+      p.isCompleted mustBe (false)
     }
     
     "return supplied value on timeout" in {
@@ -45,25 +48,27 @@ object PromiseTests extends MinimalScalaTest {
   
   "A successful Promise" should {
     val result = "test value"
-    val future = Promise[String]().complete(Right(result)).future
-    futureWithResult(_(future, result))
+    val promise = Promise[String]().complete(Success(result))
+    promise.isCompleted mustBe (true)
+    futureWithResult(_(promise.future, result))
   }
   
   "A failed Promise" should {
     val message = "Expected Exception"
-    val future = Promise[String]().complete(Left(new RuntimeException(message))).future
-    futureWithException[RuntimeException](_(future, message))
+    val promise = Promise[String]().complete(Failure(new RuntimeException(message)))
+    promise.isCompleted mustBe (true)
+    futureWithException[RuntimeException](_(promise.future, message))
   }
   
   "An interrupted Promise" should {
     val message = "Boxed InterruptedException"
-    val future = Promise[String]().complete(Left(new InterruptedException(message))).future
+    val future = Promise[String]().complete(Failure(new InterruptedException(message))).future
     futureWithException[ExecutionException](_(future, message))
   }
   
   "A NonLocalReturnControl failed Promise" should {
     val result = "test value"
-    val future = Promise[String]().complete(Left(new NonLocalReturnControl[String]("test", result))).future
+    val future = Promise[String]().complete(Failure(new NonLocalReturnControl[String]("test", result))).future
     futureWithResult(_(future, result))
   }
   
@@ -71,9 +76,9 @@ object PromiseTests extends MinimalScalaTest {
     
     "be completed" in { f((future, _) => future.isCompleted mustBe (true)) }
     
-    "contain a value" in { f((future, result) => future.value mustBe (Some(Right(result)))) }
+    "contain a value" in { f((future, result) => future.value mustBe (Some(Success(result)))) }
     
-    "return result with 'blocking'" in { f((future, result) => blocking(future, defaultTimeout) mustBe (result)) }
+    "return when ready with 'Await.ready'" in { f((future, result) => Await.ready(future, defaultTimeout).isCompleted mustBe (true)) }
     
     "return result with 'Await.result'" in { f((future, result) => Await.result(future, defaultTimeout) mustBe (result)) }
     
@@ -154,16 +159,13 @@ object PromiseTests extends MinimalScalaTest {
     
     "contain a value" in {
       f((future, message) => {
-        future.value.get.left.get.getMessage mustBe (message)
+        future.value.get.failed.get.getMessage mustBe (message)
       })
     }
     
-    "throw exception with 'blocking'" in {
+    "throw not throw exception with 'Await.ready'" in {
       f {
-        (future, message) =>
-        intercept[E] {
-          blocking(future, defaultTimeout)
-        }.getMessage mustBe (message)
+        (future, message) => Await.ready(future, defaultTimeout).isCompleted mustBe (true)
       }
     }
     

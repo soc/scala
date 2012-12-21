@@ -1,5 +1,5 @@
 /* NSC -- new Scala compiler
- * Copyright 2005-2011 LAMP/EPFL
+ * Copyright 2005-2013 LAMP/EPFL
  * @author  Paul Phillips
  */
 
@@ -10,16 +10,15 @@ import java.lang.{ reflect => r }
 import r.TypeVariable
 import scala.reflect.NameTransformer
 import NameTransformer._
-import scala.reflect.{mirror => rm}
+import scala.reflect.runtime.{universe => ru}
+import scala.reflect.{ClassTag, classTag}
 import typechecker.DestructureTypes
-import scala.tools.util.StringOps.ojoin
 
 /** A more principled system for turning types into strings.
  */
 trait StructuredTypeStrings extends DestructureTypes {
   val global: Global
   import global._
-  import definitions._
 
   case class LabelAndType(label: String, typeName: String) { }
   object LabelAndType {
@@ -34,10 +33,8 @@ trait StructuredTypeStrings extends DestructureTypes {
   val NoGrouping      = Grouping("", "", "", false)
   val ListGrouping    = Grouping("(", ", ", ")", false)
   val ProductGrouping = Grouping("(", ", ", ")", true)
-  val ParamGrouping   = Grouping("(", ", ", ")", true)
   val BlockGrouping   = Grouping(" { ", "; ", "}", false)
 
-  private implicit def lowerName(n: Name): String = "" + n
   private def str(level: Int)(body: => String): String = "  " * level + body
   private def block(level: Int, grouping: Grouping)(name: String, nodes: List[TypeNode]): String = {
     val l1 = str(level)(name + grouping.ldelim)
@@ -47,7 +44,6 @@ trait StructuredTypeStrings extends DestructureTypes {
     l1 +: l2 :+ l3 mkString "\n"
   }
   private def maybeBlock(level: Int, grouping: Grouping)(name: String, nodes: List[TypeNode]): String = {
-    import grouping._
     val threshold = 70
 
     val try1 = str(level)(name + grouping.join(nodes map (_.show(0, grouping.labels)): _*))
@@ -55,7 +51,7 @@ trait StructuredTypeStrings extends DestructureTypes {
     else block(level, grouping)(name, nodes)
   }
   private def shortClass(x: Any) = {
-    if (opt.debug) {
+    if (settings.debug.value) {
       val name   = (x.getClass.getName split '.').last
       val isAnon = name.reverse takeWhile (_ != '$') forall (_.isDigit)
       val str    = if (isAnon) name else (name split '$').last
@@ -192,7 +188,6 @@ trait TypeStrings {
       else enclClass.getName + "." + (name stripPrefix enclPre)
     )
   }
-  def scalaName(m: ClassTag[_]): String = scalaName(m.erasure)
   def anyClass(x: Any): JClass          = if (x == null) null else x.getClass
 
   private def brackets(tps: String*): String =
@@ -209,10 +204,9 @@ trait TypeStrings {
     brackets(clazz.getTypeParameters map tvarString: _*)
   }
 
-  private def tparamString[T: TypeTag] : String = {
-    // [Eugene to Paul] needs review!!
-    def typeArguments: List[rm.Type] = typeTag[T].tpe.typeArguments
-    def typeVariables: List[java.lang.Class[_]] = typeArguments map (targ => rm.typeToClass(targ))
+  private def tparamString[T: ru.TypeTag] : String = {
+    import ru._
+    def typeArguments: List[ru.Type] = ru.typeOf[T] match { case ru.TypeRef(_, _, args) => args; case _ => Nil }
     brackets(typeArguments map (jc => tvarString(List(jc))): _*)
   }
 
@@ -224,10 +218,9 @@ trait TypeStrings {
    *  practice to rely on toString for correctness) generated the VALID string
    *  representation of the type.
    */
-  def fromTypedValue[T: TypeTag](x: T): String = fromTag[T]
-  def fromValue(value: Any): String            = if (value == null) "Null" else fromClazz(anyClass(value))
-  def fromClazz(clazz: JClass): String         = scalaName(clazz) + tparamString(clazz)
-  def fromTag[T: TypeTag] : String             = scalaName(typeTag[T].erasure) + tparamString[T]
+  def fromValue(value: Any): String                          = if (value == null) "Null" else fromClazz(anyClass(value))
+  def fromClazz(clazz: JClass): String                       = scalaName(clazz) + tparamString(clazz)
+  def fromTag[T: ru.TypeTag : ClassTag] : String             = scalaName(classTag[T].runtimeClass) + tparamString[T]
 
   /** Reducing fully qualified noise for some common packages.
    */
@@ -244,13 +237,6 @@ trait TypeStrings {
       case (res, (k, v)) => res.replaceAll(k, v)
     }
   }
-
-  val typeTransforms = List(
-    "java.lang." -> "",
-    "scala.collection.immutable." -> "immutable.",
-    "scala.collection.mutable." -> "mutable.",
-    "scala.collection.generic." -> "generic."
-  )
 }
 
 object TypeStrings extends TypeStrings { }

@@ -1,5 +1,5 @@
 /* NSC -- new Scala compiler
- * Copyright 2005-2011 LAMP/EPFL
+ * Copyright 2005-2013 LAMP/EPFL
  * @author  Martin Odersky
  */
 
@@ -9,16 +9,22 @@ package icode
 
 import scala.collection.{ mutable, immutable }
 import mutable.{ ListBuffer, ArrayBuffer }
-import util.{ Position, NoPosition }
+import scala.reflect.internal.util.{ Position, NoPosition }
 import backend.icode.analysis.ProgramPoint
-import language.postfixOps
+import scala.language.postfixOps
 
 trait BasicBlocks {
   self: ICodes =>
 
   import opcodes._
-  import global.{ ifDebug, settings, log, nme }
+  import global.{ settings, log, nme }
   import nme.isExceptionResultName
+
+  /** Override Array creation for efficiency (to not go through reflection). */
+  private implicit val instructionTag: scala.reflect.ClassTag[Instruction] = new scala.reflect.ClassTag[Instruction] {
+    def runtimeClass: java.lang.Class[Instruction] = classOf[Instruction]
+    final override def newArray(len: Int): Array[Instruction] = new Array[Instruction](len)
+  }
 
   object NoBasicBlock extends BasicBlock(-1, null)
 
@@ -36,10 +42,14 @@ trait BasicBlocks {
 
     private final class SuccessorList() {
       private var successors: List[BasicBlock] = Nil
+      /** This method is very hot! Handle with care. */
       private def updateConserve() {
-        var lb: ListBuffer[BasicBlock] = null
-        var matches = 0
-        var remaining = successors
+        var lb: ListBuffer[BasicBlock]              = null
+        var matches                                 = 0
+        var remaining                               = successors
+        val direct                                  = directSuccessors
+        var scratchHandlers: List[ExceptionHandler] = method.exh
+        var scratchBlocks: List[BasicBlock]         = direct
 
         def addBlock(bb: BasicBlock) {
           if (matches < 0)
@@ -54,25 +64,27 @@ trait BasicBlocks {
           }
         }
 
-        // exceptionSuccessors
-        method.exh foreach { handler =>
-          if (handler covers outer)
-            addBlock(handler.startBlock)
+        while (scratchBlocks ne Nil) {
+          addBlock(scratchBlocks.head)
+          scratchBlocks = scratchBlocks.tail
         }
-        // directSuccessors
-        val direct = directSuccessors
-        direct foreach addBlock
-
         /** Return a list of successors for 'b' that come from exception handlers
          *  covering b's (non-exceptional) successors. These exception handlers
          *  might not cover 'b' itself. This situation corresponds to an
          *  exception being thrown as the first thing of one of b's successors.
          */
-        method.exh foreach { handler =>
-          direct foreach { block =>
-            if (handler covers block)
+        while (scratchHandlers ne Nil) {
+          val handler = scratchHandlers.head
+          if (handler covers outer)
+            addBlock(handler.startBlock)
+
+          scratchBlocks = direct
+          while (scratchBlocks ne Nil) {
+            if (handler covers scratchBlocks.head)
               addBlock(handler.startBlock)
+            scratchBlocks = scratchBlocks.tail
           }
+          scratchHandlers = scratchHandlers.tail
         }
         // Blocks did not align: create a new list.
         if (matches < 0)
@@ -95,7 +107,7 @@ trait BasicBlocks {
     }
 
     /** Flags of this basic block. */
-    private var flags: Int = 0
+    private[this] var flags: Int = 0
 
     /** Does this block have the given flag? */
     def hasFlag(flag: Int): Boolean = (flags & flag) != 0
@@ -110,7 +122,7 @@ trait BasicBlocks {
     def closed: Boolean = hasFlag(CLOSED)
     def closed_=(b: Boolean) = if (b) setFlag(CLOSED) else resetFlag(CLOSED)
 
-    /** When set, the <code>emit</code> methods will be ignored. */
+    /** When set, the `emit` methods will be ignored. */
     def ignore: Boolean = hasFlag(IGNORING)
     def ignore_=(b: Boolean) = if (b) setFlag(IGNORING) else resetFlag(IGNORING)
 
@@ -248,7 +260,7 @@ trait BasicBlocks {
       }
     }
 
-    /** Replaces <code>oldInstr</code> with <code>is</code>. It does not update
+    /** Replaces `oldInstr` with `is`. It does not update
      *  the position field in the newly inserted instructions, so it behaves
      *  differently than the one-instruction versions of this function.
      *
@@ -268,17 +280,7 @@ trait BasicBlocks {
       }
     }
 
-    /** Insert instructions in 'is' immediately after index 'idx'. */
-    def insertAfter(idx: Int, is: List[Instruction]) {
-      assert(closed, "Instructions can be replaced only after the basic block is closed")
-
-      instrs = instrs.patch(idx + 1, is, 0)
-      code.touched = true
-    }
-
     /** Removes instructions found at the given positions.
-     *
-     *  @param positions ...
      */
     def removeInstructionsAt(positions: Int*) {
       assert(closed, this)
@@ -299,8 +301,6 @@ trait BasicBlocks {
     }
 
     /** Replaces all instructions found in the map.
-     *
-     *  @param map ...
      */
     def subst(map: Map[Instruction, Instruction]): Unit =
       if (!closed)
@@ -308,7 +308,12 @@ trait BasicBlocks {
       else
         instrs.zipWithIndex collect {
           case (oldInstr, i) if map contains oldInstr =>
-            code.touched |= replaceInstruction(i, map(oldInstr))
+            // SI-6288 clone important here because `replaceInstruction` assigns
+            // a position to `newInstr`. Without this, a single instruction can
+            // be added twice, and the position last position assigned clobbers
+            // all previous positions in other usages.
+            val newInstr = map(oldInstr).clone()
+            code.touched |= replaceInstruction(i, newInstr)
         }
 
     ////////////////////// Emit //////////////////////
@@ -327,10 +332,6 @@ trait BasicBlocks {
      *  is closed, which sets the DIRTYSUCCS flag.
      */
     def emit(instr: Instruction, pos: Position) {
-/*      if (closed) {
-        print()
-        Console.println("trying to emit: " + instr)
-      } */
       assert(!closed || ignore, this)
 
       if (ignore) {
@@ -424,11 +425,6 @@ trait BasicBlocks {
       ignore = true
     }
 
-    def exitIgnoreMode() {
-      assert(ignore, "Exit ignore mode when not in ignore mode: " + this)
-      ignore = false
-    }
-
     /** Return the last instruction of this basic block. */
     def lastInstruction =
       if (closed) instrs(instrs.length - 1)
@@ -484,17 +480,6 @@ trait BasicBlocks {
     }
 
     override def hashCode = label * 41 + code.hashCode
-
-    // Instead of it, rather use a printer
-    def print() { print(java.lang.System.out) }
-
-    def print(out: java.io.PrintStream) {
-      out.println("block #"+label+" :")
-      foreach(i => out.println("  " + i))
-      out.print("Successors: ")
-      successors.foreach((x: BasicBlock) => out.print(" "+x.label.toString()))
-      out.println()
-    }
 
     private def succString = if (successors.isEmpty) "[S: N/A]" else successors.distinct.mkString("[S: ", ", ", "]")
     private def predString = if (predecessors.isEmpty) "[P: N/A]" else predecessors.distinct.mkString("[P: ", ", ", "]")

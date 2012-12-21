@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2007-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2007-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -12,7 +12,7 @@ package scala.math
 import java.{ lang => jl }
 import java.math.{ MathContext, BigDecimal => BigDec }
 import scala.collection.immutable.NumericRange
-import language.implicitConversions
+import scala.language.implicitConversions
 
 
 /**
@@ -24,12 +24,6 @@ object BigDecimal {
   private val minCached = -512
   private val maxCached = 512
   val defaultMathContext = MathContext.DECIMAL128
-
-  @deprecated("Use Long.MinValue", "2.9.0")
-  val MinLong = new BigDecimal(BigDec valueOf Long.MinValue, defaultMathContext)
-
-  @deprecated("Use Long.MaxValue", "2.9.0")
-  val MaxLong = new BigDecimal(BigDec valueOf Long.MaxValue, defaultMathContext)
 
   /** Cache ony for defaultMathContext using BigDecimals in a small range. */
   private lazy val cache = new Array[BigDecimal](maxCached - minCached + 1)
@@ -159,6 +153,7 @@ object BigDecimal {
  *  @author  Stephane Micheloud
  *  @version 1.0
  */
+@deprecatedInheritance("This class will me made final.", "2.10.0")
 class BigDecimal(
   val bigDecimal: BigDec,
   val mc: MathContext)
@@ -211,7 +206,7 @@ extends ScalaNumber with ScalaNumericConversions with Serializable {
     catch { case _: ArithmeticException => false }
   }
 
-  protected[math] def isWhole = (this remainder 1) == BigDecimal(0)
+  def isWhole() = (this remainder 1) == BigDecimal(0)
   def underlying = bigDecimal
 
   /** Compares this BigDecimal with the specified BigDecimal for equality.

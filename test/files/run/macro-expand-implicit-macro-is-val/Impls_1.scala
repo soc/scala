@@ -1,9 +1,9 @@
-import scala.reflect.makro.{Context => Ctx}
+import scala.reflect.macros.{Context => Ctx}
 
 object Impls {
   def foo(c: Ctx) = {
-    import c.mirror._
+    import c.universe._
     val body = Literal(Constant(2))
-    Expr[Int](body)
+    c.Expr[Int](body)
   }
 }

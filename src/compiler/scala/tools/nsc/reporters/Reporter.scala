@@ -1,14 +1,12 @@
 /* NSC -- new Scala compiler
- * Copyright 2002-2011 LAMP/EPFL
+ * Copyright 2002-2013 LAMP/EPFL
  * @author Martin Odersky
  */
 
 package scala.tools.nsc
 package reporters
 
-import scala.tools.nsc.util._
-import scala.tools.util.StringOps
-import StringOps._
+import scala.reflect.internal.util._
 
 /**
  * This interface provides methods to issue information, warning and
@@ -21,9 +19,15 @@ abstract class Reporter {
   class Severity(val id: Int) extends severity.Value {
     var count: Int = 0
   }
-  val INFO    = new Severity(0)
-  val WARNING = new Severity(1)
-  val ERROR   = new Severity(2)
+  val INFO    = new Severity(0) {
+    override def toString: String = "INFO"
+  }
+  val WARNING = new Severity(1) {
+    override def toString: String = "WARNING"
+  }
+  val ERROR   = new Severity(2) {
+    override def toString: String = "ERROR"
+  }
 
   /** Whether very long lines can be truncated.  This exists so important
    *  debugging information (like printing the classpath) is not rendered
@@ -78,8 +82,8 @@ abstract class Reporter {
   }
 
   // sbt compat
-  @deprecated("Moved to scala.tools.util.StringOps", "2.10.0")
+  @deprecated("Moved to scala.reflect.internal.util.StringOps", "2.10.0")
   def countElementsAsString(n: Int, elements: String): String = StringOps.countElementsAsString(n, elements)
-  @deprecated("Moved to scala.tools.util.StringOps", "2.10.0")
+  @deprecated("Moved to scala.reflect.internal.util.StringOps", "2.10.0")
   def countAsString(n: Int): String = StringOps.countAsString(n)
 }

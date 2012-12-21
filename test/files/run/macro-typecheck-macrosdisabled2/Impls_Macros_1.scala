@@ -1,11 +1,11 @@
-import scala.reflect.makro.Context
+import scala.reflect.macros.Context
 
 object Macros {
   def impl_with_macros_enabled(c: Context) = {
-    import c.mirror._
+    import c.universe._
 
-    val mr = Select(Select(Select(Ident(newTermName("scala")), newTermName("reflect")), newTermName("package")), newTermName("mirror"))
-    val tree1 = Apply(Select(mr, newTermName("reify")), List(Apply(Select(Ident(newTermName("scala")), newTermName("Array")), List(Literal(Constant(2))))))
+    val ru = Select(Select(Select(Select(Ident(newTermName("scala")), newTermName("reflect")), newTermName("runtime")), newTermName("package")), newTermName("universe"))
+    val tree1 = Apply(Select(ru, newTermName("reify")), List(Apply(Select(Ident(newTermName("scala")), newTermName("Array")), List(Literal(Constant(2))))))
     val ttree1 = c.typeCheck(tree1, withMacrosDisabled = false)
     c.literal(ttree1.toString)
   }
@@ -13,14 +13,15 @@ object Macros {
   def foo_with_macros_enabled = macro impl_with_macros_enabled
 
   def impl_with_macros_disabled(c: Context) = {
-    import c.mirror._
+    import c.universe._
 
-    val mrPkg = staticModule("scala.reflect.package")
-    val mrSym = selectTerm(mrPkg, "mirror")
-    val NullaryMethodType(mrTpe) = mrSym.typeSignature
-    val mr = newFreeTerm("mr", mrTpe, scala.reflect.mirror)
+    val rupkg = c.mirror.staticModule("scala.reflect.runtime.package")
+    val rusym = build.selectTerm(rupkg, "universe")
+    val NullaryMethodType(rutpe) = rusym.typeSignature
+    val ru = build.newFreeTerm("ru", scala.reflect.runtime.universe)
+    build.setTypeSignature(ru, rutpe)
 
-    val tree2 = Apply(Select(Ident(mr), newTermName("reify")), List(Apply(Select(Ident(newTermName("scala")), newTermName("Array")), List(Literal(Constant(2))))))
+    val tree2 = Apply(Select(Ident(ru), newTermName("reify")), List(Apply(Select(Ident(newTermName("scala")), newTermName("Array")), List(Literal(Constant(2))))))
     val ttree2 = c.typeCheck(tree2, withMacrosDisabled = true)
     c.literal(ttree2.toString)
   }

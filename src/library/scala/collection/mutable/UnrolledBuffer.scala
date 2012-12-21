@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2003-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2003-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -8,10 +8,11 @@
 
 package scala.collection.mutable
 
-import collection.AbstractIterator
-import collection.Iterator
-import collection.generic._
-import annotation.tailrec
+import scala.collection.AbstractIterator
+import scala.collection.Iterator
+import scala.collection.generic._
+import scala.annotation.tailrec
+import scala.reflect.ClassTag
 
 /** A buffer that stores elements in an unrolled linked list.
  *
@@ -41,12 +42,12 @@ import annotation.tailrec
  *
  */
 @SerialVersionUID(1L)
-class UnrolledBuffer[T](implicit val tag: ArrayTag[T])
-extends collection.mutable.AbstractBuffer[T]
-   with collection.mutable.Buffer[T]
-   with collection.mutable.BufferLike[T, UnrolledBuffer[T]]
-   with GenericArrayTagTraversableTemplate[T, UnrolledBuffer]
-   with collection.mutable.Builder[T, UnrolledBuffer[T]]
+class UnrolledBuffer[T](implicit val tag: ClassTag[T])
+extends scala.collection.mutable.AbstractBuffer[T]
+   with scala.collection.mutable.Buffer[T]
+   with scala.collection.mutable.BufferLike[T, UnrolledBuffer[T]]
+   with GenericClassTagTraversableTemplate[T, UnrolledBuffer]
+   with scala.collection.mutable.Builder[T, UnrolledBuffer[T]]
    with Serializable
 {
   import UnrolledBuffer.Unrolled
@@ -67,7 +68,7 @@ extends collection.mutable.AbstractBuffer[T]
 
   private[collection] def calcNextLength(sz: Int) = sz
 
-  def arrayTagCompanion = UnrolledBuffer
+  def classTagCompanion = UnrolledBuffer
 
   /** Concatenates the targer unrolled buffer to this unrolled buffer.
    *
@@ -152,7 +153,7 @@ extends collection.mutable.AbstractBuffer[T]
     this
   }
 
-  def insertAll(idx: Int, elems: collection.Traversable[T]) =
+  def insertAll(idx: Int, elems: scala.collection.Traversable[T]) =
     if (idx >= 0 && idx <= sz) {
       headptr.insertAll(idx, elems, this)
       sz += elems.size
@@ -180,16 +181,16 @@ extends collection.mutable.AbstractBuffer[T]
   }
 
   override def clone(): UnrolledBuffer[T] = new UnrolledBuffer[T] ++= this
-  
+
   override def stringPrefix = "UnrolledBuffer"
 }
 
 
-object UnrolledBuffer extends ArrayTagTraversableFactory[UnrolledBuffer] {
+object UnrolledBuffer extends ClassTagTraversableFactory[UnrolledBuffer] {
   /** $genericCanBuildFromInfo */
-  implicit def canBuildFrom[T](implicit t: ArrayTag[T]): CanBuildFrom[Coll, T, UnrolledBuffer[T]] =
+  implicit def canBuildFrom[T](implicit t: ClassTag[T]): CanBuildFrom[Coll, T, UnrolledBuffer[T]] =
     new GenericCanBuildFrom[T]
-  def newBuilder[T](implicit t: ArrayTag[T]): Builder[T, UnrolledBuffer[T]] = new UnrolledBuffer[T]
+  def newBuilder[T](implicit t: ClassTag[T]): Builder[T, UnrolledBuffer[T]] = new UnrolledBuffer[T]
 
   val waterline = 50
   val waterlineDelim = 100
@@ -197,7 +198,7 @@ object UnrolledBuffer extends ArrayTagTraversableFactory[UnrolledBuffer] {
 
   /** Unrolled buffer node.
    */
-  class Unrolled[T: ArrayTag] private[collection] (var size: Int, var array: Array[T], var next: Unrolled[T], val buff: UnrolledBuffer[T] = null) {
+  class Unrolled[T: ClassTag] private[collection] (var size: Int, var array: Array[T], var next: Unrolled[T], val buff: UnrolledBuffer[T] = null) {
     private[collection] def this() = this(0, new Array[T](unrolledlength), null, null)
     private[collection] def this(b: UnrolledBuffer[T]) = this(0, new Array[T](unrolledlength), null, b)
 
@@ -284,7 +285,7 @@ object UnrolledBuffer extends ArrayTagTraversableFactory[UnrolledBuffer] {
       if (next eq null) true else false // checks if last node was thrown out
     } else false
 
-    @tailrec final def insertAll(idx: Int, t: collection.Traversable[T], buffer: UnrolledBuffer[T]): Unit = if (idx < size) {
+    @tailrec final def insertAll(idx: Int, t: scala.collection.Traversable[T], buffer: UnrolledBuffer[T]): Unit = if (idx < size) {
       // divide this node at the appropriate position and insert all into head
       // update new next
       val newnextnode = new Unrolled[T](0, new Array(array.length), null, buff)

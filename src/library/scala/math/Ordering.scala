@@ -1,15 +1,16 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2003-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2003-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
 \*                                                                      */
 
-package scala.math
+package scala
+package math
 
 import java.util.Comparator
-import language.{implicitConversions, higherKinds}
+import scala.language.{implicitConversions, higherKinds}
 
 /** Ordering is a trait whose instances each represent a strategy for sorting
   * instances of a type.
@@ -28,7 +29,7 @@ import language.{implicitConversions, higherKinds}
   * Sorting.quickSort(pairs)(Ordering.by[(String, Int, Int), Int](_._2)
   *
   * // sort by the 3rd element, then 1st
-  * Sorting.quickSort(pairs)(Ordering[(Int, String)].on[(String, Int, Int)]((_._3, _._1))
+  * Sorting.quickSort(pairs)(Ordering[(Int, String)].on(x => (x._3, x._1)))
   * }}}
   *
   * An Ordering[T] is implemented by specifying compare(a:T, b:T), which
@@ -165,7 +166,7 @@ object Ordering extends LowPriorityOrderingImplicits {
     /** Not in the standard scope due to the potential for divergence:
       * For instance `implicitly[Ordering[Any]]` diverges in its presence.
       */
-    implicit def seqDerivedOrdering[CC[X] <: collection.Seq[X], T](implicit ord: Ordering[T]): Ordering[CC[T]] =
+    implicit def seqDerivedOrdering[CC[X] <: scala.collection.Seq[X], T](implicit ord: Ordering[T]): Ordering[CC[T]] =
       new Ordering[CC[T]] {
         def compare(x: CC[T], y: CC[T]): Int = {
           val xe = x.iterator

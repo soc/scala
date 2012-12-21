@@ -1,5 +1,5 @@
 /* NSC -- new scala compiler
- * Copyright 2005-2011 LAMP/EPFL
+ * Copyright 2005-2013 LAMP/EPFL
  * @author Iulian Dragos
  */
 
@@ -17,7 +17,7 @@ import Flags.SYNTHETIC
 abstract class TailCalls extends Transform {
   import global._                     // the global environment
   import definitions._                // standard classes and methods
-  import typer.{ typed, typedPos }    // methods to type trees
+  import typer.typedPos               // methods to type trees
 
   val phaseName: String = "tailcalls"
 
@@ -36,7 +36,7 @@ abstract class TailCalls extends Transform {
     }
   }
 
-  import gen.hasSynthCaseSymbol
+  import treeInfo.hasSynthCaseSymbol
 
   /**
    * A Tail Call Transformer
@@ -82,7 +82,7 @@ abstract class TailCalls extends Transform {
    *   that label.
    * </p>
    * <p>
-   *   Assumes: <code>Uncurry</code> has been run already, and no multiple
+   *   Assumes: `Uncurry` has been run already, and no multiple
    *            parameter lists exit.
    * </p>
    */
@@ -90,7 +90,7 @@ abstract class TailCalls extends Transform {
     private val defaultReason = "it contains a recursive call not in tail position"
 
     /** Has the label been accessed? Then its symbol is in this set. */
-    private val accessed = new collection.mutable.HashSet[Symbol]()
+    private val accessed = new scala.collection.mutable.HashSet[Symbol]()
     // `accessed` was stored as boolean in the current context -- this is no longer tenable
     // with jumps to labels in tailpositions now considered in tailposition,
     // a downstream context may access the label, and the upstream one will be none the wiser
@@ -147,10 +147,9 @@ abstract class TailCalls extends Transform {
       }
 
       def enclosingType    = method.enclClass.typeOfThis
-      def methodTypeParams = method.tpe.typeParams
       def isEligible       = method.isEffectivelyFinal
       // @tailrec annotation indicates mandatory transformation
-      def isMandatory      = method.hasAnnotation(TailrecClass) && !forMSIL
+      def isMandatory      = method.hasAnnotation(TailrecClass)
       def isTransformed    = isEligible && accessed(label)
       def tailrecFailure() = unit.error(failPos, "could not optimize @tailrec annotated " + method + ": " + failReason)
 
@@ -208,7 +207,7 @@ abstract class TailCalls extends Transform {
           debuglog("Cannot rewrite recursive call at: " + fun.pos + " because: " + reason)
 
           ctx.failReason = reason
-          treeCopy.Apply(tree, target, transformArgs)
+          treeCopy.Apply(tree, noTailTransform(target), transformArgs)
         }
         /** Position of failure is that of the tree being considered.
          */
@@ -220,7 +219,7 @@ abstract class TailCalls extends Transform {
           debuglog("Rewriting tail recursive call:  " + fun.pos.lineContent.trim)
 
           accessed += ctx.label
-          typedPos(fun.pos)(Apply(Ident(ctx.label), recv :: transformArgs))
+          typedPos(fun.pos)(Apply(Ident(ctx.label), noTailTransform(recv) :: transformArgs))
         }
 
         if (!ctx.isEligible)            fail("it is neither private nor final so can be overridden")
@@ -230,7 +229,6 @@ abstract class TailCalls extends Transform {
         }
         else if (!matchesTypeArgs)      failHere("it is called recursively with different type arguments")
         else if (receiver == EmptyTree) rewriteTailCall(This(currentClass))
-        else if (forMSIL)               fail("it cannot be optimized on MSIL")
         else if (!receiverIsSame)       failHere("it changes type of 'this' on a polymorphic recursive call")
         else                            rewriteTailCall(receiver)
       }
@@ -327,8 +325,16 @@ abstract class TailCalls extends Transform {
             transformTrees(cases).asInstanceOf[List[CaseDef]]
           )
 
+        case Try(block, catches, finalizer @ EmptyTree) =>
+          // SI-1672 Catches are in tail position when there is no finalizer
+          treeCopy.Try(tree,
+            noTailTransform(block),
+            transformTrees(catches).asInstanceOf[List[CaseDef]],
+            EmptyTree
+          )
+
         case Try(block, catches, finalizer) =>
-           // no calls inside a try are in tail position, but keep recursing for nested functions
+           // no calls inside a try are in tail position if there is a finalizer, but keep recursing for nested functions
           treeCopy.Try(tree,
             noTailTransform(block),
             noTailTransforms(catches).asInstanceOf[List[CaseDef]],
@@ -361,7 +367,9 @@ abstract class TailCalls extends Transform {
 
         case Alternative(_) | Star(_) | Bind(_, _) =>
           sys.error("We should've never gotten inside a pattern")
-        case EmptyTree | Super(_, _) | This(_) | Select(_, _) | Ident(_) | Literal(_) | Function(_, _) | TypeTree() =>
+        case Select(qual, name) =>
+          treeCopy.Select(tree, noTailTransform(qual), name)
+        case EmptyTree | Super(_, _) | This(_) | Ident(_) | Literal(_) | Function(_, _) | TypeTree() =>
           tree
         case _ =>
           super.transform(tree)
@@ -373,7 +381,7 @@ abstract class TailCalls extends Transform {
   // the labels all look like: matchEnd(x) {x}
   // then, in a forward jump `matchEnd(expr)`, `expr` is considered in tail position (and the matchEnd jump is replaced by the jump generated by expr)
   class TailPosLabelsTraverser extends Traverser {
-    val tailLabels = new collection.mutable.ListBuffer[Symbol]()
+    val tailLabels = new scala.collection.mutable.HashSet[Symbol]()
 
     private var maybeTail: Boolean = true // since we start in the rhs of a DefDef
 
@@ -388,8 +396,17 @@ abstract class TailCalls extends Transform {
     def traverseTreesNoTail(trees: List[Tree]) = trees foreach traverseNoTail
 
     override def traverse(tree: Tree) = tree match {
-      case LabelDef(_, List(arg), body@Ident(_)) if arg.symbol == body.symbol => // we're looking for label(x){x} in tail position, since that means `a` is in tail position in a call `label(a)`
+      // we're looking for label(x){x} in tail position, since that means `a` is in tail position in a call `label(a)`
+      case LabelDef(_, List(arg), body@Ident(_)) if arg.symbol == body.symbol =>
         if (maybeTail) tailLabels += tree.symbol
+
+      // jumps to matchEnd are transparent; need this case for nested matches
+      // (and the translated match case below does things in reverse for this case's sake)
+      case Apply(fun, arg :: Nil) if hasSynthCaseSymbol(fun) && tailLabels(fun.symbol) =>
+        traverse(arg)
+
+      case Apply(fun, args) if (fun.symbol == Boolean_or || fun.symbol == Boolean_and) =>
+        traverseTrees(args)
 
       // a translated casedef
       case LabelDef(_, _, body) if hasSynthCaseSymbol(tree) =>
@@ -400,9 +417,9 @@ abstract class TailCalls extends Transform {
         // the assumption is once we encounter a case, the remainder of the block will consist of cases
         // the prologue may be empty, usually it is the valdef that stores the scrut
         val (prologue, cases) = stats span (s => !s.isInstanceOf[LabelDef])
-        traverseTreesNoTail(prologue) // selector (may be absent)
-        traverseTrees(cases)
         traverse(expr)
+        traverseTrees(cases.reverse)  // reverse so that we enter the matchEnd LabelDef before we see jumps to it
+        traverseTreesNoTail(prologue) // selector (may be absent)
 
       case CaseDef(pat, guard, body) =>
         traverse(body)
@@ -426,7 +443,7 @@ abstract class TailCalls extends Transform {
         traverseTreesNoTail(catches)
         traverseNoTail(finalizer)
 
-      case EmptyTree | Super(_, _) | This(_) | Select(_, _) | Ident(_) | Literal(_) | Function(_, _) | TypeTree() =>
+      case Apply(_, _) | EmptyTree | Super(_, _) | This(_) | Select(_, _) | Ident(_) | Literal(_) | Function(_, _) | TypeTree() =>
       case _ => super.traverse(tree)
     }
   }

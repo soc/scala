@@ -1,2 +1,6 @@
+class A
 Test.A
-true
+Object {
+  def <init>(): Test.A
+  def foo: Nothing
+}

@@ -1,12 +1,11 @@
 /* NSC -- new Scala compiler
- * Copyright 2005-2011 LAMP/EPFL
+ * Copyright 2005-2013 LAMP/EPFL
  * @author  Martin Odersky
  */
 
 package scala.tools.nsc
 package symtab
 
-import scala.tools.nsc.util.BatchSourceFile
 import scala.tools.nsc.io.AbstractFile
 
 /** A subclass of SymbolLoaders that implements browsing behavior.
@@ -28,7 +27,7 @@ abstract class BrowsingLoaders extends SymbolLoaders {
   override protected def enterIfNew(owner: Symbol, member: Symbol, completer: SymbolLoader): Symbol = {
     completer.sourcefile match {
       case Some(src) =>
-        (if (member.isModule) member.moduleClass else member).sourceFile = src
+        (if (member.isModule) member.moduleClass else member).associatedFile = src
       case _ =>
     }
     val decls = owner.info.decls
@@ -69,10 +68,18 @@ abstract class BrowsingLoaders extends SymbolLoaders {
         case _ =>
           throw new MalformedInput(pkg.pos.point, "illegal tree node in package prefix: "+pkg)
       }
+
+      private def inPackagePrefix(pkg: Tree)(op: => Unit): Unit = {
+        val oldPrefix = packagePrefix
+        addPackagePrefix(pkg)
+        op
+        packagePrefix = oldPrefix
+      }
+
       override def traverse(tree: Tree): Unit = tree match {
         case PackageDef(pkg, body) =>
-          addPackagePrefix(pkg)
-          body foreach traverse
+          inPackagePrefix(pkg) { body foreach traverse }
+
         case ClassDef(_, name, _, _) =>
           if (packagePrefix == root.fullName) {
             enterClass(root, name.toString, new SourcefileLoader(src))
@@ -105,7 +112,7 @@ abstract class BrowsingLoaders extends SymbolLoaders {
    */
   override def enterToplevelsFromSource(root: Symbol, name: String, src: AbstractFile) {
     try {
-      if (root.isEffectiveRoot) // RootClass or EmptyPackageClass
+      if (root.isEffectiveRoot || !src.name.endsWith(".scala")) // RootClass or EmptyPackageClass
         super.enterToplevelsFromSource(root, name, src)
       else
         browseTopLevel(root, src)

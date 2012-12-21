@@ -1,15 +1,17 @@
 /* NSC -- new Scala compiler
- * Copyright 2005-2011 LAMP/EPFL
+ * Copyright 2005-2013 LAMP/EPFL
  * @author  Martin Odersky
  */
 package scala.tools.nsc
 package ast.parser
 
-import scala.tools.nsc.util._
+import scala.tools.nsc.util.CharArrayReader
+import scala.reflect.internal.util._
 import scala.reflect.internal.Chars._
 import Tokens._
 import scala.annotation.switch
-import scala.collection.mutable.{ ListBuffer, ArrayBuffer }
+import scala.collection.{ mutable, immutable }
+import mutable.{ ListBuffer, ArrayBuffer }
 import scala.xml.Utility.{ isNameStart }
 
 /** See Parsers.scala / ParsersCommon for some explanation of ScannersCommon.
@@ -25,7 +27,6 @@ trait ScannersCommon {
 
   trait ScannerCommon extends CommonTokenData {
     // things to fill in, in addition to buf, decodeUni which come from CharArrayReader
-    def warning(off: Int, msg: String): Unit
     def error  (off: Int, msg: String): Unit
     def incompleteInputError(off: Int, msg: String): Unit
     def deprecationWarning(off: Int, msg: String): Unit
@@ -48,9 +49,6 @@ trait Scanners extends ScannersCommon {
 
   /** Offset into source character array */
   type Offset = Int
-
-  /** An undefined offset */
-  val NoOffset: Offset = -1
 
   trait TokenData extends CommonTokenData {
 
@@ -87,8 +85,6 @@ trait Scanners extends ScannersCommon {
 
     def isAtEnd = charOffset >= buf.length
 
-    def flush = { charOffset = offset; nextChar(); this }
-
     def resume(lastCode: Int) = {
       token = lastCode
       if (next.token != EMPTY && !reporter.hasErrors)
@@ -96,10 +92,6 @@ trait Scanners extends ScannersCommon {
 
       nextToken()
     }
-
-    /** the last error offset
-     */
-    var errOffset: Offset = NoOffset
 
     /** A character buffer for literals
      */
@@ -181,13 +173,13 @@ trait Scanners extends ScannersCommon {
 
     /** Are we directly in a string interpolation expression?
      */
-    @inline private def inStringInterpolation =
+    private def inStringInterpolation =
       sepRegions.nonEmpty && sepRegions.head == STRINGLIT
 
     /** Are we directly in a multiline string interpolation expression?
-     *  @pre: inStringInterpolation
+     *  @pre inStringInterpolation
      */
-    @inline private def inMultiLineInterpolation =
+    private def inMultiLineInterpolation =
       inStringInterpolation && sepRegions.tail.nonEmpty && sepRegions.tail.head == STRINGPART
 
     /** read next token and return last offset
@@ -282,10 +274,16 @@ trait Scanners extends ScannersCommon {
         prev copyFrom this
         val nextLastOffset = charOffset - 1
         fetchToken()
+        def resetOffset() {
+          offset = prev.offset
+          lastOffset = prev.lastOffset
+        }
         if (token == CLASS) {
           token = CASECLASS
+          resetOffset()
         } else if (token == OBJECT) {
           token = CASEOBJECT
+          resetOffset()
         } else {
           lastOffset = nextLastOffset
           next copyFrom this
@@ -359,16 +357,19 @@ trait Scanners extends ScannersCommon {
           if (ch == '"' && token == IDENTIFIER)
             token = INTERPOLATIONID
         case '<' => // is XMLSTART?
-          val last = if (charOffset >= 2) buf(charOffset - 2) else ' '
-          nextChar()
-          last match {
-            case ' '|'\t'|'\n'|'{'|'('|'>' if isNameStart(ch) || ch == '!' || ch == '?' =>
-              token = XMLSTART
-            case _ =>
-              // Console.println("found '<', but last is '"+in.last+"'"); // DEBUG
-              putChar('<')
-              getOperatorRest()
+          def fetchLT() = {
+            val last = if (charOffset >= 2) buf(charOffset - 2) else ' '
+            nextChar()
+            last match {
+              case ' ' | '\t' | '\n' | '{' | '(' | '>' if isNameStart(ch) || ch == '!' || ch == '?' =>
+                token = XMLSTART
+              case _ =>
+                // Console.println("found '<', but last is '"+in.last+"'"); // DEBUG
+                putChar('<')
+                getOperatorRest()
+            }
           }
+          fetchLT
         case '~' | '!' | '@' | '#' | '%' |
              '^' | '*' | '+' | '-' | /*'<' | */
              '>' | '?' | ':' | '=' | '&' |
@@ -385,78 +386,87 @@ trait Scanners extends ScannersCommon {
             getOperatorRest()
           }
         case '0' =>
-          putChar(ch)
-          nextChar()
-          if (ch == 'x' || ch == 'X') {
+          def fetchZero() = {
+            putChar(ch)
             nextChar()
-            base = 16
-          }
-          else {
-            /** What should leading 0 be in the future? It is potentially dangerous
-             *  to let it be base-10 because of history.  Should it be an error? Is
-             *  there a realistic situation where one would need it?
-             */
-            if (isDigit(ch)) {
-              if (opt.future) syntaxError("Non-zero numbers may not have a leading zero.")
-              else deprecationWarning("Treating numbers with a leading zero as octal is deprecated.")
+            if (ch == 'x' || ch == 'X') {
+              nextChar()
+              base = 16
+            } else {
+              /**
+               * What should leading 0 be in the future? It is potentially dangerous
+               *  to let it be base-10 because of history.  Should it be an error? Is
+               *  there a realistic situation where one would need it?
+               */
+              if (isDigit(ch)) {
+                if (settings.future.value) syntaxError("Non-zero numbers may not have a leading zero.")
+                else deprecationWarning("Treating numbers with a leading zero as octal is deprecated.")
+              }
+              base = 8
             }
-            base = 8
+            getNumber()
           }
-          getNumber()
+          fetchZero
         case '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' =>
           base = 10
           getNumber()
         case '`' =>
           getBackquotedIdent()
         case '\"' =>
-          if (token == INTERPOLATIONID) {
-            nextRawChar()
-            if (ch == '\"') {
+          def fetchDoubleQuote() = {
+            if (token == INTERPOLATIONID) {
               nextRawChar()
               if (ch == '\"') {
                 nextRawChar()
-                getStringPart(multiLine = true)
-                sepRegions = STRINGPART :: sepRegions // indicate string part
-                sepRegions = STRINGLIT :: sepRegions // once more to indicate multi line string part
+                if (ch == '\"') {
+                  nextRawChar()
+                  getStringPart(multiLine = true)
+                  sepRegions = STRINGPART :: sepRegions // indicate string part
+                  sepRegions = STRINGLIT :: sepRegions // once more to indicate multi line string part
+                } else {
+                  token = STRINGLIT
+                  strVal = ""
+                }
               } else {
-                token = STRINGLIT
-                strVal = ""
+                getStringPart(multiLine = false)
+                sepRegions = STRINGLIT :: sepRegions // indicate single line string part
               }
             } else {
-              getStringPart(multiLine = false)
-              sepRegions = STRINGLIT :: sepRegions // indicate single line string part
-            }
-          } else {
-            nextChar()
-            if (ch == '\"') {
               nextChar()
               if (ch == '\"') {
-                nextRawChar()
-                getRawStringLit()
+                nextChar()
+                if (ch == '\"') {
+                  nextRawChar()
+                  getRawStringLit()
+                } else {
+                  token = STRINGLIT
+                  strVal = ""
+                }
               } else {
-                token = STRINGLIT
-                strVal = ""
+                getStringLit()
               }
-            } else {
-              getStringLit()
             }
           }
+          fetchDoubleQuote
         case '\'' =>
-          nextChar()
-          if (isIdentifierStart(ch))
-            charLitOr(getIdentRest)
-          else if (isOperatorPart(ch) && (ch != '\\'))
-            charLitOr(getOperatorRest)
-          else {
-            getLitChar()
-            if (ch == '\'') {
-              nextChar()
-              token = CHARLIT
-              setStrVal()
-            } else {
-              syntaxError("unclosed character literal")
+          def fetchSingleQuote() = {
+            nextChar()
+            if (isIdentifierStart(ch))
+              charLitOr(getIdentRest)
+            else if (isOperatorPart(ch) && (ch != '\\'))
+              charLitOr(getOperatorRest)
+            else {
+              getLitChar()
+              if (ch == '\'') {
+                nextChar()
+                token = CHARLIT
+                setStrVal()
+              } else {
+                syntaxError("unclosed character literal")
+              }
             }
           }
+          fetchSingleQuote
         case '.' =>
           nextChar()
           if ('0' <= ch && ch <= '9') {
@@ -487,22 +497,25 @@ trait Scanners extends ScannersCommon {
             nextChar()
           }
         case _ =>
-          if (ch == '\u21D2') {
-            nextChar(); token = ARROW
-          } else if (ch == '\u2190') {
-            nextChar(); token = LARROW
-          } else if (Character.isUnicodeIdentifierStart(ch)) {
-            putChar(ch)
-            nextChar()
-            getIdentRest()
-          } else if (isSpecial(ch)) {
-            putChar(ch)
-            nextChar()
-            getOperatorRest()
-          } else {
-            syntaxError("illegal character '" + ("" + '\\' + 'u' + "%04x".format(ch: Int)) + "'")
-            nextChar()
+          def fetchOther() = {
+            if (ch == '\u21D2') {
+              nextChar(); token = ARROW
+            } else if (ch == '\u2190') {
+              nextChar(); token = LARROW
+            } else if (Character.isUnicodeIdentifierStart(ch)) {
+              putChar(ch)
+              nextChar()
+              getIdentRest()
+            } else if (isSpecial(ch)) {
+              putChar(ch)
+              nextChar()
+              getOperatorRest()
+            } else {
+              syntaxError("illegal character '" + ("" + '\\' + 'u' + "%04x".format(ch: Int)) + "'")
+              nextChar()
+            }
           }
+          fetchOther
       }
     }
 
@@ -591,7 +604,10 @@ trait Scanners extends ScannersCommon {
       if (ch == '`') {
         nextChar()
         finishNamed(BACKQUOTED_IDENT)
-        if (name.length == 0) syntaxError("empty quoted identifier")
+        if (name.length == 0)
+          syntaxError("empty quoted identifier")
+        else if (name == nme.WILDCARD)
+          syntaxError("wildcard invalid as backquoted identifier")
       }
       else syntaxError("unclosed quoted identifier")
     }
@@ -728,14 +744,22 @@ trait Scanners extends ScannersCommon {
           next.token = IDENTIFIER
           next.name = newTermName(cbuf.toString)
           cbuf.clear()
+          val idx = next.name.start - kwOffset
+          if (idx >= 0 && idx < kwArray.length) {
+            next.token = kwArray(idx)
+          }
         } else {
-          syntaxError("invalid string interpolation")
+          syntaxError("invalid string interpolation: `$$', `$'ident or `$'BlockExpr expected")
         }
       } else {
         val isUnclosedLiteral = !isUnicodeEscape && (ch == SU || (!multiLine && (ch == CR || ch == LF)))
         if (isUnclosedLiteral) {
-          syntaxError(if (!multiLine) "unclosed string literal" else "unclosed multi-line string literal")
-        } else {
+          if (multiLine)
+            incompleteInputError("unclosed multi-line string literal")
+          else
+            syntaxError("unclosed string literal")
+        }
+        else {
           putChar(ch)
           nextRawChar()
           getStringPart(multiLine)
@@ -974,9 +998,9 @@ trait Scanners extends ScannersCommon {
         val c = lookahead.getc()
 
         /** As of scala 2.11, it isn't a number unless c here is a digit, so
-         *  opt.future excludes the rest of the logic.
+         *  settings.future.value excludes the rest of the logic.
          */
-        if (opt.future && !isDigit(c))
+        if (settings.future.value && !isDigit(c))
           return setStrVal()
 
         val isDefinitelyNumber = (c: @switch) match {
@@ -1030,7 +1054,6 @@ trait Scanners extends ScannersCommon {
     def syntaxError(off: Offset, msg: String) {
       error(off, msg)
       token = ERROR
-      errOffset = off
     }
 
     /** generate an error at the current token offset
@@ -1043,7 +1066,6 @@ trait Scanners extends ScannersCommon {
     def incompleteInputError(msg: String) {
       incompleteInputError(offset, msg)
       token = EOF
-      errOffset = offset
     }
 
     override def toString() = token match {
@@ -1208,7 +1230,6 @@ trait Scanners extends ScannersCommon {
     override val decodeUni: Boolean = !settings.nouescape.value
 
     // suppress warnings, throw exception on errors
-    def warning(off: Offset, msg: String): Unit = ()
     def deprecationWarning(off: Offset, msg: String): Unit = ()
     def error  (off: Offset, msg: String): Unit = throw new MalformedInput(off, msg)
     def incompleteInputError(off: Offset, msg: String): Unit = throw new MalformedInput(off, msg)
@@ -1219,7 +1240,6 @@ trait Scanners extends ScannersCommon {
   class UnitScanner(unit: CompilationUnit, patches: List[BracePatch]) extends SourceFileScanner(unit.source) {
     def this(unit: CompilationUnit) = this(unit, List())
 
-    override def warning(off: Offset, msg: String)              = unit.warning(unit.position(off), msg)
     override def deprecationWarning(off: Offset, msg: String)   = unit.deprecationWarning(unit.position(off), msg)
     override def error  (off: Offset, msg: String)              = unit.error(unit.position(off), msg)
     override def incompleteInputError(off: Offset, msg: String) = unit.incompleteInputError(unit.position(off), msg)
@@ -1278,7 +1298,7 @@ trait Scanners extends ScannersCommon {
   }
 
   class ParensAnalyzer(unit: CompilationUnit, patches: List[BracePatch]) extends UnitScanner(unit, patches) {
-    var balance = collection.mutable.Map(RPAREN -> 0, RBRACKET -> 0, RBRACE -> 0)
+    val balance = mutable.Map(RPAREN -> 0, RBRACKET -> 0, RBRACE -> 0)
 
     init()
 
@@ -1293,7 +1313,7 @@ trait Scanners extends ScannersCommon {
       var lineCount = 1
       var lastOffset = 0
       var indent = 0
-      val oldBalance = collection.mutable.Map[Int, Int]()
+      val oldBalance = scala.collection.mutable.Map[Int, Int]()
       def markBalance() = for ((k, v) <- balance) oldBalance(k) = v
       markBalance()
 
@@ -1400,18 +1420,6 @@ trait Scanners extends ScannersCommon {
                         else bp :: insertPatch(bps, patch)
     }
 
-    def leftColumn(offset: Int) =
-      if (offset == -1) -1 else column(lineStart(line(offset)))
-
-    def rightColumn(offset: Int, default: Int) =
-      if (offset == -1) -1
-      else {
-        val rlin = line(offset)
-        if (lineStart(rlin) == offset) column(offset)
-        else if (rlin + 1 < lineStart.length) column(lineStart(rlin + 1))
-        else default
-      }
-
     def insertRBrace(): List[BracePatch] = {
       def insert(bps: List[BracePair]): List[BracePatch] = bps match {
         case List() => patches
@@ -1452,17 +1460,6 @@ trait Scanners extends ScannersCommon {
       }
       delete(bracePairs)
     }
-
-    def imbalanceMeasure: Int = {
-      def measureList(bps: List[BracePair]): Int =
-        (bps map measure).sum
-      def measure(bp: BracePair): Int =
-        (if (bp.lindent != bp.rindent) 1 else 0) + measureList(bp.nested)
-      measureList(bracePairs)
-    }
-
-    def improves(patches1: List[BracePatch]): Boolean =
-      imbalanceMeasure > new ParensAnalyzer(unit, patches1).imbalanceMeasure
 
     override def error(offset: Int, msg: String) {}
   }

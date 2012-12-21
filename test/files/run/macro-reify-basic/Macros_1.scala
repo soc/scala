@@ -1,11 +1,11 @@
-import scala.reflect.makro.{Context => Ctx}
+import scala.reflect.macros.{Context => Ctx}
 
 object Macros {
   def foo(s: String) = macro Impls.foo
 
   object Impls {
-    def foo(c: Ctx)(s: c.Expr[String]) = c.reify {
-      println("hello " + s.eval)
+    def foo(c: Ctx)(s: c.Expr[String]) = c.universe.reify {
+      println("hello " + s.splice)
     }
   }
 }

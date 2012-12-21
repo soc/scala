@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2003-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2003-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -11,7 +11,7 @@ package scala.sys
 import scala.collection.{ mutable, Iterator }
 import scala.collection.JavaConverters._
 import java.security.AccessControlException
-import language.implicitConversions
+import scala.language.implicitConversions
 
 
 /** A bidirectional map wrapping the java System properties.
@@ -64,7 +64,6 @@ object SystemProperties {
     propertyHelp(p.key) = helpText
     p
   }
-  private def str(key: String, helpText: String) = addHelp(Prop[String](key), helpText)
   private def bool(key: String, helpText: String): BooleanProp = addHelp[BooleanProp](
     if (key startsWith "java.") BooleanProp.valueIsTrue(key) else BooleanProp.keyExists(key),
     helpText

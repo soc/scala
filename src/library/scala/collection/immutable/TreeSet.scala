@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2003-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2003-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -96,7 +96,7 @@ class TreeSet[A] private (tree: RB.Tree[A, Unit])(implicit val ordering: Orderin
   override def takeWhile(p: A => Boolean) = take(countWhile(p))
   override def span(p: A => Boolean) = splitAt(countWhile(p))
 
-  @deprecated("use `ordering.lt` instead", "2.10")
+  @deprecated("use `ordering.lt` instead", "2.10.0")
   def isSmaller(x: A, y: A) = compare(x,y) < 0
 
   def this()(implicit ordering: Ordering[A]) = this(null)(ordering)
@@ -112,7 +112,7 @@ class TreeSet[A] private (tree: RB.Tree[A, Unit])(implicit val ordering: Orderin
    *  @param elem    a new element to add.
    *  @return        a new $coll containing `elem` and all the elements of this $coll.
    */
-  def + (elem: A): TreeSet[A] = newSet(RB.update(tree, elem, ()))
+  def + (elem: A): TreeSet[A] = newSet(RB.update(tree, elem, (), false))
 
   /** A new `TreeSet` with the entry added is returned,
    *  assuming that elem is <em>not</em> in the TreeSet.
@@ -122,7 +122,7 @@ class TreeSet[A] private (tree: RB.Tree[A, Unit])(implicit val ordering: Orderin
    */
   def insert(elem: A): TreeSet[A] = {
     assert(!RB.contains(tree, elem))
-    newSet(RB.update(tree, elem, ()))
+    newSet(RB.update(tree, elem, (), false))
   }
 
   /** Creates a new `TreeSet` with the entry removed.

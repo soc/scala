@@ -1,12 +1,12 @@
-import scala.reflect.makro.{Context => Ctx}
+import scala.reflect.macros.{Context => Ctx}
 
 object Impls {
   def toOptionOfInt(c: Ctx) = {
     import c.{prefix => prefix}
-    import c.mirror._
+    import c.universe._
     val printPrefix = Apply(Select(Ident(definitions.PredefModule), newTermName("println")), List(Literal(Constant("prefix = " + prefix))))
-    val body = Block(printPrefix, Apply(Ident(definitions.SomeModule), List(Select(Select(prefix.tree, newTermName("x")), newTermName("toInt")))))
-    Expr[Option[Int]](body)
+    val body = Block(List(printPrefix), Apply(Ident(definitions.SomeModule), List(Select(Select(prefix.tree, newTermName("x")), newTermName("toInt")))))
+    c.Expr[Option[Int]](body)
   }
 }
 

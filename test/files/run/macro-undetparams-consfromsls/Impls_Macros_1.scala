@@ -1,13 +1,14 @@
-import scala.reflect.makro.Context
+import scala.reflect.runtime.universe._
+import scala.reflect.macros.Context
 
 object Macros {
-  def cons_impl[A: c.TypeTag](c: Context)(x: c.Expr[A], xs: c.Expr[List[A]]): c.Expr[List[A]] = c.reify {
-    println("A = " + c.literal(implicitly[c.TypeTag[A]].toString).eval)
-    x.eval :: xs.eval
+  def cons_impl[A: c.WeakTypeTag](c: Context)(x: c.Expr[A], xs: c.Expr[List[A]]): c.Expr[List[A]] = c.universe.reify {
+    println("A = " + c.literal(implicitly[c.WeakTypeTag[A]].toString).splice)
+    x.splice :: xs.splice
   }
 
-  def nil_impl[B: c.TypeTag](c: Context): c.Expr[List[B]] = c.reify {
-    println("B = " + c.literal(implicitly[c.TypeTag[B]].toString).eval)
+  def nil_impl[B: c.WeakTypeTag](c: Context): c.Expr[List[B]] = c.universe.reify {
+    println("B = " + c.literal(implicitly[c.WeakTypeTag[B]].toString).splice)
     Nil
   }
 

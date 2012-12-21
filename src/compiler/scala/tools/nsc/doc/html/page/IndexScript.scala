@@ -1,5 +1,5 @@
 /* NSC -- new Scala compiler
- * Copyright 2007-2011 LAMP/EPFL
+ * Copyright 2007-2013 LAMP/EPFL
  * @author  David Bernard, Manohar Jonnalagedda
  */
 
@@ -8,21 +8,14 @@ package scala.tools.nsc.doc.html.page
 import scala.tools.nsc.doc
 import scala.tools.nsc.doc.model.{Package, DocTemplateEntity}
 import scala.tools.nsc.doc.html.{Page, HtmlFactory}
-import java.nio.channels.Channels
 import scala.util.parsing.json.{JSONObject, JSONArray}
 
 class IndexScript(universe: doc.Universe, index: doc.Index) extends Page {
   def path = List("index.js")
 
   override def writeFor(site: HtmlFactory) {
-    val stream = createFileOutputStream(site)
-    val writer = Channels.newWriter(stream.getChannel, site.encoding)
-    try {
-      writer.write("Index.PACKAGES = " + packages.toString() + ";")
-    }
-    finally {
-      writer.close
-      stream.close
+    writeFile(site) {
+      _.write("Index.PACKAGES = " + packages.toString() + ";")
     }
   }
 
@@ -33,7 +26,7 @@ class IndexScript(universe: doc.Universe, index: doc.Index) extends Page {
 
         val ary = merged.keys.toList.sortBy(_.toLowerCase).map(key => {
           val pairs = merged(key).map(
-            t => docEntityKindToString(t) -> relativeLinkTo(t)
+            t => kindToString(t) -> relativeLinkTo(t)
           ) :+ ("name" -> key)
 
           JSONObject(scala.collection.immutable.Map(pairs : _*))
@@ -68,7 +61,9 @@ class IndexScript(universe: doc.Universe, index: doc.Index) extends Page {
 
   def allPackagesWithTemplates = {
     Map(allPackages.map((key) => {
-      key -> key.templates.filter(t => !t.isPackage && !isExcluded(t))
+      key -> key.templates.collect {
+        case t: DocTemplateEntity if !t.isPackage && !universe.settings.hardcoded.isExcluded(t.qualifiedName) => t
+      }
     }) : _*)
   }
 }

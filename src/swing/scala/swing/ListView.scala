@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2007-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2007-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -216,7 +216,7 @@ class ListView[A] extends Component {
     def adjusting = peer.getSelectionModel.getValueIsAdjusting
   }
 
-  def renderer: ListView.Renderer[A] = ListView.Renderer.wrap(peer.getCellRenderer)
+  def renderer: ListView.Renderer[A] = ListView.Renderer.wrap[A](peer.getCellRenderer)
   def renderer_=(r: ListView.Renderer[A]) { peer.setCellRenderer(r.peer) }
 
   def fixedCellWidth = peer.getFixedCellWidth

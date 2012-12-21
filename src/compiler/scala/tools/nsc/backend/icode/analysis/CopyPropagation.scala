@@ -1,5 +1,5 @@
 /* NSC -- new Scala compiler
- * Copyright 2005-2011 LAMP/EPFL
+ * Copyright 2005-2013 LAMP/EPFL
  * @author  Martin Odersky
  */
 
@@ -26,12 +26,8 @@ abstract class CopyPropagation {
   case object This extends Location
 
   /** Values that can be on the stack. */
-  abstract class Value {
-    def isRecord = false
-  }
-  case class Record(cls: Symbol, bindings: mutable.Map[Symbol, Value]) extends Value {
-    override def isRecord = true
-  }
+  abstract class Value { }
+  case class Record(cls: Symbol, bindings: mutable.Map[Symbol, Value]) extends Value { }
   /** The value of some location in memory. */
   case class Deref(l: Location) extends Value
 
@@ -89,16 +85,6 @@ abstract class CopyPropagation {
           case x                        => x
         }
         loop(l) getOrElse Deref(LocalVar(l))
-      }
-
-      /* Return the binding for the given field of the given record */
-      def getBinding(r: Record, f: Symbol): Value = {
-        assert(r.bindings contains f, "Record " + r + " does not contain a field " + f)
-
-        r.bindings(f) match {
-          case Deref(LocalVar(l)) => getBinding(l)
-          case target             => target
-        }
       }
 
       /** Return a local which contains the same value as this field, if any.
@@ -200,7 +186,7 @@ abstract class CopyPropagation {
           in(b)  = lattice.bottom
           out(b) = lattice.bottom
           assert(out.contains(b), out)
-          log("Added point: " + b)
+          debuglog("CopyAnalysis added point: " + b)
         }
         m.exh foreach { e =>
           in(e.startBlock) = new copyLattice.State(copyLattice.emptyBinding, copyLattice.exceptionHandlerStack);
@@ -463,14 +449,9 @@ abstract class CopyPropagation {
       }
     }
 
-    /** Update the state <code>s</code> after the call to <code>method</code>.
+    /** Update the state `s` after the call to `method`.
      *  The stack elements are dropped and replaced by the result of the call.
      *  If the method is impure, all bindings to record fields are cleared.
-     *
-     *  @param state  ...
-     *  @param method ...
-     *  @param static ...
-     *  @return       ...
      */
     final def simulateCall(state: copyLattice.State, method: Symbol, static: Boolean): copyLattice.State = {
       val out = new copyLattice.State(state.bindings, state.stack);
@@ -531,11 +512,11 @@ abstract class CopyPropagation {
         case 0 => ()
         case 1 if ctor.tpe.paramTypes.head == ctor.owner.rawowner.tpe =>
           // it's an unused outer
-          log("considering unused outer at position 0 in " + ctor.tpe.paramTypes)
+          debuglog("considering unused outer at position 0 in " + ctor.tpe.paramTypes)
           paramTypes = paramTypes.tail
           values = values.tail
         case _ =>
-          log("giving up on " + ctor + "(diff: " + diff + ")")
+          debuglog("giving up on " + ctor + "(diff: " + diff + ")")
           return bindings
       }
 
@@ -554,10 +535,7 @@ abstract class CopyPropagation {
       bindings
     }
 
-    /** Is symbol <code>m</code> a pure method?
-     *
-     *  @param m ...
-     *  @return  ...
+    /** Is symbol `m` a pure method?
      */
     final def isPureMethod(m: Symbol): Boolean =
       m.isGetter // abstract getters are still pure, as we 'know'
@@ -566,7 +544,7 @@ abstract class CopyPropagation {
       method.blocks map { b =>
         "\nIN(%s):\t Bindings: %s".format(b.label, in(b).bindings) +
         "\nIN(%s):\t Stack: %s".format(b.label, in(b).stack)
-      } 
+      }
     ).mkString
 
   } /* class CopyAnalysis */

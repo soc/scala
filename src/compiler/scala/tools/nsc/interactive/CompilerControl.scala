@@ -1,5 +1,5 @@
 /* NSC -- new Scala compiler
- * Copyright 2009-2011 Scala Solutions and LAMP/EPFL
+ * Copyright 2009-2013 Typesafe/Scala Solutions and LAMP/EPFL
  * @author Martin Odersky
  */
 package scala.tools.nsc
@@ -7,11 +7,11 @@ package interactive
 
 import scala.util.control.ControlThrowable
 import scala.tools.nsc.io.AbstractFile
-import scala.tools.nsc.util.{SourceFile, Position, WorkScheduler}
-import scala.tools.nsc.symtab._
-import scala.tools.nsc.ast._
 import scala.tools.nsc.util.FailedInterrupt
 import scala.tools.nsc.util.EmptyAction
+import scala.tools.nsc.util.WorkScheduler
+import scala.reflect.internal.util.{SourceFile, Position}
+import scala.tools.nsc.util.InterruptReq
 
 /** Interface of interactive compiler to a client such as an IDE
  *  The model the presentation compiler consists of the following parts:
@@ -68,11 +68,11 @@ trait CompilerControl { self: Global =>
    *  if it does not yet exist create a new one atomically
    *  Note: We want to get roid of this operation as it messes compiler invariants.
    */
-  @deprecated("use getUnitOf(s) or onUnitOf(s) instead")
+  @deprecated("use getUnitOf(s) or onUnitOf(s) instead", "2.10.0")
   def unitOf(s: SourceFile): RichCompilationUnit = getOrCreateUnitOf(s)
 
   /** The compilation unit corresponding to a position */
-  @deprecated("use getUnitOf(pos.source) or onUnitOf(pos.source) instead")
+  @deprecated("use getUnitOf(pos.source) or onUnitOf(pos.source) instead", "2.10.0")
   def unitOf(pos: Position): RichCompilationUnit = getOrCreateUnitOf(pos.source)
 
   /** Removes the CompilationUnit corresponding to the given SourceFile
@@ -220,6 +220,7 @@ trait CompilerControl { self: Global =>
    *                      everything is brought up to date in a regular type checker run.
    *  @param response     The response.
    */
+  @deprecated("SI-6458: Instrumentation logic will be moved out of the compiler.","2.10.0")
   def askInstrumented(source: SourceFile, line: Int, response: Response[(String, Array[Char])]) =
     postWorkItem(new AskInstrumentedItem(source, line, response))
 
@@ -231,7 +232,7 @@ trait CompilerControl { self: Global =>
   /** Tells the compile server to shutdown, and not to restart again */
   def askShutdown() = scheduler raise ShutdownReq
 
-  @deprecated("use parseTree(source) instead") // deleted 2nd parameter, as this has to run on 2.8 also.
+  @deprecated("use parseTree(source) instead", "2.10.0") // deleted 2nd parameter, as this has to run on 2.8 also.
   def askParse(source: SourceFile, response: Response[Tree]) = respond(response) {
     parseTree(source)
   }
@@ -250,6 +251,25 @@ trait CompilerControl { self: Global =>
 
   /** Asks for a computation to be done quickly on the presentation compiler thread */
   def ask[A](op: () => A): A = if (self.onCompilerThread) op() else scheduler doQuickly op
+
+  /** Asks for a computation to be done on presentation compiler thread, returning
+   *  a response with the result or an exception
+   */
+  def askForResponse[A](op: () => A): Response[A] = {
+    val r = new Response[A]
+    if (self.onCompilerThread) {
+      try   { r set op() }
+      catch { case exc: Throwable => r raise exc }
+      r
+    } else {
+      val ir = scheduler askDoQuickly op
+      ir onComplete {
+        case Left(result) => r set result
+        case Right(exc)   => r raise exc
+      }
+      r
+    }
+  }
 
   def onCompilerThread = Thread.currentThread == compileRunner
 
@@ -368,6 +388,7 @@ trait CompilerControl { self: Global =>
       response raise new MissingResponse
   }
 
+  @deprecated("SI-6458: Instrumentation logic will be moved out of the compiler.","2.10.0")
   case class AskInstrumentedItem(val source: SourceFile, line: Int, response: Response[(String, Array[Char])]) extends WorkItem {
     def apply() = self.getInstrumented(source, line, response)
     override def toString = "getInstrumented "+source
@@ -389,10 +410,20 @@ trait CompilerControl { self: Global =>
         case _ => println("don't know what to do with this " + action.getClass)
       }
     }
-    
+
     override def doQuickly[A](op: () => A): A = {
       throw new FailedInterrupt(new Exception("Posted a work item to a compiler that's shutting down"))
     }
+
+    override def askDoQuickly[A](op: () => A): InterruptReq { type R = A } = {
+      val ir = new InterruptReq {
+        type R = A
+        val todo = () => throw new MissingResponse
+      }
+      ir.execute()
+      ir
+    }
+
   }
 
 }

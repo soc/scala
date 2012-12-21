@@ -1,5 +1,5 @@
 /* NSC -- new Scala compiler
- * Copyright 2009-2011 Scala Solutions and LAMP/EPFL
+ * Copyright 2009-2013 Typesafe/Scala Solutions and LAMP/EPFL
  * @author Martin Odersky
  */
 package scala.tools.nsc
@@ -8,29 +8,31 @@ package interactive
 import java.io.{ PrintWriter, StringWriter, FileReader, FileWriter }
 import scala.collection.mutable
 import mutable.{LinkedHashMap, SynchronizedMap, HashSet, SynchronizedSet}
-import scala.concurrent.SyncVar
 import scala.util.control.ControlThrowable
 import scala.tools.nsc.io.{ AbstractFile, LogReplay, Logger, NullLogger, Replayer }
-import scala.tools.nsc.util.{ SourceFile, BatchSourceFile, Position, RangePosition, NoPosition, WorkScheduler, MultiHashMap }
+import scala.tools.nsc.util.MultiHashMap
+import scala.reflect.internal.util.{ SourceFile, BatchSourceFile, Position, RangePosition, NoPosition }
 import scala.tools.nsc.reporters._
 import scala.tools.nsc.symtab._
-import scala.tools.nsc.ast._
-import scala.tools.nsc.io.Pickler._
 import scala.tools.nsc.typechecker.DivergentImplicit
-import scala.annotation.tailrec
 import symtab.Flags.{ACCESSOR, PARAMACCESSOR}
-import language.implicitConversions
+import scala.annotation.elidable
+import scala.language.implicitConversions
 
 /** The main class of the presentation compiler in an interactive environment such as an IDE
  */
-class Global(settings: Settings, _reporter: Reporter, projectName: String = "")
-  extends scala.tools.nsc.Global(settings, _reporter)
-     with CompilerControl
-     with RangePositions
-     with ContextTrees
-     with RichCompilationUnits
-     with ScratchPadMaker
-     with Picklers {
+class Global(settings: Settings, _reporter: Reporter, projectName: String = "")  extends {
+  /* Is the compiler initializing? Early def, so that the field is true during the
+   *  execution of the super constructor.
+   */
+  private var initializing = true
+} with scala.tools.nsc.Global(settings, _reporter)
+  with CompilerControl
+  with RangePositions
+  with ContextTrees
+  with RichCompilationUnits
+  with ScratchPadMaker
+  with Picklers {
 
   import definitions._
 
@@ -50,6 +52,7 @@ class Global(settings: Settings, _reporter: Reporter, projectName: String = "")
   import log.logreplay
   debugLog("logger: " + log.getClass + " writing to " + (new java.io.File(logName)).getAbsolutePath)
   debugLog("classpath: "+classPath)
+  Console.err.println("\n ======= CHECK THREAD ACCESS compiler build ========\n")
 
   private var curTime = System.nanoTime
   private def timeStep = {
@@ -67,6 +70,7 @@ class Global(settings: Settings, _reporter: Reporter, projectName: String = "")
     if (verboseIDE) println("[%s][%s]".format(projectName, msg))
 
   override def forInteractive = true
+  override def forScaladoc = settings.isScaladoc
 
   /** A map of all loaded files to the rich compilation units that correspond to them.
    */
@@ -204,7 +208,7 @@ class Global(settings: Settings, _reporter: Reporter, projectName: String = "")
 
   protected[interactive] var minRunId = 1
 
-  private var interruptsEnabled = true
+  private[interactive] var interruptsEnabled = true
 
   private val NoResponse: Response[_] = new Response[Any]
 
@@ -354,7 +358,7 @@ class Global(settings: Settings, _reporter: Reporter, projectName: String = "")
             }
 
             // don't forget to service interrupt requests
-            val iqs = scheduler.dequeueAllInterrupts(_.execute())
+            scheduler.dequeueAllInterrupts(_.execute())
 
             debugLog("ShutdownReq: cleaning work queue (%d items)".format(units.size))
             debugLog("Cleanup up responses (%d loadedType pending, %d parsedEntered pending)"
@@ -392,47 +396,23 @@ class Global(settings: Settings, _reporter: Reporter, projectName: String = "")
     if (typerRun != currentTyperRun) demandNewCompilerRun()
   }
 
-  def debugInfo(source : SourceFile, start : Int, length : Int): String = {
-    println("DEBUG INFO "+source+"/"+start+"/"+length)
-    val end = start+length
-    val pos = rangePos(source, start, start, end)
-
-    val tree = locateTree(pos)
-    val sw = new StringWriter
-    val pw = new PrintWriter(sw)
-    newTreePrinter(pw).print(tree)
-    pw.flush
-
-    val typed = new Response[Tree]
-    askTypeAt(pos, typed)
-    val typ = typed.get.left.toOption match {
-      case Some(tree) =>
-        val sw = new StringWriter
-        val pw = new PrintWriter(sw)
-        newTreePrinter(pw).print(tree)
-        pw.flush
-        sw.toString
-      case None => "<None>"
-    }
-
-    val completionResponse = new Response[List[Member]]
-    askTypeCompletion(pos, completionResponse)
-    val completion = completionResponse.get.left.toOption match {
-      case Some(members) =>
-        members mkString "\n"
-      case None => "<None>"
-    }
-
-    source.content.view.drop(start).take(length).mkString+" : "+source.path+" ("+start+", "+end+
-    ")\n\nlocateTree:\n"+sw.toString+"\n\naskTypeAt:\n"+typ+"\n\ncompletion:\n"+completion
-  }
-
   // ----------------- The Background Runner Thread -----------------------
 
   private var threadId = 0
 
   /** The current presentation compiler runner */
-  @volatile private[interactive] var compileRunner = newRunnerThread()
+  @volatile private[interactive] var compileRunner: Thread = newRunnerThread()
+
+  /** Check that the currenyly executing thread is the presentation compiler thread.
+   *
+   *  Compiler initialization may happen on a different thread (signalled by globalPhase being NoPhase)
+   */
+  @elidable(elidable.WARNING)
+  override def assertCorrectThread() {
+    assert(initializing || (Thread.currentThread() eq compileRunner),
+        "Race condition detected: You are running a presentation compiler method outside the PC thread.[phase: %s]".format(globalPhase) +
+        " Please file a ticket with the current stack trace at https://www.assembla.com/spaces/scala-ide/support/tickets")
+  }
 
   /** Create a new presentation compiler runner.
    */
@@ -484,8 +464,8 @@ class Global(settings: Settings, _reporter: Reporter, projectName: String = "")
       } catch {
         case ex: FreshRunReq => throw ex           // propagate a new run request
         case ShutdownReq     => throw ShutdownReq  // propagate a shutdown request
-
-        case ex =>
+        case ex: ControlThrowable => throw ex
+        case ex: Throwable =>
           println("[%s]: exception during background compile: ".format(unit.source) + ex)
           ex.printStackTrace()
           for (r <- waitLoadedTypeResponses(unit.source)) {
@@ -626,7 +606,7 @@ class Global(settings: Settings, _reporter: Reporter, projectName: String = "")
         response raise ex
         throw ex
 
-      case ex =>
+      case ex: Throwable =>
         if (debugIDE) {
           println("exception thrown during response: "+ex)
           ex.printStackTrace()
@@ -748,13 +728,23 @@ class Global(settings: Settings, _reporter: Reporter, projectName: String = "")
       val originalTypeParams = sym.owner.typeParams
       parseAndEnter(unit)
       val pre = adaptToNewRunMap(ThisType(sym.owner))
-      val newsym = pre.typeSymbol.info.decl(sym.name) filter { alt =>
+      val rawsym = pre.typeSymbol.info.decl(sym.name)
+      val newsym = rawsym filter { alt =>
         sym.isType || {
           try {
             val tp1 = pre.memberType(alt) onTypeError NoType
             val tp2 = adaptToNewRunMap(sym.tpe) substSym (originalTypeParams, sym.owner.typeParams)
-            matchesType(tp1, tp2, false)
-          } catch {
+            matchesType(tp1, tp2, false) || {
+              debugLog(s"getLinkPos matchesType($tp1, $tp2) failed")
+              val tp3 = adaptToNewRunMap(sym.tpe) substSym (originalTypeParams, alt.owner.typeParams)
+              matchesType(tp1, tp3, false) || {
+                debugLog(s"getLinkPos fallback matchesType($tp1, $tp3) failed")
+                false
+              }
+            }
+          }
+          catch {
+            case ex: ControlThrowable => throw ex
             case ex: Throwable =>
               println("error in hyperlinking: " + ex)
               ex.printStackTrace()
@@ -763,8 +753,11 @@ class Global(settings: Settings, _reporter: Reporter, projectName: String = "")
         }
       }
       if (newsym == NoSymbol) {
-        debugLog("link not found " + sym + " " + source + " " + pre)
-        NoPosition
+        if (rawsym.exists && !rawsym.isOverloaded) rawsym.pos
+        else {
+          debugLog("link not found " + sym + " " + source + " " + pre)
+          NoPosition
+        }
       } else if (newsym.isOverloaded) {
         settings.uniqid.value = true
         debugLog("link ambiguous " + sym + " " + source + " " + pre + " " + newsym.alternatives)
@@ -818,8 +811,6 @@ class Global(settings: Settings, _reporter: Reporter, projectName: String = "")
     respond(response) { scopeMembers(pos) }
   }
 
-  private val Dollar = newTermName("$")
-
   private class Members[M <: Member] extends LinkedHashMap[Name, Set[M]] {
     override def default(key: Name) = Set()
 
@@ -835,7 +826,7 @@ class Global(settings: Settings, _reporter: Reporter, projectName: String = "")
     def add(sym: Symbol, pre: Type, implicitlyAdded: Boolean)(toMember: (Symbol, Type) => M) {
       if ((sym.isGetter || sym.isSetter) && sym.accessed != NoSymbol) {
         add(sym.accessed, pre, implicitlyAdded)(toMember)
-      } else if (!sym.name.decodedName.containsName(Dollar) && !sym.isSynthetic && sym.hasRawInfo) {
+      } else if (!sym.name.decodedName.containsName("$") && !sym.isSynthetic && sym.hasRawInfo) {
         val symtpe = pre.memberType(sym) onTypeError ErrorType
         matching(sym, symtpe, this(sym.name)) match {
           case Some(m) =>
@@ -1027,9 +1018,15 @@ class Global(settings: Settings, _reporter: Reporter, projectName: String = "")
     }
   }
 
+  @deprecated("SI-6458: Instrumentation logic will be moved out of the compiler.","2.10.0")
   def getInstrumented(source: SourceFile, line: Int, response: Response[(String, Array[Char])]) {
-    respond(response) {
-      instrument(source, line)
+    try {
+      interruptsEnabled = false
+      respond(response) {
+        instrument(source, line)
+      }
+    } finally {
+      interruptsEnabled = true
     }
   }
 
@@ -1063,7 +1060,7 @@ class Global(settings: Settings, _reporter: Reporter, projectName: String = "")
      *  @return true iff typechecked correctly
      */
     private def applyPhase(phase: Phase, unit: CompilationUnit) {
-      atPhase(phase) { phase.asInstanceOf[GlobalPhase] applyPhase unit }
+      enteringPhase(phase) { phase.asInstanceOf[GlobalPhase] applyPhase unit }
     }
   }
 
@@ -1091,6 +1088,12 @@ class Global(settings: Settings, _reporter: Reporter, projectName: String = "")
         alt
     }
   }
+
+  /** The compiler has been initialized. Constructors are evaluated in textual order,
+   *  so this is set to true only after all super constructors and the primary constructor
+   *  have been executed.
+   */
+  initializing = false
 }
 
 object CancelException extends Exception

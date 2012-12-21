@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2003-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2003-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -15,8 +15,6 @@ import scala.collection.generic._
 
 import scala.collection.parallel.ParIterableLike
 import scala.collection.parallel.Combiner
-import scala.collection.GenIterable
-
 
 /** A template trait for immutable parallel iterable collections.
  *
@@ -30,10 +28,11 @@ import scala.collection.GenIterable
  *  @since 2.9
  */
 trait ParIterable[+T]
-extends collection/*.immutable*/.GenIterable[T]
-   with collection.parallel.ParIterable[T]
+extends scala.collection/*.immutable*/.GenIterable[T]
+   with scala.collection.parallel.ParIterable[T]
    with GenericParTemplate[T, ParIterable]
-   with ParIterableLike[T, ParIterable[T], collection.immutable.Iterable[T]]
+   with ParIterableLike[T, ParIterable[T], scala.collection.immutable.Iterable[T]]
+   with Immutable
 {
   override def companion: GenericCompanion[ParIterable] with GenericParCompanion[ParIterable] = ParIterable
 

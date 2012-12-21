@@ -1,5 +1,5 @@
 /* NSC -- new Scala compiler
- * Copyright 2005-2011 LAMP/EPFL
+ * Copyright 2005-2013 LAMP/EPFL
  * @author  Paul Phillips
  */
 
@@ -8,10 +8,9 @@ package io
 
 import java.io.{ InputStream, OutputStream, IOException, FileNotFoundException, FileInputStream, DataOutputStream }
 import java.util.jar._
-import collection.JavaConverters._
+import scala.collection.JavaConverters._
 import Attributes.Name
-import util.ClassPath
-import language.implicitConversions
+import scala.language.implicitConversions
 
 // Attributes.Name instances:
 //
@@ -37,9 +36,6 @@ class Jar(file: File) extends Iterable[JarEntry] {
   def this(jfile: JFile) = this(File(jfile))
   def this(path: String) = this(File(path))
 
-  protected def errorFn(msg: String): Unit = Console println msg
-
-  lazy val jarFile  = new JarFile(file.jfile)
   lazy val manifest = withJarInput(s => Option(s.getManifest))
 
   def mainClass     = manifest map (f => f(Name.MAIN_CLASS))
@@ -64,12 +60,6 @@ class Jar(file: File) extends Iterable[JarEntry] {
     Iterator continually in.getNextJarEntry() takeWhile (_ != null) foreach f
   }
   override def iterator: Iterator[JarEntry] = this.toList.iterator
-  def fileishIterator: Iterator[Fileish] = jarFile.entries.asScala map (x => Fileish(x, () => getEntryStream(x)))
-
-  private def getEntryStream(entry: JarEntry) = jarFile getInputStream entry match {
-    case null   => errorFn("No such entry: " + entry) ; null
-    case x      => x
-  }
   override def toString = "" + file
 }
 
@@ -131,7 +121,6 @@ object Jar {
       m
     }
     def apply(manifest: JManifest): WManifest = new WManifest(manifest)
-    implicit def unenrichManifest(x: WManifest): JManifest = x.underlying
   }
   class WManifest(manifest: JManifest) {
     for ((k, v) <- initialMainAttrs)
@@ -148,12 +137,7 @@ object Jar {
     }
 
     def apply(name: Attributes.Name): String        = attrs(name)
-    def apply(name: String): String                 = apply(new Attributes.Name(name))
     def update(key: Attributes.Name, value: String) = attrs.put(key, value)
-    def update(key: String, value: String)          = attrs.put(new Attributes.Name(key), value)
-
-    def mainClass: String = apply(Name.MAIN_CLASS)
-    def mainClass_=(value: String) = update(Name.MAIN_CLASS, value)
   }
 
   // See http://download.java.net/jdk7/docs/api/java/nio/file/Path.html

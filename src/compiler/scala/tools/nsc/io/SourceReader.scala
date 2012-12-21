@@ -1,5 +1,5 @@
 /* NSC -- new Scala compiler
- * Copyright 2005-2011 LAMP/EPFL
+ * Copyright 2005-2013 LAMP/EPFL
  * @author  Martin Odersky
  */
 
@@ -9,7 +9,7 @@ package io
 
 import java.io.{ FileInputStream, InputStream, IOException }
 import java.nio.{ByteBuffer, CharBuffer}
-import java.nio.channels.{FileChannel, ReadableByteChannel, Channels}
+import java.nio.channels.{ ReadableByteChannel, Channels }
 import java.nio.charset.{CharsetDecoder, CoderResult}
 import scala.tools.nsc.reporters._
 
@@ -28,13 +28,10 @@ class SourceReader(decoder: CharsetDecoder, reporter: Reporter) {
   private var chars: CharBuffer = CharBuffer.allocate(0x4000)
 
   private def reportEncodingError(filename:String) = {
-    reporter.error(util.NoPosition,
+    reporter.error(scala.reflect.internal.util.NoPosition,
                    "IO error while decoding "+filename+" with "+decoder.charset()+"\n"+
                    "Please try specifying another one using the -encoding option")
   }
-
-  /** Reads the file with the specified name. */
-  def read(filename: String): Array[Char]= read(new JFile(filename))
 
   /** Reads the specified file. */
   def read(file: JFile): Array[Char] = {

@@ -1,10 +1,11 @@
-import scala.reflect.makro.{Context => Ctx}
+import scala.reflect.runtime.universe._
+import scala.reflect.macros.{Context => Ctx}
 
 object Impls {
-  def foo[T: c.TypeTag, U: c.TypeTag, V](c: Ctx)(implicit V: c.TypeTag[V]): c.Expr[Unit] = {
-    import c.mirror._
-    println(implicitly[c.TypeTag[T]])
-    println(implicitly[c.TypeTag[U]])
+  def foo[T: c.WeakTypeTag, U: c.WeakTypeTag, V](c: Ctx)(implicit V: c.WeakTypeTag[V]): c.Expr[Unit] = {
+    import c.universe._
+    println(implicitly[c.WeakTypeTag[T]])
+    println(implicitly[c.WeakTypeTag[U]])
     println(V)
     c.literalUnit
   }

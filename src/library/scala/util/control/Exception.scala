@@ -1,16 +1,18 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2003-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2003-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
 \*                                                                      */
 
-package scala.util.control
+package scala.util
+package control
 
-import collection.immutable.List
+import scala.collection.immutable.List
+import scala.reflect.{ ClassTag, classTag }
 import java.lang.reflect.InvocationTargetException
-import language.implicitConversions
+import scala.language.implicitConversions
 
 
 /** Classes representing the components of exception handling.
@@ -24,6 +26,10 @@ import language.implicitConversions
  *  val x2 = catching(classOf[MalformedURLException], classOf[NullPointerException]) either new URL(s)
  *  }}}
  *
+ *  This class differs from `scala.util.Try` in that it focuses on composing exception handlers rather than
+ *  composing behavior.   All behavior should be composed first and fed to a `Catch` object using one of the
+ *  `opt` or `either` methods.
+ *
  *  @author Paul Phillips
  */
 
@@ -32,7 +38,7 @@ object Exception {
 
   def mkCatcher[Ex <: Throwable: ClassTag, T](isDef: Ex => Boolean, f: Ex => T) = new Catcher[T] {
     private def downcast(x: Throwable): Option[Ex] =
-      if (classTag[Ex].erasure.isAssignableFrom(x.getClass)) Some(x.asInstanceOf[Ex])
+      if (classTag[Ex].runtimeClass.isAssignableFrom(x.getClass)) Some(x.asInstanceOf[Ex])
       else None
 
     def isDefinedAt(x: Throwable) = downcast(x) exists isDef
@@ -117,6 +123,11 @@ object Exception {
      */
     def either[U >: T](body: => U): Either[Throwable, U] = toEither(Right(body))
 
+    /** Apply this catch logic to the supplied body, mapping the result
+     * into Try[T] - Failure if an exception was caught, Success(T) otherwise.
+     */
+    def withTry[U >: T](body: => U): scala.util.Try[U] = toTry(Success(body))
+
     /** Create a `Catch` object with the same `isDefinedAt` logic as this one,
       * but with the supplied `apply` method replacing the current one. */
     def withApply[U](f: Throwable => U): Catch[U] = {
@@ -130,35 +141,11 @@ object Exception {
     /** Convenience methods. */
     def toOption: Catch[Option[T]] = withApply(_ => None)
     def toEither: Catch[Either[Throwable, T]] = withApply(Left(_))
-  }
-
-  /** A container class for Try logic */
-  class Try[+T] private[Exception](body: => T, val catcher: Catch[T]) {
-    /** Execute "body" using catch/finally logic "catcher" */
-    def apply(): T                    = catcher(body)
-    def apply[U >: T](other: => U): U = catcher(other)
-
-    /** As apply, but map caught exceptions to `None` and success to `Some(T)`. */
-    def opt(): Option[T]                      = catcher opt body
-    def opt[U >: T](other: => U): Option[U]   = catcher opt other
-
-    /** As apply, but map caught exceptions to `Left(ex)` and success to Right(x) */
-    def either(): Either[Throwable, T]                    = catcher either body
-    def either[U >: T](other: => U): Either[Throwable, U] = catcher either other
-
-    /** Create a `Try` object with the supplied body replacing the current body. */
-    def tryInstead[U >: T](other: => U) = new Try(other, catcher)
-
-    /** Create a `Try` object with the supplied logic appended to the existing Catch logic. */
-    def or[U >: T](pf: Catcher[U]) = new Try(body, catcher or pf)
-
-    /** Create a `Try`object with the supplied code appended to the existing `Finally`. */
-    def andFinally(fin: => Unit) = new Try(body, catcher andFinally fin)
-
-    override def toString() = List("Try(<body>)", catcher.toString) mkString " "
+    def toTry: Catch[scala.util.Try[T]] = withApply(x => Failure(x))
   }
 
   final val nothingCatcher: Catcher[Nothing]  = mkThrowableCatcher(_ => false, throw _)
+  final def nonFatalCatcher[T]: Catcher[T]    = mkThrowableCatcher({ case NonFatal(_) => true; case _ => false }, throw _)
   final def allCatcher[T]: Catcher[T]         = mkThrowableCatcher(_ => true, throw _)
 
   /** The empty `Catch` object. */
@@ -166,6 +153,9 @@ object Exception {
 
   /** A `Catch` object which catches everything. */
   final def allCatch[T]: Catch[T] = new Catch(allCatcher[T]) withDesc "<everything>"
+
+  /** A `Catch` object witch catches non-fatal exceptions. */
+  final def nonFatalCatch[T]: Catch[T] = new Catch(nonFatalCatcher[T]) withDesc "<non-fatal>"
 
   /** Creates a `Catch` object which will catch any of the supplied exceptions.
    *  Since the returned `Catch` object has no specific logic defined and will simply
@@ -228,7 +218,7 @@ object Exception {
   }
 
   /** Private **/
-  private def wouldMatch(x: Throwable, classes: collection.Seq[Class[_]]): Boolean =
+  private def wouldMatch(x: Throwable, classes: scala.collection.Seq[Class[_]]): Boolean =
     classes exists (_ isAssignableFrom x.getClass)
 
   private def pfFromExceptions(exceptions: Class[_]*): PartialFunction[Throwable, Nothing] =

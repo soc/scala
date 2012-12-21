@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2003-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2003-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -32,6 +32,7 @@ package scala.io
  *  }}}
  *  @author Burak Emir (translated from work by Matthias Zenger and others)
  */
+@deprecated("This class will be removed.", "2.10.0")
 abstract class Position {
   /** Definable behavior for overflow conditions.
    */
@@ -53,7 +54,7 @@ abstract class Position {
     if (line >= LINE_MASK)
       LINE_MASK << COLUMN_BITS
     else
-      (line << COLUMN_BITS) | math.min(COLUMN_MASK, column)
+      (line << COLUMN_BITS) | scala.math.min(COLUMN_MASK, column)
   }
 
   /** Returns the line number of the encoded position. */
@@ -67,14 +68,6 @@ abstract class Position {
 }
 
 object Position extends Position {
-  /** The undefined position */
-  @deprecated("This will be removed", "2.9.0")
-  final val NOPOS = 0
-
-  /** The first position in a source file */
-  @deprecated("This will be removed", "2.9.0")
-  final val FIRSTPOS = encode(1, 1)
-
   def checkInput(line: Int, column: Int) {
     if (line < 0)
       throw new IllegalArgumentException(line + " < 0")

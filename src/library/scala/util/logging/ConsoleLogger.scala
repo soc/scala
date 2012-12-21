@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2003-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2003-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |                                         **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -17,6 +17,7 @@ package scala.util.logging
  *  @author  Burak Emir
  *  @version 1.0
  */
+@deprecated("This class will be removed.", "2.10.0")
 trait ConsoleLogger extends Logged {
 
   /** logs argument to Console using [[scala.Console.println]]

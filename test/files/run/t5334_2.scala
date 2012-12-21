@@ -1,4 +1,7 @@
-import scala.reflect.mirror._
+import scala.reflect.runtime.universe._
+import scala.reflect.runtime.{universe => ru}
+import scala.reflect.runtime.{currentMirror => cm}
+import scala.tools.reflect.ToolBox
 
 object Test extends App {
   val code = reify {
@@ -7,6 +10,6 @@ object Test extends App {
     ret.asInstanceOf[List[Any]]
   };
 
-  val toolbox = mkToolBox()
-  println(toolbox.runExpr(code.tree))
+  val toolbox = cm.mkToolBox()
+  println(toolbox.eval(code.tree))
 }

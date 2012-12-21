@@ -1,5 +1,5 @@
 /* NSC -- new Scala compiler
- * Copyright 2009-2011 Scala Solutions and LAMP/EPFL
+ * Copyright 2009-2013 Typesafe/Scala Solutions and LAMP/EPFL
  * @author Martin Odersky
  */
 package scala.tools.nsc
@@ -7,8 +7,8 @@ package interactive
 package tests.core
 
 import scala.tools.nsc.interactive.Response
-import scala.tools.nsc.util.Position
-import scala.tools.nsc.util.SourceFile
+import scala.reflect.internal.util.Position
+import scala.reflect.internal.util.SourceFile
 
 /**
  * A trait for defining commands that can be queried to the

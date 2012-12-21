@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2006-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2006-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://www.scala-lang.org/           **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -96,6 +96,9 @@ private[collection] trait Wrappers {
     def remove(i: Int) = underlying.remove(i)
     def clear() = underlying.clear()
     def result = this
+    // Note: Clone cannot just call underlying.clone because in Java, only specific collections
+    // expose clone methods.  Generically, they're protected.
+    override def clone(): JListWrapper[A] = JListWrapper(new ju.ArrayList[A](underlying))
   }
 
   class SetWrapper[A](underlying: Set[A]) extends ju.AbstractSet[A] {
@@ -149,6 +152,10 @@ private[collection] trait Wrappers {
     override def clear() = underlying.clear()
 
     override def empty = JSetWrapper(new ju.HashSet[A])
+    // Note: Clone cannot just call underlying.clone because in Java, only specific collections
+    // expose clone methods.  Generically, they're protected.
+    override def clone() =
+      new JSetWrapper[A](new ju.LinkedHashSet[A](underlying))
   }
 
   class MapWrapper[A, B](underlying: Map[A, B]) extends ju.AbstractMap[A, B] { self =>
@@ -171,21 +178,16 @@ private[collection] trait Wrappers {
         var prev : Option[A] = None
 
         def hasNext = ui.hasNext
-        
-        def improve(hc: Int) = {
-          var i = hc * 0x9e3775cd
-          i = java.lang.Integer.reverseBytes(i)
-          i * 0x9e3775c
-        }
-        
+
         def next() = {
           val (k, v) = ui.next
           prev = Some(k)
           new ju.Map.Entry[A, B] {
+            import scala.util.hashing.byteswap32
             def getKey = k
             def getValue = v
             def setValue(v1 : B) = self.put(k, v1)
-            override def hashCode = improve(k.hashCode) + (improve(v.hashCode) << 16)
+            override def hashCode = byteswap32(k.hashCode) + (byteswap32(v.hashCode) << 16)
             override def equals(other: Any) = other match {
               case e: ju.Map.Entry[_, _] => k == e.getKey && v == e.getValue
               case _ => false
@@ -472,4 +474,5 @@ private[collection] trait Wrappers {
   }
 }
 
-object Wrappers extends Wrappers
+@SerialVersionUID(0 - 5857859809262781311L)
+object Wrappers extends Wrappers with Serializable

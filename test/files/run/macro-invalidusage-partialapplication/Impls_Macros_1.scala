@@ -1,11 +1,11 @@
-import scala.reflect.makro.{Context => Ctx}
+import scala.reflect.macros.{Context => Ctx}
 
 object Impls {
   def foo(c: Ctx)(x: c.Expr[Int])(y: c.Expr[Int]) = {
-    import c.mirror._
+    import c.universe._
     val sum = Apply(Select(x.tree, newTermName("$plus")), List(y.tree))
     val body = Apply(Select(Ident(definitions.PredefModule), newTermName("println")), List(sum))
-    Expr[Unit](body)
+    c.Expr[Unit](body)
   }
 }
 

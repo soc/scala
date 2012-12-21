@@ -5,7 +5,7 @@
 **                                                                         **
 **  This software is released under the terms of the Revised BSD License.  **
 **  There is NO WARRANTY. See the file LICENSE for the full text.          **
-\*-------------------------------------------------------------------------*/
+\*------------------------------------------------------------------------ */
 
 package org.scalacheck
 
@@ -48,6 +48,8 @@ object Pretty {
     s.lines.map(l => break(lead+l+trail, "  ", width)).mkString("\n")
 
   implicit def prettyAny(t: Any) = Pretty { p => t.toString }
+
+  implicit def prettyString(t: String) = Pretty { p => "\""++t++"\"" }
 
   implicit def prettyList(l: List[Any]) = Pretty { p =>
     l.map("\""+_+"\"").mkString("List(", ", ", ")")
@@ -94,7 +96,7 @@ object Pretty {
   }
 
   implicit def prettyTestRes(res: Test.Result) = Pretty { prms =>
-    def labels(ls: collection.immutable.Set[String]) =
+    def labels(ls: scala.collection.immutable.Set[String]) =
       if(ls.isEmpty) ""
       else "> Labels of failing property: " / ls.mkString("\n")
     val s = res.status match {

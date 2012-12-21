@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2003-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2003-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -103,7 +103,7 @@ class TreeSet[A](implicit val ordering: Ordering[A]) extends SortedSet[A] with S
    * the clone. So clone complexity in time is O(1).
    *
    */
-  override def clone: TreeSet[A] = {
+  override def clone(): TreeSet[A] = {
     val clone = new TreeSet[A](base, from, until)
     clone.avl = resolve.avl
     clone.cardinality = resolve.cardinality

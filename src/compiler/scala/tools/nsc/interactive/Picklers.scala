@@ -1,17 +1,17 @@
 /* NSC -- new Scala compiler
- * Copyright 2009-2011 Scala Solutions and LAMP/EPFL
+ * Copyright 2009-2013 Typesafe/Scala Solutions and LAMP/EPFL
  * @author Martin Odersky
  */
 package scala.tools.nsc
 package interactive
 
-import util.{SourceFile, BatchSourceFile, InterruptReq}
-import io.{AbstractFile, PlainFile}
-
-import util.{Position, RangePosition, NoPosition, OffsetPosition, TransparentPosition, EmptyAction}
-import io.{Pickler, CondPickler}
+import util.InterruptReq
+import scala.reflect.internal.util.{ SourceFile, BatchSourceFile }
+import io.{ AbstractFile, PlainFile, Pickler, CondPickler }
+import util.EmptyAction
+import scala.reflect.internal.util.{ RangePosition, OffsetPosition, TransparentPosition }
 import io.Pickler._
-import collection.mutable
+import scala.collection.mutable
 import mutable.ListBuffer
 
 trait Picklers { self: Global =>
@@ -115,7 +115,7 @@ trait Picklers { self: Global =>
         if (sym.isOverloaded) makeSymbol(sym.alternatives(rest.head.toString.toInt), rest.tail)
         else makeSymbol(sym, rest)
     }
-    pkl[List[Name]] .wrapped { makeSymbol(definitions.RootClass, _) } { ownerNames(_, new ListBuffer).toList }
+    pkl[List[Name]] .wrapped { makeSymbol(rootMirror.RootClass, _) } { ownerNames(_, new ListBuffer).toList }
   }
 
   implicit def workEvent: Pickler[WorkEvent] = {

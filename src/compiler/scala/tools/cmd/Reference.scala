@@ -1,12 +1,12 @@
 /* NSC -- new Scala compiler
- * Copyright 2005-2011 LAMP/EPFL
+ * Copyright 2005-2013 LAMP/EPFL
  * @author  Paul Phillips
  */
 
 package scala.tools
 package cmd
 
-import collection.mutable.ListBuffer
+import scala.collection.mutable.ListBuffer
 import nsc.Properties.envOrNone
 
 /** Mixes in the specification trait and uses the vals therein to
@@ -26,7 +26,6 @@ trait Reference extends Spec {
   def isUnaryOption(s: String)  = unary contains toOpt(s)
   def isBinaryOption(s: String) = binary contains toOpt(s)
   def isExpandOption(s: String) = expansionMap contains toOpt(s)
-  def isAnyOption(s: String)    = isUnaryOption(s) || isBinaryOption(s) || isExpandOption(s)
 
   def expandArg(arg: String)      = expansionMap.getOrElse(fromOpt(arg), List(arg))
 
@@ -46,7 +45,7 @@ object Reference {
   val MaxLine = 80
 
   class Accumulators() {
-    private var _help     = new ListBuffer[() => String]
+    private val _help    = new ListBuffer[() => String]
     private var _unary   = List[String]()
     private var _binary  = List[String]()
     private var _expand  = Map[String, List[String]]()

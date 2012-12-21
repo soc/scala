@@ -1,5 +1,5 @@
 /* NSC -- new Scala compiler
- * Copyright 2005-2011 LAMP/EPFL
+ * Copyright 2005-2013 LAMP/EPFL
  * @author  Paul Phillips
  */
 
@@ -11,10 +11,11 @@ import java.lang.reflect.{ Constructor, Modifier, Method }
 import java.io.{ File => JFile }
 import java.net.{ URLClassLoader => JURLClassLoader }
 import java.net.URL
-import scala.reflect.ReflectionUtils.unwrapHandler
+import scala.reflect.runtime.ReflectionUtils.unwrapHandler
 import ScalaClassLoader._
 import scala.util.control.Exception.{ catching }
-import language.implicitConversions
+import scala.language.implicitConversions
+import scala.reflect.{ ClassTag, classTag }
 
 trait HasClassPath {
   def classPathURLs: Seq[URL]
@@ -45,9 +46,6 @@ trait ScalaClassLoader extends JClassLoader {
   def create(path: String): AnyRef =
     tryToInitializeClass[AnyRef](path) map (_.newInstance()) orNull
 
-  def constructorsOf[T <: AnyRef : ClassTag]: List[Constructor[T]] =
-    classTag[T].erasure.getConstructors.toList map (_.asInstanceOf[Constructor[T]])
-
   /** The actual bytes for a class file, or an empty array if it can't be found. */
   def classBytes(className: String): Array[Byte] = classAsStream(className) match {
     case null   => Array()
@@ -70,14 +68,6 @@ trait ScalaClassLoader extends JClassLoader {
     try asContext(method.invoke(null, Array(arguments.toArray: AnyRef): _*)) // !!! : AnyRef shouldn't be necessary
     catch unwrapHandler({ case ex => throw ex })
   }
-
-  /** A list comprised of this classloader followed by all its
-   *  (non-null) parent classloaders, if any.
-   */
-  def loaderChain: List[ScalaClassLoader] = this :: (getParent match {
-    case null => Nil
-    case p    => p.loaderChain
-  })
 }
 
 /** Methods for obtaining various classloaders.
@@ -98,35 +88,6 @@ object ScalaClassLoader {
   }
   def contextLoader = apply(Thread.currentThread.getContextClassLoader)
   def appLoader     = apply(JClassLoader.getSystemClassLoader)
-  def extLoader     = apply(appLoader.getParent)
-  def bootLoader    = apply(null)
-  def contextChain  = loaderChain(contextLoader)
-
-  def pathToErasure[T: ClassTag]   = pathToClass(classTag[T].erasure)
-  def pathToClass(clazz: Class[_]) = clazz.getName.replace('.', JFile.separatorChar) + ".class"
-  def locate[T: ClassTag]          = contextLoader getResource pathToErasure[T]
-
-  /** Tries to guess the classpath by type matching the context classloader
-   *  and its parents, looking for any classloaders which will reveal their
-   *  classpath elements as urls.  It it can't find any, creates a classpath
-   *  from the supplied string.
-   */
-  def guessClassPathString(default: String = ""): String = {
-    val classpathURLs = contextChain flatMap {
-      case x: HasClassPath    => x.classPathURLs
-      case x: JURLClassLoader => x.getURLs.toSeq
-      case _                  => Nil
-    }
-    if (classpathURLs.isEmpty) default
-    else JavaClassPath.fromURLs(classpathURLs).asClasspathString
-  }
-
-  def loaderChain(head: JClassLoader) = {
-    def loop(cl: JClassLoader): List[JClassLoader] =
-      if (cl == null) Nil else cl :: loop(cl.getParent)
-
-    loop(head)
-  }
   def setContext(cl: JClassLoader) =
     Thread.currentThread.setContextClassLoader(cl)
   def savingContextLoader[T](body: => T): T = {
@@ -141,16 +102,13 @@ object ScalaClassLoader {
          with HasClassPath {
 
     private var classloaderURLs: Seq[URL] = urls
-    private def classpathString = ClassPath.fromURLs(urls: _*)
     def classPathURLs: Seq[URL] = classloaderURLs
-    def classPath: ClassPath[_] = JavaClassPath fromURLs classPathURLs
 
     /** Override to widen to public */
     override def addURL(url: URL) = {
       classloaderURLs :+= url
       super.addURL(url)
     }
-    def toLongString = urls.mkString("URLClassLoader(\n  ", "\n  ", "\n)\n")
   }
 
   def fromURLs(urls: Seq[URL], parent: ClassLoader = null): URLClassLoader =
@@ -161,7 +119,6 @@ object ScalaClassLoader {
     fromURLs(urls) tryToLoadClass name isDefined
 
   /** Finding what jar a clazz or instance came from */
-  def origin(x: Any): Option[URL] = originOfClass(x.getClass)
   def originOfClass(x: Class[_]): Option[URL] =
     Option(x.getProtectionDomain.getCodeSource) flatMap (x => Option(x.getLocation))
 }

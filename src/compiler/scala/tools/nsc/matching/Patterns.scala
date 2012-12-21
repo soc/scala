@@ -1,12 +1,11 @@
 /* NSC -- new Scala compiler
- * Copyright 2005-2011 LAMP/EPFL
+ * Copyright 2005-2013 LAMP/EPFL
  * Author: Paul Phillips
  */
 
 package scala.tools.nsc
 package matching
 
-import symtab.Flags
 import PartialFunction._
 
 /** Patterns are wrappers for Trees with enhanced semantics.
@@ -21,7 +20,7 @@ trait Patterns extends ast.TreeDSL {
   import definitions._
   import CODE._
   import Debug._
-  import treeInfo.{ unbind, isStar, isVarPattern, isVariableName }
+  import treeInfo.{ unbind, isStar, isVarPattern }
 
   type PatternMatch       = MatchMatrix#PatternMatch
   private type PatternVar = MatrixContext#PatternVar
@@ -32,9 +31,6 @@ trait Patterns extends ast.TreeDSL {
 
   // An empty pattern
   def NoPattern = WildcardPattern()
-
-  // The constant null pattern
-  def NullPattern = LiteralPattern(NULL)
 
   // The Nil pattern
   def NilPattern = Pattern(gen.mkNil)
@@ -61,7 +57,6 @@ trait Patterns extends ast.TreeDSL {
 
     override def covers(sym: Symbol) = newMatchesPattern(sym, tpt.tpe)
     override def sufficientType = tpt.tpe
-    override def subpatternsForVars: List[Pattern] = List(Pattern(expr))
     override def simplify(pv: PatternVar) = Pattern(expr) match {
       case ExtractorPattern(ua) if pv.sym.tpe <:< tpt.tpe => this rebindTo expr
       case _                                              => this
@@ -141,10 +136,6 @@ trait Patterns extends ast.TreeDSL {
     require(fn.isType && this.isCaseClass, "tree: " + tree + " fn: " + fn)
     def name = tpe.typeSymbol.name
     def cleanName = tpe.typeSymbol.decodedName
-    def hasPrefix = tpe.prefix.prefixString != ""
-    def prefixedName =
-      if (hasPrefix) "%s.%s".format(tpe.prefix.prefixString, cleanName)
-      else cleanName
 
     private def isColonColon = cleanName == "::"
 
@@ -189,13 +180,6 @@ trait Patterns extends ast.TreeDSL {
     private lazy val packedType = global.typer.computeType(tpt, tpt.tpe)
     private lazy val consRef    = appliedType(ConsClass, packedType)
     private lazy val listRef    = appliedType(ListClass, packedType)
-    private lazy val seqRef     = appliedType(SeqClass, packedType)
-
-    private def thisSeqRef = {
-      val tc = (tree.tpe baseType SeqClass).typeConstructor
-      if (tc.typeParams.size == 1) appliedType(tc, List(packedType))
-      else seqRef
-    }
 
     // Fold a list into a well-typed x :: y :: etc :: tree.
     private def listFolder(hd: Tree, tl: Tree): Tree = unbind(hd) match {
@@ -230,15 +214,13 @@ trait Patterns extends ast.TreeDSL {
 
   // 8.1.8 (b) (literal ArrayValues)
   case class SequencePattern(tree: ArrayValue) extends Pattern with SequenceLikePattern {
-    lazy val ArrayValue(elemtpt, elems) = tree
+    lazy val ArrayValue(_, elems) = tree
 
-    override def subpatternsForVars: List[Pattern] = elemPatterns
     override def description = "Seq(%s)".format(elemPatterns mkString ", ")
   }
 
   // 8.1.8 (c)
   case class StarPattern(tree: Star) extends Pattern {
-    lazy val Star(elem) = tree
     override def description = "_*"
   }
   // XXX temporary?
@@ -366,7 +348,7 @@ trait Patterns extends ast.TreeDSL {
     lazy val Select(qualifier, name) = select
     def pathSegments = getPathSegments(tree)
     def backticked: Option[String] = qualifier match {
-      case _: This if isVariableName(name)  => Some("`%s`".format(name))
+      case _: This if nme.isVariableName(name)  => Some("`%s`".format(name))
       case _                                => None
     }
     override def covers(sym: Symbol) = newMatchesPattern(sym, tree.tpe)
@@ -388,21 +370,13 @@ trait Patterns extends ast.TreeDSL {
     lazy val UnApply(unfn, args) = tree
     lazy val Apply(fn, _) = unfn
     lazy val MethodType(List(arg, _*), _) = fn.tpe
-    
+
     // Covers if the symbol matches the unapply method's argument type,
     // and the return type of the unapply is Some.
     override def covers(sym: Symbol) = newMatchesPattern(sym, arg.tpe)
-    
-    // TODO: for alwaysCovers:
-    //   fn.tpe.finalResultType.typeSymbol == SomeClass
-
     override def necessaryType = arg.tpe
-    override def subpatternsForVars = args match {
-      case List(ArrayValue(elemtpe, elems)) => toPats(elems)
-      case _                                => toPats(args)
-    }
 
-    def resTypes = analyzer.unapplyTypeList(unfn.symbol, unfn.tpe)
+    def resTypes = analyzer.unapplyTypeList(unfn.symbol, unfn.tpe, args.length)
     def resTypesString = resTypes match {
       case Nil  => "Boolean"
       case xs   => xs.mkString(", ")
@@ -411,13 +385,7 @@ trait Patterns extends ast.TreeDSL {
 
   sealed trait ApplyPattern extends Pattern {
     lazy val Apply(fn, args) = tree
-    override def subpatternsForVars: List[Pattern] = toPats(args)
 
-    override def dummies =
-      if (!this.isCaseClass) Nil
-      else emptyPatterns(sufficientType.typeSymbol.caseFieldAccessors.size)
-
-    def isConstructorPattern = fn.isType
     override def covers(sym: Symbol) = newMatchesPattern(sym, fn.tpe)
   }
 
@@ -426,9 +394,6 @@ trait Patterns extends ast.TreeDSL {
 
     // returns either a simplification of this pattern or identity.
     def simplify(pv: PatternVar): Pattern = this
-
-    // the right number of dummies for this pattern
-    def dummies: List[Pattern] = Nil
 
     // Is this a default pattern (untyped "_" or an EmptyTree inserted by the matcher)
     def isDefault = false
@@ -451,7 +416,7 @@ trait Patterns extends ast.TreeDSL {
         (sym.tpe.baseTypeSeq exists (_ matchesPattern pattp))
       }
     }
-    
+
     def    sym  = tree.symbol
     def    tpe  = tree.tpe
     def isEmpty = tree.isEmpty
@@ -459,13 +424,7 @@ trait Patterns extends ast.TreeDSL {
     def isModule    = sym.isModule || tpe.termSymbol.isModule
     def isCaseClass = tpe.typeSymbol.isCase
     def isObject    = (sym != null) && (sym != NoSymbol) && tpe.prefix.isStable  // XXX not entire logic
-
     def hasStar = false
-
-    def setType(tpe: Type): this.type = {
-      tree setType tpe
-      this
-    }
 
     def equalsCheck =
       tracing("equalsCheck")(
@@ -483,7 +442,6 @@ trait Patterns extends ast.TreeDSL {
 
     final override def toString = description
 
-    def toTypeString() = "%s <: x <: %s".format(necessaryType, sufficientType)
     def kindString = ""
   }
 

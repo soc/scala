@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2003-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2003-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://www.scala-lang.org/           **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -72,4 +72,15 @@ case class PublicID(publicId: String, systemId: String) extends ExternalID {
 
   /** always empty */
   def child = Nil
+}
+
+/** A marker used when a `DocType` contains no external id.
+ *
+ *  @author Michael Bayne
+ */
+object NoExternalID extends ExternalID {
+  val publicId = null
+  val systemId = null
+
+  override def toString = ""
 }

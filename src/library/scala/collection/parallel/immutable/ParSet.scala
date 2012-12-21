@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2003-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2003-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -9,7 +9,6 @@
 package scala.collection
 package parallel.immutable
 
-import scala.collection.GenSet
 import scala.collection.generic._
 import scala.collection.parallel.ParSetLike
 import scala.collection.parallel.Combiner
@@ -20,11 +19,11 @@ import scala.collection.parallel.Combiner
  *  @define coll mutable parallel set
  */
 trait ParSet[T]
-extends collection/*.immutable*/.GenSet[T]
+extends scala.collection/*.immutable*/.GenSet[T]
    with GenericParTemplate[T, ParSet]
    with parallel.ParSet[T]
    with ParIterable[T]
-   with ParSetLike[T, ParSet[T], collection.immutable.Set[T]]
+   with ParSetLike[T, ParSet[T], scala.collection.immutable.Set[T]]
 {
 self =>
   override def empty: ParSet[T] = ParHashSet[T]()
