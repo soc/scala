@@ -3735,15 +3735,15 @@ trait Typers extends Modes with Adaptations with Tags {
       packSymbols(localSyms.toList, normalizedTpe)
     }
 
-    def typedClassOf(tree: Tree, tpt: Tree): Tree = {
-      val tpe1 = unwrapToClass(tpt.tpe)
+    def typedClassOf(tree: Tree, tpe0: Type): Tree = {
+      val tpe1 = unwrapToClass(tpe0)
       /** Check that `tpt` refers to a non-refinement class type */
-      val checkClassType = isNonRefinementClassType(tpe1) || errorNotClass(tpt, tpe1)
+      val checkClassType = isNonRefinementClassType(tpe1) || errorNotClass(TypeTree(tpe0), tpe1)
       val tpe2 = widenEnclosedClasses(context.owner, tpe1)
       if (checkClassType)
         atPos(tree.pos)(gen.mkClassOf(tpe2))
       else
-        tpt
+        TypeTree(tpe2)
     }
 
     protected def typedExistentialTypeTree(tree: ExistentialTypeTree, mode: Int): Tree = {
@@ -3786,7 +3786,7 @@ trait Typers extends Modes with Adaptations with Tags {
           val targs = args map (_.tpe)
           checkBounds(tree, NoPrefix, NoSymbol, tparams, targs, "")
           if (fun.symbol == Predef_classOf)
-            typedClassOf(tree, TypeTree(classOfExpressionType(context.owner, args.head.tpe)))
+            typedClassOf(tree, widenEnclosedClasses(context.owner, args.head.tpe))
           else {
             if (!isPastTyper && fun.symbol == Any_isInstanceOf && targs.nonEmpty) {
               val scrutineeType = fun match {
@@ -4767,7 +4767,7 @@ trait Typers extends Modes with Adaptations with Tags {
             // Inferring classOf type parameter from expected type.  Otherwise an
             // actual call to the stubbed classOf method is generated, returning null.
             else if (isPredefMemberNamed(sym, nme.classOf) && pt.typeSymbol == ClassClass && pt.typeArgs.nonEmpty)
-              typedClassOf(tree, TypeTree(pt.typeArgs.head))
+              typedClassOf(tree, widenEnclosedClasses(context.owner, pt.typeArgs.head))
             else {
               val pre1  = if (sym.owner.isPackageClass) sym.owner.thisType else if (qual == EmptyTree) NoPrefix else qual.tpe
               val tree1 = if (qual == EmptyTree) tree else atPos(tree.pos)(Select(atPos(tree.pos.focusStart)(qual), name))
