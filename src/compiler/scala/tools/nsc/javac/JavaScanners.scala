@@ -1,5 +1,5 @@
 /* NSC -- new Scala compiler
- * Copyright 2005-2011 LAMP/EPFL
+ * Copyright 2005-2013 LAMP/EPFL
  * @author  Martin Odersky
  */
 
@@ -11,7 +11,7 @@ import scala.reflect.internal.util._
 import scala.reflect.internal.Chars._
 import JavaTokens._
 import scala.annotation.switch
-import language.implicitConversions
+import scala.language.implicitConversions
 
 // Todo merge these better with Scanners
 trait JavaScanners extends ast.parser.ScannersCommon {
@@ -57,23 +57,14 @@ trait JavaScanners extends ast.parser.ScannersCommon {
   /** ...
    */
   abstract class AbstractJavaScanner extends AbstractJavaTokenData {
-    implicit def p2g(pos: Position): ScanPosition
     implicit def g2p(pos: ScanPosition): Position
 
-    /** the last error position
-     */
-    var errpos: ScanPosition
-    var lastPos: ScanPosition
-    def skipToken: ScanPosition
     def nextToken(): Unit
     def next: AbstractJavaTokenData
     def intVal(negated: Boolean): Long
     def floatVal(negated: Boolean): Double
     def intVal: Long = intVal(false)
     def floatVal: Double = floatVal(false)
-    //def token2string(token : Int) : String = configuration.token2string(token)
-    /** return recent scala doc, if any */
-    def flushDoc: DocComment
     def currentPos: Position
   }
 
@@ -139,7 +130,7 @@ trait JavaScanners extends ast.parser.ScannersCommon {
       kwOffset = offset
       arr
     }
-    final val tokenName = allKeywords map (_.swap) toMap
+    final val tokenName = allKeywords.map(_.swap).toMap
 
 //Token representation -----------------------------------------------------
 
@@ -227,16 +218,8 @@ trait JavaScanners extends ast.parser.ScannersCommon {
   abstract class JavaScanner extends AbstractJavaScanner with JavaTokenData with Cloneable with ScannerCommon {
     override def intVal = super.intVal// todo: needed?
     override def floatVal = super.floatVal
-    override var errpos: Int = NoPos
     def currentPos: Position = g2p(pos - 1)
-
     var in: JavaCharArrayReader = _
-
-    def dup: JavaScanner = {
-      val dup = clone().asInstanceOf[JavaScanner]
-      dup.in = in.dup
-      dup
-    }
 
     /** character buffer for literals
      */
@@ -256,12 +239,6 @@ trait JavaScanners extends ast.parser.ScannersCommon {
      */
     var docBuffer: StringBuilder = null
 
-    def flushDoc: DocComment = {
-      val ret = if (docBuffer != null) DocComment(docBuffer.toString, NoPosition) else null
-      docBuffer = null
-      ret
-    }
-
     /** add the given character to the documentation buffer
      */
     protected def putDocChar(c: Char) {
@@ -276,13 +253,6 @@ trait JavaScanners extends ast.parser.ScannersCommon {
     val prev : JavaTokenData = new JavaTokenData0
 
 // Get next token ------------------------------------------------------------
-
-    /** read next token and return last position
-     */
-    def skipToken: Int = {
-      val p = pos; nextToken
-      p - 1
-    }
 
     def nextToken() {
       if (next.token == EMPTY) {
@@ -308,7 +278,6 @@ trait JavaScanners extends ast.parser.ScannersCommon {
     private def fetchToken() {
       if (token == EOF) return
       lastPos = in.cpos - 1
-      //var index = bp
       while (true) {
         in.ch match {
           case ' ' | '\t' | CR | LF | FF =>
@@ -778,7 +747,7 @@ trait JavaScanners extends ast.parser.ScannersCommon {
      */
     def intVal(negated: Boolean): Long = {
       if (token == CHARLIT && !negated) {
-        if (name.length > 0) name(0) else 0
+        if (name.length > 0) name.charAt(0) else 0
       } else {
         var value: Long = 0
         val divider = if (base == 10) 1 else 2
@@ -787,7 +756,7 @@ trait JavaScanners extends ast.parser.ScannersCommon {
         var i = 0
         val len = name.length
         while (i < len) {
-          val d = digit2int(name(i), base)
+          val d = digit2int(name.charAt(i), base)
           if (d < 0) {
             syntaxError("malformed integer number")
             return 0
@@ -868,7 +837,6 @@ trait JavaScanners extends ast.parser.ScannersCommon {
     def syntaxError(pos: Int, msg: String) {
       error(pos, msg)
       token = ERROR
-      errpos = pos
     }
 
     /** generate an error at the current token position
@@ -879,7 +847,6 @@ trait JavaScanners extends ast.parser.ScannersCommon {
     def incompleteInputError(msg: String) {
       incompleteInputError(pos, msg)
       token = EOF
-      errpos = pos
     }
 
     override def toString() = token match {
@@ -913,16 +880,12 @@ trait JavaScanners extends ast.parser.ScannersCommon {
     }
   }
 
-  /** ...
-   */
   class JavaUnitScanner(unit: CompilationUnit) extends JavaScanner {
     in = new JavaCharArrayReader(unit.source.content, !settings.nouescape.value, syntaxError)
     init
-    def warning(pos: Int, msg: String) = unit.warning(pos, msg)
     def error  (pos: Int, msg: String) = unit.  error(pos, msg)
     def incompleteInputError(pos: Int, msg: String) = unit.incompleteInputError(pos, msg)
     def deprecationWarning(pos: Int, msg: String) = unit.deprecationWarning(pos, msg)
-    implicit def p2g(pos: Position): Int = if (pos.isDefined) pos.point else -1
     implicit def g2p(pos: Int): Position = new OffsetPosition(unit.source, pos)
   }
 }

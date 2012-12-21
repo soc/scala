@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2003-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2003-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -9,9 +9,8 @@
 package scala.collection
 
 import generic._
-import TraversableView.NoBuilder
 import immutable.Stream
-import language.implicitConversions
+import scala.language.implicitConversions
 
 /** A template trait for non-strict views of iterable collections.
  *  $iterableViewInfo
@@ -44,7 +43,7 @@ trait IterableViewLike[+A,
   }
 
   /** Explicit instantiation of the `Transformed` trait to reduce class file size in subclasses. */
-  private[collection] abstract class AbstractTransformed[+B] extends super[TraversableViewLike].Transformed[B] with Transformed[B]
+  private[collection] abstract class AbstractTransformed[+B] extends Iterable[B] with super[TraversableViewLike].Transformed[B] with Transformed[B]
 
   trait EmptyView extends Transformed[Nothing] with super[TraversableViewLike].EmptyView with super[GenIterableViewLike].EmptyView
 

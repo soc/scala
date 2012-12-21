@@ -5,7 +5,10 @@ class D extends B[D] { override def toString = "D" }
 
 class E {
   val ys = List(List(new C), Stream(new D))
+<<<<<<< HEAD
 
+=======
+>>>>>>> master
 }
 
 object Test {

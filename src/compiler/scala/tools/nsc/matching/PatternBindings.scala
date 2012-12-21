@@ -1,5 +1,5 @@
 /* NSC -- new Scala compiler
- * Copyright 2005-2011 LAMP/EPFL
+ * Copyright 2005-2013 LAMP/EPFL
  * Author: Paul Phillips
  */
 
@@ -7,8 +7,7 @@ package scala.tools.nsc
 package matching
 
 import transform.ExplicitOuter
-import PartialFunction._
-import language.postfixOps
+import scala.language.postfixOps
 
 trait PatternBindings extends ast.TreeDSL
 {
@@ -17,7 +16,6 @@ trait PatternBindings extends ast.TreeDSL
   import global.{ typer => _, _ }
   import definitions.{ EqualsPatternClass }
   import CODE._
-  import Debug._
 
   /** EqualsPattern **/
   def isEquals(tpe: Type)             = tpe.typeSymbol == EqualsPatternClass
@@ -60,10 +58,6 @@ trait PatternBindings extends ast.TreeDSL
 
   trait PatternBindingLogic {
     self: Pattern =>
-
-    // This is for traversing the pattern tree - pattern types which might have
-    // bound variables beneath them return a list of said patterns for flatMapping.
-    def subpatternsForVars: List[Pattern] = Nil
 
     // The outermost Bind(x1, Bind(x2, ...)) surrounding the tree.
     private var _boundTree: Tree = tree
@@ -108,8 +102,6 @@ trait PatternBindings extends ast.TreeDSL
       case b @ Bind(_, pat) => b.symbol :: strip(pat)
       case _                => Nil
     }
-    private def deepstrip(t: Tree): List[Symbol] =
-      treeCollect(t, { case x: Bind => x.symbol })
   }
 
   case class Binding(pvar: Symbol, tvar: Symbol) {
@@ -117,9 +109,6 @@ trait PatternBindings extends ast.TreeDSL
   }
 
   class Bindings(private val vlist: List[Binding]) {
-    // if (!vlist.isEmpty)
-    //   traceCategory("Bindings", this.toString)
-
     def get() = vlist
     def toMap = vlist map (x => (x.pvar, x.tvar)) toMap
 

@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2003-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2003-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -31,7 +31,7 @@ trait GenMapLike[A, +B, +Repr] extends GenIterableLike[(A, B), Repr] with Equals
 
   // This hash code must be symmetric in the contents but ought not
   // collide trivially.
-  override def hashCode() = util.hashing.MurmurHash3.mapHash(seq)
+  override def hashCode()= scala.util.hashing.MurmurHash3.mapHash(seq)
 
   /**  Returns the value associated with a key, or a default value if the key is not contained in the map.
    *   @param   key      the key.

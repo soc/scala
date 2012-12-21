@@ -1,5 +1,5 @@
 /* NSC -- new Scala compiler
- * Copyright 2009-2011 Scala Solutions and LAMP/EPFL
+ * Copyright 2009-2013 Typesafe/Scala Solutions and LAMP/EPFL
  * @author Martin Odersky
  */
 package scala.tools.nsc
@@ -8,7 +8,6 @@ package interactive
 import ast.Trees
 import ast.Positions
 import scala.reflect.internal.util.{SourceFile, Position, RangePosition, NoPosition}
-import scala.tools.nsc.util.WorkScheduler
 import scala.collection.mutable.ListBuffer
 
 /** Handling range positions
@@ -41,11 +40,11 @@ self: scala.tools.nsc.Global =>
   /** A position that wraps a set of trees.
    *  The point of the wrapping position is the point of the default position.
    *  If some of the trees are ranges, returns a range position enclosing all ranges
-   *  Otherwise returns default position.
+   *  Otherwise returns default position that is either focused or not.
    */
-  override def wrappingPos(default: Position, trees: List[Tree]): Position = {
+  override def wrappingPos(default: Position, trees: List[Tree], focus: Boolean): Position = {
     val ranged = trees filter (_.pos.isRange)
-    if (ranged.isEmpty) default.focus
+    if (ranged.isEmpty) if (focus) default.focus else default
     else new RangePosition(default.source, (ranged map (_.pos.start)).min, default.point, (ranged map (_.pos.end)).max)
   }
 
@@ -59,13 +58,25 @@ self: scala.tools.nsc.Global =>
     if (headpos.isDefined) wrappingPos(headpos, trees) else headpos
   }
 
-/*
-  override def integratePos(tree: Tree, pos: Position) =
-    if (pos.isSynthetic && !tree.pos.isSynthetic) tree.syntheticDuplicate
-    else tree
-*/
-
   // -------------- ensuring no overlaps -------------------------------
+
+  /** Ensure that given tree has no positions that overlap with
+   *  any of the positions of `others`. This is done by
+   *  shortening the range, assigning TransparentPositions
+   *  to some of the nodes in `tree` or focusing on the position.
+   */
+  override def ensureNonOverlapping(tree: Tree, others: List[Tree], focus: Boolean) {
+    def isOverlapping(pos: Position) =
+      pos.isRange && (others exists (pos overlaps _.pos))
+    if (isOverlapping(tree.pos)) {
+      val children = tree.children
+      children foreach (ensureNonOverlapping(_, others, focus))
+      if (tree.pos.isOpaqueRange) {
+        val wpos = wrappingPos(tree.pos, children, focus)
+        tree setPos (if (isOverlapping(wpos)) tree.pos.makeTransparent else wpos)
+      }
+    }
+  }
 
   def solidDescendants(tree: Tree): List[Tree] =
     if (tree.pos.isTransparent) tree.children flatMap solidDescendants
@@ -106,24 +117,6 @@ self: scala.tools.nsc.Global =>
     if (ts.head == t) replacement ::: ts.tail
     else ts.head :: replace(ts.tail, t, replacement)
 
-  /** Ensure that given tree has no positions that overlap with
-   *  any of the positions of `others`. This is done by
-   *  shortening the range or assigning TransparentPositions
-   *  to some of the nodes in `tree`.
-   */
-  override def ensureNonOverlapping(tree: Tree, others: List[Tree]) {
-    def isOverlapping(pos: Position) =
-      pos.isRange && (others exists (pos overlaps _.pos))
-    if (isOverlapping(tree.pos)) {
-      val children = tree.children
-      children foreach (ensureNonOverlapping(_, others))
-      if (tree.pos.isOpaqueRange) {
-        val wpos = wrappingPos(tree.pos.focus, children)
-        tree setPos (if (isOverlapping(wpos)) tree.pos.makeTransparent else wpos)
-      }
-    }
-  }
-
   /** Does given list of trees have mutually non-overlapping positions?
    *  pre: None of the trees is transparent
    */
@@ -150,7 +143,7 @@ self: scala.tools.nsc.Global =>
    */
   private def setChildrenPos(pos: Position, trees: List[Tree]): Unit = try {
     for (tree <- trees) {
-      if (!tree.isEmpty && tree.pos == NoPosition) {
+      if (!tree.isEmpty && tree.canHaveAttrs && tree.pos == NoPosition) {
         val children = tree.children
         if (children.isEmpty) {
           tree setPos pos.focus
@@ -171,7 +164,7 @@ self: scala.tools.nsc.Global =>
    */
   override def atPos[T <: Tree](pos: Position)(tree: T): T = {
     if (pos.isOpaqueRange) {
-      if (!tree.isEmpty && tree.pos == NoPosition) {
+      if (!tree.isEmpty && tree.canHaveAttrs && tree.pos == NoPosition) {
         tree.setPos(pos)
         val children = tree.children
         if (children.nonEmpty) {
@@ -209,7 +202,7 @@ self: scala.tools.nsc.Global =>
 
     def validate(tree: Tree, encltree: Tree): Unit = {
 
-      if (!tree.isEmpty) {
+      if (!tree.isEmpty && tree.canHaveAttrs) {
         if (settings.Yposdebug.value && (settings.verbose.value || settings.Yrangepos.value))
           println("[%10s] %s".format("validate", treeStatus(tree, encltree)))
 

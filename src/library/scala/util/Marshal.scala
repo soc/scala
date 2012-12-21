@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2008-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2008-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -37,8 +37,6 @@ object Marshal {
     val in = new ObjectInputStream(new ByteArrayInputStream(buffer))
     val found = in.readObject.asInstanceOf[ClassTag[_]]
     try {
-      // [Eugene] needs review
-      // previously was: found <:< expected
       found.runtimeClass.asSubclass(expected.runtimeClass)
       in.readObject.asInstanceOf[A]
     } catch {

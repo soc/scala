@@ -1,68 +1,96 @@
 package scala.reflect
 package api
 
-import language.experimental.macros
-
-abstract class Universe extends base.Universe
-                           with Symbols
+/**
+ * <span class="badge badge-red" style="float: right;">EXPERIMENTAL</span>
+ *
+ * `Universe` provides a complete set of reflection operations which make it possible for one
+ * to reflectively inspect Scala type relations, such as membership or subtyping.
+ *
+ * [[scala.reflect.api.Universe]] has two specialized sub-universes for different scenarios.
+ * [[scala.reflect.api.JavaUniverse]] adds operations that link symbols and types to the underlying
+ * classes and runtime values of a JVM instance-- this can be thought of as the `Universe` that
+ * should be used for all typical use-cases of Scala reflection. [[scala.reflect.macros.Universe]]
+ * adds operations which allow macros to access selected compiler data structures and operations--
+ * this type of `Universe` should only ever exist within the implementation of a Scala macro.
+ *
+ * `Universe` can be thought of as the entry point to Scala reflection. It mixes-in, and thus provides
+ * an interface to the following main types:
+ *
+ *   - [[scala.reflect.api.Types#Type Types]] represent types
+ *   - [[scala.reflect.api.Symbols#Symbol Symbols]] represent definitions
+ *   - [[scala.reflect.api.Trees#Tree Trees]] represent abstract syntax trees
+ *   - [[scala.reflect.api.Names#Name Names]] represent term and type names
+ *   - [[scala.reflect.api.Annotations#Annotation Annotations]] represent annotations
+ *   - [[scala.reflect.api.Positions#Position Positions]] represent source positions of tree nodes
+ *   - [[scala.reflect.api.FlagSets#FlagSet FlagSet]] represent sets of flags that apply to symbols and
+ *     definition trees
+ *   - [[scala.reflect.api.Constants#Constant Constants]] represent compile-time constants.
+ *
+ * To obtain a `Universe` to use with Scala runtime reflection, simply make sure to use or import
+ * `scala.reflect.runtime.universe._`
+ *   {{{
+ *   scala> import scala.reflect.runtime.universe._
+ *   import scala.reflect.runtime.universe._
+ *
+ *   scala> typeOf[List[Int]]
+ *   res0: reflect.runtime.universe.Type = scala.List[Int]
+ *
+ *   scala> typeOf[Either[String, Int]]
+ *   res1: reflect.runtime.universe.Type = scala.Either[String,Int]
+ *   }}}
+ *
+ * To obtain a `Universe` for use within a Scala macro, use [[scala.reflect.macros.Context#universe]]. For example:
+ * {{{
+ *  def printf(format: String, params: Any*): Unit = macro impl
+ *  def impl(c: Context)(format: c.Expr[String], params: c.Expr[Any]*): c.Expr[Unit] = {
+ *    import c.universe._
+ *    ...
+ *  }
+ * }}}
+ *
+ * For more information about `Universe`s, see the [[http://docs.scala-lang.org/overviews/reflection/environment-universes-mirrors.html Reflection Guide: Universes]]
+ *
+ *  @groupprio Universe -1
+ *  @group ReflectionAPI
+ *
+ *  @contentDiagram hideNodes "*Api"
+ */
+abstract class Universe extends Symbols
                            with Types
                            with FlagSets
+                           with Scopes
                            with Names
                            with Trees
-                           with TreePrinters
                            with Constants
+                           with Annotations
                            with Positions
-                           with Mirrors
+                           with Exprs
+                           with TypeTags
+                           with TagInterop
                            with StandardDefinitions
                            with StandardNames
+                           with BuildUtils
+                           with Mirrors
+                           with Printers
                            with Importers
-                           with Exprs
-                           with AnnotationInfos
 {
-
-  /** Given an expression, generate a tree that when compiled and executed produces the original tree.
-   *  The produced tree will be bound to the Universe it was called from.
+  /** Use `refiy` to produce the abstract syntax tree representing a given Scala expression.
    *
-   *  For instance, given the abstract syntax tree representation of the <[ x + 1 ]> expression:
+   * For example:
    *
-   *  {{{
-   *    Apply(Select(Ident("x"), "+"), List(Literal(Constant(1))))
-   *  }}}
+   * {{{
+   * val five = reify{ 5 }    // Literal(Constant(5))
+   * reify{ 2 + 4 }           // Apply( Select( Literal(Constant(2)), newTermName("\$plus")), List( Literal(Constant(4)) ) )
+   * reify{ five.splice + 4 } // Apply( Select( Literal(Constant(5)), newTermName("\$plus")), List( Literal(Constant(4)) ) )
+   * }}}
    *
-   *  The reifier transforms it to the following expression:
+   * The produced tree is path dependent on the Universe `reify` was called from.
    *
-   *  {{{
-   *    <[
-   *      val $u: u.type = u // where u is a reference to the Universe that calls the reify
-   *      $u.Expr[Int]($u.Apply($u.Select($u.Ident($u.newFreeVar("x", <Int>, x), "+"), List($u.Literal($u.Constant(1))))))
-   *    ]>
-   *  }}}
-   *
-   *  Reification performs expression splicing (when processing Expr.splice)
-   *  and type splicing (for every type T that has a TypeTag[T] implicit in scope):
-   *
-   *  {{{
-   *    val two = mirror.reify(2)                         // Literal(Constant(2))
-   *    val four = mirror.reify(two.splice + two.splice)  // Apply(Select(two.tree, newTermName("$plus")), List(two.tree))
-   *
-   *    def macroImpl[T](c: Context) = {
-   *      ...
-   *      // T here is just a type parameter, so the tree produced by reify won't be of much use in a macro expansion
-   *      // however, if T were annotated with c.TypeTag (which would declare an implicit parameter for macroImpl)
-   *      // then reification would subtitute T with the TypeTree that was used in a TypeApply of this particular macro invocation
-   *      val factory = c.reify{ new Queryable[T] }
-   *      ...
-   *    }
-   *  }}}
-   *
-   *  The transformation looks mostly straightforward, but it has its tricky parts:
-   *    * Reifier retains symbols and types defined outside the reified tree, however
-   *      locally defined entities get erased and replaced with their original trees
-   *    * Free variables are detected and wrapped in symbols of the type FreeVar
-   *    * Mutable variables that are accessed from a local function are wrapped in refs
-   *    * Since reified trees can be compiled outside of the scope they've been created in,
-   *      special measures are taken to ensure that all members accessed in the reifee remain visible
+   * Use [[scala.reflect.api.Exprs#Expr.splice]] to embed an existing expression into a `reify` call. Use [[Expr]] to turn a [[Tree]] into an expression that can be spliced.
+   * @group Universe
    */
-  // implementation is magically hardwired to `scala.reflect.reify.Taggers`
-  def reify[T](expr: T): Expr[T] = macro ???
+  // implementation is hardwired to `scala.reflect.reify.Taggers`
+  // using the mechanism implemented in `scala.tools.reflect.FastTrack`
+  def reify[T](expr: T): Expr[T] = ??? // macro
 }

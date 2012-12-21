@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2003-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2003-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -12,7 +12,7 @@ package parsing
 import scala.io.Source
 
 /** An XML Parser that preserves `CDATA` blocks and knows about
- *  [[scala.xml.parsing.HtmlEntities]].
+ *  [[scala.xml.parsing.XhtmlEntities]].
  *
  *  @author (c) David Pollak, 2007 WorldWide Conferencing, LLC.
  */

@@ -1,16 +1,13 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2003-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2003-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
 \*                                                                      */
 
-
-
 package scala.collection
 package mutable
-import generic._
 
 /** A subtrait of scala.collection.IndexedSeq which represents sequences
  *  that can be mutated.
@@ -36,7 +33,7 @@ import generic._
  *  @define willNotTerminateInf
  *  @define mayNotTerminateInf
  */
-trait IndexedSeqLike[A, +Repr] extends scala.collection.IndexedSeqLike[A, Repr] { self =>
+trait IndexedSeqLike[A, +Repr] extends Any with scala.collection.IndexedSeqLike[A, Repr] { self =>
 
   override protected[this] def thisCollection: IndexedSeq[A] = this.asInstanceOf[IndexedSeq[A]]
   override protected[this] def toCollection(repr: Repr): IndexedSeq[A] = repr.asInstanceOf[IndexedSeq[A]]

@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2006-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2006-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://www.scala-lang.org/           **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -12,7 +12,7 @@ package convert
 import java.{ lang => jl, util => ju }, java.util.{ concurrent => juc }
 import Decorators._
 import WrapAsJava._
-import language.implicitConversions
+import scala.language.implicitConversions
 
 
 /** A collection of decorators that allow to convert between
@@ -313,6 +313,6 @@ trait DecorateAsJava {
    * @return An object with an `asJava` method that returns a Java
    *         `ConcurrentMap` view of the argument.
    */
-  implicit def asJavaConcurrentMapConverter[A, B](m: concurrent.Map[A, B]): AsJava[juc.ConcurrentMap[A, B]] =
-    new AsJava(asJavaConcurrentMap(m))
+  implicit def mapAsJavaConcurrentMapConverter[A, B](m: concurrent.Map[A, B]): AsJava[juc.ConcurrentMap[A, B]] =
+    new AsJava(mapAsJavaConcurrentMap(m))
 }

@@ -1,12 +1,12 @@
 /* NSC -- new Scala compiler
- * Copyright 2005-2011 LAMP/EPFL
+ * Copyright 2005-2013 LAMP/EPFL
  * @author  Martin Odersky
  */
 
 package scala.tools.nsc
 package typechecker
 
-import util.Statistics._
+import scala.reflect.internal.util.Statistics
 
 /** The main attribution phase.
  */
@@ -72,6 +72,7 @@ trait Analyzer extends AnyRef
   }
 
   object typerFactory extends SubComponent {
+    import scala.reflect.internal.TypesStats.typerNanos
     val global: Analyzer.this.global.type = Analyzer.this.global
     val phaseName = "typer"
     val runsAfter = List[String]()
@@ -84,24 +85,27 @@ trait Analyzer extends AnyRef
       // compiler run). This is good enough for the resident compiler, which was the most affected.
       undoLog.clear()
       override def run() {
-        val start = startTimer(typerNanos)
+        val start = if (Statistics.canEnable) Statistics.startTimer(typerNanos) else null
         global.echoPhaseSummary(this)
-        currentRun.units foreach applyPhase
-        undoLog.clear()
-        // need to clear it after as well or 10K+ accumulated entries are
-        // uncollectable the rest of the way.
-        stopTimer(typerNanos, start)
+        for (unit <- currentRun.units) {
+          applyPhase(unit)
+          undoLog.clear()
+        }
+        if (Statistics.canEnable) Statistics.stopTimer(typerNanos, start)
       }
       def apply(unit: CompilationUnit) {
         try {
-          unit.body = newTyper(rootContext(unit)).typed(unit.body)
+          val typer = newTyper(rootContext(unit))
+          unit.body = typer.typed(unit.body)
           if (global.settings.Yrangepos.value && !global.reporter.hasErrors) global.validatePositions(unit.body)
           for (workItem <- unit.toCheck) workItem()
-        } finally {
+          if (settings.lint.value)
+            typer checkUnused unit
+        }
+        finally {
           unit.toCheck.clear()
         }
       }
     }
   }
 }
-

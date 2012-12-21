@@ -1,15 +1,16 @@
 /* NSC -- new scala compiler
- * Copyright 2005-2011 LAMP/EPFL
+ * Copyright 2005-2013 LAMP/EPFL
  * @author  Martin Odersky
  */
 
 package scala.reflect
 package internal
 
+import scala.annotation.elidable
 import scala.collection.{ mutable, immutable }
 import util._
 
-abstract class SymbolTable extends makro.Universe
+abstract class SymbolTable extends macros.Universe
                               with Collections
                               with Names
                               with Symbols
@@ -28,7 +29,7 @@ abstract class SymbolTable extends makro.Universe
                               with AnnotationInfos
                               with AnnotationCheckers
                               with Trees
-                              with TreePrinters
+                              with Printers
                               with Positions
                               with TypeDebugging
                               with Importers
@@ -40,28 +41,36 @@ abstract class SymbolTable extends makro.Universe
 {
 
   val gen = new TreeGen { val global: SymbolTable.this.type = SymbolTable.this }
-  val treeBuild = gen
+  lazy val treeBuild = gen
 
   def log(msg: => AnyRef): Unit
-  def abort(msg: String): Nothing = throw new FatalError(supplementErrorMessage(msg))
+  def warning(msg: String): Unit     = Console.err.println(msg)
+  def globalError(msg: String): Unit = abort(msg)
+  def abort(msg: String): Nothing    = throw new FatalError(supplementErrorMessage(msg))
+
+  def shouldLogAtThisPhase = false
+  def isPastTyper = false
 
   @deprecated("Give us a reason", "2.10.0")
   def abort(): Nothing = abort("unknown error")
 
+  @deprecated("Use devWarning if this is really a warning; otherwise use log", "2.11.0")
+  def debugwarn(msg: => String): Unit = devWarning(msg)
+
   /** Override with final implementation for inlining. */
   def debuglog(msg:  => String): Unit = if (settings.debug.value) log(msg)
-  def debugwarn(msg: => String): Unit = if (settings.debug.value) Console.err.println(msg)
+  def devWarning(msg: => String): Unit = if (settings.debug.value) Console.err.println(msg)
   def throwableAsString(t: Throwable): String = "" + t
 
   /** Prints a stack trace if -Ydebug or equivalent was given, otherwise does nothing. */
-  def debugStack(t: Throwable): Unit  = debugwarn(throwableAsString(t))
+  def debugStack(t: Throwable): Unit  = devWarning(throwableAsString(t))
 
   /** Overridden when we know more about what was happening during a failure. */
   def supplementErrorMessage(msg: String): String = msg
 
   private[scala] def printCaller[T](msg: String)(result: T) = {
     Console.err.println("%s: %s\nCalled from: %s".format(msg, result,
-      (new Throwable).getStackTrace.drop(2).take(15).mkString("\n")))
+      (new Throwable).getStackTrace.drop(2).take(50).mkString("\n")))
 
     result
   }
@@ -70,11 +79,13 @@ abstract class SymbolTable extends makro.Universe
     Console.err.println(msg + ": " + result)
     result
   }
-  private[scala] def logResult[T](msg: String)(result: T): T = {
+  @inline
+  final private[scala] def logResult[T](msg: => String)(result: T): T = {
     log(msg + ": " + result)
     result
   }
-  private[scala] def logResultIf[T](msg: String, cond: T => Boolean)(result: T): T = {
+  @inline
+  final private[scala] def logResultIf[T](msg: => String, cond: T => Boolean)(result: T): T = {
     if (cond(result))
       log(msg + ": " + result)
 
@@ -101,11 +112,10 @@ abstract class SymbolTable extends makro.Universe
     val global: SymbolTable.this.type = SymbolTable.this
   } with util.TraceSymbolActivity
 
-  /** Are we compiling for Java SE? */
-  // def forJVM: Boolean
-
-  /** Are we compiling for .NET? */
-  def forMSIL: Boolean = false
+  /** Check that the executing thread is the compiler thread. No-op here,
+   *  overridden in interactive.Global. */
+  @elidable(elidable.WARNING)
+  def assertCorrectThread() {}
 
   /** A last effort if symbol in a select <owner>.<name> is not found.
    *  This is overridden by the reflection compiler to make up a package
@@ -127,13 +137,17 @@ abstract class SymbolTable extends makro.Universe
   type RunId = Int
   final val NoRunId = 0
 
-  // sigh, this has to be public or atPhase doesn't inline.
+  // sigh, this has to be public or enteringPhase doesn't inline.
   var phStack: List[Phase] = Nil
-  private var ph: Phase = NoPhase
-  private var per = NoPeriod
+  private[this] var ph: Phase = NoPhase
+  private[this] var per = NoPeriod
 
   final def atPhaseStack: List[Phase] = phStack
-  final def phase: Phase = ph
+  final def phase: Phase = {
+    if (Statistics.hotEnabled)
+      Statistics.incCounter(SymbolTableStats.phaseCounter)
+    ph
+  }
 
   def atPhaseStackMessage = atPhaseStack match {
     case Nil    => ""
@@ -166,9 +180,6 @@ abstract class SymbolTable extends makro.Universe
   /** The phase identifier of the given period. */
   final def phaseId(period: Period): Phase#Id = period & 0xFF
 
-  /** The period at the start of run that includes `period`. */
-  final def startRun(period: Period): Period = period & 0xFFFFFF00
-
   /** The current period. */
   final def currentPeriod: Period = {
     //assert(per == (currentRunId << 8) + phase.id)
@@ -186,23 +197,17 @@ abstract class SymbolTable extends makro.Universe
     p != NoPhase && phase.id > p.id
 
   /** Perform given operation at given phase. */
-  @inline final def atPhase[T](ph: Phase)(op: => T): T = {
+  @inline final def enteringPhase[T](ph: Phase)(op: => T): T = {
     val saved = pushPhase(ph)
     try op
     finally popPhase(saved)
   }
 
+  @inline final def exitingPhase[T](ph: Phase)(op: => T): T = enteringPhase(ph.next)(op)
+  @inline final def enteringPrevPhase[T](op: => T): T       = enteringPhase(phase.prev)(op)
 
-  /** Since when it is to be "at" a phase is inherently ambiguous,
-   *  a couple unambiguously named methods.
-   */
-  @inline final def beforePhase[T](ph: Phase)(op: => T): T = atPhase(ph)(op)
-  @inline final def afterPhase[T](ph: Phase)(op: => T): T  = atPhase(ph.next)(op)
-  @inline final def afterCurrentPhase[T](op: => T): T      = atPhase(phase.next)(op)
-  @inline final def beforePrevPhase[T](op: => T): T        = atPhase(phase.prev)(op)
-
-  @inline final def atPhaseNotLaterThan[T](target: Phase)(op: => T): T =
-    if (isAtPhaseAfter(target)) atPhase(target)(op) else op
+  @inline final def enteringPhaseNotLaterThan[T](target: Phase)(op: => T): T =
+    if (isAtPhaseAfter(target)) enteringPhase(target)(op) else op
 
   final def isValid(period: Period): Boolean =
     period != 0 && runId(period) == currentRunId && {
@@ -287,7 +292,6 @@ abstract class SymbolTable extends makro.Universe
 
   object perRunCaches {
     import java.lang.ref.WeakReference
-    import scala.runtime.ScalaRunTime.stringOf
     import scala.collection.generic.Clearable
 
     // Weak references so the garbage collector will take care of
@@ -329,4 +333,18 @@ abstract class SymbolTable extends makro.Universe
   /** Is this symbol table a part of a compiler universe?
    */
   def isCompilerUniverse = false
+
+  @deprecated("Use enteringPhase", "2.10.0")
+  @inline final def atPhase[T](ph: Phase)(op: => T): T = enteringPhase(ph)(op)
+  @deprecated("Use enteringPhaseNotLaterThan", "2.10.0")
+  @inline final def atPhaseNotLaterThan[T](target: Phase)(op: => T): T = enteringPhaseNotLaterThan(target)(op)
+
+  /**
+   * Adds the `sm` String interpolator to a [[scala.StringContext]].
+   */
+  implicit val StringContextStripMarginOps: StringContext => StringContextStripMarginOps = util.StringContextStripMarginOps
+}
+
+object SymbolTableStats {
+  val phaseCounter = Statistics.newCounter("#phase calls")
 }

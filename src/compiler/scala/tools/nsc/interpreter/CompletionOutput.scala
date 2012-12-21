@@ -1,5 +1,5 @@
 /* NSC -- new Scala compiler
- * Copyright 2005-2011 LAMP/EPFL
+ * Copyright 2005-2013 LAMP/EPFL
  * @author Paul Phillips
  */
 
@@ -38,7 +38,6 @@ trait CompletionOutput {
 
     def relativize(str: String): String = quietString(str stripPrefix (pkg + "."))
     def relativize(tp: Type): String    = relativize(tp.normalize.toString)
-    def relativize(sym: Symbol): String = relativize(sym.info)
 
     def braceList(tparams: List[String]) = if (tparams.isEmpty) "" else (tparams map relativize).mkString("[", ", ", "]")
     def parenList(params: List[Any])  = params.mkString("(", ", ", ")")

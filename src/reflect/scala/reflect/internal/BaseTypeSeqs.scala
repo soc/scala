@@ -1,5 +1,5 @@
 /* NSC -- new Scala compiler
- * Copyright 2005-2011 LAMP/EPFL
+ * Copyright 2005-2013 LAMP/EPFL
  * @author  Martin Odersky
  */
 package scala.reflect
@@ -7,8 +7,8 @@ package internal
 
 // todo implement in terms of BitSet
 import scala.collection.{ mutable, immutable }
-import math.max
-import util.Statistics._
+import scala.math.max
+import util.Statistics
 
 /** A base type sequence (BaseTypeSeq) is an ordered sequence spanning all the base types
  *  of a type. It characterized by the following two laws:
@@ -28,6 +28,7 @@ import util.Statistics._
 trait BaseTypeSeqs {
   this: SymbolTable =>
   import definitions._
+  import BaseTypeSeqsStats._
 
   protected def newBaseTypeSeq(parents: List[Type], elems: Array[Type]) =
     new BaseTypeSeq(parents, elems)
@@ -38,8 +39,8 @@ trait BaseTypeSeqs {
    */
   class BaseTypeSeq protected[BaseTypeSeqs] (private[BaseTypeSeqs] val parents: List[Type], private[BaseTypeSeqs] val elems: Array[Type]) {
   self =>
-    incCounter(baseTypeSeqCount)
-    incCounter(baseTypeSeqLenTotal, elems.length)
+    if (Statistics.canEnable) Statistics.incCounter(baseTypeSeqCount)
+    if (Statistics.canEnable) Statistics.incCounter(baseTypeSeqLenTotal, elems.length)
 
     /** The number of types in the sequence */
     def length: Int = elems.length
@@ -59,7 +60,7 @@ trait BaseTypeSeqs {
         elems(i) match {
           case rtp @ RefinedType(variants, decls) =>
             // can't assert decls.isEmpty; see t0764
-            //if (!decls.isEmpty) assert(false, "computing closure of "+this+":"+this.isInstanceOf[RefinedType]+"/"+closureCache(j))
+            //if (!decls.isEmpty) abort("computing closure of "+this+":"+this.isInstanceOf[RefinedType]+"/"+closureCache(j))
             //Console.println("compute closure of "+this+" => glb("+variants+")")
             pending += i
             try {
@@ -98,7 +99,7 @@ trait BaseTypeSeqs {
 
     def copy(head: Type, offset: Int): BaseTypeSeq = {
       val arr = new Array[Type](elems.length + offset)
-      compat.Platform.arraycopy(elems, 0, arr, offset, elems.length)
+      scala.compat.Platform.arraycopy(elems, 0, arr, offset, elems.length)
       arr(0) = head
       newBaseTypeSeq(parents, arr)
     }
@@ -114,7 +115,7 @@ trait BaseTypeSeqs {
     def map(f: Type => Type): BaseTypeSeq = {
 	  // inlined `elems map f` for performance
       val len = length
-      var arr = new Array[Type](len)
+      val arr = new Array[Type](len)
       var i = 0
       while (i < len) {
         arr(i) = f(elems(i))
@@ -157,7 +158,7 @@ trait BaseTypeSeqs {
     val parents = tp.parents
 //    Console.println("computing baseTypeSeq of " + tsym.tpe + " " + parents)//DEBUG
     val buf = new mutable.ListBuffer[Type]
-    buf += tsym.tpe
+    buf += tsym.tpe_*
     var btsSize = 1
     if (parents.nonEmpty) {
       val nparents = parents.length
@@ -225,9 +226,14 @@ trait BaseTypeSeqs {
     override def map(g: Type => Type) = lateMap(g)
     override def lateMap(g: Type => Type) = orig.lateMap(x => g(f(x)))
     override def exists(p: Type => Boolean) = elems exists (x => p(f(x)))
-    override protected def maxDepthOfElems: Int = elems map (x => typeDepth(f(x))) max
+    override protected def maxDepthOfElems: Int = elems.map(x => typeDepth(f(x))).max
     override def toString = elems.mkString("MBTS(", ",", ")")
   }
 
   val CyclicInheritance = new Throwable
+}
+
+object BaseTypeSeqsStats {
+  val baseTypeSeqCount = Statistics.newCounter("#base type seqs")
+  val baseTypeSeqLenTotal = Statistics.newRelCounter("avg base type seq length", baseTypeSeqCount)
 }

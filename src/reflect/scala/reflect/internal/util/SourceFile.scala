@@ -1,14 +1,14 @@
 /* NSC -- new Scala compiler
- * Copyright 2005-2011 LAMP/EPFL
+ * Copyright 2005-2013 LAMP/EPFL
  * @author  Martin Odersky
  */
 
 
 package scala.reflect.internal.util
 
-import scala.tools.nsc.io.{ AbstractFile, VirtualFile }
+import scala.reflect.io.{ AbstractFile, VirtualFile }
 import scala.collection.mutable.ArrayBuffer
-import annotation.tailrec
+import scala.annotation.tailrec
 import java.util.regex.Pattern
 import java.io.IOException
 import scala.reflect.internal.Chars._
@@ -24,7 +24,6 @@ abstract class SourceFile {
     assert(offset < length, file + ": " + offset + " >= " + length)
     new OffsetPosition(this, offset)
   }
-  def position(line: Int, column: Int) : Position = new OffsetPosition(this, lineToOffset(line) + column)
 
   def offsetToLine(offset: Int): Int
   def lineToOffset(index : Int): Int
@@ -37,11 +36,8 @@ abstract class SourceFile {
   def dbg(offset: Int) = (new OffsetPosition(this, offset)).dbgString
   def path = file.path
 
-  def beginsWith(offset: Int, text: String): Boolean =
-    (content drop offset) startsWith text
-
   def lineToString(index: Int): String =
-    content drop lineToOffset(index) takeWhile (c => !isLineBreakChar(c.toChar)) mkString
+    content drop lineToOffset(index) takeWhile (c => !isLineBreakChar(c.toChar)) mkString ""
 
   @tailrec
   final def skipWhitespace(offset: Int): Int =
@@ -81,7 +77,6 @@ object ScriptSourceFile {
     }
     else 0
   }
-  def stripHeader(cs: Array[Char]): Array[Char] = cs drop headerLength(cs)
 
   def apply(file: AbstractFile, content: Array[Char]) = {
     val underlying = new BatchSourceFile(file, content)
@@ -91,28 +86,31 @@ object ScriptSourceFile {
     stripped
   }
 }
-import ScriptSourceFile._
 
 class ScriptSourceFile(underlying: BatchSourceFile, content: Array[Char], override val start: Int) extends BatchSourceFile(underlying.file, content) {
   override def isSelfContained = false
 
   override def positionInUltimateSource(pos: Position) =
     if (!pos.isDefined) super.positionInUltimateSource(pos)
-    else new OffsetPosition(underlying, pos.point + start)
+    else pos.withSource(underlying, start)
 }
 
 /** a file whose contents do not change over time */
-class BatchSourceFile(val file : AbstractFile, val content: Array[Char]) extends SourceFile {
-
+class BatchSourceFile(val file : AbstractFile, val content0: Array[Char]) extends SourceFile {
   def this(_file: AbstractFile)                 = this(_file, _file.toCharArray)
   def this(sourceName: String, cs: Seq[Char])   = this(new VirtualFile(sourceName), cs.toArray)
   def this(file: AbstractFile, cs: Seq[Char])   = this(file, cs.toArray)
 
-  override def equals(that : Any) = that match {
-    case that : BatchSourceFile => file.path == that.file.path && start == that.start
-    case _ => false
-  }
-  override def hashCode = file.path.## + start.##
+  // If non-whitespace tokens run all the way up to EOF,
+  // positions go wrong because the correct end of the last
+  // token cannot be used as an index into the char array.
+  // The least painful way to address this was to add a
+  // newline to the array.
+  val content = (
+    if (content0.length == 0 || !content0.last.isWhitespace)
+      content0 :+ '\n'
+    else content0
+  )
   val length = content.length
   def start = 0
   def isSelfContained = true
@@ -158,4 +156,10 @@ class BatchSourceFile(val file : AbstractFile, val content: Array[Char]) extends
     lastLine = findLine(0, lines.length, lastLine)
     lastLine
   }
+
+  override def equals(that : Any) = that match {
+    case that : BatchSourceFile => file.path == that.file.path && start == that.start
+    case _ => false
+  }
+  override def hashCode = file.path.## + start.##
 }

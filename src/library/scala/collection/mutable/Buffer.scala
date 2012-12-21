@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2003-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2003-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -28,10 +28,10 @@ import generic._
  *  @define Coll `Buffer`
  *  @define coll buffer
  */
-@cloneable
 trait Buffer[A] extends Seq[A]
                    with GenericTraversableTemplate[A, Buffer]
-                   with BufferLike[A, Buffer[A]] {
+                   with BufferLike[A, Buffer[A]]
+                   with scala.Cloneable {
   override def companion: GenericCompanion[Buffer] = Buffer
 }
 

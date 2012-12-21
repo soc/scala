@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2003-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2003-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -24,13 +24,13 @@ import scala.collection.GenIterable
 import scala.collection.GenTraversableOnce
 import scala.collection.GenTraversable
 import immutable.HashMapCombiner
-import reflect.{ClassTag, classTag}
+import scala.reflect.{ClassTag, classTag}
 
 import java.util.concurrent.atomic.AtomicBoolean
 
-import annotation.unchecked.uncheckedVariance
-import annotation.unchecked.uncheckedStable
-import language.implicitConversions
+import scala.annotation.unchecked.uncheckedVariance
+import scala.annotation.unchecked.uncheckedStable
+import scala.language.{ higherKinds, implicitConversions }
 
 
 /** A template trait for parallel collections of type `ParIterable[T]`.
@@ -71,6 +71,10 @@ import language.implicitConversions
  *  which splits the splitter into a sequence of disjunct subsplitters. This is typically a
  *  very fast operation which simply creates wrappers around the receiver collection.
  *  This can be repeated recursively.
+ *
+ *  Tasks are scheduled for execution through a
+ *  [[scala.collection.parallel.TaskSupport]] object, which can be changed
+ *  through the `tasksupport` setter of the collection.
  *
  *  Method `newCombiner` produces a new combiner. Combiners are an extension of builders.
  *  They provide a method `combine` which combines two combiners and returns a combiner
@@ -165,6 +169,11 @@ self: ParIterableLike[T, Repr, Sequential] =>
     _tasksupport = defaultTaskSupport
   }
 
+  /** The task support object which is responsible for scheduling and
+   *  load-balancing tasks to processors.
+   *
+   *  @see [[scala.collection.parallel.TaskSupport]]
+   */
   def tasksupport = {
     val ts = _tasksupport
     if (ts eq null) {
@@ -173,6 +182,24 @@ self: ParIterableLike[T, Repr, Sequential] =>
     } else ts
   }
 
+  /** Changes the task support object which is responsible for scheduling and
+   *  load-balancing tasks to processors.
+   *
+   *  A task support object can be changed in a parallel collection after it
+   *  has been created, but only during a quiescent period, i.e. while there
+   *  are no concurrent invocations to parallel collection methods.
+   *
+   *  Here is a way to change the task support of a parallel collection:
+   *
+   *  {{{
+   *  import scala.collection.parallel._
+   *  val pc = mutable.ParArray(1, 2, 3)
+   *  pc.tasksupport = new ForkJoinTaskSupport(
+   *    new scala.concurrent.forkjoin.ForkJoinPool(2))
+   *  }}}
+   *
+   *  @see [[scala.collection.parallel.TaskSupport]]
+   */
   def tasksupport_=(ts: TaskSupport) = _tasksupport = ts
 
   def seq: Sequential
@@ -236,7 +263,7 @@ self: ParIterableLike[T, Repr, Sequential] =>
   /** The `newBuilder` operation returns a parallel builder assigned to this collection's fork/join pool.
    *  This method forwards the call to `newCombiner`.
    */
-  //protected[this] def newBuilder: collection.mutable.Builder[T, Repr] = newCombiner
+  //protected[this] def newBuilder: scala.collection.mutable.Builder[T, Repr] = newCombiner
 
   /** Optionally reuses an existing combiner for better performance. By default it doesn't - subclasses may override this behaviour.
    *  The provided combiner `oldc` that can potentially be reused will be either some combiner from the previous computational task, or `None` if there
@@ -406,12 +433,13 @@ self: ParIterableLike[T, Repr, Sequential] =>
    *  @tparam S        the type of accumulated results
    *  @param z         the initial value for the accumulated result of the partition - this
    *                   will typically be the neutral element for the `seqop` operator (e.g.
-   *                   `Nil` for list concatenation or `0` for summation)
+   *                   `Nil` for list concatenation or `0` for summation) and may be evaluated
+   *                   more than once
    *  @param seqop     an operator used to accumulate results within a partition
    *  @param combop    an associative operator used to combine results from different partitions
    */
-  def aggregate[S](z: S)(seqop: (S, T) => S, combop: (S, S) => S): S = {
-    tasksupport.executeAndWaitResult(new Aggregate(z, seqop, combop, splitter))
+  def aggregate[S](z: =>S)(seqop: (S, T) => S, combop: (S, S) => S): S = {
+    tasksupport.executeAndWaitResult(new Aggregate(() => z, seqop, combop, splitter))
   }
 
   def foldLeft[S](z: S)(op: (S, T) => S): S = seq.foldLeft(z)(op)
@@ -426,7 +454,7 @@ self: ParIterableLike[T, Repr, Sequential] =>
 
   def reduceRightOption[U >: T](op: (T, U) => U): Option[U] = seq.reduceRightOption(op)
 
-  /** Applies a function `f` to all the elements of $coll in a sequential order.
+  /** Applies a function `f` to all the elements of $coll in a undefined order.
    *
    *  @tparam U    the result type of the function applied to each element, which is always discarded
    *  @param f     function applied to each element
@@ -831,7 +859,7 @@ self: ParIterableLike[T, Repr, Sequential] =>
 
   override def toList: List[T] = seq.toList
 
-  override def toIndexedSeq: collection.immutable.IndexedSeq[T] = seq.toIndexedSeq
+  override def toIndexedSeq: scala.collection.immutable.IndexedSeq[T] = seq.toIndexedSeq
 
   override def toStream: Stream[T] = seq.toStream
 
@@ -839,9 +867,9 @@ self: ParIterableLike[T, Repr, Sequential] =>
 
   // the methods below are overridden
 
-  override def toBuffer[U >: T]: collection.mutable.Buffer[U] = seq.toBuffer // have additional, parallel buffers?
+  override def toBuffer[U >: T]: scala.collection.mutable.Buffer[U] = seq.toBuffer // have additional, parallel buffers?
 
-  override def toTraversable: GenTraversable[T] = this.asInstanceOf[GenTraversable[T]] // TODO add ParTraversable[T]
+  override def toTraversable: GenTraversable[T] = this.asInstanceOf[GenTraversable[T]]
 
   override def toIterable: ParIterable[T] = this.asInstanceOf[ParIterable[T]]
 
@@ -850,6 +878,12 @@ self: ParIterableLike[T, Repr, Sequential] =>
   override def toSet[U >: T]: immutable.ParSet[U] = toParCollection[U, immutable.ParSet[U]](() => immutable.ParSet.newCombiner[U])
 
   override def toMap[K, V](implicit ev: T <:< (K, V)): immutable.ParMap[K, V] = toParMap[K, V, immutable.ParMap[K, V]](() => immutable.ParMap.newCombiner[K, V])
+
+  override def toVector: Vector[T] = to[Vector]
+
+  override def to[Col[_]](implicit cbf: CanBuildFrom[Nothing, T, Col[T @uncheckedVariance]]): Col[T @uncheckedVariance] = if (cbf().isCombiner) {
+    toParCollection[T, Col[T]](() => cbf().asCombiner)
+  } else seq.to(cbf)
 
   /* tasks */
 
@@ -902,8 +936,8 @@ self: ParIterableLike[T, Repr, Sequential] =>
   (f: First, s: Second)
   extends Composite[FR, SR, R, First, Second](f, s) {
     def leaf(prevr: Option[R]) = {
-      tasksupport.executeAndWaitResult(ft)
-      tasksupport.executeAndWaitResult(st)
+      tasksupport.executeAndWaitResult(ft) : Any
+      tasksupport.executeAndWaitResult(st) : Any
       mergeSubtasks
     }
   }
@@ -913,8 +947,8 @@ self: ParIterableLike[T, Repr, Sequential] =>
   (f: First, s: Second)
   extends Composite[FR, SR, R, First, Second](f, s) {
     def leaf(prevr: Option[R]) = {
-      val ftfuture = tasksupport.execute(ft)
-      tasksupport.executeAndWaitResult(st)
+      val ftfuture: () => Any = tasksupport.execute(ft)
+      tasksupport.executeAndWaitResult(st) : Any
       ftfuture()
       mergeSubtasks
     }
@@ -972,10 +1006,10 @@ self: ParIterableLike[T, Repr, Sequential] =>
     override def merge(that: Fold[U]) = result = op(result, that.result)
   }
 
-  protected[this] class Aggregate[S](z: S, seqop: (S, T) => S, combop: (S, S) => S, protected[this] val pit: IterableSplitter[T])
+  protected[this] class Aggregate[S](z: () => S, seqop: (S, T) => S, combop: (S, S) => S, protected[this] val pit: IterableSplitter[T])
   extends Accessor[S, Aggregate[S]] {
     @volatile var result: S = null.asInstanceOf[S]
-    def leaf(prevr: Option[S]) = result = pit.foldLeft(z)(seqop)
+    def leaf(prevr: Option[S]) = result = pit.foldLeft(z())(seqop)
     protected[this] def newSubtask(p: IterableSplitter[T]) = new Aggregate(z, seqop, combop, p)
     override def merge(that: Aggregate[S]) = result = combop(result, that.result)
   }
@@ -1334,7 +1368,7 @@ self: ParIterableLike[T, Repr, Sequential] =>
       val until = from + len
       val blocksize = scanBlockSize
       while (i < until) {
-        trees += scanBlock(i, math.min(blocksize, pit.remaining))
+        trees += scanBlock(i, scala.math.min(blocksize, pit.remaining))
         i += blocksize
       }
 
@@ -1462,7 +1496,7 @@ self: ParIterableLike[T, Repr, Sequential] =>
     debugBuffer += s
   }
 
-  import collection.DebugUtils._
+  import scala.collection.DebugUtils._
   private[parallel] def printDebugBuffer() = println(buildString {
     append =>
     for (s <- debugBuffer) {
@@ -1471,31 +1505,3 @@ self: ParIterableLike[T, Repr, Sequential] =>
   })
 
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

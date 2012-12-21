@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2003-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2003-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -50,7 +50,7 @@ trait SeqForwarder[+A] extends Seq[A] with IterableForwarder[A] {
   override def lastIndexOfSlice[B >: A](that: GenSeq[B]): Int = underlying lastIndexOfSlice that
   override def lastIndexOfSlice[B >: A](that: GenSeq[B], end: Int): Int = underlying.lastIndexOfSlice(that, end)
   override def containsSlice[B](that: GenSeq[B]): Boolean = underlying containsSlice that
-  override def contains(elem: Any): Boolean = underlying contains elem
+  override def contains[A1 >: A](elem: A1): Boolean = underlying contains elem
   override def corresponds[B](that: GenSeq[B])(p: (A,B) => Boolean): Boolean = underlying.corresponds(that)(p)
   override def indices: Range = underlying.indices
 }

@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2002-2012, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2002-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -8,12 +8,43 @@
 
 package scala
 
-import collection.mutable.ArrayBuffer
-
-/** A class to support string interpolation.
- *  This class supports string interpolation as outlined in Scala SIP-11.
- *  It needs to be fully documented once the SIP is accepted.
+/** This class provides the basic mechanism to do String Interpolation.
+ * String Interpolation allows users
+ * to embed variable references directly in *processed* string literals.
+ * Here's an example:
+ * {{{
+ *   val name = "James"
+ *   println(s"Hello, $name")  // Hello, James
+ * }}}
  *
+ * Any processed string literal is rewritten as an instantiation and
+ * method call against this class.   For example:
+ * {{{
+ *   s"Hello, $name"
+ * }}}
+ *
+ * is rewritten to be:
+ *
+ * {{{
+ *   StringContext("Hello, ", "").s(name)
+ * }}}
+ *
+ * By default, this class provides the `raw`, `s` and `f` methods as
+ * available interpolators.
+ *
+ * To provide your own string interpolator, create an implicit class
+ * which adds a method to `StringContext`.  Here's an example:
+ * {{{
+ *    implicit class JsonHelper(val sc: StringContext) extends AnyVal {
+ *      def json(args: Any*): JSONObject = ...
+ *    }
+ *    val x: JSONObject = json"{ a: $a }"
+ * }}}
+ *
+ *  Here the `JsonHelper` extenion class implicitly adds the `json` method to
+ *  `StringContext` which can be used for `json` string literals.
+ *
+ *  @since 2.10.0
  *  @param   parts  The parts that make up the interpolated string,
  *                  without the expressions that get inserted by interpolation.
  */
@@ -21,12 +52,12 @@ case class StringContext(parts: String*) {
 
   import StringContext._
 
-  /** Checks that the given arguments `args` number one less than the number
+  /** Checks that the length of the given argument `args` is one less than the number
    *  of `parts` supplied to the enclosing `StringContext`.
    *  @param `args` The arguments to be checked.
    *  @throws An `IllegalArgumentException` if this is not the case.
    */
-  def checkLengths(args: Any*): Unit =
+  def checkLengths(args: Seq[Any]): Unit =
     if (parts.length != args.length + 1)
       throw new IllegalArgumentException("wrong number of arguments for interpolated string")
 
@@ -35,21 +66,61 @@ case class StringContext(parts: String*) {
    *
    *  It inserts its arguments between corresponding parts of the string context.
    *  It also treats standard escape sequences as defined in the Scala specification.
+   *  Here's an example of usage:
+   *  {{{
+   *    val name = "James"
+   *    println(s"Hello, $name")  // Hello, James
+   *  }}}
+   *  In this example, the expression $name is replaced with the `toString` of the
+   *  variable `name`.
+   *  The `s` interpolator can take the `toString` of any arbitrary expression within
+   *  a `${}` block, for example:
+   *  {{{
+   *    println(s"1 + 1 = ${1 + 1}")
+   *  }}}
+   *  will print the string `1 + 1 = 2`.
+   *
    *  @param `args` The arguments to be inserted into the resulting string.
    *  @throws An `IllegalArgumentException`
    *          if the number of `parts` in the enclosing `StringContext` does not exceed
    *          the number of arguments `arg` by exactly 1.
-   *  @throws A `StringContext.InvalidEscapeException` if if a `parts` string contains a backslash (`\`) character
+   *  @throws A `StringContext.InvalidEscapeException` if a `parts` string contains a backslash (`\`) character
    *          that does not start a valid escape sequence.
    */
-  def s(args: Any*) = {
-    checkLengths(args: _*)
+  def s(args: Any*): String = standardInterpolator(treatEscapes, args)
+
+  /** The raw string interpolator.
+   *
+   *  It inserts its arguments between corresponding parts of the string context.
+   *  As opposed to the simple string interpolator `s`, this one does not treat
+   *  standard escape sequences as defined in the Scala specification.
+   *
+   *  For example, the raw processed string `raw"a\nb"` is equal to the scala string `"a\\nb"`.
+   *
+   *  ''Note:'' Even when using the raw interpolator, Scala will preprocess unicode escapes.
+   *  For example:
+   *  {{{
+   *    scala> raw"\u005cu0025"
+   *    res0: String = #
+   *  }}}
+   *
+   *  @param `args` The arguments to be inserted into the resulting string.
+   *  @throws An `IllegalArgumentException`
+   *          if the number of `parts` in the enclosing `StringContext` does not exceed
+   *          the number of arguments `arg` by exactly 1.
+   *  @throws A `StringContext.InvalidEscapeException` if a `parts` string contains a backslash (`\`) character
+   *          that does not start a valid escape sequence.
+   */
+  def raw(args: Any*): String = standardInterpolator(identity, args)
+
+  def standardInterpolator(process: String => String, args: Seq[Any]): String = {
+    checkLengths(args)
     val pi = parts.iterator
     val ai = args.iterator
-    val bldr = new java.lang.StringBuilder(treatEscapes(pi.next()))
+    val bldr = new java.lang.StringBuilder(process(pi.next()))
     while (ai.hasNext) {
       bldr append ai.next
-      bldr append treatEscapes(pi.next())
+      bldr append process(pi.next())
     }
     bldr.toString
   }
@@ -62,6 +133,13 @@ case class StringContext(parts: String*) {
    *  that starts with a formatting specifier, the expression is formatted according to that
    *  specifier. All specifiers allowed in Java format strings are handled, and in the same
    *  way they are treated in Java.
+   *
+   *  For example:
+   *  {{{
+   *    val height = 1.9d
+   *    val name = "James"
+   *    println(f"$name%s is $height%2.2f meters tall")  // James is 1.90 meters tall
+   *  }}}
    *
    *  @param `args` The arguments to be inserted into the resulting string.
    *  @throws An `IllegalArgumentException`
@@ -82,43 +160,14 @@ case class StringContext(parts: String*) {
    *      string literally. This is achieved by replacing each such occurrence by the
    *      format specifier `%%`.
    */
-  def f(args: Any*) = {
-    checkLengths(args: _*)
-    val pi = parts.iterator
-    val bldr = new java.lang.StringBuilder
-    def copyString(first: Boolean): Unit = {
-      val str = treatEscapes(pi.next())
-      val strIsEmpty = str.length == 0
-      var start = 0
-      var idx = 0
-      if (!first) {
-        if (strIsEmpty || (str charAt 0) != '%')
-          bldr append "%s"
-        idx = 1
-      }
-      if (!strIsEmpty) {
-        val len = str.length
-        while (idx < len) {
-          if (str(idx) == '%') {
-            bldr append (str substring (start, idx)) append "%%"
-            start = idx + 1
-          }
-          idx += 1
-        }
-        bldr append (str substring (start, idx))
-      }
-    }
-    copyString(first = true)
-    while (pi.hasNext) {
-      copyString(first = false)
-    }
-    bldr.toString format (args: _*)
-  }
+  // The implementation is hardwired to `scala.tools.reflect.MacroImplementations.macro_StringInterpolation_f`
+  // Using the mechanism implemented in `scala.tools.reflect.FastTrack`
+  def f(args: Any*): String = ??? // macro
 }
 
 object StringContext {
 
-  /** An exception that is thrown if a string contains a backslash (`\`) character that
+  /** An exception that is thrown if a string contains a backslash (`\`) character
    *  that does not start a valid escape sequence.
    *  @param  str   The offending string
    *  @param  idx   The index of the offending backslash character in `str`.
@@ -142,7 +191,7 @@ object StringContext {
     var cur = 0
     var idx = 0
     def output(ch: Char) = {
-      bldr append str.substring (start, cur)
+      bldr.append(str, start, cur)
       bldr append ch
       start = idx
     }
@@ -150,14 +199,15 @@ object StringContext {
       cur = idx
       if (str(idx) == '\\') {
         idx += 1
+        if (idx >= len) throw new InvalidEscapeException(str, cur)
         if ('0' <= str(idx) && str(idx) <= '7') {
           val leadch = str(idx)
           var oct = leadch - '0'
           idx += 1
-          if ('0' <= str(idx) && str(idx) <= '7') {
+          if (idx < len && '0' <= str(idx) && str(idx) <= '7') {
             oct = oct * 8 + str(idx) - '0'
             idx += 1
-            if (leadch <= '3' && '0' <= str(idx) && str(idx) <= '7') {
+            if (idx < len && leadch <= '3' && '0' <= str(idx) && str(idx) <= '7') {
               oct = oct * 8 + str(idx) - '0'
               idx += 1
             }
@@ -185,6 +235,6 @@ object StringContext {
       }
     }
     if (start == 0) str
-    else (bldr append str.substring(start, idx)).toString
+    else bldr.append(str, start, idx).toString
   }
 }

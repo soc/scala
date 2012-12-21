@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2003-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2003-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -16,7 +16,7 @@ import scala.concurrent.forkjoin._
 import scala.concurrent.ExecutionContext
 import scala.util.control.Breaks._
 
-import annotation.unchecked.uncheckedVariance
+import scala.annotation.unchecked.uncheckedVariance
 
 
 
@@ -66,18 +66,8 @@ trait Task[R, +Tp] {
 
   private[parallel] def tryMerge(t: Tp @uncheckedVariance) {
     val that = t.asInstanceOf[Task[R, Tp]]
-    val local = result // ensure that any effects of modifying `result` are detected
-    // checkMerge(that)
     if (this.throwable == null && that.throwable == null) merge(t)
     mergeThrowables(that)
-  }
-
-  private def checkMerge(that: Task[R, Tp] @uncheckedVariance) {
-    if (this.throwable == null && that.throwable == null && (this.result == null || that.result == null)) {
-      println("This: " + this + ", thr=" + this.throwable + "; merged with " + that + ", thr=" + that.throwable)
-    } else if (this.throwable != null || that.throwable != null) {
-      println("merging this: " + this + " with thr: " + this.throwable + " with " + that + ", thr=" + that.throwable)
-    }
   }
 
   private[parallel] def mergeThrowables(that: Task[_, _]) {
@@ -98,7 +88,7 @@ trait Task[R, +Tp] {
  */
 trait Tasks {
 
-  private[parallel] val debugMessages = collection.mutable.ArrayBuffer[String]()
+  private[parallel] val debugMessages = scala.collection.mutable.ArrayBuffer[String]()
 
   private[parallel] def debuglog(s: String) = synchronized {
     debugMessages += s
@@ -176,7 +166,6 @@ trait AdaptiveWorkStealingTasks extends Tasks {
 
       while (last.next != null) {
         // val lastresult = Option(last.body.result)
-        val beforelast = last
         last = last.next
         if (last.tryCancel()) {
           // println("Done with " + beforelast.body + ", next direct is " + last.body)
@@ -534,11 +523,11 @@ trait AdaptiveWorkStealingThreadPoolTasks extends ThreadPoolTasks with AdaptiveW
 
 
 trait ExecutionContextTasks extends Tasks {
-  
+
   def executionContext = environment
-  
+
   val environment: ExecutionContext
-  
+
   // this part is a hack which allows switching
   val driver: Tasks = executionContext match {
     case eci: scala.concurrent.impl.ExecutionContextImpl => eci.executor match {
@@ -548,13 +537,13 @@ trait ExecutionContextTasks extends Tasks {
     }
     case _ => ???
   }
-  
+
   def execute[R, Tp](task: Task[R, Tp]): () => R = driver execute task
-  
+
   def executeAndWaitResult[R, Tp](task: Task[R, Tp]): R = driver executeAndWaitResult task
-  
+
   def parallelismLevel = driver.parallelismLevel
-  
+
 }
 
 

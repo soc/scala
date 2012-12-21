@@ -1,18 +1,15 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2007-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2007-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
 \*                                                                      */
 
-
-
 package scala.swing
 
 import java.awt.{Window => AWTWindow}
 import event._
-import javax.swing._
 
 /**
  * A window with decoration such as a title, border, and action buttons.
@@ -51,7 +48,7 @@ abstract class Window extends UIElement with RootPanel with Publisher { outer =>
     peer.getRootPane.setDefaultButton(b.peer)
   }
   def defaultButton_=(b: Option[Button]) {
-    peer.getRootPane.setDefaultButton(b map (_.peer) orNull)
+    peer.getRootPane.setDefaultButton(b.map(_.peer).orNull)
   }
 
   def dispose() { peer.dispose() }

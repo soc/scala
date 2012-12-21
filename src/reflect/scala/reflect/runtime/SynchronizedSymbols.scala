@@ -1,9 +1,9 @@
 package scala.reflect
 package runtime
 
-import internal.Flags.DEFERRED
+import scala.reflect.io.AbstractFile
 
-trait SynchronizedSymbols extends internal.Symbols { self: SymbolTable =>
+private[reflect] trait SynchronizedSymbols extends internal.Symbols { self: SymbolTable =>
 
   override protected def nextId() = synchronized { super.nextId() }
 
@@ -14,11 +14,11 @@ trait SynchronizedSymbols extends internal.Symbols { self: SymbolTable =>
   override def connectModuleToClass(m: ModuleSymbol, moduleClass: ClassSymbol): ModuleSymbol =
     synchronized { super.connectModuleToClass(m, moduleClass) }
 
-  override def newFreeTermSymbol(name: TermName, info: Type, value: => Any, flags: Long = 0L, origin: String = null): FreeTermSymbol =
-    new FreeTermSymbol(name, value, origin) with SynchronizedTermSymbol initFlags flags setInfo info
+  override def newFreeTermSymbol(name: TermName, value: => Any, flags: Long = 0L, origin: String = null): FreeTermSymbol =
+    new FreeTermSymbol(name, value, origin) with SynchronizedTermSymbol initFlags flags
 
-  override def newFreeTypeSymbol(name: TypeName, info: Type, value: => Any, flags: Long = 0L, origin: String = null): FreeTypeSymbol =
-    new FreeTypeSymbol(name, value, origin) with SynchronizedTypeSymbol initFlags flags setInfo info
+  override def newFreeTypeSymbol(name: TypeName, flags: Long = 0L, origin: String = null): FreeTypeSymbol =
+    new FreeTypeSymbol(name, origin) with SynchronizedTypeSymbol initFlags flags
 
   override protected def makeNoSymbol: NoSymbol = new NoSymbol with SynchronizedSymbol
 
@@ -83,9 +83,6 @@ trait SynchronizedSymbols extends internal.Symbols { self: SymbolTable =>
     override protected def createPackageObjectClassSymbol(pos: Position, newFlags: Long): PackageObjectClassSymbol =
       new PackageObjectClassSymbol(this, pos) with SynchronizedClassSymbol initFlags newFlags
 
-    override protected def createTermSymbol(name: TermName, pos: Position, newFlags: Long): TermSymbol =
-      new TermSymbol(this, pos, name) with SynchronizedTermSymbol initFlags newFlags
-
     override protected def createMethodSymbol(name: TermName, pos: Position, newFlags: Long): MethodSymbol =
       new MethodSymbol(this, pos, name) with SynchronizedMethodSymbol initFlags newFlags
 
@@ -110,18 +107,21 @@ trait SynchronizedSymbols extends internal.Symbols { self: SymbolTable =>
 
   trait SynchronizedMethodSymbol extends MethodSymbol with SynchronizedTermSymbol {
     override def typeAsMemberOf(pre: Type): Type = synchronized { super.typeAsMemberOf(pre) }
+    override def paramss: List[List[Symbol]] = synchronized { super.paramss }
+    override def returnType: Type = synchronized { super.returnType }
   }
 
   trait SynchronizedTypeSymbol extends TypeSymbol with SynchronizedSymbol {
     override def name_=(x: Name) = synchronized { super.name_=(x) }
     override def rawname = synchronized { super.rawname }
     override def typeConstructor: Type = synchronized { super.typeConstructor }
-    override def tpe: Type = synchronized { super.tpe }
+    override def tpe_* : Type = synchronized { super.tpe_* }
+    override def tpeHK : Type = synchronized { super.tpeHK }
   }
 
   trait SynchronizedClassSymbol extends ClassSymbol with SynchronizedTypeSymbol {
     override def associatedFile = synchronized { super.associatedFile }
-    override def associatedFile_=(f: AbstractFileType) = synchronized { super.associatedFile_=(f) }
+    override def associatedFile_=(f: AbstractFile) = synchronized { super.associatedFile_=(f) }
     override def thisSym: Symbol = synchronized { super.thisSym }
     override def thisType: Type = synchronized { super.thisType }
     override def typeOfThis: Type = synchronized { super.typeOfThis }
@@ -132,9 +132,7 @@ trait SynchronizedSymbols extends internal.Symbols { self: SymbolTable =>
 
   trait SynchronizedModuleClassSymbol extends ModuleClassSymbol with SynchronizedClassSymbol {
     override def sourceModule = synchronized { super.sourceModule }
-    // [Eugene++ to Martin] doesn't override anything. no longer necessary?
-    // def sourceModule_=(module: ModuleSymbol) = synchronized { super.sourceModule_=(module) }
-    override def implicitMembers: List[Symbol] = synchronized { super.implicitMembers }
+    override def implicitMembers: Scope = synchronized { super.implicitMembers }
   }
 }
 

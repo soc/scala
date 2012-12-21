@@ -1,19 +1,17 @@
 /* NSC -- new Scala compiler
- * Copyright 2005-2011 LAMP/EPFL
+ * Copyright 2005-2013 LAMP/EPFL
  * @author  Martin Odersky
  */
 
 package scala.reflect.internal.util
 
 object HashSet {
-  def apply[T >: Null <: AnyRef](): HashSet[T] = this(16)
-  def apply[T >: Null <: AnyRef](label: String): HashSet[T] = this(label, 16)
   def apply[T >: Null <: AnyRef](initialCapacity: Int): HashSet[T] = this("No Label", initialCapacity)
   def apply[T >: Null <: AnyRef](label: String, initialCapacity: Int): HashSet[T] =
     new HashSet[T](label, initialCapacity)
 }
 
-class HashSet[T >: Null <: AnyRef](val label: String, initialCapacity: Int) extends Set[T] {
+class HashSet[T >: Null <: AnyRef](val label: String, initialCapacity: Int) extends Set[T] with scala.collection.generic.Clearable {
   private var used = 0
   private var table = new Array[AnyRef](initialCapacity)
   private def index(x: Int): Int = math.abs(x % table.length)

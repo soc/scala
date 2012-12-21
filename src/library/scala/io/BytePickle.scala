@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2003-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2003-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -19,6 +19,7 @@ import scala.collection.mutable
  * @author  Philipp Haller
  * @version 1.1
  */
+@deprecated("This class will be removed.", "2.10.0")
 object BytePickle {
   abstract class SPU[T] {
     def appP(a: T, state: PicklerState): PicklerState

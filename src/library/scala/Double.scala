@@ -10,7 +10,7 @@
 
 package scala
 
-import language.implicitConversions
+import scala.language.implicitConversions
 
 /** `Double`, a 64-bit IEEE-754 floating point number (equivalent to Java's `double` primitive type) is a
  *  subtype of [[scala.AnyVal]]. Instances of `Double` are not
@@ -369,9 +369,6 @@ object Double extends AnyValCompanion {
   final val NaN              = java.lang.Double.NaN
   final val PositiveInfinity = java.lang.Double.POSITIVE_INFINITY
   final val NegativeInfinity = java.lang.Double.NEGATIVE_INFINITY
-
-  @deprecated("use Double.MinPositiveValue instead", "2.9.0")
-  final val Epsilon  = MinPositiveValue
 
   /** The negative number with the greatest (finite) absolute value which is representable
    *  by a Double.  Note that it differs from [[java.lang.Double.MIN_VALUE]], which

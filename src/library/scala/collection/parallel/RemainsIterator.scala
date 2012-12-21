@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2003-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2003-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -123,9 +123,10 @@ private[collection] trait AugmentedIterableIterator[+T] extends RemainsIterator[
 
   def collect2combiner[S, That](pf: PartialFunction[T, S], cb: Combiner[S, That]): Combiner[S, That] = {
     //val cb = pbf(repr)
+    val runWith = pf.runWith(cb += _)
     while (hasNext) {
       val curr = next
-      if (pf.isDefinedAt(curr)) cb += pf(curr)
+      runWith(curr)
     }
     cb
   }
@@ -190,7 +191,7 @@ private[collection] trait AugmentedIterableIterator[+T] extends RemainsIterator[
 
   def slice2combiner[U >: T, This](from: Int, until: Int, cb: Combiner[U, This]): Combiner[U, This] = {
     drop(from)
-    var left = math.max(until - from, 0)
+    var left = scala.math.max(until - from, 0)
     cb.sizeHint(left)
     while (left > 0) {
       cb += next

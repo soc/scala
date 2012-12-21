@@ -8,6 +8,7 @@ scala> // should infer List[scala.collection.immutable.Seq[Nothing]]
 scala> // but reverted that for SI-5534.
 
 scala> val x = List(List(), Vector())
+<<<<<<< HEAD
 x: List[scala.collection.immutable.Seq[Nothing] with scala.collection.AbstractSeq[Nothing]] = List(List(), Vector())
 
 scala>
@@ -25,6 +26,9 @@ defined class Baz
 scala> def f = if (true) new Bar else new Baz
 f: Foo
 
+=======
+x: List[scala.collection.immutable.Seq[Nothing] with scala.collection.AbstractSeq[Nothing]{def companion: scala.collection.generic.GenericCompanion[scala.collection.immutable.Seq with scala.collection.AbstractSeq]; def dropRight(n: Int): scala.collection.immutable.Seq[Nothing] with scala.collection.AbstractSeq[Nothing]{def companion: scala.collection.generic.GenericCompanion[scala.collection.immutable.Seq with scala.collection.AbstractSeq]; def dropRight(n: Int): scala.collection.immutable.Seq[Nothing] with scala.collection.AbstractSeq[Nothing]{def dropRight(n: Int): scala.collection.immutable.Seq[Nothing] with scala.collection.AbstractSeq[Nothing]; def takeRight(n: Int): scala.collection.immutable.Seq[Nothing] with scala.collection.AbstractSeq[Nothing]; def drop(n: Int): scala.collecti...
+>>>>>>> master
 scala> 
 
 scala> 

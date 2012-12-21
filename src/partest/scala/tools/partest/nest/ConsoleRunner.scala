@@ -1,5 +1,5 @@
 /* NEST (New Scala Test)
- * Copyright 2007-2011 LAMP/EPFL
+ * Copyright 2007-2013 LAMP/EPFL
  * @author Philipp Haller
  */
 
@@ -11,11 +11,11 @@ package nest
 import java.io.{File, PrintStream, FileOutputStream, BufferedReader,
                 InputStreamReader, StringWriter, PrintWriter}
 import utils.Properties._
-import RunnerUtils._
 import scala.tools.nsc.Properties.{ versionMsg, setProp }
 import scala.tools.nsc.util.CommandLineParser
 import scala.tools.nsc.io
 import io.{ Path }
+import scala.collection.{ mutable, immutable }
 
 class ConsoleRunner extends DirectRunner {
   import PathSettings.{ srcDir, testRoot }
@@ -25,8 +25,6 @@ class ConsoleRunner extends DirectRunner {
   private def antFilter(p: Path) = p.isFile && (p endsWith "build.xml")
 
   val testSets = {
-    val pathFilter: Path => Boolean = x => x.isDirectory || (x hasExtension "scala")
-
     List(
       TestSet("pos", stdFilter, "Testing compiler (on files whose compilation should succeed)"),
       TestSet("neg", stdFilter, "Testing compiler (on files whose compilation should fail)"),
@@ -39,6 +37,7 @@ class ConsoleRunner extends DirectRunner {
       TestSet("scalacheck", stdFilter, "Testing ScalaCheck tests"),
       TestSet("scalap", _.isDirectory, "Run scalap decompiler tests"),
       TestSet("specialized", stdFilter, "Testing specialized tests"),
+      TestSet("instrumented", stdFilter, "Testing instrumented tests"),
       TestSet("presentation", _.isDirectory, "Testing presentation compiler tests."),
       TestSet("ant", antFilter, "Run Ant task tests.")
     )
@@ -51,8 +50,6 @@ class ConsoleRunner extends DirectRunner {
   private val testSetKinds  = testSets map (_.kind)
   private val testSetArgs   = testSets map ("--" + _.kind)
   private val testSetArgMap = testSetArgs zip testSets toMap
-
-  def denotesTestSet(arg: String)  = testSetArgs contains arg
 
   private def printVersion() { NestUI outline (versionMsg + "\n") }
 
@@ -68,10 +65,11 @@ class ConsoleRunner extends DirectRunner {
   // true if a test path matches the --grep expression.
   private def pathMatchesExpr(path: Path, expr: String) = {
     def pred(p: Path) = file2String(p.toFile) contains expr
-    def srcs = path.toDirectory.deepList() filter (_.hasExtension("scala", "java"))
+    def greppable(f: Path) = f.isFile && (f hasExtension ("scala", "java"))
+    def any(d: Path) = d.toDirectory.deepList() exists (f => greppable(f) && pred(f))
 
     (path.isFile && pred(path)) ||
-    (path.isDirectory && srcs.exists(pred)) ||
+    (path.isDirectory && any(path)) ||
     (pred(path changeExtension "check"))
   }
 
@@ -92,8 +90,6 @@ class ConsoleRunner extends DirectRunner {
       else if (parsed isSet "--pack") new ConsoleFileManager("build/pack")
       else new ConsoleFileManager  // auto detection, see ConsoleFileManager.findLatest
 
-    def argNarrowsTests(x: String) = denotesTestSet(x) || denotesTestPath(x)
-
     NestUI._verbose         = parsed isSet "--verbose"
     fileManager.showDiff    = true
     // parsed isSet "--show-diff"
@@ -104,8 +100,6 @@ class ConsoleRunner extends DirectRunner {
     if (parsed isSet "--ansi") NestUI initialize NestUI.MANY
     if (parsed isSet "--timeout") fileManager.timeout = parsed("--timeout")
     if (parsed isSet "--debug") setProp("partest.debug", "true")
-
-    setProperties() // must be done after processing command line arguments such as --debug
 
     def addTestFile(file: File) = {
       if (!file.exists)
@@ -121,7 +115,7 @@ class ConsoleRunner extends DirectRunner {
     val grepOption = parsed get "--grep"
     val grepPaths = grepOption.toList flatMap { expr =>
       val subjectDirs = testSetKinds map (srcDir / _ toDirectory)
-      val testPaths   = subjectDirs flatMap (_.files filter stdFilter)
+      val testPaths   = subjectDirs flatMap (_.list filter stdFilter)
       val paths       = testPaths filter (p => pathMatchesExpr(p, expr))
 
       if (paths.isEmpty)
@@ -171,13 +165,10 @@ class ConsoleRunner extends DirectRunner {
     if (grepMessage != "")
       NestUI.normal(grepMessage + "\n")
 
-    val start = System.currentTimeMillis
-    val (successes, failures) = testCheckAll(enabledTestSets)
-    val end = System.currentTimeMillis
-
+    val ((successes, failures), elapsedMillis) = timed(testCheckAll(enabledTestSets))
     val total = successes + failures
 
-    val elapsedSecs = (end - start)/1000
+    val elapsedSecs = elapsedMillis/1000
     val elapsedMins = elapsedSecs/60
     val elapsedHrs  = elapsedMins/60
     val dispMins = elapsedMins - elapsedHrs  * 60
@@ -188,7 +179,6 @@ class ConsoleRunner extends DirectRunner {
       form(elapsedHrs)+":"+form(dispMins)+":"+form(dispSecs)
     }
 
-    println
     if (failures == 0)
       NestUI.success("All of "+total+" tests were successful (elapsed time: "+dispElapsed+")\n")
     else

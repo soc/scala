@@ -1,18 +1,15 @@
 /* NSC -- new Scala compiler
- * Copyright 2007-2011 LAMP/EPFL
+ * Copyright 2007-2013 LAMP/EPFL
  * @author Lex Spoon
  */
 
 package scala.tools.nsc
 package plugins
 
-import io.{ File, Path, Jar }
+import io.{ Path, Jar }
 import java.net.URLClassLoader
 import java.util.jar.JarFile
 import java.util.zip.ZipException
-
-import scala.collection.mutable
-import mutable.ListBuffer
 import scala.xml.XML
 
 /** Information about a plugin loaded from a jar file.
@@ -74,7 +71,7 @@ object Plugin {
   }
 
   /** Try to load a plugin description from the specified
-   *  file, returning <code>None</code> if it does not work.
+   *  file, returning `None` if it does not work.
    */
   private def loadDescription(jarfile: Path): Option[PluginDescription] =
     // XXX Return to this once we have some ARM support

@@ -1,4 +1,4 @@
-/* NSC -- new Scala compiler -- Copyright 2007-2012 LAMP/EPFL
+/* NSC -- new Scala compiler -- Copyright 2007-2013 LAMP/EPFL
  *
  * This trait finds implicit conversions for a class in the default scope and creates scaladoc entries for each of them.
  *
@@ -10,15 +10,8 @@ package scala.tools.nsc
 package doc
 package model
 
-import comment._
-
 import scala.collection._
-import scala.util.matching.Regex
-
 import symtab.Flags
-import io._
-
-import model.{ RootPackage => RootPackageEntity }
 
 /**
  * This trait finds implicit conversions for a class in the default scope and creates scaladoc entries for each of them.
@@ -53,7 +46,7 @@ import model.{ RootPackage => RootPackageEntity }
  * TODO: Give an overview here
  */
 trait ModelFactoryImplicitSupport {
-  thisFactory: ModelFactory with CommentFactory with TreeFactory =>
+  thisFactory: ModelFactory with ModelFactoryTypeSupport with CommentFactory with TreeFactory =>
 
   import global._
   import global.analyzer._
@@ -63,8 +56,8 @@ trait ModelFactoryImplicitSupport {
   // debugging:
   val DEBUG: Boolean = settings.docImplicitsDebug.value
   val ERROR: Boolean = true // currently we show all errors
-  @inline final def debug(msg: => String) = if (DEBUG) println(msg)
-  @inline final def error(msg: => String) = if (ERROR) println(msg)
+  @inline final def debug(msg: => String) = if (DEBUG) settings.printMsg(msg)
+  @inline final def error(msg: => String) = if (ERROR) settings.printMsg(msg)
 
   /** This is a flag that indicates whether to eliminate implicits that cannot be satisfied within the current scope.
    * For example, if an implicit conversion requires that there is a Numeric[T] in scope:
@@ -79,79 +72,7 @@ trait ModelFactoryImplicitSupport {
    *   - not be generated at all, since there's no Numeric[String] in scope (if ran without -implicits-show-all)
    *   - generated with a *weird* constraint, Numeric[String] as the user might add it by hand (if flag is enabled)
    */
-  val implicitsShowAll: Boolean = settings.docImplicitsShowAll.value
   class ImplicitNotFound(tpe: Type) extends Exception("No implicit of type " + tpe + " found in scope.")
-
-  /* ============== IMPLEMENTATION PROVIDING ENTITY TYPES ============== */
-
-  class ImplicitConversionImpl(
-    val sym: Symbol,
-    val convSym: Symbol,
-    val toType: Type,
-    val constrs: List[Constraint],
-    inTpl: => DocTemplateImpl)
-      extends ImplicitConversion {
-
-    def source: DocTemplateEntity = inTpl
-
-    def targetType: TypeEntity = makeType(toType, inTpl)
-
-    def convertorOwner: TemplateEntity =
-      if (convSym != NoSymbol)
-        makeTemplate(convSym.owner)
-      else {
-        error("Scaladoc implicits: Implicit conversion from " + sym.tpe + " to " + toType + " done by " + convSym + " = NoSymbol!")
-        makeRootPackage.get // surely the root package was created :)
-      }
-
-    def convertorMethod: Either[MemberEntity, String] = {
-      var convertor: MemberEntity = null
-
-      convertorOwner match {
-        case doc: DocTemplateImpl =>
-          val convertors = members.collect { case m: MemberImpl if m.sym == convSym => m }
-          if (convertors.length == 1)
-            convertor = convertors.head
-        case _ =>
-      }
-      if (convertor ne null)
-        Left(convertor)
-      else
-        Right(convSym.nameString)
-    }
-
-    def conversionShortName = convSym.nameString
-
-    def conversionQualifiedName = convertorOwner.qualifiedName + "." + convSym.nameString
-
-    lazy val constraints: List[Constraint] = constrs
-
-    val members: List[MemberEntity] = {
-      // Obtain the members inherited by the implicit conversion
-      var memberSyms = toType.members.filter(implicitShouldDocument(_))
-      val existingMembers = sym.info.members
-
-      // Debugging part :)
-      debug(sym.nameString + "\n" + "=" * sym.nameString.length())
-      debug(" * conversion " + convSym + " from " + sym.tpe + " to " + toType)
-
-      // Members inherited by implicit conversions cannot override actual members
-      memberSyms = memberSyms.filterNot((sym1: Symbol) =>
-        existingMembers.exists(sym2 => sym1.name == sym2.name &&
-          !isDistinguishableFrom(toType.memberInfo(sym1), sym.info.memberInfo(sym2))))
-
-      debug("   -> full type: " + toType)
-      if (constraints.length != 0) {
-        debug("   -> constraints: ")
-        constraints foreach { constr => debug("      - " + constr) }
-      }
-      debug("   -> members:")
-      memberSyms foreach (sym => debug("      - "+ sym.decodedName +" : " + sym.info))
-      debug("")
-
-      memberSyms.flatMap((makeMember(_, this, inTpl)))
-    }
-  }
 
   /* ============== MAKER METHODS ============== */
 
@@ -162,30 +83,31 @@ trait ModelFactoryImplicitSupport {
    *  default Scala imports (Predef._ for example) and the companion object of the current class, if one exists. In the
    *  future we might want to extend this to more complex scopes.
    */
-  def makeImplicitConversions(sym: Symbol, inTpl: => DocTemplateImpl): List[ImplicitConversion] =
+  def makeImplicitConversions(sym: Symbol, inTpl: DocTemplateImpl): List[ImplicitConversionImpl] =
     // Nothing and Null are somewhat special -- they can be transformed by any implicit conversion available in scope.
     // But we don't want that, so we'll simply refuse to find implicit conversions on for Nothing and Null
     if (!(sym.isClass || sym.isTrait || sym == AnyRefClass) || sym == NothingClass || sym == NullClass) Nil
     else {
-      var context: global.analyzer.Context = global.analyzer.rootContext(NoCompilationUnit)
+      val context: global.analyzer.Context = global.analyzer.rootContext(NoCompilationUnit)
 
-      val results = global.analyzer.allViewsFrom(sym.tpe, context, sym.typeParams)
+      val results = global.analyzer.allViewsFrom(sym.tpe_*, context, sym.typeParams)
       var conversions = results.flatMap(result => makeImplicitConversion(sym, result._1, result._2, context, inTpl))
-      conversions = conversions.filterNot(_.members.isEmpty)
+      // also keep empty conversions, so they appear in diagrams
+      // conversions = conversions.filter(!_.members.isEmpty)
 
       // Filter out specialized conversions from array
       if (sym == ArrayClass)
-        conversions = conversions.filterNot((conv: ImplicitConversion) =>
+        conversions = conversions.filterNot((conv: ImplicitConversionImpl) =>
           hardcoded.arraySkipConversions.contains(conv.conversionQualifiedName))
 
       // Filter out non-sensical conversions from value types
-      if (isPrimitiveValueType(sym.tpe))
-        conversions = conversions.filter((ic: ImplicitConversion) =>
+      if (isPrimitiveValueType(sym.tpe_*))
+        conversions = conversions.filter((ic: ImplicitConversionImpl) =>
           hardcoded.valueClassFilter(sym.nameString, ic.conversionQualifiedName))
 
-      // Put the class-specific conversions in front
+      // Put the visible conversions in front
       val (ownConversions, commonConversions) =
-        conversions.partition(conv => !hardcoded.commonConversionTargets.contains(conv.conversionQualifiedName))
+        conversions.partition(!_.isHiddenConversion)
 
       ownConversions ::: commonConversions
     }
@@ -218,7 +140,7 @@ trait ModelFactoryImplicitSupport {
    *  - we also need to transform implicit parameters in the view's signature into constraints, such that Numeric[T4]
    * appears as a constraint
    */
-  def makeImplicitConversion(sym: Symbol, result: SearchResult, constrs: List[TypeConstraint], context: Context, inTpl: => DocTemplateImpl): List[ImplicitConversion] =
+  def makeImplicitConversion(sym: Symbol, result: SearchResult, constrs: List[TypeConstraint], context: Context, inTpl: DocTemplateImpl): List[ImplicitConversionImpl] =
     if (result.tree == EmptyTree) Nil
     else {
       // `result` will contain the type of the view (= implicit conversion method)
@@ -246,7 +168,7 @@ trait ModelFactoryImplicitSupport {
       val appliedTree = new ApplyImplicitView(viewTree, List(Ident("<argument>") setType viewTree.tpe.paramTypes.head))
       val appliedTreeTyped: Tree = {
         val newContext = context.makeImplicit(context.ambiguousErrors)
-        newContext.macrosEnabled = false // [Eugene] I assume you want macro signature, not macro expansion
+        newContext.macrosEnabled = false
         val newTyper = global.analyzer.newTyper(newContext)
           newTyper.silent(_.typed(appliedTree, global.analyzer.EXPRmode, WildcardType), false) match {
 
@@ -276,11 +198,11 @@ trait ModelFactoryImplicitSupport {
       }
     }
 
-  def makeImplicitConstraints(types: List[Type], sym: Symbol, context: Context, inTpl: => DocTemplateImpl): List[Constraint] =
+  def makeImplicitConstraints(types: List[Type], sym: Symbol, context: Context, inTpl: DocTemplateImpl): List[Constraint] =
     types.flatMap((tpe:Type) => {
       // TODO: Before creating constraints, map typeVarToOriginOrWildcard on the implicitTypes
       val implType = typeVarToOriginOrWildcard(tpe)
-      val qualifiedName = implType.typeSymbol.ownerChain.reverse.map(_.nameString).mkString(".")
+      val qualifiedName = makeQualifiedName(implType.typeSymbol)
 
       var available: Option[Boolean] = None
 
@@ -312,14 +234,14 @@ trait ModelFactoryImplicitSupport {
 
           available = Some(search.tree != EmptyTree)
         } catch {
-          case _ =>
+          case _: TypeError =>
         }
       }
 
       available match {
         case Some(true) =>
           Nil
-        case Some(false) if (!implicitsShowAll) =>
+        case Some(false) if (!settings.docImplicitsShowAll.value) =>
           // if -implicits-show-all is not set, we get rid of impossible conversions (such as Numeric[String])
           throw new ImplicitNotFound(implType)
         case _ =>
@@ -333,26 +255,26 @@ trait ModelFactoryImplicitSupport {
                 case Some(explanation) =>
                   List(new KnownTypeClassConstraint {
                     val typeParamName = targ.nameString
-                    val typeExplanation = explanation
-                    val typeClassEntity = makeTemplate(sym)
-                    val implicitType: TypeEntity = makeType(implType, inTpl)
+                    lazy val typeExplanation = explanation
+                    lazy val typeClassEntity = makeTemplate(sym)
+                    lazy val implicitType: TypeEntity = makeType(implType, inTpl)
                   })
                 case None =>
                   List(new TypeClassConstraint {
                     val typeParamName = targ.nameString
-                    val typeClassEntity = makeTemplate(sym)
-                    val implicitType: TypeEntity = makeType(implType, inTpl)
+                    lazy val typeClassEntity = makeTemplate(sym)
+                    lazy val implicitType: TypeEntity = makeType(implType, inTpl)
                   })
               }
             case _ =>
               List(new ImplicitInScopeConstraint{
-                val implicitType: TypeEntity = makeType(implType, inTpl)
+                lazy val implicitType: TypeEntity = makeType(implType, inTpl)
               })
           }
       }
     })
 
-  def makeSubstitutionConstraints(subst: TreeTypeSubstituter, inTpl: => DocTemplateImpl): List[Constraint] =
+  def makeSubstitutionConstraints(subst: TreeTypeSubstituter, inTpl: DocTemplateImpl): List[Constraint] =
     (subst.from zip subst.to) map {
       case (from, to) =>
         new EqualTypeParamConstraint {
@@ -362,7 +284,7 @@ trait ModelFactoryImplicitSupport {
         }
     }
 
-  def makeBoundedConstraints(tparams: List[Symbol], constrs: List[TypeConstraint], inTpl: => DocTemplateImpl): List[Constraint] =
+  def makeBoundedConstraints(tparams: List[Symbol], constrs: List[TypeConstraint], inTpl: DocTemplateImpl): List[Constraint] =
     (tparams zip constrs) flatMap {
       case (tparam, constr) => {
         uniteConstraints(constr) match {
@@ -372,23 +294,23 @@ trait ModelFactoryImplicitSupport {
             case (List(lo), List(up)) if (lo == up) =>
               List(new EqualTypeParamConstraint {
                 val typeParamName = tparam.nameString
-                val rhs = makeType(lo, inTpl)
+                lazy val rhs = makeType(lo, inTpl)
               })
             case (List(lo), List(up)) =>
               List(new BoundedTypeParamConstraint {
                 val typeParamName = tparam.nameString
-                val lowerBound = makeType(lo, inTpl)
-                val upperBound = makeType(up, inTpl)
+                lazy val lowerBound = makeType(lo, inTpl)
+                lazy val upperBound = makeType(up, inTpl)
               })
             case (List(lo), Nil) =>
               List(new LowerBoundedTypeParamConstraint {
                 val typeParamName = tparam.nameString
-                val lowerBound = makeType(lo, inTpl)
+                lazy val lowerBound = makeType(lo, inTpl)
               })
             case (Nil, List(up)) =>
               List(new UpperBoundedTypeParamConstraint {
                 val typeParamName = tparam.nameString
-                val upperBound = makeType(up, inTpl)
+                lazy val upperBound = makeType(up, inTpl)
               })
             case other =>
               // this is likely an error on the lub/glb side
@@ -398,6 +320,140 @@ trait ModelFactoryImplicitSupport {
         }
       }
     }
+
+  /* ============== IMPLEMENTATION PROVIDING ENTITY TYPES ============== */
+
+  class ImplicitConversionImpl(
+    val sym: Symbol,
+    val convSym: Symbol,
+    val toType: Type,
+    val constrs: List[Constraint],
+    inTpl: DocTemplateImpl)
+      extends ImplicitConversion {
+
+    def source: DocTemplateEntity = inTpl
+
+    def targetType: TypeEntity = makeType(toType, inTpl)
+
+    def convertorOwner: TemplateEntity =
+      if (convSym != NoSymbol)
+        makeTemplate(convSym.owner)
+      else {
+        error("Scaladoc implicits: " + toString + " = NoSymbol!")
+        makeRootPackage
+      }
+
+    def targetTypeComponents: List[(TemplateEntity, TypeEntity)] = makeParentTypes(toType, None, inTpl)
+
+    def convertorMethod: Either[MemberEntity, String] = {
+      var convertor: MemberEntity = null
+
+      convertorOwner match {
+        case doc: DocTemplateImpl =>
+          val convertors = members.collect { case m: MemberImpl if m.sym == convSym => m }
+          if (convertors.length == 1)
+            convertor = convertors.head
+        case _ =>
+      }
+      if (convertor ne null)
+        Left(convertor)
+      else
+        Right(convSym.nameString)
+    }
+
+    def conversionShortName = convSym.nameString
+
+    def conversionQualifiedName = makeQualifiedName(convSym)
+
+    lazy val constraints: List[Constraint] = constrs
+
+    lazy val memberImpls: List[MemberImpl] = {
+      // Obtain the members inherited by the implicit conversion
+      val memberSyms = toType.members.filter(implicitShouldDocument(_)).toList
+
+      // Debugging part :)
+      debug(sym.nameString + "\n" + "=" * sym.nameString.length())
+      debug(" * conversion " + convSym + " from " + sym.tpe + " to " + toType)
+
+      debug("   -> full type: " + toType)
+      if (constraints.length != 0) {
+        debug("   -> constraints: ")
+        constraints foreach { constr => debug("      - " + constr) }
+      }
+      debug("   -> members:")
+      memberSyms foreach (sym => debug("      - "+ sym.decodedName +" : " + sym.info))
+      debug("")
+
+      memberSyms.flatMap({ aSym =>
+        // we can't just pick up nodes from the original template, although that would be very convenient:
+        // they need the byConversion field to be attached to themselves and the types to be transformed by
+        // asSeenFrom
+
+        // at the same time, the member itself is in the inTpl, not in the new template -- but should pick up
+        // variables from the old template. Ugly huh? We'll always create the member inTpl, but it will change
+        // the template when expanding variables in the comment :)
+        makeMember(aSym, Some(this), inTpl)
+      })
+    }
+
+    lazy val members: List[MemberEntity] = memberImpls
+
+    def isHiddenConversion = settings.hiddenImplicits(conversionQualifiedName)
+
+    override def toString = "Implcit conversion from " + sym.tpe + " to " + toType + " done by " + convSym
+  }
+
+  /* ========================= HELPER METHODS ========================== */
+  /**
+   *  Computes the shadowing table for all the members in the implicit conversions
+   *  @param members All template's members, including usecases and full signature members
+   *  @param convs All the conversions the template takes part in
+   *  @param inTpl the usual :)
+   */
+  def makeShadowingTable(members: List[MemberImpl],
+                         convs: List[ImplicitConversionImpl],
+                         inTpl: DocTemplateImpl): Map[MemberEntity, ImplicitMemberShadowing] = {
+    assert(modelFinished)
+
+    val shadowingTable = mutable.Map[MemberEntity, ImplicitMemberShadowing]()
+    val membersByName: Map[Name, List[MemberImpl]] = members.groupBy(_.sym.name)
+    val convsByMember = (Map.empty[MemberImpl, ImplicitConversionImpl] /: convs) {
+      case (map, conv) => map ++ conv.memberImpls.map (_ -> conv)
+    }
+
+    for (conv <- convs) {
+      val otherConvMembers: Map[Name, List[MemberImpl]] = convs filterNot (_ == conv) flatMap (_.memberImpls) groupBy (_.sym.name)
+
+      for (member <- conv.memberImpls) {
+        val sym1 = member.sym
+        val tpe1 = conv.toType.memberInfo(sym1)
+
+        // check if it's shadowed by a member in the original class.
+        val shadowed = membersByName.get(sym1.name).toList.flatten filter { other =>
+          !settings.docImplicitsSoundShadowing.value || !isDistinguishableFrom(tpe1, inTpl.sym.info.memberInfo(other.sym))
+        }
+
+        // check if it's shadowed by another conversion.
+        val ambiguous = otherConvMembers.get(sym1.name).toList.flatten filter { other =>
+          val tpe2 = convsByMember(other).toType.memberInfo(other.sym)
+          !isDistinguishableFrom(tpe1, tpe2) || !isDistinguishableFrom(tpe2, tpe1)
+        }
+
+        // we finally have the shadowing info
+        if (!shadowed.isEmpty || !ambiguous.isEmpty) {
+          val shadowing = new ImplicitMemberShadowing {
+            def shadowingMembers: List[MemberEntity] = shadowed
+            def ambiguatingMembers: List[MemberEntity] = ambiguous
+          }
+
+          shadowingTable += (member -> shadowing)
+        }
+      }
+    }
+
+    shadowingTable.toMap
+  }
+
 
   /**
    * uniteConstraints takes a TypeConstraint instance and simplifies the constraints inside
@@ -425,14 +481,14 @@ trait ModelFactoryImplicitSupport {
   /**
    *  Make implicits explicit - Not used curently
    */
-  object implicitToExplicit extends TypeMap {
-    def apply(tp: Type): Type = mapOver(tp) match {
-      case MethodType(params, resultType) =>
-        MethodType(params.map(param => if (param.isImplicit) param.cloneSymbol.resetFlag(Flags.IMPLICIT) else param), resultType)
-      case other =>
-        other
-    }
-  }
+  // object implicitToExplicit extends TypeMap {
+  //   def apply(tp: Type): Type = mapOver(tp) match {
+  //     case MethodType(params, resultType) =>
+  //       MethodType(params.map(param => if (param.isImplicit) param.cloneSymbol.resetFlag(Flags.IMPLICIT) else param), resultType)
+  //     case other =>
+  //       other
+  //   }
+  // }
 
   /**
    * removeImplicitParameters transforms implicit parameters from the view result type into constraints and
@@ -493,8 +549,8 @@ trait ModelFactoryImplicitSupport {
     // - common methods (in Any, AnyRef, Object) as they are automatically removed
     // - private and protected members (not accessible following an implicit conversion)
     // - members starting with _ (usually reserved for internal stuff)
-    localShouldDocument(aSym) && (!aSym.isConstructor) && (aSym.owner != ObjectClass) &&
-    (aSym.owner != AnyClass) && (aSym.owner != AnyRefClass) &&
+    localShouldDocument(aSym) && (!aSym.isConstructor) && (aSym.owner != AnyValClass) &&
+    (aSym.owner != AnyClass) && (aSym.owner != ObjectClass) &&
     (!aSym.isProtected) && (!aSym.isPrivate) && (!aSym.name.startsWith("_")) &&
     (aSym.isMethod || aSym.isGetter || aSym.isSetter) &&
     (aSym.nameString != "getClass")
@@ -506,15 +562,18 @@ trait ModelFactoryImplicitSupport {
    * The trick here is that the resultType does not matter - the condition for removal it that paramss have the same
    * structure (A => B => C may not override (A, B) => C) and that all the types involved are
    * of the implcit conversion's member are subtypes of the parent members' parameters */
-  def isDistinguishableFrom(t1: Type, t2: Type): Boolean =
+  def isDistinguishableFrom(t1: Type, t2: Type): Boolean = {
+    // Vlad: I tried using matches but it's not exactly what we need:
+    // (p: AnyRef)AnyRef matches ((t: String)AnyRef returns false -- but we want that to be true
+    // !(t1 matches t2)
     if (t1.paramss.map(_.length) == t2.paramss.map(_.length)) {
       for ((t1p, t2p) <- t1.paramss.flatten zip t2.paramss.flatten)
-        if (!isSubType(t1 memberInfo t1p, t2 memberInfo t2p))
-          return true // if on the corresponding parameter you give a type that is in t1 but not in t2
-                      // example:
-                      // def foo(a: Either[Int, Double]): Int = 3
-                      // def foo(b: Left[T1]): Int = 6
-                      // a.foo(Right(4.5d)) prints out 3 :)
+       if (!isSubType(t1 memberInfo t1p, t2 memberInfo t2p))
+         return true // if on the corresponding parameter you give a type that is in t1 but not in t2
+                     // def foo(a: Either[Int, Double]): Int = 3
+                     // def foo(b: Left[T1]): Int = 6
+                     // a.foo(Right(4.5d)) prints out 3 :)
       false
     } else true // the member structure is different foo(3, 5) vs foo(3)(5)
+  }
 }

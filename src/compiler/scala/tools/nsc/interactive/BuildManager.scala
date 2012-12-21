@@ -1,5 +1,5 @@
 /* NSC -- new Scala compiler
- * Copyright 2009-2011 Scxala Solutions and LAMP/EPFL
+ * Copyright 2009-2013 Typesafe/Scala Solutions and LAMP/EPFL
  * @author Iulian Dragos
  * @author Hubert Plocinicak
  */
@@ -7,21 +7,13 @@ package scala.tools.nsc
 package interactive
 
 import scala.collection._
-
-import scala.tools.nsc.reporters.{Reporter, ConsoleReporter}
-import scala.reflect.internal.util.FakePos
-
-import dependencies._
 import io.AbstractFile
-import language.implicitConversions
+import scala.language.implicitConversions
 
 trait BuildManager {
 
   /** Add the given source files to the managed build process. */
   def addSourceFiles(files: Set[AbstractFile])
-
-  /** Remove the given files from the managed build process. */
-  def removeFiles(files: Set[AbstractFile])
 
   /** The given files have been modified by the user. Recompile
    *  them and their dependent files.
@@ -76,8 +68,6 @@ object BuildManagerTest extends EvalLoop {
     val settings = new Settings(buildError)
     settings.Ybuildmanagerdebug.value = true
     val command = new CompilerCommand(args.toList, settings)
-//    settings.make.value = "off"
-//    val buildManager: BuildManager = new SimpleBuildManager(settings)
     val buildManager: BuildManager = new RefinedBuildManager(settings)
 
     buildManager.addSourceFiles(command.files)

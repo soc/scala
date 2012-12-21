@@ -1,5 +1,5 @@
 /* NSC -- new Scala compiler
- * Copyright 2005-2011 LAMP/EPFL
+ * Copyright 2005-2013 LAMP/EPFL
  * @author  Paul Phillips
  */
 
@@ -40,8 +40,6 @@ trait Collections {
     mforeach(xss)(x => if ((res eq null) && p(x)) res = Some(x))
     if (res eq null) None else res
   }
-  final def mfilter[A](xss: List[List[A]])(p: A => Boolean) =
-    for (xs <- xss; x <- xs; if p(x)) yield x
 
   final def map2[A, B, C](xs1: List[A], xs2: List[B])(f: (A, B) => C): List[C] = {
     val lb = new ListBuffer[C]
@@ -69,26 +67,13 @@ trait Collections {
     }
     lb.toList
   }
-  
+
   final def flatCollect[A, B](elems: List[A])(pf: PartialFunction[A, Traversable[B]]): List[B] = {
     val lb = new ListBuffer[B]
     for (x <- elems ; if pf isDefinedAt x)
       lb ++= pf(x)
 
     lb.toList
-  }
-
-  final def distinctBy[A, B](xs: List[A])(f: A => B): List[A] = {
-    val buf = new ListBuffer[A]
-    val seen = mutable.Set[B]()
-    xs foreach { x =>
-      val y = f(x)
-      if (!seen(y)) {
-        buf += x
-        seen += y
-      }
-    }
-    buf.toList
   }
 
   @tailrec final def flattensToEmpty(xss: Seq[Seq[_]]): Boolean = {
@@ -104,7 +89,7 @@ trait Collections {
       index += 1
     }
   }
-  
+
   // @inline
   final def findOrElse[A](xs: TraversableOnce[A])(p: A => Boolean)(orElse: => A): A = {
     xs find p getOrElse orElse
@@ -175,17 +160,19 @@ trait Collections {
     }
     false
   }
-  final def forall2[A, B](xs1: List[A], xs2: List[B])(f: (A, B) => Boolean): Boolean = {
+  final def exists3[A, B, C](xs1: List[A], xs2: List[B], xs3: List[C])(f: (A, B, C) => Boolean): Boolean = {
     var ys1 = xs1
     var ys2 = xs2
-    while (!ys1.isEmpty && !ys2.isEmpty) {
-      if (!f(ys1.head, ys2.head))
-        return false
+    var ys3 = xs3
+    while (!ys1.isEmpty && !ys2.isEmpty && !ys3.isEmpty) {
+      if (f(ys1.head, ys2.head, ys3.head))
+        return true
 
       ys1 = ys1.tail
       ys2 = ys2.tail
+      ys3 = ys3.tail
     }
-    true
+    false
   }
   final def forall3[A, B, C](xs1: List[A], xs2: List[B], xs3: List[C])(f: (A, B, C) => Boolean): Boolean = {
     var ys1 = xs1
@@ -208,6 +195,3 @@ trait Collections {
     case _: IllegalArgumentException => None
   }
 }
-
-object Collections extends Collections { }
-

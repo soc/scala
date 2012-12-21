@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2003-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2003-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -8,10 +8,8 @@
 
 package scala.collection
 
-import generic._
 import mutable.ListBuffer
 import immutable.List
-import scala.util.control.Breaks._
 
 /** A template trait for linear sequences of type `LinearSeq[A]`  which optimizes
  *  the implementation of several methods under the assumption of fast linear access.
@@ -82,15 +80,14 @@ trait LinearSeqOptimized[+A, +Repr <: LinearSeqOptimized[A, Repr]] extends Linea
     false
   }
 
-  override /*TraversableLike*/
-  def count(p: A => Boolean): Int = {
+  override /*SeqLike*/
+  def contains[A1 >: A](elem: A1): Boolean = {
     var these = this
-    var cnt = 0
     while (!these.isEmpty) {
-      if (p(these.head)) cnt += 1
+      if (these.head == elem) return true
       these = these.tail
     }
-    cnt
+    false
   }
 
   override /*IterableLike*/

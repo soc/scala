@@ -1,12 +1,10 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2002-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2002-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
 \*                                                                      */
-
-
 
 package scala.collection
 package immutable
@@ -25,7 +23,7 @@ import mutable.StringBuilder
  *  @param repr     the actual representation of this string operations object.
  *
  *  @since 2.8
- *  @define Coll `StringOps`
+ *  @define Coll `String`
  *  @define coll string
  */
 final class StringOps(override val repr: String) extends AnyVal with StringLike[String] {

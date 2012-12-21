@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2006-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2006-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -10,7 +10,7 @@
 package scala.collection
 package generic
 
-import language.higherKinds
+import scala.language.higherKinds
 
 /** A template for companion objects of `Traversable` and subclasses thereof.
  *  This class provides a set of operations to create `$Coll` objects.
@@ -36,15 +36,12 @@ import language.higherKinds
  *    @see GenericCanBuildFrom
  */
 abstract class GenTraversableFactory[CC[X] <: GenTraversable[X] with GenericTraversableTemplate[X, CC]]
-  extends GenericCompanion[CC] {
+extends GenericCompanion[CC] {
 
-  // A default implementation of GenericCanBuildFrom which can be cast
-  // to whatever is desired.
-  private class ReusableCBF extends GenericCanBuildFrom[Nothing] {
+  private[this] val ReusableCBFInstance: GenericCanBuildFrom[Nothing] = new GenericCanBuildFrom[Nothing] {
     override def apply() = newBuilder[Nothing]
   }
-  // Working around SI-4789 by using a lazy val instead of an object.
-  lazy val ReusableCBF: GenericCanBuildFrom[Nothing] = new ReusableCBF
+  def ReusableCBF: GenericCanBuildFrom[Nothing] = ReusableCBFInstance
 
   /** A generic implementation of the `CanBuildFrom` trait, which forwards
    *  all calls to `apply(from)` to the `genericBuilder` method of
@@ -252,4 +249,3 @@ abstract class GenTraversableFactory[CC[X] <: GenTraversable[X] with GenericTrav
     b.result
   }
 }
-

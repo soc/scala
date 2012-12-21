@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2003-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2003-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -12,9 +12,9 @@ package scala.collection
 package generic
 
 import mutable.Builder
-import annotation.migration
-import annotation.unchecked.uncheckedVariance
-import language.higherKinds
+import scala.annotation.migration
+import scala.annotation.unchecked.uncheckedVariance
+import scala.language.higherKinds
 
 /** A template class for companion objects of ``regular`` collection classes
  *  that represent an unconstrained higher-kinded type.
@@ -128,7 +128,7 @@ trait GenericTraversableTemplate[+A, +CC[X] <: GenTraversable[X]] extends HasNew
    *  @usecase def flatten[B]: $Coll[B]
    *
    *    @inheritdoc
-   *  
+   *
    *    The resulting collection's type will be guided by the
    *    static type of $coll. For example:
    *
@@ -138,7 +138,7 @@ trait GenericTraversableTemplate[+A, +CC[X] <: GenTraversable[X]] extends HasNew
    *
    *    val ys = Set(List(1, 2, 3), List(3, 2, 1))
    *    // ys == Set(1, 2, 3)
-   *    }}} 
+   *    }}}
    */
   def flatten[B](implicit asTraversable: A => /*<:<!!!*/ GenTraversableOnce[B]): CC[B] = {
     val b = genericBuilder[B]

@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2002-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2002-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -75,7 +75,7 @@ extends AbstractSeq[T]
   override def stringPrefix = "WrappedArray"
 
   /** Clones this object, including the underlying Array. */
-  override def clone: WrappedArray[T] = WrappedArray make array.clone()
+  override def clone(): WrappedArray[T] = WrappedArray make array.clone()
 
   /** Creates new builder for this collection ==> move to subclasses
    */

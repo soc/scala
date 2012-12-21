@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2006-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2006-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://www.scala-lang.org/           **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -10,10 +10,11 @@ package scala.collection
 package convert
 
 import java.{ lang => jl, util => ju }, java.util.{ concurrent => juc }
-import Wrappers._
-import language.implicitConversions
+import scala.language.implicitConversions
 
 trait WrapAsJava {
+  import Wrappers._
+
   /**
    * Implicitly converts a Scala Iterator to a Java Iterator.
    * The returned Java Iterator is backed by the provided Scala
@@ -253,7 +254,7 @@ trait WrapAsJava {
     case JConcurrentMapDeprecatedWrapper(wrapped) => wrapped
     case _ => new ConcurrentMapDeprecatedWrapper(m)
   }
-  
+
   /**
    * Implicitly converts a Scala mutable `concurrent.Map` to a Java
    * `ConcurrentMap`.
@@ -269,7 +270,7 @@ trait WrapAsJava {
    * @param m The Scala `concurrent.Map` to be converted.
    * @return A Java `ConcurrentMap` view of the argument.
    */
-  implicit def asJavaConcurrentMap[A, B](m: concurrent.Map[A, B]): juc.ConcurrentMap[A, B] = m match {
+  implicit def mapAsJavaConcurrentMap[A, B](m: concurrent.Map[A, B]): juc.ConcurrentMap[A, B] = m match {
     case JConcurrentMapWrapper(wrapped) => wrapped
     case _ => new ConcurrentMapWrapper(m)
   }

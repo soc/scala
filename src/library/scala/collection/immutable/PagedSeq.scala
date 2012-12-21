@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2006-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2006-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -13,7 +13,7 @@ package immutable
 
 import java.io._
 import scala.util.matching.Regex
-import reflect.ClassTag
+import scala.reflect.ClassTag
 
 /** The `PagedSeq` object defines a lazy implementations of
  *  a random access sequence.
@@ -99,7 +99,7 @@ object PagedSeq {
 
   /** Constructs a paged character sequence from a scala.io.Source value
    */
-  def fromSource(source: io.Source) =
+  def fromSource(source: scala.io.Source) =
     fromLines(source.getLines())
 }
 

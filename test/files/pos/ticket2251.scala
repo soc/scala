@@ -27,14 +27,22 @@ lub of List(D, C) is B[_2] forSome { type _2 >: D with C{} <: B[_1] forSome { ty
 
   val data3: List[B[X] forSome { type X <: B[_ <: A] }] = List(new C, new D)
 
+<<<<<<< HEAD
   // val data4: List[B[X] forSome { type X <: B[X] }] = List(new C, new D)
   //
+=======
+  // Not yet --
+  // val data4: List[B[X] forSome { type X <: B[X] }] = List(new C, new D)
+>>>>>>> master
   // <console>:7: error: type mismatch;
   //  found   : List[B[_ >: D with C <: B[_ >: D with C <: A]]]
   //  required: List[B[X] forSome { type X <: B[X] }]
   //        val data4: List[B[X] forSome { type X <: B[X] }] = List(new C, new D)
+<<<<<<< HEAD
   //                                                               ^
   //
+=======
+>>>>>>> master
 
   // works
   val data5 = List[B[X] forSome { type X <: B[X] }](new C, new D)

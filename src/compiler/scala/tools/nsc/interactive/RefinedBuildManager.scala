@@ -1,5 +1,5 @@
 /* NSC -- new Scala compiler
- * Copyright 2009-2011 Scala Solutions and LAMP/EPFL
+ * Copyright 2009-2013 Typesafe/Scala Solutions and LAMP/EPFL
  * @author Iulian Dragos
  * @author Hubert Plocinicak
  */
@@ -12,7 +12,6 @@ import scala.util.control.Breaks._
 import scala.tools.nsc.symtab.Flags
 
 import dependencies._
-import scala.reflect.internal.util.FakePos
 import util.ClassPath
 import io.AbstractFile
 import scala.tools.util.PathResolver
@@ -49,7 +48,7 @@ class RefinedBuildManager(val settings: Settings) extends Changes with BuildMana
   protected def newCompiler(settings: Settings) = new BuilderGlobal(settings)
 
   val compiler = newCompiler(settings)
-  import compiler.{ Symbol, Type, beforeErasure }
+  import compiler.{ Symbol, Type, enteringErasure }
   import compiler.dependencyAnalysis.Inherited
 
   private case class SymWithHistory(sym: Symbol, befErasure: Type)
@@ -69,7 +68,7 @@ class RefinedBuildManager(val settings: Settings) extends Changes with BuildMana
   private var inherited: mutable.Map[AbstractFile, immutable.Set[Inherited]] = _
 
   /** Reverse of definitions, used for caching */
-  private var classes: mutable.Map[String, AbstractFile] =
+  private val classes: mutable.Map[String, AbstractFile] =
     new mutable.HashMap[String, AbstractFile] {
       override def default(key: String) = null
   }
@@ -161,7 +160,7 @@ class RefinedBuildManager(val settings: Settings) extends Changes with BuildMana
                     isCorrespondingSym(s.sym, sym)) match {
               case Some(SymWithHistory(oldSym, info)) =>
                 val changes = changeSet(oldSym.info, sym)
-                val changesErasure = beforeErasure(changeSet(info, sym))
+                val changesErasure = enteringErasure(changeSet(info, sym))
 
                 changesOf(oldSym) = (changes ++ changesErasure).distinct
               case _ =>
@@ -220,7 +219,7 @@ class RefinedBuildManager(val settings: Settings) extends Changes with BuildMana
   }
 
   /** Return the set of source files that are invalidated by the given changes. */
-  def invalidated(files: Set[AbstractFile], changesOf: collection.Map[Symbol, List[Change]],
+  def invalidated(files: Set[AbstractFile], changesOf: scala.collection.Map[Symbol, List[Change]],
                   processed: Set[AbstractFile] = Set.empty):
     Set[AbstractFile] = {
     val buf = new mutable.HashSet[AbstractFile]
@@ -332,7 +331,7 @@ class RefinedBuildManager(val settings: Settings) extends Changes with BuildMana
     for (src <- files; localDefs = compiler.dependencyAnalysis.definitions(src)) {
       definitions(src) = (localDefs map (s => {
         this.classes += s.fullName -> src
-        SymWithHistory(s.cloneSymbol, beforeErasure(s.info.cloneInfo(s)))
+        SymWithHistory(s.cloneSymbol, enteringErasure(s.info.cloneInfo(s)))
       }))
     }
     this.references = compiler.dependencyAnalysis.references

@@ -1,5 +1,5 @@
 /* NSC -- new Scala compiler
- * Copyright 2005-2011 LAMP/EPFL
+ * Copyright 2005-2013 LAMP/EPFL
  * @author  Martin Odersky
  */
 
@@ -16,9 +16,7 @@ import javax.swing.tree._
 
 import scala.concurrent.Lock
 import scala.text._
-import symtab.Flags._
-import symtab.SymbolTable
-import language.implicitConversions
+import scala.language.implicitConversions
 
 /**
  * Tree browsers can show the AST in a graphical and interactive
@@ -140,7 +138,7 @@ abstract class TreeBrowsers {
       UIManager.setLookAndFeel("com.sun.java.swing.plaf.nimbus.NimbusLookAndFeel")
     }
     catch {
-      case _ => UIManager.setLookAndFeel(UIManager.getCrossPlatformLookAndFeelClassName())
+      case _: Throwable => UIManager.setLookAndFeel(UIManager.getCrossPlatformLookAndFeelClassName())
     }
 
     val frame = new JFrame("Scala AST after " + phaseName + " phase")
@@ -509,7 +507,7 @@ abstract class TreeBrowsers {
     /** Return a textual representation of this t's symbol */
     def symbolText(t: Tree): String = {
       val prefix =
-        if (t.hasSymbol)  "[has] "
+        if (t.hasSymbolField)  "[has] "
         else if (t.isDef) "[defines] "
         else ""
 
@@ -529,10 +527,9 @@ abstract class TreeBrowsers {
      * attributes */
     def symbolAttributes(t: Tree): String = {
       val s = t.symbol
-      var att = ""
 
       if ((s ne null) && (s != NoSymbol)) {
-        var str = flagsToString(s.flags)
+        var str = s.flagString
         if (s.isStaticMember) str = str + " isStatic ";
         (str + " annotations: " + s.annotations.mkString("", " ", "")
           + (if (s.isTypeSkolem) "\ndeSkolemized annotations: " + s.deSkolemize.annotations.mkString("", " ", "") else ""))

@@ -1,5 +1,5 @@
 /* NSC -- new Scala compiler
- * Copyright 2005-2011 LAMP/EPFL
+ * Copyright 2005-2013 LAMP/EPFL
  * @author  Martin Odersky
  */
 
@@ -10,10 +10,9 @@ import java.io.IOException
 import scala.compat.Platform.currentTime
 import scala.tools.nsc.util.{ ClassPath }
 import classfile.ClassfileParser
-import reflect.internal.Flags._
-import reflect.internal.MissingRequirementError
-import util.Statistics._
-import scala.tools.nsc.io.{ AbstractFile, MsilFile }
+import scala.reflect.internal.MissingRequirementError
+import scala.reflect.internal.util.Statistics
+import scala.tools.nsc.io.{ AbstractFile }
 
 /** This class ...
  *
@@ -23,6 +22,7 @@ import scala.tools.nsc.io.{ AbstractFile, MsilFile }
 abstract class SymbolLoaders {
   val global: Global
   import global._
+  import SymbolLoadersStats._
 
   protected def enterIfNew(owner: Symbol, member: Symbol, completer: SymbolLoader): Symbol = {
     assert(owner.info.decls.lookup(member.name) == NoSymbol, owner.fullName + "." + member.name)
@@ -33,8 +33,7 @@ abstract class SymbolLoaders {
   /** Enter class with given `name` into scope of `root`
    *  and give them `completer` as type.
    */
-  def enterClass(root: Symbol, name: String, completer: SymbolLoader): Symbol = {
-    val owner = root.ownerOfNewSymbols
+  def enterClass(owner: Symbol, name: String, completer: SymbolLoader): Symbol = {
     val clazz = owner.newClass(newTypeName(name))
     clazz setInfo completer
     enterIfNew(owner, clazz, completer)
@@ -43,8 +42,7 @@ abstract class SymbolLoaders {
   /** Enter module with given `name` into scope of `root`
    *  and give them `completer` as type.
    */
-  def enterModule(root: Symbol, name: String, completer: SymbolLoader): Symbol = {
-    val owner = root.ownerOfNewSymbols
+  def enterModule(owner: Symbol, name: String, completer: SymbolLoader): Symbol = {
     val module = owner.newModule(newTermName(name))
     module setInfo completer
     module.moduleClass setInfo moduleClassLoader
@@ -113,11 +111,23 @@ abstract class SymbolLoaders {
     enterClassAndModule(root, name, new SourcefileLoader(src))
   }
 
+  /** The package objects of scala and scala.reflect should always
+   *  be loaded in binary if classfiles are available, even if sourcefiles
+   *  are newer. Late-compiling these objects from source leads to compilation
+   *  order issues.
+   *  Note: We do a name-base comparison here because the method is called before we even
+   *  have ReflectPackage defined.
+   */
+  def binaryOnly(owner: Symbol, name: String): Boolean =
+    name == "package" &&
+    (owner.fullName == "scala" || owner.fullName == "scala.reflect")
+
   /** Initialize toplevel class and module symbols in `owner` from class path representation `classRep`
    */
   def initializeFromClassPath(owner: Symbol, classRep: ClassPath[platform.BinaryRepr]#ClassRep) {
     ((classRep.binary, classRep.source) : @unchecked) match {
-      case (Some(bin), Some(src)) if platform.needCompile(bin, src) =>
+      case (Some(bin), Some(src))
+      if platform.needCompile(bin, src) && !binaryOnly(owner, classRep.name) =>
         if (settings.verbose.value) inform("[symloader] picked up newer source file for " + src.path)
         global.loaders.enterToplevelsFromSource(owner, classRep.name, src)
       case (None, Some(src)) =>
@@ -142,7 +152,7 @@ abstract class SymbolLoaders {
     def sourcefile: Option[AbstractFile] = None
 
     /**
-     * Description of the resource (ClassPath, AbstractFile, MsilFile)
+     * Description of the resource (ClassPath, AbstractFile)
      * being processed by this loader
      */
     protected def description: String
@@ -151,8 +161,8 @@ abstract class SymbolLoaders {
 
     private def setSource(sym: Symbol) {
       sourcefile foreach (sf => sym match {
-        case cls: ClassSymbol => cls.sourceFile = sf
-        case mod: ModuleSymbol => mod.moduleClass.sourceFile = sf
+        case cls: ClassSymbol => cls.associatedFile = sf
+        case mod: ModuleSymbol => mod.moduleClass.associatedFile = sf
         case _ => ()
       })
     }
@@ -208,27 +218,29 @@ abstract class SymbolLoaders {
   /**
    * Load contents of a package
    */
-  class PackageLoader(classpath: ClassPath[platform.BinaryRepr]) extends SymbolLoader {
+  class PackageLoader(classpath: ClassPath[platform.BinaryRepr]) extends SymbolLoader with FlagAgnosticCompleter {
     protected def description = "package loader "+ classpath.name
 
     protected def doComplete(root: Symbol) {
       assert(root.isPackageClass, root)
       root.setInfo(new PackageClassInfoType(newScope, root))
 
-      val sourcepaths = classpath.sourcepaths
-      for (classRep <- classpath.classes if platform.doLoad(classRep)) {
-        initializeFromClassPath(root, classRep)
+      if (!root.isRoot) {
+        for (classRep <- classpath.classes if platform.doLoad(classRep)) {
+          initializeFromClassPath(root, classRep)
+        }
       }
+      if (!root.isEmptyPackageClass) {
+        for (pkg <- classpath.packages) {
+          enterPackage(root, pkg.name, new PackageLoader(pkg))
+        }
 
-      for (pkg <- classpath.packages) {
-        enterPackage(root, pkg.name, new PackageLoader(pkg))
+        openPackageModule(root)
       }
-
-      openPackageModule(root)
     }
   }
 
-  class ClassfileLoader(val classfile: AbstractFile) extends SymbolLoader {
+  class ClassfileLoader(val classfile: AbstractFile) extends SymbolLoader with FlagAssigningCompleter {
     private object classfileParser extends ClassfileParser {
       val global: SymbolLoaders.this.global.type = SymbolLoaders.this.global
     }
@@ -236,7 +248,7 @@ abstract class SymbolLoaders {
     protected def description = "class file "+ classfile.toString
 
     protected def doComplete(root: Symbol) {
-      val start = startTimer(classReadNanos)
+      val start = if (Statistics.canEnable) Statistics.startTimer(classReadNanos) else null
       classfileParser.parse(classfile, root)
       if (root.associatedFile eq null) {
         root match {
@@ -248,39 +260,29 @@ abstract class SymbolLoaders {
             debuglog("Not setting associatedFile to %s because %s is a %s".format(classfile, root.name, root.shortSymbolClass))
         }
       }
-      stopTimer(classReadNanos, start)
+      if (Statistics.canEnable) Statistics.stopTimer(classReadNanos, start)
     }
     override def sourcefile: Option[AbstractFile] = classfileParser.srcfile
   }
 
-  class MsilFileLoader(msilFile: MsilFile) extends SymbolLoader {
-    private def typ = msilFile.msilType
-    private object typeParser extends clr.TypeParser {
-      val global: SymbolLoaders.this.global.type = SymbolLoaders.this.global
-    }
-
-    protected def description = "MsilFile "+ typ.FullName + ", assembly "+ typ.Assembly.FullName
-    protected def doComplete(root: Symbol) { typeParser.parse(typ, root) }
-  }
-
-  class SourcefileLoader(val srcfile: AbstractFile) extends SymbolLoader {
+  class SourcefileLoader(val srcfile: AbstractFile) extends SymbolLoader with FlagAssigningCompleter {
     protected def description = "source file "+ srcfile.toString
     override def fromSource = true
     override def sourcefile = Some(srcfile)
     protected def doComplete(root: Symbol): Unit = global.currentRun.compileLate(srcfile)
   }
 
-  object moduleClassLoader extends SymbolLoader {
+  object moduleClassLoader extends SymbolLoader with FlagAssigningCompleter {
     protected def description = "module class loader"
     protected def doComplete(root: Symbol) { root.sourceModule.initialize }
-  }
-
-  object clrTypes extends clr.CLRTypes {
-    val global: SymbolLoaders.this.global.type = SymbolLoaders.this.global
-    if (global.forMSIL) init()
   }
 
   /** used from classfile parser to avoid cyclies */
   var parentsLevel = 0
   var pendingLoadActions: List[() => Unit] = Nil
+}
+
+object SymbolLoadersStats {
+  import scala.reflect.internal.TypesStats.typerNanos
+  val classReadNanos = Statistics.newSubTimer  ("time classfilereading", typerNanos)
 }

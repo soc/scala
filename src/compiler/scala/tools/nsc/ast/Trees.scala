@@ -1,5 +1,5 @@
 /* NSC -- new Scala compiler
- * Copyright 2005-2011 LAMP/EPFL
+ * Copyright 2005-2013 LAMP/EPFL
  * @author  Martin Odersky
  */
 
@@ -15,7 +15,7 @@ import scala.reflect.internal.Flags.PRESUPER
 import scala.reflect.internal.Flags.TRAIT
 import scala.compat.Platform.EOL
 
-trait Trees extends reflect.internal.Trees { self: Global =>
+trait Trees extends scala.reflect.internal.Trees { self: Global =>
 
   def treeLine(t: Tree): String =
     if (t.pos.isDefined && t.pos.isRange) t.pos.lineContent.drop(t.pos.column - 1).take(t.pos.end - t.pos.start + 1)
@@ -48,15 +48,15 @@ trait Trees extends reflect.internal.Trees { self: Global =>
     override def isType = definition.isType
   }
 
- /** Array selection <qualifier> . <name> only used during erasure */
+ /** Array selection `<qualifier> . <name>` only used during erasure */
   case class SelectFromArray(qualifier: Tree, name: Name, erasure: Type)
-       extends TermTree with RefTree
+       extends RefTree with TermTree
 
-  /** Derived value class injection (equivalent to: new C(arg) after easure); only used during erasure
-   *  The class C is stored as the symbol of the tree node.
+  /** Derived value class injection (equivalent to: `new C(arg)` after erasure); only used during erasure.
+   *  The class `C` is stored as a tree attachment.
    */
   case class InjectDerivedValue(arg: Tree)
-       extends SymTree
+       extends SymTree with TermTree
 
   class PostfixSelect(qual: Tree, name: Name) extends Select(qual, name)
 
@@ -64,6 +64,13 @@ trait Trees extends reflect.internal.Trees { self: Global =>
   case class TypeTreeWithDeferredRefCheck()(val check: () => TypeTree) extends TypTree
 
   // --- factory methods ----------------------------------------------------------
+
+  /** Factory method for a primary constructor super call `super.<init>(args_1)...(args_n)`
+   */
+  def PrimarySuperCall(argss: List[List[Tree]]): Tree = argss match {
+    case Nil        => Apply(gen.mkSuperInitCall, Nil)
+    case xs :: rest => rest.foldLeft(Apply(gen.mkSuperInitCall, xs): Tree)(Apply.apply)
+  }
 
     /** Generates a template with constructor corresponding to
    *
@@ -82,7 +89,7 @@ trait Trees extends reflect.internal.Trees { self: Global =>
    *    body
    *  }
    */
-  def Template(parents: List[Tree], self: ValDef, constrMods: Modifiers, vparamss: List[List[ValDef]], argss: List[List[Tree]], body: List[Tree], superPos: Position): Template = {
+  def Template(parents: List[Tree], self: ValDef, constrMods: Modifiers, vparamss: List[List[ValDef]], body: List[Tree], superPos: Position): Template = {
     /* Add constructor to template */
 
     // create parameters for <init> as synthetic trees.
@@ -95,37 +102,42 @@ trait Trees extends reflect.internal.Trees { self: Global =>
     val (edefs, rest) = body span treeInfo.isEarlyDef
     val (evdefs, etdefs) = edefs partition treeInfo.isEarlyValDef
     val gvdefs = evdefs map {
-      case vdef @ ValDef(_, _, tpt, _) => copyValDef(vdef)(
-        // !!! I know "atPos in case" wasn't intentionally planted to
-        // add an air of mystery to this file, but it is the sort of
-        // comment which only its author could love.
-        tpt = atPos(vdef.pos.focus)(TypeTree() setOriginal tpt setPos tpt.pos.focus), // atPos in case
+      case vdef @ ValDef(_, _, tpt, _) =>
+        copyValDef(vdef)(
+        // atPos for the new tpt is necessary, since the original tpt might have no position
+        // (when missing type annotation for ValDef for example), so even though setOriginal modifies the
+        // position of TypeTree, it would still be NoPosition. That's what the author meant.
+        tpt = atPos(vdef.pos.focus)(TypeTree() setOriginal tpt setPos tpt.pos.focus),
         rhs = EmptyTree
       )
     }
-    val lvdefs = evdefs collect { case vdef: ValDef => copyValDef(vdef)(mods = Modifiers(PRESUPER)) }
+    val lvdefs = evdefs collect { case vdef: ValDef => copyValDef(vdef)(mods = vdef.mods | PRESUPER) }
 
     val constrs = {
       if (constrMods hasFlag TRAIT) {
         if (body forall treeInfo.isInterfaceMember) List()
         else List(
           atPos(wrappingPos(superPos, lvdefs)) (
-            DefDef(NoMods, nme.MIXIN_CONSTRUCTOR, List(), List(List()), TypeTree(), Block(lvdefs, Literal(Constant())))))
+            DefDef(NoMods, nme.MIXIN_CONSTRUCTOR, List(), ListOfNil, TypeTree(), Block(lvdefs, Literal(Constant())))))
       } else {
         // convert (implicit ... ) to ()(implicit ... ) if its the only parameter section
         if (vparamss1.isEmpty || !vparamss1.head.isEmpty && vparamss1.head.head.mods.isImplicit)
           vparamss1 = List() :: vparamss1;
-        val superRef: Tree = atPos(superPos)(gen.mkSuperSelect)
-        def mkApply(fun: Tree, args: List[Tree]) = Apply(fun, args)
-        val superCall = (superRef /: argss) (mkApply)
-        // [Eugene++] no longer compiles after I moved the `Apply` case class into scala.reflect.internal
-        // val superCall = (superRef /: argss) (Apply)
+        val superRef: Tree = atPos(superPos)(gen.mkSuperInitCall)
+        val superCall = pendingSuperCall // we can't know in advance which of the parents will end up as a superclass
+                                         // this requires knowing which of the parents is a type macro and which is not
+                                         // and that's something that cannot be found out before typer
+                                         // (the type macros aren't in the trunk yet, but there is a plan for them to land there soon)
+                                         // this means that we don't know what will be the arguments of the super call
+                                         // therefore here we emit a dummy which gets populated when the template is named and typechecked
         List(
-          atPos(wrappingPos(superPos, lvdefs ::: argss.flatten)) (
+          // TODO: previously this was `wrappingPos(superPos, lvdefs ::: argss.flatten)`
+          // is it going to be a problem that we can no longer include the `argss`?
+          atPos(wrappingPos(superPos, lvdefs)) (
             DefDef(constrMods, nme.CONSTRUCTOR, List(), vparamss1, TypeTree(), Block(lvdefs ::: List(superCall), Literal(Constant())))))
       }
     }
-    constrs foreach (ensureNonOverlapping(_, parents ::: gvdefs))
+    constrs foreach (ensureNonOverlapping(_, parents ::: gvdefs, focus=false))
     // Field definitions for the class - remove defaults.
     val fieldDefs = vparamss.flatten map (vd => copyValDef(vd)(mods = vd.mods &~ DEFAULTPARAM, rhs = EmptyTree))
 
@@ -139,11 +151,10 @@ trait Trees extends reflect.internal.Trees { self: Global =>
    *  @param constrMods the modifiers for the class constructor, i.e. as in `class C private (...)`
    *  @param vparamss   the value parameters -- if they have symbols they
    *                    should be owned by `sym`
-   *  @param argss      the supercall arguments
    *  @param body       the template statements without primary constructor
    *                    and value parameter fields.
    */
-  def ClassDef(sym: Symbol, constrMods: Modifiers, vparamss: List[List[ValDef]], argss: List[List[Tree]], body: List[Tree], superPos: Position): ClassDef = {
+  def ClassDef(sym: Symbol, constrMods: Modifiers, vparamss: List[List[ValDef]], body: List[Tree], superPos: Position): ClassDef = {
     // "if they have symbols they should be owned by `sym`"
     assert(
       mforall(vparamss)(p => (p.symbol eq NoSymbol) || (p.symbol.owner == sym)),
@@ -153,7 +164,7 @@ trait Trees extends reflect.internal.Trees { self: Global =>
     ClassDef(sym,
       Template(sym.info.parents map TypeTree,
                if (sym.thisSym == sym || phase.erasedTypes) emptyValDef else ValDef(sym.thisSym),
-               constrMods, vparamss, argss, body, superPos))
+               constrMods, vparamss, body, superPos))
   }
 
  // --- subcomponents --------------------------------------------------
@@ -180,7 +191,7 @@ trait Trees extends reflect.internal.Trees { self: Global =>
     case _ => super.xtraverse(traverser, tree)
   }
 
-  trait TreeCopier extends super.TreeCopierOps {
+  trait TreeCopier extends super.InternalTreeCopierOps {
     def DocDef(tree: Tree, comment: DocComment, definition: Tree): DocDef
     def SelectFromArray(tree: Tree, qualifier: Tree, selector: Name, erasure: Type): SelectFromArray
     def InjectDerivedValue(tree: Tree, arg: Tree): InjectDerivedValue
@@ -283,7 +294,7 @@ trait Trees extends reflect.internal.Trees { self: Global =>
     val trace = scala.tools.nsc.util.trace when debug
 
     val locals = util.HashSet[Symbol](8)
-    val orderedLocals = collection.mutable.ListBuffer[Symbol]()
+    val orderedLocals = scala.collection.mutable.ListBuffer[Symbol]()
     def registerLocal(sym: Symbol) {
       if (sym != null && sym != NoSymbol) {
         if (debug && !(locals contains sym)) orderedLocals append sym
@@ -326,27 +337,24 @@ trait Trees extends reflect.internal.Trees { self: Global =>
         else
           super.transform {
             tree match {
+              case tree if !tree.canHaveAttrs =>
+                tree
               case tpt: TypeTree =>
                 if (tpt.original != null)
                   transform(tpt.original)
                 else if (tpt.tpe != null && (tpt.wasEmpty || (tpt.tpe exists (tp => locals contains tp.typeSymbol)))) {
-                  val dupl = tpt.duplicate
-                  dupl.tpe = null
-                  dupl
+                  tpt.duplicate.clearType()
                 }
                 else tree
               case TypeApply(fn, args) if args map transform exists (_.isEmpty) =>
                 transform(fn)
               case This(_) if tree.symbol != null && tree.symbol.isPackageClass =>
                 tree
-              case EmptyTree =>
-                tree
               case _ =>
                 val dupl = tree.duplicate
-                if (tree.hasSymbol && (!localOnly || (locals contains tree.symbol)) && !(keepLabels && tree.symbol.isLabel))
+                if (tree.hasSymbolField && (!localOnly || (locals contains tree.symbol)) && !(keepLabels && tree.symbol.isLabel))
                   dupl.symbol = NoSymbol
-                dupl.tpe = null
-                dupl
+                dupl.clearType()
             }
           }
       }

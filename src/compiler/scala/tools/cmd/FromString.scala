@@ -1,14 +1,14 @@
 /* NSC -- new Scala compiler
- * Copyright 2005-2011 LAMP/EPFL
+ * Copyright 2005-2013 LAMP/EPFL
  * @author  Paul Phillips
  */
 
 package scala.tools
 package cmd
 
-import nsc.io.{ Path, File, Directory }
+import scala.tools.nsc.io.{ File, Directory }
 import scala.reflect.runtime.{universe => ru}
-import scala.tools.reflect.StdTags._
+import scala.tools.reflect.StdRuntimeTags._
 
 /** A general mechanism for defining how a command line argument
  *  (always a String) is transformed into an arbitrary type.  A few
@@ -24,18 +24,11 @@ abstract class FromString[+T](implicit t: ru.TypeTag[T]) extends PartialFunction
 }
 
 object FromString {
-  // We need these because we clash with the String => Path implicits.
-  private def toFile(s: String) = new File(new java.io.File(s))
+  // We need this because we clash with the String => Path implicits.
   private def toDir(s: String)  = new Directory(new java.io.File(s))
 
   /** Path related stringifiers.
    */
-  val ExistingFile: FromString[File] = new FromString[File]()(tagOfFile) {
-    override def isDefinedAt(s: String) = toFile(s).isFile
-    def apply(s: String): File =
-      if (isDefinedAt(s)) toFile(s)
-      else cmd.runAndExit(println("'%s' is not an existing file." format s))
-  }
   val ExistingDir: FromString[Directory] = new FromString[Directory]()(tagOfDirectory) {
     override def isDefinedAt(s: String) = toDir(s).isDirectory
     def apply(s: String): Directory =
@@ -43,7 +36,7 @@ object FromString {
       else cmd.runAndExit(println("'%s' is not an existing directory." format s))
   }
   def ExistingDirRelativeTo(root: Directory) = new FromString[Directory]()(tagOfDirectory) {
-    private def resolve(s: String) = toDir(s) toAbsoluteWithRoot root toDirectory
+    private def resolve(s: String) = (toDir(s) toAbsoluteWithRoot root).toDirectory
     override def isDefinedAt(s: String) = resolve(s).isDirectory
     def apply(s: String): Directory =
       if (isDefinedAt(s)) resolve(s)

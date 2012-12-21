@@ -1,16 +1,17 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2002-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2002-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
 \*                                                                      */
 
-package scala.runtime
+package scala
+package runtime
 
 import java.util.Arrays.copyOfRange
 
-final class SeqCharSequence(val xs: collection.IndexedSeq[Char]) extends CharSequence {
+final class SeqCharSequence(val xs: scala.collection.IndexedSeq[Char]) extends CharSequence {
   def length: Int                                     = xs.length
   def charAt(index: Int): Char                        = xs(index)
   def subSequence(start: Int, end: Int): CharSequence = new SeqCharSequence(xs.slice(start, end))

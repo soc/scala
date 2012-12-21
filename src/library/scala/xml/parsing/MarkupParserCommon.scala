@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2003-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2003-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -10,7 +10,6 @@ package scala.xml
 package parsing
 
 import scala.io.Source
-import scala.xml.dtd._
 import scala.annotation.switch
 import Utility.Escapes.{ pairs => unescape }
 
@@ -21,7 +20,7 @@ import Utility.SU
  *  All members should be accessed through those.
  */
 private[scala] trait MarkupParserCommon extends TokenTests {
-  protected def unreachable = sys.error("Cannot be reached.")
+  protected def unreachable = scala.sys.error("Cannot be reached.")
 
   // type HandleType       // MarkupHandler, SymbolicXMLBuilder
   type InputType        // Source, CharArrayReader
@@ -82,7 +81,7 @@ private[scala] trait MarkupParserCommon extends TokenTests {
       case `end`  => return buf.toString
       case ch     => buf append ch
     }
-    sys.error("Expected '%s'".format(end))
+    scala.sys.error("Expected '%s'".format(end))
   }
 
   /** [42]  '<' xmlEndTag ::=  '<' '/' Name S? '>'

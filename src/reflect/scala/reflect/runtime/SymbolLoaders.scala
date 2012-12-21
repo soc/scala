@@ -3,9 +3,9 @@ package runtime
 
 import internal.Flags
 import java.lang.{Class => jClass, Package => jPackage}
-import collection.mutable
+import scala.collection.mutable
 
-trait SymbolLoaders { self: SymbolTable =>
+private[reflect] trait SymbolLoaders { self: SymbolTable =>
 
   /** The standard completer for top-level classes
    *  @param clazz   The top-level class
@@ -14,7 +14,7 @@ trait SymbolLoaders { self: SymbolTable =>
    *  by unpickling information from the corresponding Java class. If no Java class
    *  is found, a package is created instead.
    */
-  class TopClassCompleter(clazz: Symbol, module: Symbol) extends SymLoader {
+  class TopClassCompleter(clazz: Symbol, module: Symbol) extends SymLoader with FlagAssigningCompleter {
 //    def makePackage() {
 //      println("wrong guess; making package "+clazz)
 //      val ptpe = newPackageType(module.moduleClass)
@@ -28,7 +28,7 @@ trait SymbolLoaders { self: SymbolTable =>
       debugInfo("completing "+sym+"/"+clazz.fullName)
       assert(sym == clazz || sym == module || sym == module.moduleClass)
 //      try {
-      atPhaseNotLaterThan(picklerPhase) {
+      enteringPhaseNotLaterThan(picklerPhase) {
         val loadingMirror = mirrorThatLoaded(sym)
         val javaClass = loadingMirror.javaClass(clazz.javaClassName)
         loadingMirror.unpickleClass(clazz, module, javaClass)
@@ -57,19 +57,17 @@ trait SymbolLoaders { self: SymbolTable =>
    *  @param name    The simple name of the newly created class
    *  @param completer  The completer to be used to set the info of the class and the module
    */
-  protected def createClassModule(owner: Symbol, name: TypeName, completer: (Symbol, Symbol) => LazyType) = {
+  protected def initAndEnterClassAndModule(owner: Symbol, name: TypeName, completer: (Symbol, Symbol) => LazyType) = {
     assert(!(name.toString endsWith "[]"), name)
     val clazz = owner.newClass(name)
     val module = owner.newModule(name.toTermName)
-    // [Eugene++] am I doing this right?
-    // todo: drop condition, see what goes wrong
-    // [Eugene++ to Martin] test/files/run/t5256g and test/files/run/t5256h will crash
-    // reflection meeting verdict: need to enter the symbols into the first symbol in the owner chain that has a non-empty scope
+    // without this check test/files/run/t5256g and test/files/run/t5256h will crash
+    // todo. reflection meeting verdict: need to enter the symbols into the first symbol in the owner chain that has a non-empty scope
     if (owner.info.decls != EmptyScope) {
       owner.info.decls enter clazz
       owner.info.decls enter module
     }
-    initClassModule(clazz, module, completer(clazz, module))
+    initClassAndModule(clazz, module, completer(clazz, module))
     (clazz, module)
   }
 
@@ -77,12 +75,12 @@ trait SymbolLoaders { self: SymbolTable =>
     List(clazz, module, module.moduleClass) foreach (_ setInfo info)
   }
 
-  protected def initClassModule(clazz: Symbol, module: Symbol, completer: LazyType) =
+  protected def initClassAndModule(clazz: Symbol, module: Symbol, completer: LazyType) =
     setAllInfos(clazz, module, completer)
 
   /** The type completer for packages.
    */
-  class LazyPackageType extends LazyType {
+  class LazyPackageType extends LazyType with FlagAgnosticCompleter {
     override def complete(sym: Symbol) {
       assert(sym.isPackageClass)
       sym setInfo new ClassInfoType(List(), new PackageScope(sym), sym)
@@ -99,8 +97,10 @@ trait SymbolLoaders { self: SymbolTable =>
     0 < dp && dp < (name.length - 1)
   }
 
-  class PackageScope(pkgClass: Symbol) extends Scope() with SynchronizedScope {
+  class PackageScope(pkgClass: Symbol) extends Scope(initFingerPrints = -1L) // disable fingerprinting as we do not know entries beforehand
+      with SynchronizedScope {
     assert(pkgClass.isType)
+    // disable fingerprinting as we do not know entries beforehand
     private val negatives = mutable.Set[Name]() // Syncnote: Performance only, so need not be protected.
     override def lookupEntry(name: Name): ScopeEntry = {
       val e = super.lookupEntry(name)
@@ -116,9 +116,9 @@ trait SymbolLoaders { self: SymbolTable =>
         currentMirror.tryJavaClass(path) match {
           case Some(cls) =>
             val loadingMirror = currentMirror.mirrorDefining(cls)
-            val (clazz, module) =
+            val (_, module) =
               if (loadingMirror eq currentMirror) {
-                createClassModule(pkgClass, name.toTypeName, new TopClassCompleter(_, _))
+                initAndEnterClassAndModule(pkgClass, name.toTypeName, new TopClassCompleter(_, _))
               } else {
                 val origOwner = loadingMirror.packageNameToScala(pkgClass.fullName)
                 val clazz = origOwner.info decl name.toTypeName

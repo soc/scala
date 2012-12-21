@@ -18,7 +18,6 @@ build script or user-created if needed.  This is not a complete listing. ::
    +--dist/                     The destination folder for Scala distributions.
    +--docs/                     Documentation and sample code.
    +--lib/                      Pre-compiled libraries for the build.
-   |   +--fjbg.jar              The Java byte-code generation library.
    |   +--scala-compiler.jar    The stable reference ('starr') compiler jar
    |   +--scala-library.jar     The stable reference ('starr') library jar
    |   +--scala-library-src.jar A snapshot of the source used to build starr.
@@ -200,6 +199,8 @@ all code submitted to the project is unencumbered by copyrights or patents.
 The form is available at:
 http://www.scala-lang.org/sites/default/files/contributor_agreement.pdf
 
+Before submitting a pull-request, please make sure you have followed the guidelines
+outlined in our `Pull Request Policy <https://github.com/scala/scala/wiki/Pull-Request-Policy>`_.
 
 ------------------
 
@@ -208,5 +209,3 @@ http://www.scala-lang.org/sites/default/files/contributor_agreement.pdf
 Thank you!
 
 The Scala Team
-
-

@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2003-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2003-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -15,7 +15,7 @@ import scala.util.control.Exception.allCatch
  *
  *  @author  Martin Odersky, Stepan Koltsov, Philipp Haller
  */
-@deprecated("Use `future` instead.", "2.10.0")
+@deprecated("Use `Future` instead.", "2.10.0")
 object ops
 {
   val defaultRunner: FutureTaskRunner = TaskRunners.threadRunner

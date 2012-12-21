@@ -1,16 +1,14 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2002-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2002-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
 \*                                                                      */
 
-
 package scala.xml
 package include.sax
 
-import scala.xml.include._
 import scala.collection.mutable
 import org.xml.sax.{ ContentHandler, XMLReader, Locator, Attributes }
 import org.xml.sax.ext.LexicalHandler
@@ -62,7 +60,7 @@ class XIncluder(outs: OutputStream, encoding: String) extends ContentHandler wit
         val value = atts.getValue(i);
         // @todo Need to use character references if the encoding
         // can't support the character
-        out.write(xml.Utility.escape(value))
+        out.write(scala.xml.Utility.escape(value))
         out.write("'");
         i += 1
       }

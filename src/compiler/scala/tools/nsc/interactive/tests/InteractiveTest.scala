@@ -1,5 +1,5 @@
 /* NSC -- new Scala compiler
- * Copyright 2009-2011 Scala Solutions and LAMP/EPFL
+ * Copyright 2009-2013 Typesafe/Scala Solutions and LAMP/EPFL
  * @author Martin Odersky
  */
 package scala.tools.nsc
@@ -7,15 +7,7 @@ package interactive
 package tests
 
 import core._
-
-import java.io.File.pathSeparatorChar
-import java.io.File.separatorChar
-
-import scala.annotation.migration
-import scala.reflect.internal.util.Position
-import scala.reflect.internal.util.SourceFile
-
-import collection.mutable.ListBuffer
+import scala.collection.mutable.ListBuffer
 
 /** A base class for writing interactive compiler tests.
  *
@@ -82,13 +74,17 @@ abstract class InteractiveTest
 
   /** Test's entry point */
   def main(args: Array[String]) {
+    try execute()
+    finally shutdown()
+  }
+
+  protected def execute(): Unit = {
     loadSources()
-    runTests()
-    shutdown()
+    runDefaultTests()
   }
 
   /** Load all sources before executing the test. */
-  private def loadSources() {
+  protected def loadSources() {
     // ask the presentation compiler to track all sources. We do
     // not wait for the file to be entirely typed because we do want
     // to exercise the presentation compiler on scoped type requests.
@@ -100,19 +96,21 @@ abstract class InteractiveTest
   }
 
   /** Run all defined `PresentationCompilerTestDef` */
-  protected def runTests() {
+  protected def runDefaultTests() {
     //TODO: integrate random tests!, i.e.: if (runRandomTests) randomTests(20, sourceFiles)
     testActions.foreach(_.runTest())
   }
 
   /** Perform n random tests with random changes. */
+  /****
   private def randomTests(n: Int, files: Array[SourceFile]) {
     val tester = new Tester(n, files, settings) {
       override val compiler = self.compiler
-      override val reporter = compilerReporter
+      override val reporter = new reporters.StoreReporter
     }
     tester.run()
   }
+  ****/
 
   /** shutdown the presentation compiler. */
   protected def shutdown() {

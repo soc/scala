@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2003-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2003-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -51,7 +51,7 @@ class TreeMap[A, +B] private (tree: RB.Tree[A, B])(implicit val ordering: Orderi
      with MapLike[A, B, TreeMap[A, B]]
      with Serializable {
 
-  @deprecated("use `ordering.lt` instead", "2.10")
+  @deprecated("use `ordering.lt` instead", "2.10.0")
   def isSmaller(x: A, y: A) = ordering.lt(x, y)
 
   override protected[this] def newBuilder : Builder[(A, B), TreeMap[A, B]] =
@@ -131,7 +131,7 @@ class TreeMap[A, +B] private (tree: RB.Tree[A, B])(implicit val ordering: Orderi
    *  @param value   the value to be associated with `key`
    *  @return        a new $coll with the updated binding
    */
-  override def updated [B1 >: B](key: A, value: B1): TreeMap[A, B1] = new TreeMap(RB.update(tree, key, value))
+  override def updated [B1 >: B](key: A, value: B1): TreeMap[A, B1] = new TreeMap(RB.update(tree, key, value, true))
 
   /** Add a key/value pair to this map.
    *  @tparam   B1   type of the value of the new binding, a supertype of `B`
@@ -171,7 +171,7 @@ class TreeMap[A, +B] private (tree: RB.Tree[A, B])(implicit val ordering: Orderi
    */
   def insert [B1 >: B](key: A, value: B1): TreeMap[A, B1] = {
     assert(!RB.contains(tree, key))
-    new TreeMap(RB.update(tree, key, value))
+    new TreeMap(RB.update(tree, key, value, true))
   }
 
   def - (key:A): TreeMap[A, B] =

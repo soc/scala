@@ -5,11 +5,10 @@ trait Calculate {
   self: Reifier =>
 
   import global._
-  import definitions._
 
   implicit class RichCalculateSymbol(sym: Symbol) {
     def metalevel: Int = { assert(sym != null && sym != NoSymbol); localSymbols.getOrElse(sym, 0) }
-    def isLocalToReifee = (localSymbols contains sym) // [Eugene] how do I account for local skolems?
+    def isLocalToReifee = (localSymbols contains sym) // todo. how do I account for local skolems?
   }
 
   implicit class RichCalculateType(tpe: Type) {

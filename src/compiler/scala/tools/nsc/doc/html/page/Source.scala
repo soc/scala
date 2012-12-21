@@ -1,5 +1,5 @@
 /* NSC -- new Scala compiler
- * Copyright 2007-2011 LAMP/EPFL
+ * Copyright 2007-2013 LAMP/EPFL
  * @author  David Bernard, Manohar Jonnalagedda
  */
 
@@ -8,9 +8,7 @@ package doc
 package html
 package page
 
-import model._
-import comment._
-import xml.{NodeSeq, Unparsed}
+import scala.xml.NodeSeq
 import java.io.File
 
 class Source(sourceFile: File) extends HtmlPage {

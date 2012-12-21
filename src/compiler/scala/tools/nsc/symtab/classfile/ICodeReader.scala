@@ -1,5 +1,5 @@
 /* NSC -- new Scala compiler
- * Copyright 2005-2011 LAMP/EPFL
+ * Copyright 2005-2013 LAMP/EPFL
  * @author Iulian Dragos
  */
 
@@ -9,9 +9,7 @@ package classfile
 
 import scala.collection.{ mutable, immutable }
 import mutable.ListBuffer
-import backend.icode._
 import ClassfileConstants._
-import scala.reflect.internal.Flags._
 
 /** ICode reader from Java bytecode.
  *
@@ -33,11 +31,10 @@ abstract class ICodeReader extends ClassfileParser {
    *  for non-static members.
    */
   def readClass(cls: Symbol): (IClass, IClass) = {
-    var classFile: io.AbstractFile = null;
     cls.info // ensure accurate type information
 
     isScalaModule = cls.isModule && !cls.isJavaDefined
-    log("Reading class: " + cls + " isScalaModule?: " + isScalaModule)
+    log("ICodeReader reading " + cls)
     val name = cls.javaClassName
 
     classPath.findSourceFile(name) match {
@@ -58,11 +55,9 @@ abstract class ICodeReader extends ClassfileParser {
   override def parseClass() {
     this.instanceCode = new IClass(clazz)
     this.staticCode   = new IClass(staticModule)
-    val jflags = in.nextChar
-    val isAttribute = (jflags & JAVA_ACC_ANNOTATION) != 0
-    val sflags = toScalaClassFlags(jflags)  // what, this is never used??
-    val c = pool getClassSymbol in.nextChar
 
+    in.nextChar
+    pool getClassSymbol in.nextChar
     parseInnerClasses()
 
     in.skip(2)               // super class
@@ -85,7 +80,7 @@ abstract class ICodeReader extends ClassfileParser {
     val jflags   = in.nextChar
     val name     = pool getName in.nextChar
     val owner    = getOwner(jflags)
-    val dummySym = owner.newMethod(name, owner.pos, toScalaMethodFlags(jflags))
+    val dummySym = owner.newMethod(name.toTermName, owner.pos, toScalaMethodFlags(jflags))
 
     try {
       val ch  = in.nextChar
@@ -99,11 +94,9 @@ abstract class ICodeReader extends ClassfileParser {
         if (sym == NoSymbol)
           sym = owner.info.findMember(newTermName(name + nme.LOCAL_SUFFIX_STRING), 0, 0, false).suchThat(_.tpe =:= tpe)
         if (sym == NoSymbol) {
-          log("Could not find symbol for " + name + ": " + tpe)
-          log(owner.info.member(name).tpe + " : " + tpe)
-          sym = if (field) owner.newValue(name, owner.pos, toScalaFieldFlags(jflags)) else dummySym
+          sym = if (field) owner.newValue(name.toTermName, owner.pos, toScalaFieldFlags(jflags)) else dummySym
           sym setInfoAndEnter tpe
-          log("added " + sym + ": " + sym.tpe)
+          log(s"ICodeReader could not locate ${name.decode} in $owner.  Created ${sym.defString}.")
         }
         (jflags, sym)
       }
@@ -127,7 +120,7 @@ abstract class ICodeReader extends ClassfileParser {
 
   override def parseMethod() {
     val (jflags, sym) = parseMember(false)
-    var beginning = in.bp
+    val beginning = in.bp
     try {
       if (sym != NoSymbol) {
         this.method = new IMethod(sym)
@@ -172,14 +165,11 @@ abstract class ICodeReader extends ClassfileParser {
     }
     else if (nme.isModuleName(name)) {
       val strippedName = nme.stripModuleSuffix(name)
-      val sym = forceMangledName(newTermName(strippedName.decode), true)
-
-      if (sym == NoSymbol) rootMirror.getModule(strippedName)
-      else sym
+      forceMangledName(newTermName(strippedName.decode), true) orElse rootMirror.getModuleByName(strippedName)
     }
     else {
       forceMangledName(name, false)
-      afterFlatten(rootMirror.getClassByName(name.toTypeName))
+      exitingFlatten(rootMirror.getClassByName(name.toTypeName))
     }
     if (sym.isModule)
       sym.moduleClass
@@ -594,6 +584,7 @@ abstract class ICodeReader extends ClassfileParser {
     while (pc < codeLength) parseInstruction
 
     val exceptionEntries = in.nextChar.toInt
+    code.containsEHs = (exceptionEntries != 0)
     var i = 0
     while (i < exceptionEntries) {
       // skip start end PC
@@ -641,12 +632,13 @@ abstract class ICodeReader extends ClassfileParser {
     else instanceCode
 
   class LinearCode {
-    var instrs: ListBuffer[(Int, Instruction)] = new ListBuffer
-    var jmpTargets: mutable.Set[Int] = perRunCaches.newSet[Int]()
-    var locals: mutable.Map[Int, List[(Local, TypeKind)]] = perRunCaches.newMap()
+    val instrs: ListBuffer[(Int, Instruction)] = new ListBuffer
+    val jmpTargets: mutable.Set[Int] = perRunCaches.newSet[Int]()
+    val locals: mutable.Map[Int, List[(Local, TypeKind)]] = perRunCaches.newMap()
 
     var containsDUPX = false
     var containsNEW  = false
+    var containsEHs  = false
 
     def emit(i: Instruction) {
       instrs += ((pc, i))
@@ -664,6 +656,7 @@ abstract class ICodeReader extends ClassfileParser {
 
       val code = new Code(method)
       method.setCode(code)
+      method.bytecodeHasEHs = containsEHs
       var bb = code.startBlock
 
       def makeBasicBlocks: mutable.Map[Int, BasicBlock] =
@@ -671,7 +664,6 @@ abstract class ICodeReader extends ClassfileParser {
 
       val blocks = makeBasicBlocks
       var otherBlock: BasicBlock = NoBasicBlock
-      var disableJmpTarget = false
 
       for ((pc, instr) <- instrs.iterator) {
 //        Console.println("> " + pc + ": " + instr);
@@ -722,24 +714,19 @@ abstract class ICodeReader extends ClassfileParser {
 
       val tfa = new analysis.MethodTFA() {
         import analysis._
-        import analysis.typeFlowLattice.IState
 
         /** Abstract interpretation for one instruction. */
-        override def interpret(in: typeFlowLattice.Elem, i: Instruction): typeFlowLattice.Elem = {
-          var out = IState(new VarBinding(in.vars), new TypeStack(in.stack))
-          val bindings = out.vars
+        override def mutatingInterpret(out: typeFlowLattice.Elem, i: Instruction): typeFlowLattice.Elem = {
           val stack = out.stack
           import stack.push
           i match {
             case DUP_X1 =>
               val (one, two) = stack.pop2
               push(one); push(two); push(one);
-              out = IState(bindings, stack)
 
             case DUP_X2 =>
               val (one, two, three) = stack.pop3
               push(one); push(three); push(two); push(one);
-              out = IState(bindings, stack)
 
             case DUP2_X1 =>
               val (one, two) = stack.pop2
@@ -749,7 +736,6 @@ abstract class ICodeReader extends ClassfileParser {
                 val three = stack.pop
                 push(two); push(one); push(three); push(two); push(one);
               }
-              out = IState(bindings, stack)
 
             case DUP2_X2 =>
               val (one, two) = stack.pop2
@@ -768,10 +754,9 @@ abstract class ICodeReader extends ClassfileParser {
                   push(two); push(one); push(four); push(one); push(three); push(two); push(one);
                 }
               }
-              out = IState(bindings, stack)
 
             case _ =>
-              out = super.interpret(in, i)
+              super.mutatingInterpret(out, i)
           }
           out
         }
@@ -908,7 +893,7 @@ abstract class ICodeReader extends ClassfileParser {
 
       for (bb <- method.code.blocks ; (i, idx) <- bb.toList.zipWithIndex) i match {
         case cm @ CALL_METHOD(m, Static(true)) if m.isClassConstructor =>
-          def loop(bb0: BasicBlock, idx0: Int, depth: Int = 0): Unit = {
+          def loop(bb0: BasicBlock, idx0: Int, depth: Int): Unit = {
             rdef.findDefs(bb0, idx0, 1, depth) match {
               case ((bb1, idx1)) :: _ =>
                 bb1(idx1) match {
@@ -958,7 +943,7 @@ abstract class ICodeReader extends ClassfileParser {
         case None =>
           checkValidIndex
           val l = freshLocal(idx, kind, false)
-          log("Added new local for idx " + idx + ": " + kind)
+          debuglog("Added new local for idx " + idx + ": " + kind)
           locals += (idx -> List((l, kind)))
           l
       }

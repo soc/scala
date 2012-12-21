@@ -1,8 +1,8 @@
 package scala.reflect.reify
 
 import scala.tools.nsc.Global
-import scala.reflect.makro.ReificationError
-import scala.reflect.makro.UnexpectedReificationError
+import scala.reflect.macros.ReificationException
+import scala.reflect.macros.UnexpectedReificationException
 import scala.reflect.reify.utils.Utils
 
 /** Given a tree or a type, generate a tree that when executed at runtime produces the original tree or type.
@@ -52,35 +52,19 @@ abstract class Reifier extends States
    */
   lazy val reification: Tree = {
     try {
-      // [Eugene] conventional way of doing this?
       if (universe exists (_.isErroneous)) CannotReifyErroneousPrefix(universe)
       if (universe.tpe == null) CannotReifyUntypedPrefix(universe)
 
       val result = reifee match {
         case tree: Tree =>
-          reifyTrace("reifying = ")(if (opt.showTrees) "\n" + nodePrinters.nodeToString(tree).trim else tree.toString)
+          reifyTrace("reifying = ")(if (settings.Xshowtrees.value || settings.XshowtreesCompact.value || settings.XshowtreesStringified.value) "\n" + nodePrinters.nodeToString(tree).trim else tree.toString)
           reifyTrace("reifee is located at: ")(tree.pos)
           reifyTrace("universe = ")(universe)
           reifyTrace("mirror = ")(mirror)
-          // [Eugene] conventional way of doing this?
           if (tree exists (_.isErroneous)) CannotReifyErroneousReifee(tree)
           if (tree.tpe == null) CannotReifyUntypedReifee(tree)
           val pipeline = mkReificationPipeline
           val rtree = pipeline(tree)
-
-          // consider the following code snippet
-          //
-          //   val x = reify { class C; new C }
-          //
-          // inferred type for x will be C
-          // but C ceases to exist after reification so this type is clearly incorrect
-          // however, reify is "just" a library function, so it cannot affect type inference
-          //
-          // hence we crash here even though the reification itself goes well
-          // fortunately, all that it takes to fix the error is to cast "new C" to Object
-          // so I'm not very much worried about introducing this restriction
-          if (tree.tpe exists (sub => sub.typeSymbol.isLocalToReifee))
-            CannotReifyReifeeThatHasTypeLocalToReifee(tree)
 
           val tpe = typer.packedType(tree, NoSymbol)
           val ReifiedType(_, _, tpeSymtab, _, rtpe, tpeReificationIsConcrete) = `package`.reifyType(global)(typer, universe, mirror, tpe, concrete = false)
@@ -122,14 +106,10 @@ abstract class Reifier extends States
       //
       // todo. this is a common problem with non-trivial macros in our current macro system
       // needs to be solved some day
-      //
-      // list of non-hygienic transformations:
-      // todo. to be updated
-      // [Eugene++] yeah, ugly and extremely brittle, but we do need to do resetAttrs. will be fixed later
-      // todo. maybe try `resetLocalAttrs` once the dust settles
+      // maybe try `resetLocalAttrs` once the dust settles
       var importantSymbols = Set[Symbol](
-        NothingClass, AnyClass, SingletonClass, PredefModule, ScalaRunTimeModule, TypeCreatorClass, TreeCreatorClass, MirrorOfClass,
-        BaseUniverseClass, ApiUniverseClass, JavaUniverseClass, ReflectRuntimePackage, ReflectRuntimeCurrentMirror)
+        NothingClass, AnyClass, SingletonClass, PredefModule, ScalaRunTimeModule, TypeCreatorClass, TreeCreatorClass, MirrorClass,
+        ApiUniverseClass, JavaUniverseClass, ReflectRuntimePackage, ReflectRuntimeCurrentMirror)
       importantSymbols ++= importantSymbols map (_.companionSymbol)
       importantSymbols ++= importantSymbols map (_.moduleClass)
       importantSymbols ++= importantSymbols map (_.linkedClassOfClass)
@@ -152,12 +132,12 @@ abstract class Reifier extends States
 
       untyped
     } catch {
-      case ex: ReificationError =>
+      case ex: ReificationException =>
         throw ex
-      case ex: UnexpectedReificationError =>
+      case ex: UnexpectedReificationException =>
         throw ex
       case ex: Throwable =>
-        throw new UnexpectedReificationError(defaultErrorPosition, "reification crashed", ex)
+        throw new UnexpectedReificationException(defaultErrorPosition, "reification crashed", ex)
     }
   }
 }

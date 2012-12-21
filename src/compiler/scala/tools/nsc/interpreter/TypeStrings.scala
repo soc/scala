@@ -1,5 +1,5 @@
 /* NSC -- new Scala compiler
- * Copyright 2005-2011 LAMP/EPFL
+ * Copyright 2005-2013 LAMP/EPFL
  * @author  Paul Phillips
  */
 
@@ -13,15 +13,12 @@ import NameTransformer._
 import scala.reflect.runtime.{universe => ru}
 import scala.reflect.{ClassTag, classTag}
 import typechecker.DestructureTypes
-import scala.reflect.internal.util.StringOps.ojoin
-import language.implicitConversions
 
 /** A more principled system for turning types into strings.
  */
 trait StructuredTypeStrings extends DestructureTypes {
   val global: Global
   import global._
-  import definitions._
 
   case class LabelAndType(label: String, typeName: String) { }
   object LabelAndType {
@@ -36,10 +33,8 @@ trait StructuredTypeStrings extends DestructureTypes {
   val NoGrouping      = Grouping("", "", "", false)
   val ListGrouping    = Grouping("(", ", ", ")", false)
   val ProductGrouping = Grouping("(", ", ", ")", true)
-  val ParamGrouping   = Grouping("(", ", ", ")", true)
   val BlockGrouping   = Grouping(" { ", "; ", "}", false)
 
-  private implicit def lowerName(n: Name): String = "" + n
   private def str(level: Int)(body: => String): String = "  " * level + body
   private def block(level: Int, grouping: Grouping)(name: String, nodes: List[TypeNode]): String = {
     val l1 = str(level)(name + grouping.ldelim)
@@ -49,7 +44,6 @@ trait StructuredTypeStrings extends DestructureTypes {
     l1 +: l2 :+ l3 mkString "\n"
   }
   private def maybeBlock(level: Int, grouping: Grouping)(name: String, nodes: List[TypeNode]): String = {
-    import grouping._
     val threshold = 70
 
     val try1 = str(level)(name + grouping.join(nodes map (_.show(0, grouping.labels)): _*))
@@ -57,7 +51,7 @@ trait StructuredTypeStrings extends DestructureTypes {
     else block(level, grouping)(name, nodes)
   }
   private def shortClass(x: Any) = {
-    if (opt.debug) {
+    if (settings.debug.value) {
       val name   = (x.getClass.getName split '.').last
       val isAnon = name.reverse takeWhile (_ != '$') forall (_.isDigit)
       val str    = if (isAnon) name else (name split '$').last
@@ -194,7 +188,6 @@ trait TypeStrings {
       else enclClass.getName + "." + (name stripPrefix enclPre)
     )
   }
-  def scalaName(ct: ClassTag[_]): String = scalaName(ct.runtimeClass)
   def anyClass(x: Any): JClass          = if (x == null) null else x.getClass
 
   private def brackets(tps: String*): String =
@@ -212,11 +205,8 @@ trait TypeStrings {
   }
 
   private def tparamString[T: ru.TypeTag] : String = {
-    // [Eugene++ to Paul] needs review!!
-    def typeArguments: List[ru.Type] = ru.typeOf[T].typeArguments
-    // [Eugene++] todo. need to use not the `rootMirror`, but a mirror with the REPL's classloader
-    // how do I get to it? acquiring context classloader seems unreliable because of multithreading
-    def typeVariables: List[java.lang.Class[_]] = typeArguments map (targ => ru.rootMirror.runtimeClass(targ))
+    import ru._
+    def typeArguments: List[ru.Type] = ru.typeOf[T] match { case ru.TypeRef(_, _, args) => args; case _ => Nil }
     brackets(typeArguments map (jc => tvarString(List(jc))): _*)
   }
 
@@ -228,7 +218,6 @@ trait TypeStrings {
    *  practice to rely on toString for correctness) generated the VALID string
    *  representation of the type.
    */
-  def fromTypedValue[T: ru.TypeTag : ClassTag](x: T): String = fromTag[T]
   def fromValue(value: Any): String                          = if (value == null) "Null" else fromClazz(anyClass(value))
   def fromClazz(clazz: JClass): String                       = scalaName(clazz) + tparamString(clazz)
   def fromTag[T: ru.TypeTag : ClassTag] : String             = scalaName(classTag[T].runtimeClass) + tparamString[T]
@@ -248,13 +237,6 @@ trait TypeStrings {
       case (res, (k, v)) => res.replaceAll(k, v)
     }
   }
-
-  val typeTransforms = List(
-    "java.lang." -> "",
-    "scala.collection.immutable." -> "immutable.",
-    "scala.collection.mutable." -> "mutable.",
-    "scala.collection.generic." -> "generic."
-  )
 }
 
 object TypeStrings extends TypeStrings { }

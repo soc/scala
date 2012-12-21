@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2003-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2003-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -30,9 +30,9 @@ import generic._
  *  @define mayNotTerminateInf
  *  @define willNotTerminateInf
  */
-@cloneable
 class Queue[A]
 extends MutableList[A]
+   with LinearSeqOptimized[A, Queue[A]]
    with GenericTraversableTemplate[A, Queue]
    with Cloneable[Queue[A]]
    with Serializable
@@ -66,7 +66,7 @@ extends MutableList[A]
     else {
       val res = first0.elem
       first0 = first0.next
-      len -= 1
+      decrementLength()
       res
     }
 
@@ -82,11 +82,11 @@ extends MutableList[A]
     else if (p(first0.elem)) {
       val res: Option[A] = Some(first0.elem)
       first0 = first0.next
-      len -= 1
+      decrementLength()
       res
     } else {
       val optElem = removeFromList(p)
-      if (optElem != None) len -= 1
+      if (optElem != None) decrementLength()
       optElem
     }
 
@@ -119,7 +119,7 @@ extends MutableList[A]
       while ((first0.nonEmpty) && p(first0.elem)) {
         res += first0.elem
         first0 = first0.next
-        len -= 1
+        decrementLength()
       }
       if (first0.isEmpty) res
       else removeAllFromList(p, res)
@@ -130,10 +130,10 @@ extends MutableList[A]
     var leftlst = first0
     while (leftlst.next.nonEmpty) {
       if (p(leftlst.next.elem)) {
-	res += leftlst.next.elem
-	if (leftlst.next eq last0) last0 = leftlst
-	leftlst.next = leftlst.next.next
-	len -= 1
+        res += leftlst.next.elem
+        if (leftlst.next eq last0) last0 = leftlst
+        leftlst.next = leftlst.next.next
+        decrementLength()
       } else leftlst = leftlst.next
     }
     res
@@ -154,7 +154,7 @@ extends MutableList[A]
       else {
         val res: Option[LinkedList[A]] = Some(cell.next)
         cell.next = cell.next.next
-        len -= 1
+        decrementLength()
         res
       }
     }
@@ -166,6 +166,25 @@ extends MutableList[A]
    *  @return the first element.
    */
   def front: A = head
+
+
+  // TODO - Don't override this just for new to create appropriate type....
+  override def tail: Queue[A] = {
+    val tl = new Queue[A]
+    tailImpl(tl)
+    tl
+  }
+
+  override def clone(): Queue[A] = {
+    val bf = newBuilder
+    bf ++= seq
+    bf.result
+  }
+
+  private[this] def decrementLength() {
+    len -= 1
+    if (len == 0) last0 = first0
+  }
 }
 
 

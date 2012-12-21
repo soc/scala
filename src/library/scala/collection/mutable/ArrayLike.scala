@@ -1,16 +1,13 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2003-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2003-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
 \*                                                                      */
 
-
-
 package scala.collection
 package mutable
-import generic._
 
 /** A common supertrait of `ArrayOps` and `WrappedArray` that factors out most
  *  operations on arrays and wrapped arrays.
@@ -22,7 +19,7 @@ import generic._
  *  @version 2.8
  *  @since   2.8
  */
-trait ArrayLike[A, +Repr] extends IndexedSeqOptimized[A, Repr] { self =>
+trait ArrayLike[A, +Repr] extends Any with IndexedSeqOptimized[A, Repr] { self =>
 
   /** Creates a possible nested `IndexedSeq` which consists of all the elements
    *  of this array. If the elements are arrays themselves, the `deep` transformation

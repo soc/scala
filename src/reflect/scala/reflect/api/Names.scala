@@ -1,27 +1,91 @@
 package scala.reflect
 package api
 
-/** A trait that manages names.
- *  A name is a string in one of two name universes: terms and types.
- *  The same string can be a name in both universes.
- *  Two names are equal if they represent the same string and they are
- *  members of the same universe.
+/**
+ * <span class="badge badge-red" style="float: right;">EXPERIMENTAL</span>
  *
- *  Names are interned. That is, for two names `name11 and `name2`,
- *  `name1 == name2` implies `name1 eq name2`.
+ * This trait defines `Name`s in Scala Reflection, and operations on them.
+ *
+ *  Names are simple wrappers for strings. [[scala.reflect.api.Names#Name Name]] has two subtypes
+ *  [[scala.reflect.api.Names#TermName TermName]] and [[scala.reflect.api.Names#TypeName TypeName]]
+ *  which distinguish names of terms (like objects or members) and types. A term and a type of the
+ *  same name can co-exist in an object.
+ *
+ *  To search for the `map` method (which is a term) declared in the `List` class, one can do:
+ *
+ * {{{
+ *   scala> typeOf[List[_]].member(newTermName("map"))
+ *   res0: reflect.runtime.universe.Symbol = method map
+ * }}}
+ *
+ *  To search for a type member, one can follow the same procedure, using `newTypeName` instead.
+ *
+ *  For more information about creating and using `Name`s, see the [[http://docs.scala-lang.org/overviews/reflection/annotations-names-scopes.html Reflection Guide: Annotations, Names, Scopes, and More]]
+ *
+ *  @contentDiagram hideNodes "*Api"
+ *  @group ReflectionAPI
  */
-trait Names extends base.Names {
+trait Names {
+  /** An implicit conversion from String to TermName.
+   *  Enables an alternative notation `"map": TermName` as opposed to `newTermName("map")`.
+   *  @group Names
+   */
+  implicit def stringToTermName(s: String): TermName = newTermName(s)
 
-  /** The abstract type of names */
+  /** An implicit conversion from String to TypeName.
+   *  Enables an alternative notation `"List": TypeName` as opposed to `newTypeName("List")`.
+   *  @group Names
+   */
+  implicit def stringToTypeName(s: String): TypeName = newTypeName(s)
+
+  /** The abstract type of names.
+   *  @group Names
+   */
   type Name >: Null <: NameApi
 
-  /** The extended API of names that's supported on reflect mirror via an
-   *  implicit conversion in reflect.ops
+  /** A tag that preserves the identity of the `Name` abstract type from erasure.
+   *  Can be used for pattern matching, instance tests, serialization and likes.
+   *  @group Tags
    */
-  abstract class NameApi extends NameBase {
+  implicit val NameTag: ClassTag[Name]
 
-    // [Eugene++] this functionality should be in base
-    // this is because stuff will be reified in mangled state, and people will need a way to figure it out
+  /** The abstract type of names representing terms.
+   *  @group Names
+   */
+  type TypeName >: Null <: Name
+
+  /** A tag that preserves the identity of the `TypeName` abstract type from erasure.
+   *  Can be used for pattern matching, instance tests, serialization and likes.
+   *  @group Tags
+   */
+implicit val TypeNameTag: ClassTag[TypeName]
+
+  /** The abstract type of names representing types.
+   *  @group Names
+   */
+  type TermName >: Null <: Name
+
+  /** A tag that preserves the identity of the `TermName` abstract type from erasure.
+   *  Can be used for pattern matching, instance tests, serialization and likes.
+   *  @group Tags
+   */
+  implicit val TermNameTag: ClassTag[TermName]
+
+  /** The API of Name instances.
+   *  @group API
+   */
+  abstract class NameApi {
+    /** Checks wether the name is a a term name */
+    def isTermName: Boolean
+
+    /** Checks wether the name is a a type name */
+    def isTypeName: Boolean
+
+    /** Returns a term name that wraps the same string as `this` */
+    def toTermName: TermName
+
+    /** Returns a type name that wraps the same string as `this` */
+    def toTypeName: TypeName
 
     /** Replaces all occurrences of \$op_names in this name by corresponding operator symbols.
      *  Example: `foo_\$plus\$eq` becomes `foo_+=`
@@ -41,4 +105,14 @@ trait Names extends base.Names {
      */
     def encodedName: Name
   }
+
+  /** Create a new term name.
+   *  @group Names
+   */
+  def newTermName(s: String): TermName
+
+  /** Creates a new type name.
+   *  @group Names
+   */
+  def newTypeName(s: String): TypeName
 }

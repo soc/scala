@@ -1,6 +1,7 @@
 package scala.reflect.internal.util
 
 import TableDef._
+import scala.language.postfixOps
 
 /** A class for representing tabular data in a way that preserves
  *  its inner beauty.  See Exceptional for an example usage.
@@ -64,12 +65,6 @@ class TableDef[T](_cols: Column[T]*) {
     def allToSeq = headers ++ toFormattedSeq
 
     override def toString = allToSeq mkString "\n"
-  }
-
-  def formatterFor(rows: Seq[T]): T => String = {
-    val formatStr = new Table(rows).rowFormat
-
-    x => formatStr.format(colApply(x) : _*)
   }
 
   def table(rows: Seq[T]) = new Table(rows)

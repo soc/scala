@@ -1,16 +1,19 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2003-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2003-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
 \*                                                                      */
 
-package scala.collection
+package scala
+package collection
 
 import mutable.ArrayBuffer
-import annotation.migration
+import scala.annotation.migration
 import immutable.Stream
+import scala.collection.generic.CanBuildFrom
+import scala.annotation.unchecked.{ uncheckedVariance => uV }
 
 /** The `Iterator` object provides various functions for creating specialized iterators.
  *
@@ -391,7 +394,7 @@ trait Iterator[+A] extends TraversableOnce[A] {
 
     def next() = if (hasNext) { hdDefined = false; hd } else empty.next()
   }
-  
+
   /** Tests whether every element of this iterator relates to the
    *  corresponding element of another collection by satisfying a test predicate.
    *
@@ -559,7 +562,6 @@ trait Iterator[+A] extends TraversableOnce[A] {
      * handling of structural calls. It's not what's intended here.
      */
     class Leading extends AbstractIterator[A] {
-      private var isDone = false
       val lookahead = new mutable.Queue[A]
       def advance() = {
         self.hasNext && p(self.head) && {
@@ -569,7 +571,6 @@ trait Iterator[+A] extends TraversableOnce[A] {
       }
       def finish() = {
         while (advance()) ()
-        isDone = true
       }
       def hasNext = lookahead.nonEmpty || advance()
       def next() = {
@@ -756,7 +757,7 @@ trait Iterator[+A] extends TraversableOnce[A] {
    *
    *  @param elem  the element to test.
    *  @return     `true` if this iterator produces some value that is
-   *               is equal (wrt `==`) to `elem`, `false` otherwise.
+   *               is equal (as determined by `==`) to `elem`, `false` otherwise.
    *  @note        Reuse: $consumesIterator
    */
   def contains(elem: Any): Boolean = exists(_ == elem)
@@ -1138,6 +1139,7 @@ trait Iterator[+A] extends TraversableOnce[A] {
   def toStream: Stream[A] =
     if (self.hasNext) Stream.cons(self.next, self.toStream)
     else Stream.empty[A]
+
 
   /** Converts this iterator to a string.
    *
