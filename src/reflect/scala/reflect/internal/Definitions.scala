@@ -752,10 +752,10 @@ trait Definitions extends api.StandardDefinitions {
      *  of some other element of the list. */
     def eliminateSupertypes(tps: List[Type]): List[Type] = tps match {
       case Nil      => Nil
-      case t :: Nil => t
+      case t :: Nil => tps
       case t :: ts =>
-        val rest = eliminateSupertypes(ts1 filter (t1 => !(t <:< t1)))
-        if (rest exists (t1 => t1 <:< t)) rest else t :: rest
+        val rest = eliminateSupertypes(ts filter (t1 => !(t <:< t1)))
+        if (rest exists (_ <:< t)) rest else t :: rest
     }
 
     def weakeningMap(qualifies: Symbol => Boolean): TypeMap = {
@@ -784,8 +784,8 @@ trait Definitions extends api.StandardDefinitions {
      */
     def getClassExpressionType(owner: Symbol, tp: Type): Type = {
       if (phase.erasedTypes) ClassClass.tpe
-      else if (isScalaValueType(tp)) ClassType(tp.widen)
-      else if (isPhantomClass(tp.typeSymbol)) boundedClassType(AnyClass)
+      else if (isPrimitiveValueType(tp)) ClassType(tp.widen)
+      else if (isPhantomClass(tp.typeSymbol)) boundedClassType(AnyClass.tpe)
       else boundedClassType(widenEnclosedClasses(owner, tp))
     }
     /** Determine the return type of a classOf[X] expression.
