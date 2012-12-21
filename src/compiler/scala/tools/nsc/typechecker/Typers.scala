@@ -258,12 +258,6 @@ trait Typers extends Modes with Adaptations with Tags {
     private def errorNotClass(tpt: Tree, found: Type)  = { ClassTypeRequiredError(tpt, found); false }
     private def errorNotStable(tpt: Tree, found: Type) = { TypeNotAStablePrefixError(tpt, found); false }
 
-    /** Check that `tpt` refers to a non-refinement class type */
-    def checkClassType(tpt: Tree): Boolean = {
-      val tpe = unwrapToClass(tpt.tpe)
-      isNonRefinementClassType(tpe) || errorNotClass(tpt, tpe)
-    }
-
     /** Check that `tpt` refers to a class type with a stable prefix. */
     def checkStablePrefixClassType(tpt: Tree): Boolean = {
       val tpe = unwrapToStableClass(tpt.tpe)
@@ -607,13 +601,13 @@ trait Typers extends Modes with Adaptations with Tags {
         // To fully benefit from special casing the return type of
         // getClass, we have to catch it immediately so expressions
         // like x.getClass().newInstance() are typed with the type of x.
-        else if (  tree.symbol.name == nme.getClass_
-                && tree.tpe.params.isEmpty
-                // TODO: If the type of the qualifier is inaccessible, we can cause private types
-                // to escape scope here, e.g. pos/t1107.  I'm not sure how to properly handle this
-                // so for now it requires the type symbol be public.
-                && pre.typeSymbol.isPublic)
-          tree setType MethodType(Nil, getClassReturnType(pre))
+        else if (tree.symbol.name == nme.getClass_ && tree.tpe.params.isEmpty) {
+          // TODO: If the type of the qualifier is inaccessible, we can cause private types
+          // to escape scope here, e.g. pos/t1107.  I'm not sure how to properly handle this
+          // so for now it requires the type symbol be public.
+          val gcType = getClassExpressionType(context.owner, pre)
+          tree setType MethodType(Nil, gcType)
+        }
         else
           tree
       }
@@ -3741,7 +3735,16 @@ trait Typers extends Modes with Adaptations with Tags {
       packSymbols(localSyms.toList, normalizedTpe)
     }
 
-    def typedClassOf(tree: Tree, tpt: Tree, noGen: Boolean = false) =
+    def typedClassOf(tree: Tree, tpt: Tree): Tree = {
+      val tpe1 = unwrapToClass(tpt.tpe)
+      /** Check that `tpt` refers to a non-refinement class type */
+      val checkClassType = isNonRefinementClassType(tpe1) || errorNotClass(tpt, tpe1)
+      if (checkClassType)
+        atPos(tree.pos)(gen.mkClassOf(TypeTree(classOfExpressionType(context.owner, tpe1))))
+      else
+        tpt
+    }
+
       if (!checkClassType(tpt) && noGen) tpt
       else atPos(tree.pos)(gen.mkClassOf(tpt.tpe))
 
@@ -3785,7 +3788,7 @@ trait Typers extends Modes with Adaptations with Tags {
           val targs = args map (_.tpe)
           checkBounds(tree, NoPrefix, NoSymbol, tparams, targs, "")
           if (fun.symbol == Predef_classOf)
-            typedClassOf(tree, args.head, true)
+            typedClassOf(tree, TypeTree(classOfExpressionType(context.owner, args.head.tpe)))
           else {
             if (!isPastTyper && fun.symbol == Any_isInstanceOf && targs.nonEmpty) {
               val scrutineeType = fun match {

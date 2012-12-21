@@ -723,11 +723,11 @@ trait Definitions extends api.StandardDefinitions {
     lazy val Any_isInstanceOf = newT1NullaryMethod(AnyClass, nme.isInstanceOf_, FINAL)(_ => booltype)
     lazy val Any_asInstanceOf = newT1NullaryMethod(AnyClass, nme.asInstanceOf_, FINAL)(_.typeConstructor)
 
-  // A type function from T => Class[U], used to determine the return
+    // A type function from T => Class[U], used to determine the return
     // type of getClass calls.  The returned type is:
     //
     //  1. If T is a value type, Class[T].
-    //  2. If T is a phantom type (Any or AnyVal), Class[_].
+    //  2. If T is a phantom type, Class[_].
     //  3. If T is a local class, Class[_ <: |T|].
     //  4. Otherwise, Class[_ <: T].
     //
@@ -736,25 +736,18 @@ trait Definitions extends api.StandardDefinitions {
     // class object is that of java.lang.Integer, not Int.
     //
     // TODO: If T is final, return type could be Class[T].  Should it?
-    def getClassReturnType(tp: Type): Type = {
-      val sym = tp.typeSymbol
-      def upperBound = (
-        if (isPhantomClass(sym)) AnyClass.tpe
-        else if (sym.isLocalClass) erasure.intersectionDominator(tp.parents)
-        else tp.widen
-      )
+    // def getClassReturnType(tp: Type): Type = {
+    //   val sym = tp.typeSymbol
+    //   def upperBound = (
+    //     if (isPhantomClass(sym)) AnyClass.tpe
+    //     else if (sym.isLocalClass) erasure.intersectionDominator(tp.parents)
+    //     else tp.widen
+    //   )
+    //   if (phase.erasedTypes) ClassClass.tpe
+    //   else if (isPrimitiveValueClass(sym)) ClassType(tp.widen)
+    //   else boundedClassType(upperBound)
+    // }
 
-      if (phase.erasedTypes) ClassClass.tpe
-      else if (isPrimitiveValueClass(sym)) ClassType(tp.widen)
-      else boundedClassType(upperBound)
-
-        val eparams    = typeParamsToExistentials(ClassClass, ClassClass.typeParams)
-        existentialAbstraction(
-          eparams,
-          ClassType((eparams.head setInfo TypeBounds.upper(upperBound)).tpe)
-        )
-      }
-    }
     /** Eliminate from list of types all elements which are a supertype
      *  of some other element of the list. */
     def eliminateSupertypes(tps: List[Type]): List[Type] = tps match {
@@ -808,10 +801,11 @@ trait Definitions extends api.StandardDefinitions {
     /** Given type U, creates a Type representing Class[_ <: U].
      */
     def boundedClassType(upperBound: Type) = {
+      val bound1 = dropRefinements(upperBound)
       val eparams = typeParamsToExistentials(ClassClass, ClassClass.typeParams)
       existentialAbstraction(
         eparams,
-        ClassType(eparams.head setInfo TypeBounds.upper(dropRefinements(upperBound)) tpe)
+        ClassType(eparams.head setInfo TypeBounds.upper(bound1) tpe)
       )
     }
 

@@ -70,7 +70,7 @@ trait SyntheticMethods extends ast.TreeDSL {
     if (clazz0 == AnyValClass || isPrimitiveValueClass(clazz0)) return {
       if ((clazz0.info member nme.getClass_).isDeferred) {
         // XXX dummy implementation for now
-        val getClassMethod = createMethod(nme.getClass_, getClassReturnType(clazz.tpe))(_ => NULL)
+        val getClassMethod = createMethod(nme.getClass_, getClassExpressionType(clazz, clazz.tpe))(_ => NULL)
         deriveTemplate(templ)(_ :+ getClassMethod)
       }
       else templ
