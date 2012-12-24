@@ -2251,6 +2251,7 @@ trait Typers extends Modes with Adaptations with Tags {
 
     def typedDefDef(ddef: DefDef): DefDef = {
       val meth = ddef.symbol.initialize
+      println(s"typedDefDef $meth")
 
       reenterTypeParams(ddef.tparams)
       reenterValueParams(ddef.vparamss)
@@ -2327,7 +2328,7 @@ trait Typers extends Modes with Adaptations with Tags {
         case _ =>
       }
 
-      treeCopy.DefDef(ddef, typedMods, ddef.name, tparams1, vparamss1, tpt1, rhs1) setType NoType
+      treeCopy.DefDef(ddef, typedMods, ddef.name, tparams1, vparamss1, tpt1, checkForRecursive(rhs1)) setType NoType
     }
 
     def typedTypeDef(tdef: TypeDef): TypeDef =
@@ -5283,13 +5284,31 @@ trait Typers extends Modes with Adaptations with Tags {
       }
     }
 
+    def checkForRecursive[T <: Tree](tree: T): T = {
+      println(s"checkForRecursive: $tree")
+      tree foreach { t =>
+        if (t.symbol != null) {
+          println(t.symbol.defString)
+          // t.symbol.info match {
+          //   case RecursiveType(incomplete) =>
+          //     println(s"When typing ${tree.shortClass} $tree with symbol ${tree.symbol} ")
+          //     println(s"$t is incomplete: ${t.symbol} / ${t.tpe}")
+          //   case _ =>
+          // }
+          // println(t.symbol)
+        }
+      }
+
+      tree
+    }
+
     def typed(tree: Tree, mode: Int, pt: Type): Tree = {
       lastTreeToTyper = tree
       indentTyping()
 
       val startByType = if (Statistics.canEnable) Statistics.pushTimer(byTypeStack, byTypeNanos(tree.getClass)) else null
       if (Statistics.canEnable) Statistics.incCounter(visitsByType, tree.getClass)
-      try {
+      checkForRecursive(try {
         if (context.retyping &&
             (tree.tpe ne null) && (tree.tpe.isErroneous || !(tree.tpe <:< pt))) {
           tree.clearType()
@@ -5344,7 +5363,7 @@ trait Typers extends Modes with Adaptations with Tags {
       finally {
         deindentTyping()
         if (Statistics.canEnable) Statistics.popTimer(byTypeStack, startByType)
-      }
+      })
     }
 
     def atOwner(owner: Symbol): Typer =
