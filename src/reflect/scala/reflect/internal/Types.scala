@@ -1297,6 +1297,11 @@ trait Types extends api.Types { self: SymbolTable =>
     override def safeToString: String = "?"
     override def kind = "WildcardType"
   }
+  case class RecursiveType(val incomplete: Type) extends Type {
+    override def safeToString: String = "<recurs>"
+    override def kind = "RecursiveType"
+  }
+
   /** BoundedWildcardTypes, used only during type inference, are created in
    *  two places that I can find:
    *
@@ -6398,7 +6403,7 @@ trait Types extends api.Types { self: SymbolTable =>
     }
   }
 
-  def lub(ts: List[Type]): Type = ts match {
+  def lub(ts: List[Type]): Type = (ts filterNot (_.isInstanceOf[RecursiveType])) match {
     case List() => NothingClass.tpe
     case List(t) => t
     case _ =>

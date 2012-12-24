@@ -3337,6 +3337,9 @@ trait Typers extends Modes with Adaptations with Tags {
         case otpe if inPatternMode(mode) && unapplyMember(otpe).exists =>
           doTypedUnapply(tree, fun0, fun, args, mode, pt)
 
+        case RecursiveType(incomplete) =>
+          tree setType RecursiveType(fun.tpe)
+
         case _ =>
           duplErrorTree(ApplyWithoutArgsError(tree, fun))
       }
@@ -4964,8 +4967,12 @@ trait Typers extends Modes with Adaptations with Tags {
 
       val sym: Symbol = tree.symbol
       if ((sym ne null) && (sym ne NoSymbol)) {
-        if (!sym.maybeInitialize) {
-          println("Oops: " + sym)
+        sym.initialize
+        sym.info match {
+          case RecursiveType(incomplete) =>
+            println("Typing " + tree)
+            // MethodExitFinder
+          case _ =>
         }
       }
 
