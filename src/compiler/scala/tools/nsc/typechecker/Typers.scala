@@ -51,6 +51,109 @@ trait Typers extends Modes with Adaptations with Tags {
     clearDocComments()
   }
 
+
+  class MethodExitFinder(dd: DefDef) extends Traverser {
+    private var exits: List[Tree] = Nil
+    private def add(ts: Tree*) = ts foreach (exits ::= _)
+
+    locally {
+      dd.rhs match {
+        case Block(stats, expr) => stats foreach traverse ; traverseInExitPosition(expr)
+        case expr               => traverseInExitPosition(expr)
+      }
+    }
+    // // eliminated by typer
+    // case Annotated(annot, arg)  =>
+    // case AssignOrNamedArg(lhs, rhs) =>
+    // case DocDef(comment, definition) =>
+    // case Import(expr, selectors) =>
+
+    // // eliminated by refchecks
+    // case ModuleDef(mods, name, impl) =>
+    // case TypeTreeWithDeferredRefCheck() =>
+
+    // // eliminated by erasure
+    // case TypeDef(mods, name, tparams, rhs) =>
+    // case Typed(expr, tpt) =>
+
+    // // eliminated by cleanup
+    // case ApplyDynamic(qual, args) =>
+
+    // // eliminated by explicitouter
+    // case Alternative(trees) =>
+    // case Bind(name, body) =>
+    // case CaseDef(pat, guard, body) =>
+    // case Star(elem) =>
+    // case UnApply(fun, args) =>
+
+    // // eliminated by lambdalift
+    // case Function(vparams, body) =>
+
+    // // eliminated by uncurry
+    // case AppliedTypeTree(tpt, args) =>
+    // case CompoundTypeTree(templ) =>
+    // case ExistentialTypeTree(tpt, whereClauses) =>
+    // case SelectFromTypeTree(qual, selector) =>
+    // case SingletonTypeTree(ref) =>
+    // case TypeBoundsTree(lo, hi) =>
+
+    // // survivors
+    // case Apply(fun, args) =>
+    // case ArrayValue(elemtpt, trees) =>
+    // case Assign(lhs, rhs) =>
+    // case Block(stats, expr) =>
+    // case ClassDef(mods, name, tparams, impl) =>
+    // case DefDef(mods, name, tparams, vparamss, tpt, rhs)  =>
+    // case EmptyTree =>
+    // case Ident(name) =>
+    // case If(cond, thenp, elsep) =>
+    // case LabelDef(name, params, rhs) =>
+    // case Literal(value) =>
+    // case Match(selector, cases) =>
+    // case New(tpt) =>
+    // case PackageDef(pid, stats) =>
+    // case Return(expr) =>
+    // case Select(qualifier, selector) =>
+    // case Super(qual, mix) =>
+    // case Template(parents, self, body) =>
+    // case This(qual) =>
+    // case Throw(expr) =>
+    // case Try(block, catches, finalizer) =>
+    // case TypeApply(fun, args) =>
+    // case TypeTree() =>
+    // case ValDef(mods, name, tpt, rhs) =>
+
+    // // missing from the Trees comment
+    // case Parens(args) =>                          // only used during parsing
+    // case SelectFromArray(qual, name, erasure) =>  // only used during erasure
+
+    private def traverseInExitPosition(t: Tree) {
+      t match {
+        case _: DefTree                            =>
+        case Block(stats, expr)                    => stats foreach traverse ; traverseInExitPosition(expr)
+        case Return(expr)                          => traverseInExitPosition(expr)
+        case Apply(_, _) | Assign(_, _) | Ident(_) => add(t)
+        case If(cond, thenp, elsep)                => traverse(cond) ; traverseInExitPosition(thenp) ; traverseInExitPosition(elsep)
+        case Literal(value)                        => add(t)
+        case CaseDef(_, guard, body)               => traverse(guard) ; traverseInExitPosition(body)
+        case Match(selector, cases)                => traverse(selector) ; cases foreach traverseInExitPosition
+        case New(tpt)                              => add(t)
+        case Select(_, _) | This(_) | Throw(_)     => add(t)
+        case Try(block, catches, _)                => traverseInExitPosition(block) ; catches foreach traverseInExitPosition
+        case _                                     => super.traverse(t)
+      }
+    }
+
+    override def traverse(t: Tree): Unit = {
+      t match {
+        case x: DefTree          =>
+        case Return(expr)        => traverseInExitPosition(expr)
+        case Throw(_)            => add(t)
+        case _                   => super.traverse(t)
+      }
+    }
+  }
+
   object UnTyper extends Traverser {
     override def traverse(tree: Tree) = {
       if (tree.canHaveAttrs) {
@@ -4860,7 +4963,11 @@ trait Typers extends Modes with Adaptations with Tags {
       }
 
       val sym: Symbol = tree.symbol
-      if ((sym ne null) && (sym ne NoSymbol)) sym.initialize
+      if ((sym ne null) && (sym ne NoSymbol)) {
+        if (!sym.maybeInitialize) {
+          println("Oops: " + sym)
+        }
+      }
 
       def typedPackageDef(pdef: PackageDef) = {
         val pid1 = typedQualifier(pdef.pid).asInstanceOf[RefTree]

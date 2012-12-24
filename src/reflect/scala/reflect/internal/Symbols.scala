@@ -1230,6 +1230,7 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
         if ((_rawflags & LOCKED) != 0L) { // rolled out once for performance
           lock {
             setInfo(ErrorType)
+            // setInfo(WildcardType)
             throw CyclicReference(this, tp)
           }
         } else {
