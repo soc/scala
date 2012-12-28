@@ -887,8 +887,8 @@ trait StdNames {
     val PLUSPLUS  = encode("++")
     val SUB       = MINUS  // ... as does SUB with PLUS
     val XOR       = encode("^")
-    val ZAND      = encode("&&")
-    val ZOR       = encode("||")
+    val ZAND      = newTermNameCached("&&")
+    val ZOR       = newTermNameCached("||")
 
     // unary operators
     val UNARY_~ = encode("unary_~")

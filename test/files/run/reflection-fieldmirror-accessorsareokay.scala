@@ -25,5 +25,5 @@ object Test extends App {
   }
 
   test(cs.info.decl(TermName("x")).asTerm)
-  test(cs.info.decl(TermName("x_$eq")).asTerm)
+  test(cs.info.decl(TermName("x_=")).asTerm)
 }

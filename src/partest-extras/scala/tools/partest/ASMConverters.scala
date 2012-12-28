@@ -21,7 +21,8 @@ object ASMConverters {
   implicit class RichInstructionLists(val self: List[Instruction]) extends AnyVal {
     def === (other: List[Instruction]) = equivalentBytecode(self, other)
 
-    def dropLinesFrames = self.filterNot(i => i.isInstanceOf[LineNumber] || i.isInstanceOf[FrameEntry])
+    // !!! Undo after transition
+    def dropLinesFrames = self.filterNot(i => i.isInstanceOf[LineNumber]).filterNot(i => i.isInstanceOf[FrameEntry])
 
     private def referencedLabels(instruction: Instruction): Set[Instruction] = instruction match {
       case Jump(op, label)                         => Set(label)
@@ -84,7 +85,7 @@ object ASMConverters {
     def method: Method = Method(instructions, convertHandlers(asmMethod), convertLocalVars(asmMethod))
 
     private def labelIndex(l: t.LabelNode): Int = asmMethod.instructions.indexOf(l)
-    
+
     private def op(i: t.AbstractInsnNode): Int = i.getOpcode
 
     private def lst[T](xs: java.util.List[T]): List[T] = if (xs == null) Nil else xs.asScala.toList

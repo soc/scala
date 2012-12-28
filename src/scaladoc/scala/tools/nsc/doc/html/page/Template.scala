@@ -15,7 +15,7 @@ import base.comment._
 
 import model._
 import model.diagram._
-import scala.xml.{Elem, NodeSeq, Text, UnprefixedAttribute}
+import scala.xml.{Elem, NodeSeq, Text, UnprefixedAttribute, MetaData}
 import scala.language.postfixOps
 import scala.collection.mutable. { Set, HashSet }
 
@@ -754,12 +754,9 @@ class Template(universe: doc.Universe, generator: DiagramGenerator, tpl: DocTemp
               <span class={ nameClass }>{ value }</span>
             val encoded = scala.reflect.NameTransformer.encode(value)
             if (encoded != value) {
-              span % new UnprefixedAttribute("title",
-                                             "gt4s: " + encoded +
-                                             span.attribute("title").map(
-                                               node => ". " + node
-                                             ).getOrElse(""),
-                                             scala.xml.Null)
+              // !!! Replace with % again ...
+              span.copy(attributes = MetaData.update(span.attributes, span.scope,
+                  new UnprefixedAttribute("title", "gt4s: " + encoded + span.attribute("title").map(node => ". " + node).getOrElse(""), scala.xml.Null)))
             } else {
               span
             }

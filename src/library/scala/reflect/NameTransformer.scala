@@ -19,10 +19,10 @@ object NameTransformer {
   val NAME_JOIN_STRING              = sys.props.getOrElse("SCALA_NAME_JOIN_STRING", "$")
   val MODULE_INSTANCE_NAME          = "MODULE$"
   val LOCAL_SUFFIX_STRING           = " "
-  val SETTER_SUFFIX_STRING          = "_$eq"
+  val SETTER_SUFFIX_STRING          = "_="
   val TRAIT_SETTER_SEPARATOR_STRING = "$_setter_$"
 
-  private val nops = 128
+  private val nops = 164
   private val ncodes = 26 * 26
 
   private class OpCodes(val op: Char, val code: String, val next: OpCodes)
@@ -36,24 +36,19 @@ object NameTransformer {
   }
 
   /* Note: decoding assumes opcodes are only ever lowercase. */
-  enterOp('~', "$tilde")
-  enterOp('=', "$eq")
+  enterOp('.', "$dot")
+  enterOp(',', "$comma")
+  enterOp(':', "$colon")
+  enterOp(';', "$semicolon")
+  enterOp('"', "$quot")
+  enterOp('/', "$div")
+  enterOp('\\', "$bslash")
+  enterOp('[', "$lbracket")
+  enterOp(']', "$rbracket")
   enterOp('<', "$less")
   enterOp('>', "$greater")
-  enterOp('!', "$bang")
-  enterOp('#', "$hash")
-  enterOp('%', "$percent")
-  enterOp('^', "$up")
-  enterOp('&', "$amp")
-  enterOp('|', "$bar")
-  enterOp('*', "$times")
-  enterOp('/', "$div")
-  enterOp('+', "$plus")
-  enterOp('-', "$minus")
-  enterOp(':', "$colon")
-  enterOp('\\', "$bslash")
-  enterOp('?', "$qmark")
-  enterOp('@', "$at")
+  enterOp('¢', "$cent")
+  enterOp('£', "$pound")
 
   /** Replace operator symbols by corresponding `\$opname`.
    *
@@ -71,17 +66,8 @@ object NameTransformer {
           buf = new StringBuilder()
           buf.append(name.substring(0, i))
         }
-        buf.append(op2code(c.toInt))
-      /* Handle glyphs that are not valid Java/JVM identifiers */
-      }
-      else if (!Character.isJavaIdentifierPart(c)) {
-        if (buf eq null) {
-          buf = new StringBuilder()
-          buf.append(name.substring(0, i))
-        }
-        buf.append("$u%04X".format(c.toInt))
-      }
-      else if (buf ne null) {
+        buf.append(op2code(c))
+      } else if (buf ne null) {
         buf.append(c)
       }
       i += 1

@@ -13,9 +13,9 @@
       ()
     };
     @new ann(List.apply("5a")) @new ann(List.apply("5b")) def f(x: Int @ann(List.apply("6a")) @ann(List.apply("6b"))) = {
-      @new ann(List.apply("7a")) @new ann(List.apply("7b")) val r = x.$plus(3): @ann(List.apply("8a")): @ann(List.apply("8b"));
+      @new ann(List.apply("7a")) @new ann(List.apply("7b")) val r = x.+(3): @ann(List.apply("8a")): @ann(List.apply("8b"));
       val s = (4: Int @ann(List.apply("9a")) @ann(List.apply("9b")));
-      r.$plus(s)
+      r.+(s)
     }
   };
   ()

@@ -8,7 +8,7 @@
     }
   };
   val c = C.apply(2, 2);
-  Predef.println(c.foo.$times(c.bar))
+  Predef.println(c.foo.*(c.bar))
 }
 4
 ()
