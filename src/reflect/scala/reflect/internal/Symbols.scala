@@ -700,7 +700,7 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
       }
 
     def isStrictFP          = hasAnnotation(ScalaStrictFPAttr) || (enclClass hasAnnotation ScalaStrictFPAttr)
-    def isSerializable      = info.baseClasses.exists(p => p == SerializableClass || p == JavaSerializableClass)
+    def isSerializable      = baseClasses.exists(p => p == SerializableClass || p == JavaSerializableClass)
     def hasBridgeAnnotation = hasAnnotation(BridgeClass)
     def isDeprecated        = hasAnnotation(DeprecatedAttr)
     def deprecationMessage  = getAnnotation(DeprecatedAttr) flatMap (_ stringArg 0)
@@ -1824,7 +1824,7 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
     }
 
     /** All directly or indirectly inherited classes. */
-    def ancestors: List[Symbol] = info.baseClasses drop 1
+    def ancestors: List[Symbol] = baseClasses drop 1
 
     @inline final def enclosingSuchThat(p: Symbol => Boolean): Symbol = {
       var sym = this
@@ -2080,7 +2080,7 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
      *  pre: `this.owner` is in the base class sequence of `base`.
      */
     final def superSymbol(base: Symbol): Symbol = {
-      var bcs = base.info.baseClasses.dropWhile(owner != _).tail
+      var bcs = base.baseClasses.dropWhile(owner != _).tail
       var sym: Symbol = NoSymbol
       while (!bcs.isEmpty && sym == NoSymbol) {
         if (!bcs.head.isImplClass)

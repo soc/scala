@@ -1302,8 +1302,9 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
 
     def cancel() { reporter.cancelled = true }
 
+    private lazy val phaseDescriptorsSize = phaseDescriptors.size
     private def currentProgress   = (phasec * size) + unitc
-    private def totalProgress     = (phaseDescriptors.size - 1) * size // -1: drops terminal phase
+    private def totalProgress     = (phaseDescriptorsSize - 1) * size // -1: drops terminal phase
     private def refreshProgress() = if (size > 0) progress(currentProgress, totalProgress)
 
     // ----- finding phases --------------------------------------------

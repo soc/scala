@@ -88,6 +88,26 @@ sealed abstract class List[+A] extends AbstractSeq[A]
   def head: A
   def tail: List[A]
 
+  override def length = {
+    val result = super.length
+    List.lengthCalls(result) += 1
+    if (result > 500) {
+      // scala.reflect.internal.util.Origins("length>500", 6)(5)
+      List.reallyLongLists ::= ((new Throwable, this))
+      // println("List.length == " + result)
+      // (new Throwable).printStackTrace
+    }
+    // if (result == 30) {
+    //   scala.reflect.internal.util.Origins("length=30", 6)(5)
+    // }
+    result
+  }
+  override def apply(idx: Int): A = {
+    List.lengthCalls(idx) += 1
+    // List.applyCalls(idx) += 1
+    super.apply(idx)
+  }
+
   // New methods in List
 
   /** Adds an element at the beginning of this list.
@@ -386,6 +406,35 @@ final case class ::[B](private var hd: B, private[scala] var tl: List[B]) extend
  *  @define Coll `List`
  */
 object List extends SeqFactory[List] {
+  var reallyLongLists: List[(Throwable, List[_])] = Nil
+  val lengthCalls = mutable.Map[Int, Int]() withDefaultValue 0
+  val applyCalls = mutable.Map[Int, Int]() withDefaultValue 0
+
+  scala.sys addShutdownHook {
+    Thread.sleep(1000)
+    val totalLength = lengthCalls map { case (k, v) => k * v } sum;
+    val totalCalls  = lengthCalls.values.sum
+    val avgLength = "%.3f" format (totalLength.toDouble / totalCalls)
+
+    println(s"$totalCalls calls to length, total length $totalLength, average list length $avgLength\n")
+    println(" LENGTH   CALLS  CALL SHARE  LENGTH SHARE")
+    println(" ------   -----  ----------  ------------")
+
+    lengthCalls.toList.sortBy(_._1) foreach {
+      case (k, v) =>
+        val callShare = "%.3f%%" format ((v.toDouble / totalCalls) * 100)
+        val lenShare = "%.3f%%" format (((k * v).toDouble / totalLength) * 100)
+        println(f"$k%7d $v%7d  $callShare%10s  $lenShare%12s")
+    }
+  }
+
+  scala.sys addShutdownHook {
+    Thread.sleep(2000)
+    for ((where, xs) <- reallyLongLists) {
+      where.printStackTrace()
+      println(xs.mkString("List(\n  ", ",\n  ", "\n)\n"))
+    }
+  }
   /** $genericCanBuildFromInfo */
   implicit def canBuildFrom[A]: CanBuildFrom[Coll, A, List[A]] =
     ReusableCBF.asInstanceOf[GenericCanBuildFrom[A]]
