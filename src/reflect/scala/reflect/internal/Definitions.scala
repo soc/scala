@@ -755,13 +755,13 @@ trait Definitions extends api.StandardDefinitions {
       val sym     = tp.typeSymbol
 
       if (phase.erasedTypes) ClassClass.tpe
-      else if (isPrimitiveValueClass(sym)) ClassType(tp.widen)
+      else if (isPrimitiveValueClass(sym)) ClassType(tp.dealiasWiden)
       else {
         val eparams    = typeParamsToExistentials(ClassClass, ClassClass.typeParams)
         val upperBound = (
           if (isPhantomClass(sym)) AnyClass.tpe
           else if (sym.isLocalClass) erasure.intersectionDominator(tp.parents)
-          else tp.widen
+          else tp.dealiasWiden
         )
 
         existentialAbstraction(

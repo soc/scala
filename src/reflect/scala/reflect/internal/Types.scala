@@ -309,7 +309,7 @@ trait Types extends api.Types { self: SymbolTable =>
    *  chance to make peace with the other types. See SI-5330.
    */
   private def narrowForFindMember(tp: Type): Type = {
-    val w = tp.widen
+    val w = tp.dealiasWiden
     // Only narrow on widened type when we have to -- narrow is expensive unless the target is a singleton type.
     if ((tp ne w) && containsExistential(w)) w.narrow
     else tp.narrow
@@ -2205,7 +2205,7 @@ trait Types extends api.Types { self: SymbolTable =>
     override def typeSymbol = if (this ne normalize) normalize.typeSymbol else sym
     override def widen = {
       val result = super.widen
-      if (dealias ne dealias.widen)
+      if (dealias.isInstanceOf[SingletonType])
         devWarning(s"Widening $this (to $result) without dealiasing to $dealias (which widens to ${dealias.widen})")
 
       result
@@ -3617,9 +3617,9 @@ trait Types extends api.Types { self: SymbolTable =>
       case TypeRef(pre, sym, bogons)                      => devWarning(s"Dropping $bogons from $tycon in appliedType.") ; copyTypeRef(tycon, pre, sym, args)
       case PolyType(tparams, restpe)                      => restpe.instantiateTypeParams(tparams, args)
       case ExistentialType(tparams, restpe)               => newExistentialType(tparams, appliedType(restpe, args))
-      case st: SingletonType                              => appliedType(st.widen, args) // @M TODO: what to do? see bug1
-      case RefinedType(parents, decls)                    => RefinedType(parents map (appliedType(_, args)), decls)   // @PP: Can this be right?
-      case TypeBounds(lo, hi)                             => TypeBounds(appliedType(lo, args), appliedType(hi, args)) // @PP: Can this be right?
+      case st: SingletonType                              => devWarning(s"appliedType($tycon, $args)") ; appliedType(st.widen, args) // @M TODO: what to do? see bug1
+      case RefinedType(parents, decls)                    => devWarning(s"appliedType($tycon, $args)") ; RefinedType(parents map (appliedType(_, args)), decls)   // @PP: Can this be right?
+      case TypeBounds(lo, hi)                             => devWarning(s"appliedType($tycon, $args)") ; TypeBounds(appliedType(lo, args), appliedType(hi, args)) // @PP: Can this be right?
       case tv@TypeVar(_, _)                               => tv.applyArgs(args)
       case AnnotatedType(annots, underlying, self)        => AnnotatedType(annots, appliedType(underlying, args), self)
       case ErrorType | WildcardType                       => tycon
