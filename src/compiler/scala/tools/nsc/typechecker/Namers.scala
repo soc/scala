@@ -812,7 +812,7 @@ trait Namers extends MethodSynthesis {
       }
 
       val tpe1 = dropIllegalStarTypes(tpe.deconst)
-      val tpe2 = tpe1.widen
+      val tpe2 = tpe1.dealiasWiden
 
       // This infers Foo.type instead of "object Foo"
       // See Infer#adjustTypeArgs for the polymorphic case.

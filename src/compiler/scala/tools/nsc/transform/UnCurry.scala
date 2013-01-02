@@ -153,7 +153,7 @@ abstract class UnCurry extends InfoTransform
      */
     private def nonLocalReturnThrow(expr: Tree, meth: Symbol) = localTyper typed {
       Throw(
-        nonLocalReturnExceptionType(expr.tpe.widen),
+        nonLocalReturnExceptionType(expr.tpe.dealiasWiden),
         Ident(nonLocalReturnKey(meth)),
         expr
       )

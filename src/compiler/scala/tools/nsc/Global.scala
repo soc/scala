@@ -260,6 +260,10 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
     if (settings.developer.value || settings.debug.value)
       warning("!!! " + msg)
   }
+  @inline final override def devWarning(pos: Position, msg: => String) {
+    if (settings.developer.value || settings.debug.value)
+      reporter.warning(pos, "!!! " + msg)
+  }
 
   private def elapsedMessage(msg: String, start: Long) =
     msg + " in " + (currentTime - start) + "ms"

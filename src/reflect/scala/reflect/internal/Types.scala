@@ -5253,8 +5253,12 @@ trait Types extends api.Types { self: SymbolTable =>
       case tr1: TypeRef =>
         tp2 match {
           case tr2: TypeRef =>
-            if (tr1.sym.isAliasType || tr2.sym.isAliasType)
-              return isSameType2(tr1.dealias, tr2.dealias)
+            if (tr1.sym.isAliasType || tr2.sym.isAliasType) {
+              if ((tr1 eq tr1.dealias) && (tr2 eq tr2.dealias))
+                println(s"Huh? $tr1 $tr2")
+              else
+                return isSameType2(tr1.dealias, tr2.dealias)
+            }
 
             return (equalSymsAndPrefixes(tr1.sym, tr1.pre, tr2.sym, tr2.pre) &&
               ((tp1.isHigherKinded && tp2.isHigherKinded && tp1.normalize =:= tp2.normalize) ||
@@ -5683,8 +5687,14 @@ trait Types extends api.Types { self: SymbolTable =>
             val pre1 = tr1.pre
             val pre2 = tr2.pre
 
-            if (sym1.isAliasType || sym2.isAliasType)
-              return isSubType2(tr1.dealias, tr2.dealias, depth)
+            if (sym1.isAliasType || sym2.isAliasType) {
+              if (sym1.isAliasType && (tr1 eq tr1.dealias))
+                devWarning(s"Type dealiases to itself! $tr1")
+              else if (sym2.isAliasType && (tr2 eq tr2.dealias))
+                devWarning(s"Type dealiases to itself! $tr2")
+              else
+                return isSubType2(tr1.dealias, tr2.dealias, depth)
+            }
 
             (((if (sym1 == sym2) phase.erasedTypes || sym1.owner.hasPackageFlag || isSubType(pre1, pre2, depth)
                else (sym1.name == sym2.name && !sym1.isModuleClass && !sym2.isModuleClass &&
