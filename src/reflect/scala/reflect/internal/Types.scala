@@ -2205,8 +2205,8 @@ trait Types extends api.Types { self: SymbolTable =>
     override def typeSymbol = if (this ne normalize) normalize.typeSymbol else sym
     override def widen = {
       val result = super.widen
-      // if (dealias.isInstanceOf[SingletonType])
-      //   devWarning(s"Widening $this (to $result) without dealiasing to $dealias (which widens to ${dealias.widen})")
+      if (dealias.isInstanceOf[SingletonType])
+        devWarning(s"Widening $this (to $result) without dealiasing to $dealias (which widens to ${dealias.widen})")
 
       result
     }
