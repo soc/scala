@@ -370,8 +370,8 @@ trait Typers extends Modes with Adaptations with Tags {
         if (hiddenSymbols.isEmpty) tree setType tp1
         else if (hiddenSymbols exists (_.isErroneous)) HiddenSymbolWithError(tree)
         else if (isFullyDefined(pt)) tree setType pt
-        else if (tp1.typeSymbol.isAnonymousClass)
-          check(owner, scope, pt, tree setType tp1.typeSymbol.classBound)
+        else if (tp1.dealiasWiden.typeSymbol.isAnonymousClass)
+          check(owner, scope, pt, tree setType tp1.dealiasWiden.typeSymbol.classBound)
         else if (owner == NoSymbol)
           tree setType packSymbols(hiddenSymbols.reverse, tp1)
         else if (!phase.erasedTypes) { // privates
@@ -1230,7 +1230,7 @@ trait Typers extends Modes with Adaptations with Tags {
     }
 
     private def isAdaptableWithView(qual: Tree) = {
-      val qtpe = qual.tpe.widen
+      val qtpe = qual.tpe.dealiasWiden
       (    !isPastTyper
         && qual.isTerm
         && !qual.isInstanceOf[Super]
@@ -2437,7 +2437,7 @@ trait Typers extends Modes with Adaptations with Tags {
     // takes untyped sub-trees of a match and type checks them
     def typedMatch(selector: Tree, cases: List[CaseDef], mode: Int, pt: Type, tree: Tree = EmptyTree): Match = {
       val selector1  = checkDead(typed(selector, EXPRmode | BYVALmode, WildcardType))
-      val selectorTp = packCaptured(selector1.tpe.widen).skolemizeExistential(context.owner, selector)
+      val selectorTp = packCaptured(selector1.tpe.dealiasWiden).skolemizeExistential(context.owner, selector)
       val casesTyped = typedCases(cases, selectorTp, pt)
 
       val (resTp, needAdapt) = ptOrLubPacked(casesTyped, pt)

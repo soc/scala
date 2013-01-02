@@ -276,7 +276,7 @@ trait PatternMatching extends Transform with TypingTransformers with ast.TreeDSL
 
       val start = if (Statistics.canEnable) Statistics.startTimer(patmatNanos) else null
 
-      val selectorTp = repeatedToSeq(elimAnonymousClass(selector.tpe.widen.withoutAnnotations))
+      val selectorTp = repeatedToSeq(elimAnonymousClass(selector.tpe.dealiasWiden.withoutAnnotations))
 
       val origPt  = match_.tpe
       // when one of the internal cps-type-state annotations is present, strip all CPS annotations
@@ -391,7 +391,7 @@ trait PatternMatching extends Transform with TypingTransformers with ast.TreeDSL
         if (!extractor.isTyped) ErrorUtils.issueNormalTypeError(patTree, "Could not typecheck extractor call: "+ extractor)(context)
         // if (extractor.resultInMonad == ErrorType) throw new TypeError(pos, "Unsupported extractor type: "+ extractor.tpe)
 
-        patmatDebug("translateExtractorPattern checking parameter type: "+ (patBinder, patBinder.info.widen, extractor.paramType, patBinder.info.widen <:< extractor.paramType))
+        patmatDebug("translateExtractorPattern checking parameter type: "+ (patBinder, patBinder.info.dealiasWiden, extractor.paramType, patBinder.info.dealiasWiden <:< extractor.paramType))
 
         // must use type `tp`, which is provided by extractor's result, not the type expected by binder,
         // as b.info may be based on a Typed type ascription, which has not been taken into account yet by the translation
@@ -405,7 +405,7 @@ trait PatternMatching extends Transform with TypingTransformers with ast.TreeDSL
         // example check: List[Int] <:< ::[Int]
         // TODO: extractor.paramType may contain unbound type params (run/t2800, run/t3530)
         val (typeTestTreeMaker, patBinderOrCasted) =
-          if (needsTypeTest(patBinder.info.widen, extractor.paramType)) {
+          if (needsTypeTest(patBinder.info.dealiasWiden, extractor.paramType)) {
             // chain a type-testing extractor before the actual extractor call
             // it tests the type, checks the outer pointer and casts to the expected type
             // TODO: the outer check is mandated by the spec for case classes, but we do it for user-defined unapplies as well [SPEC]
@@ -477,7 +477,7 @@ trait PatternMatching extends Transform with TypingTransformers with ast.TreeDSL
         **/
         // must treat Typed and Bind together -- we need to know the patBinder of the Bind pattern to get at the actual type
         case MaybeBoundTyped(subPatBinder, pt) =>
-          val next = glb(List(patBinder.info.widen, pt)).normalize
+          val next = glb(List(patBinder.info.dealiasWiden, pt)).normalize
           // a typed pattern never has any subtrees
           noFurtherSubPats(TypeTestTreeMaker(subPatBinder, patBinder, pt, next)(pos))
 
@@ -1222,10 +1222,10 @@ trait PatternMatching extends Transform with TypingTransformers with ast.TreeDSL
         else expectedTp match {
           // TODO: [SPEC] the spec requires `eq` instead of `==` for singleton types
           // this implies sym.isStable
-          case SingleType(_, sym)                       => and(equalsTest(gen.mkAttributedQualifier(expectedTp), testedBinder), typeTest(testedBinder, expectedTp.widen))
+          case SingleType(_, sym)                       => and(equalsTest(gen.mkAttributedQualifier(expectedTp), testedBinder), typeTest(testedBinder, expectedTp.dealiasWiden))
           // must use == to support e.g. List() == Nil
-          case ThisType(sym) if sym.isModule            => and(equalsTest(CODE.REF(sym), testedBinder), typeTest(testedBinder, expectedTp.widen))
-          case ConstantType(Constant(null)) if testedBinder.info.widen <:< AnyRefClass.tpe
+          case ThisType(sym) if sym.isModule            => and(equalsTest(CODE.REF(sym), testedBinder), typeTest(testedBinder, expectedTp.dealiasWiden))
+          case ConstantType(Constant(null)) if testedBinder.info.dealiasWiden <:< AnyRefClass.tpe
                                                         => eqTest(expTp(CODE.NULL), testedBinder)
           case ConstantType(const)                      => equalsTest(expTp(Literal(const)), testedBinder)
           case ThisType(sym)                            => eqTest(expTp(This(sym)), testedBinder)
@@ -1234,7 +1234,7 @@ trait PatternMatching extends Transform with TypingTransformers with ast.TreeDSL
           // I think it's okay:
           //  - the isInstanceOf test includes a test for the element type
           //  - Scala's arrays are invariant (so we don't drop type tests unsoundly)
-          case _ if (expectedTp <:< AnyRefClass.tpe) && !needsTypeTest(testedBinder.info.widen, expectedTp) =>
+          case _ if (expectedTp <:< AnyRefClass.tpe) && !needsTypeTest(testedBinder.info.dealiasWiden, expectedTp) =>
             // do non-null check first to ensure we won't select outer on null
             if (outerTestNeeded) and(nonNullTest(testedBinder), outerTest(testedBinder, expectedTp))
             else nonNullTest(testedBinder)
@@ -1254,7 +1254,7 @@ trait PatternMatching extends Transform with TypingTransformers with ast.TreeDSL
 
     // need to substitute to deal with existential types -- TODO: deal with existentials better, don't substitute (see RichClass during quick.comp)
     case class EqualityTestTreeMaker(prevBinder: Symbol, patTree: Tree, override val pos: Position) extends CondTreeMaker {
-      val nextBinderTp = prevBinder.info.widen
+      val nextBinderTp = prevBinder.info.dealiasWiden
 
       // NOTE: generate `patTree == patBinder`, since the extractor must be in control of the equals method (also, patBinder may be null)
       // equals need not be well-behaved, so don't intersect with pattern's (stabilized) type (unlike MaybeBoundTyped's accumType, where it's required)
@@ -2526,7 +2526,7 @@ trait PatternMatching extends Transform with TypingTransformers with ast.TreeDSL
           case ConstantType(c) => c.escapedStringValue
           case _ => tp.toString
         }
-        Const.unique(tp, new ValueConst(tp, tp.widen, toString))
+        Const.unique(tp, new ValueConst(tp, tp.dealiasWiden, toString))
       }
       def apply(p: Tree) = {
         val tp = p.tpe.normalize

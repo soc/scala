@@ -277,7 +277,7 @@ trait NamesDefaults { self: Analyzer =>
             case _                                       => seqType(arg.tpe)
           }
           else arg.tpe
-        ).widen // have to widen or types inferred from literal defaults will be singletons
+        ).dealiasWiden // have to widen or types inferred from literal defaults will be singletons
         val s = context.owner.newValue(unit.freshTermName("x$"), arg.pos, newFlags = ARTIFACT) setInfo (
           if (byName) functionType(Nil, argTpe) else argTpe
         )

@@ -88,7 +88,7 @@ trait TypeDiagnostics {
       // Avoid "explaining" that String is really java.lang.String,
       // while still dealiasing types from non-default namespaces.
       case TypeRef(pre, sym, args) if sym.isAliasType && !sym.isInDefaultNamespace =>
-        mapOver(tp.dealias)
+        apply(tp.dealias)
       case _ =>
         mapOver(tp)
     }
@@ -177,7 +177,7 @@ trait TypeDiagnostics {
   def explainAlias(tp: Type) = {
     // Don't automatically normalize standard aliases; they still will be
     // expanded if necessary to disambiguate simple identifiers.
-    if ((tp eq tp.normalize) || tp.typeSymbolDirect.isInDefaultNamespace) ""
+    if ((tp eq tp.dealias) || tp.typeSymbolDirect.isInDefaultNamespace) ""
     else {
       // A sanity check against expansion being identical to original.
       val s = "" + DealiasedType(tp)

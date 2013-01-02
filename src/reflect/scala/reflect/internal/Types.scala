@@ -583,6 +583,9 @@ trait Types extends api.Types { self: SymbolTable =>
       else Nil
     )
 
+    /** Overridden in AbstractTypeRef. */
+    def upperBoundChain: List[Type] = this :: Nil
+
     def etaExpand: Type = this
 
     /** Performs a single step of beta-reduction on types.
@@ -2200,7 +2203,13 @@ trait Types extends api.Types { self: SymbolTable =>
     override def prefix     = if (this ne normalize) normalize.prefix else pre
     override def termSymbol = if (this ne normalize) normalize.termSymbol else super.termSymbol
     override def typeSymbol = if (this ne normalize) normalize.typeSymbol else sym
+    override def widen = {
+      val result = super.widen
+      if (dealias ne dealias.widen)
+        devWarning(s"Widening $this (to $result) without dealiasing to $dealias (which widens to ${dealias.widen})")
 
+      result
+    }
     // beta-reduce, but don't do partial application -- cycles have been checked in typeRef
     override protected def normalizeImpl =
       if (typeParamsMatchArgs) betaReduce.normalize
@@ -2249,6 +2258,7 @@ trait Types extends api.Types { self: SymbolTable =>
     private var symInfoCache: Type = _
     private var thisInfoCache: Type = _
 
+    override def upperBoundChain = this :: sym.info.bounds.hi.upperBoundChain
     override def isVolatile = {
       // need to be careful not to fall into an infinite recursion here
       // because volatile checking is done before all cycles are detected.
@@ -5243,6 +5253,9 @@ trait Types extends api.Types { self: SymbolTable =>
       case tr1: TypeRef =>
         tp2 match {
           case tr2: TypeRef =>
+            if (tr1.sym.isAliasType || tr2.sym.isAliasType)
+              return isSameType2(tr1.dealias, tr2.dealias)
+
             return (equalSymsAndPrefixes(tr1.sym, tr1.pre, tr2.sym, tr2.pre) &&
               ((tp1.isHigherKinded && tp2.isHigherKinded && tp1.normalize =:= tp2.normalize) ||
                isSameTypes(tr1.args, tr2.args))) ||
@@ -5659,15 +5672,20 @@ trait Types extends api.Types { self: SymbolTable =>
      *   - bind TypeVars  on the right, if lhs is not Annotated nor BoundedWildcard
      *   - handle common cases for first-kind TypeRefs on both sides as a fast path.
      */
-    def firstTry = tp2 match {
+    def firstTry: Boolean = tp2 match {
       // fast path: two typerefs, none of them HK
       case tr2: TypeRef =>
         tp1 match {
           case tr1: TypeRef =>
+
             val sym1 = tr1.sym
             val sym2 = tr2.sym
             val pre1 = tr1.pre
             val pre2 = tr2.pre
+
+            if (sym1.isAliasType || sym2.isAliasType)
+              return isSubType2(tr1.dealias, tr2.dealias, depth)
+
             (((if (sym1 == sym2) phase.erasedTypes || sym1.owner.hasPackageFlag || isSubType(pre1, pre2, depth)
                else (sym1.name == sym2.name && !sym1.isModuleClass && !sym2.isModuleClass &&
                      (isUnifiable(pre1, pre2) ||

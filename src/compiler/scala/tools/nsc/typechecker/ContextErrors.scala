@@ -146,13 +146,14 @@ trait ContextErrors {
         issueNormalTypeError(tree, errMsg)
       }
 
-      def AdaptTypeError(tree: Tree, found: Type, req: Type) = {
+      def AdaptTypeError(tree: Tree, found0: Type, req: Type) = {
+        val found = found0.dealiasWiden
         // If the expected type is a refinement type, and the found type is a refinement or an anon
         // class, we can greatly improve the error message by retyping the tree to recover the actual
         // members present, then display along with the expected members. This is done here because
         // this is the last point where we still have access to the original tree, rather than just
         // the found/req types.
-        val foundType: Type = req.normalize match {
+        val foundType: Type = req.dealias match {
           case RefinedType(parents, decls) if !decls.isEmpty && found.typeSymbol.isAnonOrRefinementClass =>
             val retyped    = typed (tree.duplicate.clearType())
             val foundDecls = retyped.tpe.decls filter (sym => !sym.isConstructor && !sym.isSynthetic)

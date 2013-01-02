@@ -525,13 +525,13 @@ trait Contexts { self: Analyzer =>
         {
           target.isType || { // allow accesses to types from arbitrary subclasses fixes #4737
             val res =
-              isSubClassOrCompanion(pre.widen.typeSymbol, c.owner) ||
+              isSubClassOrCompanion(pre.dealiasWiden.typeSymbol, c.owner) ||
               c.owner.isModuleClass &&
-              isSubClassOrCompanion(pre.widen.typeSymbol, c.owner.linkedClassOfClass)
+              isSubClassOrCompanion(pre.dealiasWiden.typeSymbol, c.owner.linkedClassOfClass)
             if (!res)
               lastAccessCheckDetails =
                 "\n Access to protected "+target+" not permitted because"+
-                "\n prefix type "+pre.widen+" does not conform to"+
+                "\n prefix type "+pre.dealiasWiden+" does not conform to"+
                 "\n "+c.owner+c.owner.locationString+" where the access take place"
               res
           }
