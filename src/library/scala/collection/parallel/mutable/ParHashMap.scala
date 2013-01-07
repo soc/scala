@@ -40,7 +40,7 @@ import scala.collection.parallel.Task
 class ParHashMap[K, V] private[collection] (contents: HashTable.Contents[K, DefaultEntry[K, V]])
 extends ParMap[K, V]
    with GenericParMapTemplate[K, V, ParHashMap]
-   with ParMapLike[K, V, ParHashMap[K, V], scala.collection.mutable.HashMap[K, V]]
+   with ParMapLike[K, V, ParHashMap[K, V], scala.collection.mutable.OldHashMap[K, V]]
    with ParHashTable[K, DefaultEntry[K, V]]
    with Serializable
 {
@@ -57,7 +57,7 @@ self =>
 
   protected[this] override def newCombiner = ParHashMapCombiner[K, V]
 
-  override def seq = new scala.collection.mutable.HashMap[K, V](hashTableContents)
+  override def seq = new scala.collection.mutable.OldHashMap[K, V](hashTableContents)
 
   def splitter = new ParHashMapIterator(1, table.length, size, table(0).asInstanceOf[DefaultEntry[K, V]])
 

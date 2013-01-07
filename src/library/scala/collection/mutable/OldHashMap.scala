@@ -36,10 +36,10 @@ import scala.collection.parallel.mutable.ParHashMap
  *  @define willNotTerminateInf
  */
 @SerialVersionUID(1L)
-class HashMap[A, B] private[collection] (contents: HashTable.Contents[A, DefaultEntry[A, B]])
+class OldHashMap[A, B] private[collection] (contents: HashTable.Contents[A, DefaultEntry[A, B]])
 extends AbstractMap[A, B]
    with Map[A, B]
-   with MapLike[A, B, HashMap[A, B]]
+   with MapLike[A, B, OldHashMap[A, B]]
    with HashTable[A, DefaultEntry[A, B]]
    with CustomParallelizable[(A, B), ParHashMap[A, B]]
    with Serializable
@@ -48,7 +48,7 @@ extends AbstractMap[A, B]
 
   type Entry = DefaultEntry[A, B]
 
-  override def empty: HashMap[A, B] = HashMap.empty[A, B]
+  override def empty: OldHashMap[A, B] = OldHashMap.empty[A, B]
   override def clear() { clearTable() }
   override def size: Int = tableSize
 
@@ -148,7 +148,7 @@ extends AbstractMap[A, B]
  *  @define Coll `mutable.HashMap`
  *  @define coll mutable hash map
  */
-object HashMap extends MutableMapFactory[HashMap] {
-  implicit def canBuildFrom[A, B]: CanBuildFrom[Coll, (A, B), HashMap[A, B]] = new MapCanBuildFrom[A, B]
-  def empty[A, B]: HashMap[A, B] = new HashMap[A, B]
+object OldHashMap extends MutableMapFactory[OldHashMap] {
+  implicit def canBuildFrom[A, B]: CanBuildFrom[Coll, (A, B), OldHashMap[A, B]] = new MapCanBuildFrom[A, B]
+  def empty[A, B]: OldHashMap[A, B] = new OldHashMap[A, B]
 }
