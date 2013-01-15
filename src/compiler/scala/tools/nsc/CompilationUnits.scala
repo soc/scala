@@ -80,6 +80,7 @@ trait CompilationUnits { self: Global =>
       def get(sym: Symbol): Option[Tree] = logResultIf[Option[Tree]](s"found synthetic for $sym in $self", _.isDefined) {
         map get sym
       }
+      def remove(sym: Symbol): Option[Tree] = map remove sym
       def keys: Iterable[Symbol] = map.keys
       def clear(): Unit = map.clear()
       override def toString = map.toString

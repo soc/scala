@@ -665,6 +665,7 @@ trait Namers extends MethodSynthesis {
           MaxParametersCaseClassError(tree)
 
         val m = ensureCompanionObject(tree, caseModuleDef)
+        tree.updateAttachment(new SymbolForCompanionObjectAttachment(m))
         m.moduleClass.updateAttachment(new ClassForCaseCompanionAttachment(tree))
       }
       val hasDefault = impl.body exists {

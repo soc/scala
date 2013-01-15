@@ -29,6 +29,7 @@ trait Unapplies extends ast.TreeDSL
   // `enterClassDef`), the case class ClassDef is added as an attachment to the
   // moduleClass symbol of the companion module.
   class ClassForCaseCompanionAttachment(val caseClass: ClassDef)
+  class SymbolForCompanionObjectAttachment(val module: Symbol)
 
   /** returns type list for return type of the extraction
    * @see extractorFormalTypes
