@@ -1,7 +1,6 @@
 /* NSC -- new Scala compiler
  * Copyright 2005-2013 LAMP/EPFL
  * @author  Martin Odersky
- *
  */
 
 package scala.reflect.internal.util
@@ -9,6 +8,7 @@ package scala.reflect.internal.util
 import scala.reflect.ClassTag
 import scala.reflect.internal.FatalError
 import scala.reflect.macros.Attachments
+import StringOps._
 
 object Position {
   val tabInc = 8
@@ -20,18 +20,12 @@ object Position {
       else if (posIn.isDefined) posIn.inUltimateSource(posIn.source)
       else posIn
     )
-    def file   = pos.source.file
-    def prefix = if (shortenFile) file.name else file.path
+    val prefix = if (shortenFile) pos.sourceName else pos.sourcePath
 
     pos match {
       case FakePos(fmsg) => fmsg+" "+msg
       case NoPosition    => msg
-      case _             =>
-        List(
-          "%s:%s: %s".format(prefix, pos.line, msg),
-          pos.lineContent.stripLineEnd,
-          " " * (pos.column - 1) + "^"
-        ) mkString "\n"
+      case _             => s"$prefix:${pos.line}: $msg\n${pos.lineContent}\n${pos.lineCarat}"
     }
   }
 }
@@ -91,7 +85,7 @@ abstract class Position extends scala.reflect.api.Position { self =>
   /** An optional value containing the source file referred to by this position, or
    *  None if not defined.
    */
-  def source: SourceFile = throw new UnsupportedOperationException("Position.source")
+  def source: SourceFile = fail("source")
 
   /** Is this position neither a NoPosition nor a FakePosition?
    *  If isDefined is true, offset and source are both defined.
@@ -111,25 +105,22 @@ abstract class Position extends scala.reflect.api.Position { self =>
   def makeTransparent: Position = this
 
   /** The start of the position's range, error if not a range position */
-  def start: Int = throw new UnsupportedOperationException("Position.start")
+  def start: Int = fail("start")
 
   /** The start of the position's range, or point if not a range position */
   def startOrPoint: Int = point
 
   /**  The point (where the ^ is) of the position */
-  def point: Int = throw new UnsupportedOperationException("Position.point")
+  def point: Int = fail("point")
 
   /**  The point (where the ^ is) of the position, or else `default` if undefined */
   def pointOrElse(default: Int): Int = default
 
   /** The end of the position's range, error if not a range position */
-  def end: Int = throw new UnsupportedOperationException("Position.end")
+  def end: Int = fail("end")
 
   /** The end of the position's range, or point if not a range position */
   def endOrPoint: Int = point
-
-  @deprecated("use point instead", "2.9.0")
-  def offset: Option[Int] = if (isDefined) Some(point) else None // used by sbt
 
   /** The same position with a different start value (if a range) */
   def withStart(off: Int): Position = this
@@ -202,16 +193,42 @@ abstract class Position extends scala.reflect.api.Position { self =>
   def sameRange(pos: Position): Boolean =
     isRange && pos.isRange && start == pos.start && end == pos.end
 
-  def line: Int = throw new UnsupportedOperationException("Position.line")
+  private def fail(msg: String) =
+    throw new UnsupportedOperationException("Position." + msg)
 
-  def column: Int = throw new UnsupportedOperationException("Position.column")
+  protected def calculateColumn: Int = {
+    var idx = source.lineToOffset(source.offsetToLine(point))
+    var col = 0
+    while (idx != point) {
+      col += (if (source.content(idx) == '\t') Position.tabInc - col % Position.tabInc else 1)
+      idx += 1
+    }
+    col + 1
+  }
+
+  def line   = if (isDefined) source.offsetToLine(point) + 1 else fail("line")
+  def column = if (isDefined) calculateColumn else fail("column")
+
+  /** A line with a ^ padded with the right number of spaces.
+   */
+  def lineCarat: String = " " * (column - 1) + "^"
 
   /** Convert this to a position around `point` that spans a single source line */
   def toSingleLine: Position = this
 
-  def lineContent: String =
-    if (isDefined) source.lineToString(line - 1)
-    else "NO_LINE"
+  /** The source code corresponding to the range, if this is a range position.
+   *  Otherwise the empty string.
+   */
+  def lengthInChars = 0
+  def lengthInLines = 0
+  def sourceCode    = ""
+  def sourceName    = if (isDefined) source.file.name else "<none>"
+  def sourcePath    = if (isDefined) source.file.path else "<none>"
+  def lineContent   = if (isDefined) source.lineToString(line) else "<none>"
+  def lengthString = (
+    if (lengthInChars == 0) ""
+    else plural(lengthInLines, "line") + ", " + plural(lengthInChars, "char")
+  )
 
   /** Map this position to a position in an original source
    * file.  If the SourceFile is a normal SourceFile, simply
@@ -222,7 +239,10 @@ abstract class Position extends scala.reflect.api.Position { self =>
 
   def dbgString: String = toString
   def safeLine: Int = try line catch { case _: UnsupportedOperationException => -1 }
-
+  override def toString = safeLine match {
+    case -1   => sourceName
+    case line => s"$sourceName:$line($lengthString)"
+  }
   def show: String = "["+toString+"]"
 }
 
@@ -240,17 +260,7 @@ class OffsetPosition(override val source: SourceFile, override val point: Int) e
   override def withPoint(off: Int) = new OffsetPosition(source, off)
   override def withSource(source: SourceFile, shift: Int) = new OffsetPosition(source, point + shift)
 
-  override def line: Int = source.offsetToLine(point) + 1
-
-  override def column: Int = {
-    var idx = source.lineToOffset(source.offsetToLine(point))
-    var col = 0
-    while (idx != point) {
-      col += (if (source.content(idx) == '\t') Position.tabInc - col % Position.tabInc else 1)
-      idx += 1
-    }
-    col + 1
-  }
+  override def line        = source.offsetToLine(point) + 1
 
   override def union(pos: Position) = if (pos.isRange) pos else this
 
@@ -260,10 +270,7 @@ class OffsetPosition(override val source: SourceFile, override val point: Int) e
   }
   override def hashCode = point * 37 + source.file.hashCode
 
-  override def toString = {
-    val pointmsg = if (point > source.length) "out-of-bounds-" else "offset="
-    "source-%s,line-%s,%s%s".format(source.file.canonicalPath, line, pointmsg, point)
-  }
+  override def lengthString = "col=" + column
   override def show = "["+point+"]"
 }
 
@@ -298,7 +305,10 @@ extends OffsetPosition(source, point) {
     case _ => this
   }
 
-  override def toString = "RangePosition("+source.file.canonicalPath+", "+start+", "+point+", "+end+")"
+  override def lengthInChars = end - start
+  override def lengthInLines = focusEnd.line - focusStart.line + 1
+  override def sourceCode    = new String(source.content, start, lengthInChars)
+
   override def show = "["+start+":"+end+"]"
   private var focusCache: Position = NoPosition
 }

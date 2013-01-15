@@ -104,6 +104,7 @@ abstract class TreeGen extends macros.TreeBuilder {
         abort("bad qualifier received: " + failMessage)
     }
   }
+
   /** If this is a reference to a method with an empty
    *  parameter list, wrap it in an apply.
    */

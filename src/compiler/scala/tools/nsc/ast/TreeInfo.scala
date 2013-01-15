@@ -13,7 +13,19 @@ package ast
  */
 abstract class TreeInfo extends scala.reflect.internal.TreeInfo {
   val global: Global
+
   import global._
+  import definitions.ThrowableClass
+
+  def dumpMemberDefs(tree: Tree) = {
+    tree foreach {
+      case t: MemberDef if !t.mods.isParameter =>
+        val code = t.pos.sourceCode
+        if (code != "")
+          println(">> %-12s %-30s\n%s\n".format(t.shortClass, t.pos, code))
+      case _ =>
+    }
+  }
 
   /** Is tree legal as a member definition of an interface?
    */

@@ -80,8 +80,8 @@ object ScriptSourceFile {
 
   def apply(file: AbstractFile, content: Array[Char]) = {
     val underlying = new BatchSourceFile(file, content)
-    val headerLen = headerLength(content)
-    val stripped = new ScriptSourceFile(underlying, content drop headerLen, headerLen)
+    val headerLen  = headerLength(content)
+    val stripped   = new ScriptSourceFile(underlying, content drop headerLen, headerLen)
 
     stripped
   }

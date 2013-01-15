@@ -26,6 +26,11 @@ trait StringOps {
     }
   }
 
+  def plural(num: Int, what: String): String = if (num == 1) s"1 $what" else s"$num${what}s"
+  def truncateString(max: Int)(s: String): String =
+    if (s.length <= max) s
+    else s.substring(0, max - 3) + "..."
+
   def decompose(str: String, sep: Char): List[String] = {
     def ws(start: Int): List[String] =
       if (start == str.length) List()

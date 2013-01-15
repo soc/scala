@@ -34,6 +34,9 @@ abstract class SyntaxAnalyzer extends SubComponent with Parsers with MarkupParse
 
       if (settings.Yrangepos.value && !reporter.hasErrors)
         validatePositions(unit.body)
+
+      if (settings.Yposdebug.value)
+        treeInfo.dumpMemberDefs(unit.body)
     }
   }
 }

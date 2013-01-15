@@ -9,6 +9,7 @@ package internal
 import Flags._
 import scala.collection.mutable.{ListBuffer, LinkedHashSet}
 import util.Statistics
+import util.StringOps.ojoin
 
 trait Trees extends api.Trees { self: SymbolTable =>
 
@@ -201,16 +202,23 @@ trait Trees extends api.Trees { self: SymbolTable =>
     /** When you want to know a little more than the class, but a lot
      *  less than the whole tree.
      */
-    def summaryString: String = this match {
-      case Literal(const)     => "Literal(" + const + ")"
-      case Ident(name)        => "Ident(%s)".format(name.decode)
-      case Select(qual, name) => "Select(%s, %s)".format(qual.summaryString, name.decode)
-      case t: NameTree        => t.name.longString
-      case t                  =>
-        t.shortClass + (
-          if (t.symbol != null && t.symbol != NoSymbol) "(" + t.symbol + ")"
-          else ""
-        )
+    def summaryString: String = {
+      val treeClass = this match {
+        case _: RefTree => ""
+        case _          => shortClass
+      }
+      val treeName = this match {
+        case Select(qual, name) => qual.summaryString + "." + name.decode
+        case Ident(name)        => name.longString
+        case Literal(const)     => const.escapedStringValue
+        case t: DefTree         => t.name.decode
+        case t: RefTree         => t.name.longString
+        case t                  => ""
+      }
+      val treeSym = if (symbol == null || symbol == NoSymbol) "" else "" + symbol
+      val treePos = if (pos == null || pos == NoPosition) "" else "" + pos
+
+      ojoin(treeClass, treeName, treeSym, treePos)
     }
   }
 
