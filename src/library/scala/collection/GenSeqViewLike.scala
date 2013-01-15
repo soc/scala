@@ -30,7 +30,7 @@ self =>
 
   trait Forced[B] extends super.Forced[B] with Transformed[B] {
     def length = forced.length
-    def apply(idx: Int) = forced.apply(idx)
+    def apply(idx: Int): B = forced.apply(idx)
   }
 
   trait Sliced extends super.Sliced with Transformed[A] {
@@ -39,7 +39,7 @@ self =>
       if (idx + from < until) self.apply(idx + from)
       else throw new IndexOutOfBoundsException(idx.toString)
 
-    override def foreach[U](f: A => U) = iterator foreach f
+    override def foreach[U](f: A => U): Unit = iterator foreach f
     override def iterator: Iterator[A] = self.iterator drop from take endpoints.width
   }
 
@@ -49,7 +49,7 @@ self =>
   }
 
   trait FlatMapped[B] extends super.FlatMapped[B] with Transformed[B] {
-    protected[this] lazy val index = {
+    protected[this] lazy val index: Array[Int] = {
       val index = new Array[Int](self.length + 1)
       index(0) = 0
       for (i <- 0 until self.length) // note that if the mapping returns a list, performance is bad, bad
@@ -63,7 +63,7 @@ self =>
       else mid
     }
     def length = index(self.length)
-    def apply(idx: Int) = {
+    def apply(idx: Int): B = {
       val row = findRow(idx, 0, self.length - 1)
       mapping(self(row)).seq.toSeq(idx - index(row))
     }
@@ -72,7 +72,7 @@ self =>
   trait Appended[B >: A] extends super.Appended[B] with Transformed[B] {
     protected[this] lazy val restSeq = rest.toSeq
     def length = self.length + restSeq.length
-    def apply(idx: Int) =
+    def apply(idx: Int): B =
       if (idx < self.length) self(idx) else restSeq(idx - self.length)
   }
 
@@ -88,13 +88,13 @@ self =>
       arr take len
     }
     def length = index.length
-    def apply(idx: Int) = self(index(idx))
+    def apply(idx: Int): A = self(index(idx))
   }
 
   trait TakenWhile extends super.TakenWhile with Transformed[A] {
     protected[this] lazy val len = self prefixLength pred
     def length = len
-    def apply(idx: Int) =
+    def apply(idx: Int): A =
       if (idx < len) self(idx)
       else throw new IndexOutOfBoundsException(idx.toString)
   }
@@ -102,7 +102,7 @@ self =>
   trait DroppedWhile extends super.DroppedWhile with Transformed[A] {
     protected[this] lazy val start = self prefixLength pred
     def length = self.length - start
-    def apply(idx: Int) =
+    def apply(idx: Int): A =
       if (idx >= 0) self(idx + start)
       else throw new IndexOutOfBoundsException(idx.toString)
   }
@@ -111,13 +111,13 @@ self =>
     protected[this] lazy val thatSeq = other.seq.toSeq
     /* Have to be careful here - other may be an infinite sequence. */
     def length = if ((thatSeq lengthCompare self.length) <= 0) thatSeq.length else self.length
-    def apply(idx: Int) = (self.apply(idx), thatSeq.apply(idx))
+    def apply(idx: Int): (A, B) = (self.apply(idx), thatSeq.apply(idx))
   }
 
   trait ZippedAll[A1 >: A, B] extends super.ZippedAll[A1, B] with Transformed[(A1, B)] {
     protected[this] lazy val thatSeq = other.seq.toSeq
     def length: Int = self.length max thatSeq.length
-    def apply(idx: Int) =
+    def apply(idx: Int): (A1, B) =
       (if (idx < self.length) self.apply(idx) else thisElem,
        if (idx < thatSeq.length) thatSeq.apply(idx) else thatElem)
   }

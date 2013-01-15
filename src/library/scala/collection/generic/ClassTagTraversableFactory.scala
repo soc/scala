@@ -11,6 +11,7 @@ package generic
 
 import scala.language.higherKinds
 import scala.reflect.ClassTag
+import mutable.Builder
 
 /** A template for companion objects of `ClassTagTraversable` and
  *  subclasses thereof.
@@ -26,7 +27,7 @@ abstract class ClassTagTraversableFactory[CC[X] <: Traversable[X] with GenericCl
               extends GenericClassTagCompanion[CC] {
 
   class GenericCanBuildFrom[A](implicit tag: ClassTag[A]) extends CanBuildFrom[CC[_], A, CC[A]] {
-    def apply(from: CC[_]) = from.genericClassTagBuilder[A]
-    def apply = newBuilder[A]
+    def apply(from: CC[_]): Builder[A, CC[A]] = from.genericClassTagBuilder[A]
+    def apply: Builder[A, CC[A]] = newBuilder[A]
   }
 }

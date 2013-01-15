@@ -3094,6 +3094,7 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
     override def isLocalClass            = true
     override def hasMeaninglessName      = true
     override def companionModule: Symbol = NoSymbol
+    // override def owner = util.Origins("RefinementClassSymbol#owner")(super.owner)
 
     /** The mentioned twist.  A refinement class has transowner X
      *  if any of its parents has transowner X.
@@ -3244,6 +3245,18 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
     deriveSymbols(syms, _.cloneSymbol)
   def cloneSymbolsAtOwner(syms: List[Symbol], owner: Symbol): List[Symbol] =
     deriveSymbols(syms, _ cloneSymbol owner)
+
+  def cloneScopeInType(decls: Scope, from: Type, result: Type): Type = {
+    decls foreach (sym =>
+      result.decls enter (sym cloneSymbol result.typeSymbol)
+    )
+    result.decls foreach (sym =>
+      sym modifyInfo (info =>
+        info.substThisAndScope(from.typeSymbol, result.typeSymbol.thisType, decls, result.decls)
+      )
+    )
+    result
+  }
 
   /** Clone symbols and apply the given function to each new symbol's info.
    *

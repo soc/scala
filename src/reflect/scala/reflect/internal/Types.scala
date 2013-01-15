@@ -787,6 +787,10 @@ trait Types extends api.Types { self: SymbolTable =>
       if (symsFrom eq symsTo) substThis(from, to)
       else substThis(from, to).substSym(symsFrom, symsTo)
 
+    def substThisAndScope(from: Symbol, to: Type, scopeFrom: Scope, scopeTo: Scope): Type =
+      if (scopeFrom eq scopeTo) substThis(from, to)
+      else substThis(from, to).substSym(scopeFrom.toList, scopeTo.toList)
+
     /** Returns all parts of this type which satisfy predicate `p` */
     def withFilter(p: Type => Boolean) = new FilterMapForeach(p)
 
@@ -1751,8 +1755,11 @@ trait Types extends api.Types { self: SymbolTable =>
    *  Cannot be created directly;
    *  one should always use `refinedType` for creation.
    */
-  case class RefinedType(override val parents: List[Type],
-                         override val decls: Scope) extends CompoundType with RefinedTypeApi {
+  case class RefinedType(override val parents: List[Type], override val decls: Scope) extends CompoundType with RefinedTypeApi {
+    if (parents exists isPureIntersection) {
+      devWarning(s"Refined Type is not flattened: parents=" + parents.map(util.shortClassOfInstance))
+    }
+    // assert(parents forall (p => !isPureIntersection(p)), parents)
 
     override def isHigherKinded = (
       parents.nonEmpty &&
@@ -1776,28 +1783,15 @@ trait Types extends api.Types { self: SymbolTable =>
       }
 
     private var normalized: Type = _
-    private def normalizeImpl = {
-      // TODO see comments around def intersectionType and def merge
-      def flatten(tps: List[Type]): List[Type] = tps flatMap { case RefinedType(parents, ds) if ds.isEmpty => flatten(parents) case tp => List(tp) }
-      val flattened = flatten(parents).distinct
-      if (decls.isEmpty && flattened.tail.isEmpty) {
-        flattened.head
-      } else if (flattened != parents) {
-        refinedType(flattened, if (typeSymbol eq NoSymbol) NoSymbol else typeSymbol.owner, decls, NoPosition)
-      } else if (isHigherKinded) {
-        // MO to AM: This is probably not correct
-        // If they are several higher-kinded parents with different bounds we need
-        // to take the intersection of their bounds
-        typeFun(
-          typeParams,
-          RefinedType(
-            parents map {
-              case TypeRef(pre, sym, List()) => TypeRef(pre, sym, dummyArgs)
-              case p => p
-            },
-            decls,
-            typeSymbol))
-      } else super.normalize
+
+    // TODO see comments around def intersectionType and def merge
+    // MO to AM: This is probably not correct
+    // If they are several higher-kinded parents with different bounds we need
+    // to take the intersection of their bounds
+    private def normalizeImpl = parents match {
+      case p :: Nil if decls.isEmpty => p
+      case _ if isHigherKinded       => typeFun(typeParams, RefinedType(parents map (p => appliedType(p, dummyArgs)), decls, typeSymbol))
+      case _                         => super.normalize
     }
 
     /** A refined type P1 with ... with Pn { decls } is volatile if
@@ -1835,7 +1829,7 @@ trait Types extends api.Types { self: SymbolTable =>
 
   object RefinedType extends RefinedTypeExtractor {
     def apply(parents: List[Type], decls: Scope, clazz: Symbol): RefinedType =
-      new RefinedType0(parents, decls, clazz)
+      new RefinedType0(flattenedParents(parents), decls, clazz)
   }
 
   /** Overridden in reflection compiler */
@@ -3475,11 +3469,20 @@ trait Types extends api.Types { self: SymbolTable =>
   def refinedType(parents: List[Type], owner: Symbol, decls: Scope, pos: Position): Type = {
     if (phase.erasedTypes)
       if (parents.isEmpty) ObjectClass.tpe else parents.head
-    else {
-      val clazz = owner.newRefinementClass(pos) // TODO: why were we passing in NoPosition instead of pos?
-      val result = RefinedType(parents, decls, clazz)
-      clazz.setInfo(result)
-      result
+    else flattenedParents(parents) match {
+      case `parents` =>
+        if ((owner ne NoSymbol) && !owner.isPackageClass && parents.tail.nonEmpty) {
+          val parents_s = parents.mkString(" with ")
+          val owner_s = owner.ownerChain.takeWhile(!_.isPackageClass).mkString("\n  -> ")
+          // parents1 foreach (p => devWarning(s"  $p / ${p.typeSymbol.fullName} (${util.shortClassOfInstance(p)})"))
+          devWarning(s"For $parents_s, refinement owner is $owner_s")
+        }
+        val clazz = owner.newRefinementClass(pos) // TODO: why were we passing in NoPosition instead of pos?
+        val result = RefinedType(parents, decls, clazz)
+        clazz.setInfo(result)
+        result
+      case parents1 =>
+        refinedType(parents1, owner, decls, pos)
     }
   }
 
@@ -3493,15 +3496,7 @@ trait Types extends api.Types { self: SymbolTable =>
     else {
       val owner = if (original.typeSymbol == NoSymbol) NoSymbol else original.typeSymbol.owner
       val result = refinedType(parents, owner)
-      val syms1 = decls.toList
-      for (sym <- syms1)
-        result.decls.enter(sym.cloneSymbol(result.typeSymbol))
-      val syms2 = result.decls.toList
-      val resultThis = result.typeSymbol.thisType
-      for (sym <- syms2)
-        sym modifyInfo (_ substThisAndSym(original.typeSymbol, resultThis, syms1, syms2))
-
-      result
+      cloneScopeInType(decls, original, result)
     }
 
   /** The canonical creator for typerefs
@@ -4809,7 +4804,11 @@ trait Types extends api.Types { self: SymbolTable =>
   /** The most deeply nested owner that contains all the symbols
    *  of thistype or prefixless typerefs/singletype occurrences in given type.
    */
-  private def commonOwner(t: Type): Symbol = commonOwner(t :: Nil)
+  private def commonOwner(t: Type): Symbol = t match {
+    case RefinedType(parents, decls) if decls.isEmpty => commonOwner(parents)
+    case _                                            => commonOwner(t :: Nil)
+  }
+
 
   /** The most deeply nested owner that contains all the symbols
    *  of thistype or prefixless typerefs/singletype occurrences in given list
@@ -4819,7 +4818,7 @@ trait Types extends api.Types { self: SymbolTable =>
     if (tps.isEmpty) NoSymbol
     else {
       commonOwnerMap.clear()
-      tps foreach (commonOwnerMap traverse _)
+      tps filterNot (t => excludeFromCommonOwner(t.typeSymbol)) foreach (commonOwnerMap traverse _)
       if (commonOwnerMap.result ne null) commonOwnerMap.result else NoSymbol
     }
   }
@@ -4839,11 +4838,13 @@ trait Types extends api.Types { self: SymbolTable =>
         while ((result ne NoSymbol) && (result ne sym) && !(sym isNestedIn result))
           result = result.owner
     }
-    def traverse(tp: Type) = tp.normalize match {
-      case ThisType(sym)                => register(sym)
-      case TypeRef(NoPrefix, sym, args) => register(sym.owner) ; args foreach traverse
-      case SingleType(NoPrefix, sym)    => register(sym.owner)
-      case _                            => mapOver(tp)
+
+    def traverse(tp: Type) = tp.dealias match {
+      case ThisType(sym)                                     => register(sym)
+      case TypeRef(_, sym, _) if excludeFromCommonOwner(sym) => // don't want these types messing up our commonality
+      case TypeRef(NoPrefix, sym, args)                      => register(sym.owner) ; args foreach traverse
+      case SingleType(NoPrefix, sym)                         => register(sym.owner)
+      case _                                                 => mapOver(tp)
     }
   }
 
@@ -6251,7 +6252,7 @@ trait Types extends api.Types { self: SymbolTable =>
 
   /** Eliminate from list of types all elements which are a supertype
    *  of some other element of the list. */
-  private def elimSuper(ts: List[Type]): List[Type] = ts match {
+  def elimSuper(ts: List[Type]): List[Type] = ts match {
     case List() => List()
     case List(t) => List(t)
     case t :: ts1 =>

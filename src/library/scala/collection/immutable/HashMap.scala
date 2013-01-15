@@ -41,7 +41,7 @@ class HashMap[A, +B] extends AbstractMap[A, B]
 {
   override def size: Int = 0
 
-  override def empty = HashMap.empty[A, B]
+  override def empty: HashMap[A, B] = HashMap.empty[A, B]
 
   def iterator: Iterator[(A,B)] = Iterator.empty
 
@@ -107,7 +107,7 @@ class HashMap[A, +B] extends AbstractMap[A, B]
 
   protected def merge0[B1 >: B](that: HashMap[A, B1], level: Int, merger: Merger[A, B1]): HashMap[A, B1] = that
 
-  override def par = ParHashMap.fromTrie(this)
+  override def par: ParHashMap[A, B] = ParHashMap.fromTrie(this)
 
 }
 

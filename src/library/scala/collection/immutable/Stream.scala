@@ -967,7 +967,7 @@ self =>
     else flatten1(asTraversable(head).seq.toTraversable)
   }
 
-  override def view = new StreamView[A, Stream[A]] {
+  override def view: StreamView[A, Stream[A]] = new StreamView[A, Stream[A]] {
     protected lazy val underlying = self.repr
     override def iterator = self.iterator
     override def length = self.length

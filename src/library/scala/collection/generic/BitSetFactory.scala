@@ -30,7 +30,7 @@ trait BitSetFactory[Coll <: BitSet with BitSetLike[Coll]] {
   def empty: Coll
   def newBuilder: Builder[Int, Coll]
   def apply(elems: Int*): Coll = (empty /: elems) (_ + _)
-  def bitsetCanBuildFrom = new CanBuildFrom[Coll, Int, Coll] {
+  def bitsetCanBuildFrom: CanBuildFrom[Coll, Int, Coll] = new CanBuildFrom[Coll, Int, Coll] {
     def apply(from: Coll) = newBuilder
     def apply() = newBuilder
   }

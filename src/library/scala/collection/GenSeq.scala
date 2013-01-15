@@ -8,9 +8,8 @@
 
 package scala.collection
 
-
 import generic._
-
+import mutable.Builder
 
 /** A trait for all sequences which may possibly
  *  have their operations implemented in parallel.
@@ -31,6 +30,6 @@ extends GenSeqLike[A, GenSeq[A]]
 
 
 object GenSeq extends GenTraversableFactory[GenSeq] {
-  implicit def canBuildFrom[A] = ReusableCBF.asInstanceOf[GenericCanBuildFrom[A]]
-  def newBuilder[A] = Seq.newBuilder
+  implicit def canBuildFrom[A] : GenericCanBuildFrom[A] = ReusableCBF.asInstanceOf[GenericCanBuildFrom[A]]
+  def newBuilder[A] : Builder[A, GenSeq[A]] = Seq.newBuilder
 }

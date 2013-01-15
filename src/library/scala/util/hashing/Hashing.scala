@@ -28,12 +28,12 @@ trait Hashing[T] extends Serializable {
 
 object Hashing {
   final class Default[T] extends Hashing[T] {
-    def hash(x: T) = x.##
+    def hash(x: T): Int = x.##
   }
 
-  implicit def default[T] = new Default[T]
+  implicit def default[T] : Default[T] = new Default[T]
 
-  def fromFunction[T](f: T => Int) = new Hashing[T] {
+  def fromFunction[T](f: T => Int): Hashing[T] = new Hashing[T] {
     def hash(x: T) = f(x)
   }
 }

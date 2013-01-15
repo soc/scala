@@ -632,7 +632,7 @@ trait SeqLike[+A, +Repr] extends Any with IterableLike[A, Repr] with GenSeqLike[
    */
   def indices: Range = 0 until length
 
-  override def view = new SeqView[A, Repr] {
+  override def view: SeqView[A, Repr] = new SeqView[A, Repr] {
     protected lazy val underlying = self.repr
     override def iterator = self.iterator
     override def length = self.length
@@ -660,7 +660,7 @@ object SeqLike {
    *  @param  n1   The far end of the target sequence that we should use (exclusive)
    *  @return Target packed in an IndexedSeq (taken from iterator unless W already is an IndexedSeq)
    */
-  private def kmpOptimizeWord[B](W: Seq[B], n0: Int, n1: Int, forward: Boolean) = W match {
+  private def kmpOptimizeWord[B](W: Seq[B], n0: Int, n1: Int, forward: Boolean): IndexedSeq[B] = W match {
     case iso: IndexedSeq[_] =>
       // Already optimized for indexing--use original (or custom view of original)
       if (forward && n0==0 && n1==W.length) iso.asInstanceOf[IndexedSeq[B]]

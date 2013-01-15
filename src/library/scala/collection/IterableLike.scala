@@ -171,7 +171,7 @@ self =>
    *          fewer elements than size.
    */
   def sliding(size: Int): Iterator[Repr] = sliding(size, 1)
-  
+
   /** Groups elements in fixed size blocks by passing a "sliding window"
    *  over them (as opposed to partitioning them, as is done in grouped.)
    *  @see [[scala.collection.Iterator]], method `sliding`
@@ -291,7 +291,7 @@ self =>
    */
   override /*TraversableLike*/ def canEqual(that: Any) = true
 
-  override /*TraversableLike*/ def view = new IterableView[A, Repr] {
+  override /*TraversableLike*/ def view: IterableView[A, Repr] = new IterableView[A, Repr] {
     protected lazy val underlying = self.repr
     override def iterator = self.iterator
   }

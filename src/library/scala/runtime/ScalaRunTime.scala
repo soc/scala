@@ -146,7 +146,7 @@ object ScalaRunTime {
       dest
   }
 
-  def toArray[T](xs: scala.collection.Seq[T]) = {
+  def toArray[T](xs: scala.collection.Seq[T]): Array[AnyRef] = {
     val arr = new Array[AnyRef](xs.length)
     var i = 0
     for (x <- xs) {

@@ -26,7 +26,7 @@ trait BitSet extends SortedSet[Int]
  */
 object BitSet extends BitSetFactory[BitSet] {
   val empty: BitSet = immutable.BitSet.empty
-  def newBuilder = immutable.BitSet.newBuilder
+  def newBuilder: mutable.Builder[Int, BitSet] = immutable.BitSet.newBuilder
 
   /** $canBuildFromInfo */
   implicit def canBuildFrom: CanBuildFrom[BitSet, Int, BitSet] = bitsetCanBuildFrom

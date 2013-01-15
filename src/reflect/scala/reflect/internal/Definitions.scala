@@ -626,7 +626,7 @@ trait Definitions extends api.StandardDefinitions {
         len <= MaxTupleArity && sym == TupleClass(len)
       case _ => false
     }
-    def isTupleType(tp: Type) = isTupleTypeDirect(tp.normalize)
+    def isTupleType(tp: Type) = isTupleTypeDirect(tp.dealias)
 
     lazy val ProductRootClass: ClassSymbol = requiredClass[scala.Product]
       def Product_productArity          = getMemberMethod(ProductRootClass, nme.productArity)
@@ -648,7 +648,7 @@ trait Definitions extends api.StandardDefinitions {
       case _                         => tp
     }
 
-    def unapplyUnwrap(tpe:Type) = tpe.finalResultType.normalize match {
+    def unapplyUnwrap(tpe:Type) = tpe.finalResultType.dealias match {
       case RefinedType(p :: _, _) => p.normalize
       case tp                     => tp
     }
@@ -657,7 +657,7 @@ trait Definitions extends api.StandardDefinitions {
       if (isFunctionType(tp)) abstractFunctionType(tp.typeArgs.init, tp.typeArgs.last)
       else NoType
 
-    def isFunctionType(tp: Type): Boolean = tp.normalize match {
+    def isFunctionType(tp: Type): Boolean = tp.dealias match {
       case TypeRef(_, sym, args) if args.nonEmpty =>
         val arity = args.length - 1   // -1 is the return type
         arity <= MaxFunctionArity && sym == FunctionClass(arity)
@@ -786,15 +786,39 @@ trait Definitions extends api.StandardDefinitions {
     }
 
     /** The following transformations applied to a list of parents.
-     *  If any parent is a class/trait, all parents which normalize to
-     *  Object are discarded.  Otherwise, all parents which normalize
+     *  If any parent is a class/trait, all parents which dealias to
+     *  Object are discarded.  Otherwise, all parents which dealias
      *  to Object except the first one found are discarded.
      */
     def normalizedParents(parents: List[Type]): List[Type] = {
-      if (parents exists (t => (t.typeSymbol ne ObjectClass) && t.typeSymbol.isClass))
+      if (parents exists (t => (t.typeSymbol ne ObjectClass) && t.typeSymbol.isClass && (t.typeSymbol isSubClass ObjectClass)))
         parents filterNot (_.typeSymbol eq ObjectClass)
       else
         removeRedundantObjects(parents)
+    }
+    lazy val excludeFromCommonOwner = Set[Symbol](
+      SingletonClass, SerializableClass,
+      JavaSerializableClass, ProductRootClass,
+      ObjectClass, AnyRefClass
+    )
+
+    def flattenedParents(parents: List[Type]): List[Type] = {
+      def isFlattenable(tp: Type) = tp match {
+        case RefinedType(ps, decls) => decls.isEmpty
+        case TypeRef(_, sym, _)     => sym.isRefinementClass && sym.info.decls.isEmpty
+        case _                      => false
+      }
+      def loop(in: List[Type], out: List[Type]): List[Type] = in match {
+        case Nil                         => out.reverse
+        case p :: ps if out contains p   => loop(ps, out)
+        case p :: ps if isFlattenable(p) => loop(p.parents ::: ps, out)
+        case p :: ps                     => loop(ps, p :: out)
+      }
+      loop(parents.distinct, Nil)
+    }
+    def isPureIntersection(tp: Type) = tp match {
+      case RefinedType(_, decls) => decls.isEmpty
+      case _                     => false
     }
 
     /** Flatten curried parameter lists of a method type. */

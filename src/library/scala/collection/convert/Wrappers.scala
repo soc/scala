@@ -27,7 +27,7 @@ private[collection] trait Wrappers {
 
   case class IteratorWrapper[A](underlying: Iterator[A]) extends ju.Iterator[A] with ju.Enumeration[A] {
     def hasNext = underlying.hasNext
-    def next() = underlying.next
+    def next(): A = underlying.next
     def hasMoreElements = underlying.hasNext
     def nextElement() = underlying.next
     def remove() = throw new UnsupportedOperationException
@@ -39,12 +39,12 @@ private[collection] trait Wrappers {
 
   case class JIteratorWrapper[A](underlying: ju.Iterator[A]) extends AbstractIterator[A] with Iterator[A] {
     def hasNext = underlying.hasNext
-    def next() = underlying.next
+    def next(): A = underlying.next
   }
 
   case class JEnumerationWrapper[A](underlying: ju.Enumeration[A]) extends AbstractIterator[A] with Iterator[A] {
     def hasNext = underlying.hasMoreElements
-    def next() = underlying.nextElement
+    def next(): A = underlying.nextElement
   }
 
   case class IterableWrapper[A](underlying: Iterable[A]) extends ju.AbstractCollection[A] with IterableWrapperTrait[A] { }
@@ -102,14 +102,13 @@ private[collection] trait Wrappers {
   }
 
   class SetWrapper[A](underlying: Set[A]) extends ju.AbstractSet[A] {
-    self =>
     def size = underlying.size
-    def iterator = new ju.Iterator[A] {
+    def iterator: ju.Iterator[A] = new ju.Iterator[A] {
       val ui = underlying.iterator
       var prev: Option[A] = None
       def hasNext = ui.hasNext
-      def next = { val e = ui.next; prev = Some(e); e }
-      def remove = prev match {
+      def next(): A = { val e = ui.next; prev = Some(e); e }
+      def remove: Unit = prev match {
         case Some(e) =>
           underlying match {
             case ms: mutable.Set[a] =>
@@ -151,10 +150,10 @@ private[collection] trait Wrappers {
     override def remove(elem: A): Boolean = underlying remove elem
     override def clear() = underlying.clear()
 
-    override def empty = JSetWrapper(new ju.HashSet[A])
+    override def empty: JSetWrapper[A] = JSetWrapper(new ju.HashSet[A])
     // Note: Clone cannot just call underlying.clone because in Java, only specific collections
     // expose clone methods.  Generically, they're protected.
-    override def clone() =
+    override def clone(): JSetWrapper[A] =
       new JSetWrapper[A](new ju.LinkedHashSet[A](underlying))
   }
 
@@ -173,13 +172,13 @@ private[collection] trait Wrappers {
     override def entrySet: ju.Set[ju.Map.Entry[A, B]] = new ju.AbstractSet[ju.Map.Entry[A, B]] {
       def size = self.size
 
-      def iterator = new ju.Iterator[ju.Map.Entry[A, B]] {
+      def iterator: ju.Iterator[ju.Map.Entry[A, B]] = new ju.Iterator[ju.Map.Entry[A, B]] {
         val ui = underlying.iterator
         var prev : Option[A] = None
 
         def hasNext = ui.hasNext
 
-        def next() = {
+        def next(): ju.Map.Entry[A, B] = {
           val (k, v) = ui.next
           prev = Some(k)
           new ju.Map.Entry[A, B] {
@@ -264,7 +263,7 @@ private[collection] trait Wrappers {
     def iterator: Iterator[(A, B)] = new AbstractIterator[(A, B)] {
       val ui = underlying.entrySet.iterator
       def hasNext = ui.hasNext
-      def next() = { val e = ui.next(); (e.getKey, e.getValue) }
+      def next(): (A, B) = { val e = ui.next(); (e.getKey, e.getValue) }
     }
 
     override def clear() = underlying.clear()
@@ -327,7 +326,7 @@ private[collection] trait Wrappers {
       else None
     }
 
-    override def empty = new JConcurrentMapDeprecatedWrapper(new juc.ConcurrentHashMap[A, B])
+    override def empty: JConcurrentMapDeprecatedWrapper[A, B] = new JConcurrentMapDeprecatedWrapper(new juc.ConcurrentHashMap[A, B])
 
     def putIfAbsent(k: A, v: B): Option[B] = {
       val r = underlying.putIfAbsent(k, v)
@@ -352,7 +351,7 @@ private[collection] trait Wrappers {
       else None
     }
 
-    override def empty = new JConcurrentMapWrapper(new juc.ConcurrentHashMap[A, B])
+    override def empty: JConcurrentMapWrapper[A, B] = new JConcurrentMapWrapper(new juc.ConcurrentHashMap[A, B])
 
     def putIfAbsent(k: A, v: B): Option[B] = {
       val r = underlying.putIfAbsent(k, v)
@@ -454,7 +453,7 @@ private[collection] trait Wrappers {
     def iterator: Iterator[(String, String)] = new AbstractIterator[(String, String)] {
       val ui = underlying.entrySet.iterator
       def hasNext = ui.hasNext
-      def next() = {
+      def next(): (String, String) = {
         val e = ui.next()
         (e.getKey.asInstanceOf[String], e.getValue.asInstanceOf[String])
       }

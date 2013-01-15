@@ -301,7 +301,7 @@ self: ParIterableLike[T, Repr, Sequential] =>
   }
 
   /* convenience task operations wrapper */
-  protected implicit def task2ops[R, Tp](tsk: SSCTask[R, Tp]) = new TaskOps[R, Tp] {
+  protected implicit def task2ops[R, Tp](tsk: SSCTask[R, Tp]): TaskOps[R, Tp] = new TaskOps[R, Tp] {
     def mapResult[R1](mapping: R => R1): ResultMapping[R, Tp, R1] = new ResultMapping[R, Tp, R1](tsk) {
       def map(r: R): R1 = mapping(r)
     }
@@ -315,20 +315,20 @@ self: ParIterableLike[T, Repr, Sequential] =>
     }
   }
 
-  protected def wrap[R](body: => R) = new NonDivisible[R] {
+  protected def wrap[R](body: => R): NonDivisible[R] = new NonDivisible[R] {
     def leaf(prevr: Option[R]) = result = body
     @volatile var result: R = null.asInstanceOf[R]
   }
 
   /* convenience signalling operations wrapper */
-  protected implicit def delegatedSignalling2ops[PI <: DelegatedSignalling](it: PI) = new SignallingOps[PI] {
+  protected implicit def delegatedSignalling2ops[PI <: DelegatedSignalling](it: PI): SignallingOps[PI] = new SignallingOps[PI] {
     def assign(cntx: Signalling): PI = {
       it.signalDelegate = cntx
       it
     }
   }
 
-  protected implicit def builder2ops[Elem, To](cb: Builder[Elem, To]) = new BuilderOps[Elem, To] {
+  protected implicit def builder2ops[Elem, To](cb: Builder[Elem, To]): BuilderOps[Elem, To] = new BuilderOps[Elem, To] {
     def ifIs[Cmb](isbody: Cmb => Unit) = new Otherwise[Cmb] {
       def otherwise(notbody: => Unit)(implicit t: ClassTag[Cmb]) {
         if (cb.getClass == t.runtimeClass) isbody(cb.asInstanceOf[Cmb]) else notbody
@@ -338,12 +338,12 @@ self: ParIterableLike[T, Repr, Sequential] =>
     def asCombiner = cb.asInstanceOf[Combiner[Elem, To]]
   }
 
-  protected[this] def bf2seq[S, That](bf: CanBuildFrom[Repr, S, That]) = new CanBuildFrom[Sequential, S, That] {
+  protected[this] def bf2seq[S, That](bf: CanBuildFrom[Repr, S, That]): CanBuildFrom[Sequential, S, That] = new CanBuildFrom[Sequential, S, That] {
     def apply(from: Sequential) = bf.apply(from.par.asInstanceOf[Repr]) // !!! we only use this on `this.seq`, and know that `this.seq.par.getClass == this.getClass`
     def apply() = bf.apply()
   }
 
-  protected[this] def sequentially[S, That <: Parallel](b: Sequential => Parallelizable[S, That]) = b(seq).par.asInstanceOf[Repr]
+  protected[this] def sequentially[S, That <: Parallel](b: Sequential => Parallelizable[S, That]): Repr = b(seq).par.asInstanceOf[Repr]
 
   def mkString(start: String, sep: String, end: String): String = seq.mkString(start, sep, end)
 
@@ -564,7 +564,7 @@ self: ParIterableLike[T, Repr, Sequential] =>
    *  concurrent parallel collections, the combiners of which allow
    *  thread safe access.
    */
-  protected[this] def combinerFactory = {
+  protected[this] def combinerFactory: CombinerFactory[T, Repr] = {
     val combiner = newCombiner
     combiner.combinerTaskSupport = tasksupport
     if (combiner.canBeShared) new CombinerFactory[T, Repr] {
@@ -577,7 +577,7 @@ self: ParIterableLike[T, Repr, Sequential] =>
     }
   }
 
-  protected[this] def combinerFactory[S, That](cbf: () => Combiner[S, That]) = {
+  protected[this] def combinerFactory[S, That](cbf: () => Combiner[S, That]): CombinerFactory[S, That] = {
     val combiner = cbf()
     combiner.combinerTaskSupport = tasksupport
     if (combiner.canBeShared) new CombinerFactory[S, That] {
@@ -842,7 +842,7 @@ self: ParIterableLike[T, Repr, Sequential] =>
     tasksupport.executeAndWaitResult(new ToParMap(combinerFactory(cbf), splitter)(ev) mapResult { _.resultWithTaskSupport })
   }
 
-  def view = new ParIterableView[T, Repr, Sequential] {
+  def view: ParIterableView[T, Repr, Sequential] = new ParIterableView[T, Repr, Sequential] {
     protected lazy val underlying = self.repr
     protected[this] def viewIdentifier = ""
     protected[this] def viewIdString = ""

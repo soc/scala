@@ -21,7 +21,7 @@ import mutable.{ ListBuffer, Builder }
 object ListSet extends ImmutableSetFactory[ListSet] {
   /** setCanBuildFromInfo */
   implicit def canBuildFrom[A]: CanBuildFrom[Coll, A, ListSet[A]] = setCanBuildFrom[A]
-  override def empty[A] = EmptyListSet.asInstanceOf[ListSet[A]]
+  override def empty[A]: ListSet[A] = EmptyListSet.asInstanceOf[ListSet[A]]
   override def newBuilder[A]: Builder[A, ListSet[A]] = new ListSetBuilder[A]
 
   private object EmptyListSet extends ListSet[Any] { }

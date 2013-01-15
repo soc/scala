@@ -209,9 +209,7 @@ trait AdaptiveWorkStealingTasks extends Tasks {
 
   // specialize ctor
   protected def newWrappedTask[R, Tp](b: Task[R, Tp]): WrappedTask[R, Tp]
-
 }
-
 
 /** An implementation of tasks objects based on the Java thread pooling API. */
 trait ThreadPoolTasks extends Tasks {
@@ -505,7 +503,7 @@ trait AdaptiveWorkStealingForkJoinTasks extends ForkJoinTasks with AdaptiveWorkS
     def split = body.split.map(b => newWrappedTask(b))
   }
 
-  def newWrappedTask[R, Tp](b: Task[R, Tp]) = new WrappedTask[R, Tp](b)
+  def newWrappedTask[R, Tp](b: Task[R, Tp]): WrappedTask[R, Tp] = new WrappedTask[R, Tp](b)
 
 }
 
@@ -517,7 +515,7 @@ trait AdaptiveWorkStealingThreadPoolTasks extends ThreadPoolTasks with AdaptiveW
     def split = body.split.map(b => newWrappedTask(b))
   }
 
-  def newWrappedTask[R, Tp](b: Task[R, Tp]) = new WrappedTask[R, Tp](b)
+  def newWrappedTask[R, Tp](b: Task[R, Tp]): WrappedTask[R, Tp] = new WrappedTask[R, Tp](b)
 
 }
 

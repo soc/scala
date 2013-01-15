@@ -29,7 +29,7 @@ abstract class BitSet extends scala.collection.AbstractSet[Int]
                          with scala.collection.BitSet
                          with BitSetLike[BitSet]
                          with Serializable {
-  override def empty = BitSet.empty
+  override def empty: BitSet = BitSet.empty
 
   @deprecated("Use BitSet.fromBitMask[NoCopy] instead of fromArray", "2.10.0")
   def fromArray(elems: Array[Long]): BitSet = fromBitMaskNoCopy(elems)

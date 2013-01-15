@@ -6,7 +6,8 @@
 **                          |/                                          **
 \*                                                                      */
 
-package scala.collection.parallel
+package scala.collection
+package parallel
 
 import scala.collection.{ Parallel, SeqView, SeqViewLike, GenSeqView, GenSeqViewLike, GenSeq }
 import scala.collection.{ GenIterable, GenTraversable, GenTraversableOnce, Iterator }
@@ -42,19 +43,19 @@ self =>
   trait Transformed[+S] extends ParSeqView[S, Coll, CollSeq]
   with super[ParIterableView].Transformed[S] with super[GenSeqViewLike].Transformed[S] {
     override def splitter: SeqSplitter[S]
-    override def iterator = splitter
+    override def iterator = splitter // scala.collection.parallel.IterableSplitter[S] = splitter
     override def size = length
   }
 
   trait Sliced extends super[GenSeqViewLike].Sliced with super[ParIterableViewLike].Sliced with Transformed[T] {
     // override def slice(from1: Int, until1: Int): This = newSliced(from1 max 0, until1 max 0).asInstanceOf[This]
-    override def splitter = self.splitter.psplit(from, until - from)(1)
-    override def seq = self.seq.slice(from, until)
+    override def splitter: SeqSplitter[T] = self.splitter.psplit(from, until - from)(1)
+    override def seq: ThisSeq = self.seq.slice(from, until)
   }
 
   trait Mapped[S] extends super[GenSeqViewLike].Mapped[S] with super[ParIterableViewLike].Mapped[S] with Transformed[S] {
-    override def splitter = self.splitter.map(mapping)
-    override def seq = self.seq.map(mapping).asInstanceOf[SeqView[S, CollSeq]]
+    override def splitter: SeqSplitter[S] = self.splitter.map(mapping)
+    override def seq: SeqView[S, CollSeq] = self.seq.map(mapping).asInstanceOf[SeqView[S, CollSeq]]
   }
 
   trait Appended[U >: T] extends super[GenSeqViewLike].Appended[U] with super[ParIterableViewLike].Appended[U] with Transformed[U] {

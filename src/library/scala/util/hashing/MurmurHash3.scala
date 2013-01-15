@@ -213,37 +213,37 @@ object MurmurHash3 extends MurmurHash3 {
 
   /** To offer some potential for optimization.
    */
-  def seqHash(xs: scala.collection.Seq[_]): Int    = xs match {
+  def seqHash(xs: scala.collection.Seq[_]): Int = xs match {
     case xs: List[_] => listHash(xs, seqSeed)
-    case xs => orderedHash(xs, seqSeed)
+    case xs          => orderedHash(xs, seqSeed)
   }
 
   def mapHash(xs: scala.collection.Map[_, _]): Int = unorderedHash(xs, mapSeed)
   def setHash(xs: scala.collection.Set[_]): Int    = unorderedHash(xs, setSeed)
 
   class ArrayHashing[@specialized T] extends Hashing[Array[T]] {
-    def hash(a: Array[T]) = arrayHash(a)
+    def hash(a: Array[T]): Int = arrayHash(a)
   }
 
-  def arrayHashing[@specialized T] = new ArrayHashing[T]
+  def arrayHashing[@specialized T]: ArrayHashing[T] = new ArrayHashing[T]
 
-  def bytesHashing = new Hashing[Array[Byte]] {
-    def hash(data: Array[Byte]) = bytesHash(data)
+  def bytesHashing: Hashing[Array[Byte]] = new Hashing[Array[Byte]] {
+    def hash(data: Array[Byte]): Int = bytesHash(data)
   }
 
-  def orderedHashing = new Hashing[TraversableOnce[Any]] {
-    def hash(xs: TraversableOnce[Any]) = orderedHash(xs)
+  def orderedHashing: Hashing[TraversableOnce[Any]] = new Hashing[TraversableOnce[Any]] {
+    def hash(xs: TraversableOnce[Any]): Int = orderedHash(xs)
   }
 
-  def productHashing = new Hashing[Product] {
-    def hash(x: Product) = productHash(x)
+  def productHashing: Hashing[Product] = new Hashing[Product] {
+    def hash(x: Product): Int = productHash(x)
   }
 
-  def stringHashing = new Hashing[String] {
-    def hash(x: String) = stringHash(x)
+  def stringHashingHashing: Hashing[String] = new Hashing[String] {
+    def hash(x: String): Int = stringHash(x)
   }
 
-  def unorderedHashing = new Hashing[TraversableOnce[Any]] {
+  def unorderedHashing: Hashing[TraversableOnce[Any]] = new Hashing[TraversableOnce[Any]] {
     def hash(xs: TraversableOnce[Any]) = unorderedHash(xs)
   }
 

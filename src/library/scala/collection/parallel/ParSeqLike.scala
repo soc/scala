@@ -322,7 +322,7 @@ self =>
 
   override def toSeq = this.asInstanceOf[ParSeq[T]]
 
-  override def view = new ParSeqView[T, Repr, Sequential] {
+  override def view: ParSeqView[T, Repr, Sequential] = new ParSeqView[T, Repr, Sequential] {
     protected lazy val underlying = self.repr
     protected[this] def viewIdentifier = ""
     protected[this] def viewIdString = ""
