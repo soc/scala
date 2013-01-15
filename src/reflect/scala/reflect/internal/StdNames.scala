@@ -200,7 +200,6 @@ trait StdNames {
     protected implicit def createNameType(name: String): TypeName = newTypeNameCached(name)
 
     final val BYNAME_PARAM_CLASS_NAME: NameType        = "<byname>"
-    final val EQUALS_PATTERN_NAME: NameType            = "<equals>"
     final val JAVA_REPEATED_PARAM_CLASS_NAME: NameType = "<repeated...>"
     final val LOCAL_CHILD: NameType                    = "<local child>"
     final val REFINE_CLASS_NAME: NameType              = "<refinement>"
@@ -640,8 +639,6 @@ trait StdNames {
     val newFreeType: NameType          = "newFreeType"
     val newNestedSymbol: NameType      = "newNestedSymbol"
     val newScopeWith: NameType         = "newScopeWith"
-    val nmeNewTermName: NameType       = "newTermName"
-    val nmeNewTypeName: NameType       = "newTypeName"
     val notifyAll_ : NameType          = "notifyAll"
     val notify_ : NameType             = "notify"
     val null_ : NameType               = "null"
@@ -672,6 +669,7 @@ trait StdNames {
     val staticModule : NameType        = "staticModule"
     val staticPackage : NameType       = "staticPackage"
     val synchronized_ : NameType       = "synchronized"
+    val TermName: NameType             = "TermName"
     val this_ : NameType               = "this"
     val thisPrefix : NameType          = "thisPrefix"
     val toArray: NameType              = "toArray"
@@ -682,6 +680,7 @@ trait StdNames {
     val tree : NameType                = "tree"
     val true_ : NameType               = "true"
     val typedProductIterator: NameType = "typedProductIterator"
+    val TypeName: NameType             = "TypeName"
     val typeTagToManifest: NameType    = "typeTagToManifest"
     val unapply: NameType              = "unapply"
     val unapplySeq: NameType           = "unapplySeq"

@@ -104,7 +104,6 @@ trait ScalaSettings extends AbsScalaSettings
   val showPhases    = BooleanSetting    ("-Xshow-phases", "Print a synopsis of compiler phases.")
   val sourceReader  = StringSetting     ("-Xsource-reader", "classname", "Specify a custom method for reading source files.", "")
 
-  val XoldPatmat    = BooleanSetting    ("-Xoldpatmat", "Use the pre-2.10 pattern matcher. Otherwise, the 'virtualizing' pattern matcher is used in 2.10.")
   val XnoPatmatAnalysis = BooleanSetting ("-Xno-patmat-analysis", "Don't perform exhaustivity/unreachability analysis. Also, ignore @switch annotation.")
   val XfullLubs     = BooleanSetting    ("-Xfull-lubs", "Retains pre 2.10 behavior of less aggressive truncation of least upper bounds.")
 
@@ -163,7 +162,6 @@ trait ScalaSettings extends AbsScalaSettings
   val refinementMethodDispatch
                       = ChoiceSetting     ("-Ystruct-dispatch", "policy", "structural method dispatch policy", List("no-cache", "mono-cache", "poly-cache", "invoke-dynamic"), "poly-cache")
   val Yrangepos       = BooleanSetting    ("-Yrangepos", "Use range positions for syntax trees.")
-  val Ybuilderdebug   = ChoiceSetting     ("-Ybuilder-debug", "manager", "Compile using the specified build manager.", List("none", "refined", "simple"), "none")
   val Yreifycopypaste = BooleanSetting    ("-Yreify-copypaste", "Dump the reified trees in copypasteable representation.")
   val Yreplsync       = BooleanSetting    ("-Yrepl-sync", "Do not use asynchronous code for repl startup")
   val Yreploutdir     = StringSetting     ("-Yrepl-outdir", "path", "Write repl-generated classfiles to given output directory (use \"\" to generate a temporary dir)" , "")
@@ -178,7 +176,6 @@ trait ScalaSettings extends AbsScalaSettings
 
   /** Area-specific debug output.
    */
-  val Ybuildmanagerdebug      = BooleanSetting("-Ybuild-manager-debug", "Generate debug information for the Refined Build Manager compiler.")
   val Ydocdebug               = BooleanSetting("-Ydoc-debug", "Trace all scaladoc activity.")
   val Yidedebug               = BooleanSetting("-Yide-debug", "Generate, validate and output trees using the interactive compiler.")
   val Yinferdebug             = BooleanSetting("-Yinfer-debug", "Trace type inference and implicit search.")

@@ -39,6 +39,8 @@ trait Trees extends api.Trees { self: SymbolTable =>
     def isDef = false
 
     def isEmpty = false
+    def nonEmpty = !isEmpty
+
     def canHaveAttrs = true
 
     /** The canonical way to test if a Tree represents a term.
@@ -161,6 +163,9 @@ trait Trees extends api.Trees { self: SymbolTable =>
 
     override def substituteThis(clazz: Symbol, to: Tree): Tree =
       new ThisSubstituter(clazz, to) transform this
+
+    def replace(from: Tree, to: Tree): Tree =
+      new TreeReplacer(from, to, positionAware = false) transform this
 
     def hasSymbolWhich(f: Symbol => Boolean) =
       (symbol ne null) && (symbol ne NoSymbol) && f(symbol)
@@ -926,13 +931,16 @@ trait Trees extends api.Trees { self: SymbolTable =>
     def withPosition(flag: Long, position: Position) =
       copy() setPositions positions + (flag -> position)
 
-    override def mapAnnotations(f: List[Tree] => List[Tree]): Modifiers =
-      Modifiers(flags, privateWithin, f(annotations)) setPositions positions
+    override def mapAnnotations(f: List[Tree] => List[Tree]): Modifiers = {
+      val newAnns = f(annotations)
+      if (annotations == newAnns) this
+      else Modifiers(flags, privateWithin, newAnns) setPositions positions
+    }
 
     override def toString = "Modifiers(%s, %s, %s)".format(flagString, annotations mkString ", ", positions)
   }
 
-  object Modifiers extends ModifiersCreator
+  object Modifiers extends ModifiersExtractor
 
   implicit val ModifiersTag = ClassTag[Modifiers](classOf[Modifiers])
 
@@ -1376,6 +1384,16 @@ trait Trees extends api.Trees { self: SymbolTable =>
       if (tree eq orig) super.transform(tree)
       else tree
   }
+
+  /** A transformer that replaces tree `from` with tree `to` in a given tree */
+  class TreeReplacer(from: Tree, to: Tree, positionAware: Boolean) extends Transformer {
+    override def transform(t: Tree): Tree = {
+      if (t == from) to
+      else if (!positionAware || (t.pos includes from.pos) || t.pos.isTransparent) super.transform(t)
+      else t
+    }
+  }
+
   // Create a readable string describing a substitution.
   private def substituterString(fromStr: String, toStr: String, from: List[Any], to: List[Any]): String = {
     "subst[%s, %s](%s)".format(fromStr, toStr, (from, to).zipped map (_ + " -> " + _) mkString ", ")
@@ -1499,14 +1517,17 @@ trait Trees extends api.Trees { self: SymbolTable =>
     }
   }
 
-  private lazy val duplicator = new Transformer {
+  private lazy val duplicator = new Duplicator(focusPositions = true)
+  private class Duplicator(focusPositions: Boolean) extends Transformer {
     override val treeCopy = newStrictTreeCopier
     override def transform(t: Tree) = {
       val t1 = super.transform(t)
-      if ((t1 ne t) && t1.pos.isRange) t1 setPos t.pos.focus
+      if ((t1 ne t) && t1.pos.isRange && focusPositions) t1 setPos t.pos.focus
       t1
     }
   }
+
+  def duplicateAndKeepPositions(tree: Tree) = new Duplicator(focusPositions = false) transform tree
 
   // ------ copiers -------------------------------------------
 

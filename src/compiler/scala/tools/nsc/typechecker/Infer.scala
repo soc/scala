@@ -43,7 +43,7 @@ trait Infer extends Checkable {
       case formal => formal
     } else formals
     if (isVarArgTypes(formals1) && (removeRepeated || formals.length != nargs)) {
-      val ft = formals1.last.normalize.typeArgs.head
+      val ft = formals1.last.dealiasWiden.typeArgs.head
       formals1.init ::: (for (i <- List.range(formals1.length - 1, nargs)) yield ft)
     } else formals1
   }
@@ -198,7 +198,7 @@ trait Infer extends Checkable {
    *  @throws NoInstance
    */
   def solvedTypes(tvars: List[TypeVar], tparams: List[Symbol],
-                  variances: List[Int], upper: Boolean, depth: Int): List[Type] = {
+                  variances: List[Variance], upper: Boolean, depth: Int): List[Type] = {
 
     if (tvars.nonEmpty)
       printInference("[solve types] solving for " + tparams.map(_.name).mkString(", ") + " in " + tvars.mkString(", "))
@@ -488,7 +488,7 @@ trait Infer extends Checkable {
                       pt: Type): List[Type] = {
       /** Map type variable to its instance, or, if `variance` is covariant/contravariant,
        *  to its upper/lower bound */
-      def instantiateToBound(tvar: TypeVar, variance: Int): Type = try {
+      def instantiateToBound(tvar: TypeVar, variance: Variance): Type = {
         lazy val hiBounds = tvar.constr.hiBounds
         lazy val loBounds = tvar.constr.loBounds
         lazy val upper = glb(hiBounds)
@@ -501,23 +501,21 @@ trait Infer extends Checkable {
         //Console.println("instantiate "+tvar+tvar.constr+" variance = "+variance);//DEBUG
         if (tvar.constr.inst != NoType)
           instantiate(tvar.constr.inst)
-        else if ((variance & COVARIANT) != 0 && hiBounds.nonEmpty)
-          setInst(upper)
-        else if ((variance & CONTRAVARIANT) != 0 && loBounds.nonEmpty)
+        else if (loBounds.nonEmpty && variance.isContravariant)
           setInst(lower)
-        else if (hiBounds.nonEmpty && loBounds.nonEmpty && upper <:< lower)
+        else if (hiBounds.nonEmpty && (variance.isPositive || loBounds.nonEmpty && upper <:< lower))
           setInst(upper)
         else
           WildcardType
-      } catch {
-        case ex: NoInstance => WildcardType
       }
       val tvars = tparams map freshVar
       if (isConservativelyCompatible(restpe.instantiateTypeParams(tparams, tvars), pt))
         map2(tparams, tvars)((tparam, tvar) =>
-          instantiateToBound(tvar, varianceInTypes(formals)(tparam)))
+          try instantiateToBound(tvar, varianceInTypes(formals)(tparam))
+          catch { case ex: NoInstance => WildcardType }
+        )
       else
-        tvars map (tvar => WildcardType)
+        tvars map (_ => WildcardType)
     }
 
     /** [Martin] Can someone comment this please? I have no idea what it's for
@@ -571,18 +569,17 @@ trait Infer extends Checkable {
 
       foreach3(tparams, tvars, targs) { (tparam, tvar, targ) =>
         val retract = (
-              targ.typeSymbol == NothingClass                                         // only retract Nothings
-          && (restpe.isWildcard || (varianceInType(restpe)(tparam) & COVARIANT) == 0) // don't retract covariant occurrences
+              targ.typeSymbol == NothingClass                                   // only retract Nothings
+          && (restpe.isWildcard || !varianceInType(restpe)(tparam).isPositive)  // don't retract covariant occurrences
         )
 
-        // checks !settings.XoldPatmat.value directly so one need not run under -Xexperimental to use virtpatmat
         buf += ((tparam,
           if (retract) None
           else Some(
             if (targ.typeSymbol == RepeatedParamClass)     targ.baseType(SeqClass)
             else if (targ.typeSymbol == JavaRepeatedParamClass) targ.baseType(ArrayClass)
             // this infers Foo.type instead of "object Foo" (see also widenIfNecessary)
-            else if (targ.typeSymbol.isModuleClass || ((settings.Xexperimental.value || !settings.XoldPatmat.value) && tvar.constr.avoidWiden)) targ
+            else if (targ.typeSymbol.isModuleClass || tvar.constr.avoidWiden) targ
             else targ.widen
           )
         ))
@@ -1123,15 +1120,17 @@ trait Infer extends Checkable {
      */
     def inferExprInstance(tree: Tree, tparams: List[Symbol], pt: Type = WildcardType, treeTp0: Type = null, keepNothings: Boolean = true, useWeaklyCompatible: Boolean = false): List[Symbol] = {
       val treeTp = if(treeTp0 eq null) tree.tpe else treeTp0 // can't refer to tree in default for treeTp0
+      val (targs, tvars) = exprTypeArgs(tparams, treeTp, pt, useWeaklyCompatible)
       printInference(
         ptBlock("inferExprInstance",
           "tree"    -> tree,
           "tree.tpe"-> tree.tpe,
           "tparams" -> tparams,
-          "pt"      -> pt
+          "pt"      -> pt,
+          "targs"   -> targs,
+          "tvars"   -> tvars
         )
       )
-      val (targs, tvars) = exprTypeArgs(tparams, treeTp, pt, useWeaklyCompatible)
 
       if (keepNothings || (targs eq null)) { //@M: adjustTypeArgs fails if targs==null, neg/t0226
         substExpr(tree, tparams, targs, pt)
@@ -1315,7 +1314,7 @@ trait Infer extends Checkable {
       val tvars1 = tvars map (_.cloneInternal)
       // Note: right now it's not clear that solving is complete, or how it can be made complete!
       // So we should come back to this and investigate.
-      solve(tvars1, tvars1 map (_.origin.typeSymbol), tvars1 map (x => COVARIANT), false)
+      solve(tvars1, tvars1 map (_.origin.typeSymbol), tvars1 map (_ => Variance.Covariant), false)
     }
 
     // this is quite nasty: it destructively changes the info of the syms of e.g., method type params (see #3692, where the type param T's bounds were set to >: T <: T, so that parts looped)
@@ -1438,9 +1437,9 @@ trait Infer extends Checkable {
     }
 
     object approximateAbstracts extends TypeMap {
-      def apply(tp: Type): Type = tp.normalize match {
+      def apply(tp: Type): Type = tp.dealiasWiden match {
         case TypeRef(pre, sym, _) if sym.isAbstractType => WildcardType
-        case _ => mapOver(tp)
+        case _                                          => mapOver(tp)
       }
     }
 

@@ -104,7 +104,7 @@ trait NamesDefaults { self: Analyzer =>
    *  @return the transformed application (a Block) together with the NamedApplyInfo.
    *     if isNamedApplyBlock(tree), returns the existing context.namedApplyBlockInfo
    */
-  def transformNamedApplication(typer: Typer, mode: Int, pt: Type)
+  def transformNamedApplication(typer: Typer, mode: Mode, pt: Type)
                                (tree: Tree, argPos: Int => Int): Tree = {
     import typer._
     import typer.infer._
@@ -394,7 +394,7 @@ trait NamesDefaults { self: Analyzer =>
           // TODO #3649 can create spurious errors when companion object is gone (because it becomes unlinked from scope)
           if (defGetter == NoSymbol) None // prevent crash in erroneous trees, #3649
           else {
-            var default1 = qual match {
+            var default1: Tree = qual match {
               case Some(q) => gen.mkAttributedSelect(q.duplicate, defGetter)
               case None    => gen.mkAttributedRef(defGetter)
 

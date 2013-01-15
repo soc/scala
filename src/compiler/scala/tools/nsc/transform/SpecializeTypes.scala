@@ -10,6 +10,7 @@ import scala.tools.nsc.symtab.Flags
 import scala.collection.{ mutable, immutable }
 import scala.language.postfixOps
 import scala.language.existentials
+import scala.annotation.tailrec
 
 /** Specialize code on types.
  *
@@ -403,11 +404,16 @@ abstract class SpecializeTypes extends InfoTransform with TypingTransformers {
     case _                    => false
   })
   def specializedTypeVars(tpes: List[Type]): immutable.Set[Symbol] = {
-    val buf = Set.newBuilder[Symbol]
-    tpes foreach (tp => buf ++= specializedTypeVars(tp))
-    buf.result
+    @tailrec def loop(result: immutable.Set[Symbol], xs: List[Type]): immutable.Set[Symbol] = {
+      if (xs.isEmpty) result
+      else loop(result ++ specializedTypeVars(xs.head), xs.tail)
+    }
+    loop(immutable.Set.empty, tpes)
   }
-  def specializedTypeVars(sym: Symbol): immutable.Set[Symbol] = enteringTyper(specializedTypeVars(sym.info))
+  def specializedTypeVars(sym: Symbol): immutable.Set[Symbol] = (
+    if (definitions.neverHasTypeParameters(sym)) immutable.Set.empty
+    else enteringTyper(specializedTypeVars(sym.info))
+  )
 
   /** Return the set of @specialized type variables mentioned by the given type.
    *  It only counts type variables that appear:
@@ -436,7 +442,7 @@ abstract class SpecializeTypes extends InfoTransform with TypingTransformers {
     case AnnotatedType(_, tp, _)     => specializedTypeVars(tp)
     case TypeBounds(lo, hi)          => specializedTypeVars(lo :: hi :: Nil)
     case RefinedType(parents, _)     => parents flatMap specializedTypeVars toSet
-    case _                           => Set()
+    case _                           => immutable.Set.empty
   }
 
   /** Returns the type parameter in the specialized class `sClass` that corresponds to type parameter

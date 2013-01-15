@@ -621,6 +621,8 @@ abstract class TreeInfo {
    *  For advanced use, call `dissectApplied` explicitly and use its methods instead of pattern matching.
    */
   object Applied {
+    def apply(tree: Tree): Applied = new Applied(tree)
+
     def unapply(applied: Applied): Option[(Tree, List[Tree], List[List[Tree]])] =
       Some((applied.core, applied.targs, applied.argss))
 
@@ -733,4 +735,15 @@ abstract class TreeInfo {
       case tree: RefTree => true
       case _ => false
     })
+
+  def isMacroApplication(tree: Tree): Boolean =
+    !tree.isDef && tree.symbol != null && tree.symbol.isMacro && !tree.symbol.isErroneous
+
+  def isMacroApplicationOrBlock(tree: Tree): Boolean = tree match {
+    case Block(_, expr) => isMacroApplicationOrBlock(expr)
+    case tree => isMacroApplication(tree)
+  }
+
+  def isNonTrivialMacroApplication(tree: Tree): Boolean =
+    isMacroApplication(tree) && dissectApplied(tree).core != tree
 }
