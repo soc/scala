@@ -2841,23 +2841,22 @@ trait Typers extends Adaptations with Tags {
 
       def addSynthetics(stats: List[Tree]): List[Tree] = {
         val scope = if (inBlock) context.scope else context.owner.info.decls
-        var newStats = new ListBuffer[Tree]
-        var moreToAdd = true
-        while (moreToAdd) {
+        val newStats = new ListBuffer[Tree]
+        def addLoop() {
           val initElems = scope.elems
           // SI-5877 The decls of a package include decls of the package object. But we don't want to add
           //         the corresponding synthetics to the package class, only to the package object class.
-          def shouldAdd(sym: Symbol) =
-            inBlock || !context.isInPackageObject(sym, context.owner)
-          for (sym <- scope if shouldAdd(sym))
-            for (tree <- context.unit.synthetics get sym) {
-              newStats += typedStat(tree) // might add even more synthetics to the scope
-              context.unit.synthetics -= sym
-            }
+          def shouldAdd(sym: Symbol) = inBlock || !context.isInPackageObject(sym, context.owner)
+
+          for (sym <- scope ; if shouldAdd(sym); tree <- context.unit.synthetics remove sym)
+            newStats += typedStat(tree)
+
           // the type completer of a synthetic might add more synthetics. example: if the
           // factory method of a case class (i.e. the constructor) has a default.
-          moreToAdd = scope.elems ne initElems
+          if (scope.elems ne initElems) addLoop()
         }
+        addLoop()
+
         if (newStats.isEmpty) stats
         else {
           // put default getters next to the method they belong to,
