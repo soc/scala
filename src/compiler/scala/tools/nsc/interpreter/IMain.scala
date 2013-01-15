@@ -999,8 +999,25 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
   def symbolOfLine(code: String): Symbol =
     exprTyper.symbolOfLine(code)
 
-  def typeOfExpression(expr: String, silent: Boolean = true): Type =
-    exprTyper.typeOfExpression(expr, silent)
+  def memberType(prefix: Type, name: Name): Type = prefix member name match {
+    case NoSymbol => NoType
+    case sym      => prefix memberType sym
+  }
+  def followMemberTypes(prefix: Type, names: Name*): Type = names.toList match {
+    case Nil      => prefix
+    case x :: xs  => if (prefix == NoType) NoType else followMemberTypes(memberType(prefix, x), xs: _*)
+  }
+  def followMemberTypes(names: Name*): Type = names.toList match {
+    case Nil     => NoType
+    case x :: xs => followMemberTypes(typeOfName(x), xs: _*)
+  }
+  def typeOfExpression(expr: String, silent: Boolean = true): Type = {
+    val names = if (expr contains " ") Nil else (expr split '.').toList map newTermName
+    followMemberTypes(names: _*) match {
+      case NoType => exprTyper.typeOfExpression(expr, silent)
+      case tpe    => tpe
+    }
+  }
 
   protected def onlyTerms(xs: List[Name]): List[TermName] = xs collect { case x: TermName => x }
   protected def onlyTypes(xs: List[Name]): List[TypeName] = xs collect { case x: TypeName => x }
