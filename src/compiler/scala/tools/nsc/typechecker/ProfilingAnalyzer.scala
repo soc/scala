@@ -42,13 +42,13 @@ trait ProfilingAnalyzer extends Analyzer { prof =>
 
   class ProfilingTyper(context0: Context) extends Typer(context0) with TypedTrees {
     override def typed(tree: Tree, mode: Int, pt: Type): Tree =
-      typing(tree)(super.typed(tree, mode, pt))
+      typing(tree, hasPt = pt != WildcardType)(super.typed(tree, mode, pt))
     override def typedApply(tree: Apply, mode: Int, pt: Type): Tree =
-      typing(tree)(super.typedApply(tree, mode, pt))
+      typing(tree, hasPt = pt != WildcardType)(super.typedApply(tree, mode, pt))
     override def typedBlock(block: Block, mode: Int, pt: Type): Block =
-      typing(block)(super.typedBlock(block, mode, pt))
+      typing(block, hasPt = pt != WildcardType)(super.typedBlock(block, mode, pt))
     override def typedIdent(tree: Ident, mode: Int, pt: Type): Tree =
-      typing(tree)(super.typedIdent(tree, mode, pt))
+      typing(tree, hasPt = pt != WildcardType)(super.typedIdent(tree, mode, pt))
     override def typedStat(stat: Tree, exprOwner: Symbol): Tree =
       typing(stat)(super.typedStat(stat, exprOwner))
     override def typedClassDef(cdef: ClassDef): ClassDef =
@@ -65,7 +65,42 @@ trait ProfilingAnalyzer extends Analyzer { prof =>
       typing(templ)(super.typedTemplate(templ, parents1))
   }
 
+  private var isCounting = false
+  // private var ptStack: List[Type]
+  private var counts, skipped, ptNanos, wildNanos = 0L
+  scala.sys addShutdownHook {
+    println(s"Counted $counts typed calls, skipped $skipped.")
+    println(f"  pt secs: ${ptNanos / 1e9 }%.3f")
+    println(f"wild secs: ${wildNanos / 1e9 }%.3f")
+  }
+  private def timing[T](body: => T): (T, Long) = {
+    counts += 1
+    isCounting = true
+    try {
+      val startTime  = System.nanoTime
+      val result     = body
+      val endTime    = System.nanoTime
+
+      (result, endTime - startTime)
+    }
+    finally isCounting = false
+  }
+
   private val openTrees = mutable.HashSet[Tree]()
+  private def typing[T](tree: Tree, hasPt: Boolean)(body: => T): T = {
+    // ptStack ::= ((pt, System.nanoTime)
+    // try
+    // finally ptStack = ptStack.tail
+
+    if (isCounting) {
+      skipped += 1
+      typing(tree)(body)
+    }
+    else {
+      val (res, elapsed) = timing(typing(tree)(body))
+      try res finally if (hasPt) ptNanos += elapsed else wildNanos += elapsed
+    }
+  }
   protected def typing[T](tree: Tree)(body: => T): T = {
     // No recursion for now
     if (openTrees(tree)) body
@@ -94,7 +129,7 @@ trait ProfilingAnalyzer extends Analyzer { prof =>
       try "\nIn file " + root.pos.source.file
       catch { case _: UnsupportedOperationException => "???" }
     )
-    override def receiverPos(recv: Tree)  = "(line " + recv.pos.safeLine + ")"
+    override def receiverPos(recv: Tree)  = s"(line ${recv.pos.safeLine})"
     override def consolidate(root: TNode) = treeConsolidator consolidate root
     override def consolidationString      = " to typer time >= " + minimumMillis + " ms"
 
