@@ -2292,10 +2292,26 @@ abstract class GenASM extends SubComponent with BytecodeWriters with GenJVMASM {
           || !isInterfaceCall(hostSymbol) && isAccessibleFrom(methodOwner, siteSymbol)
           || hostSymbol.isBottomClass
         )
+
         val receiver = if (useMethodOwner) methodOwner else hostSymbol
+        def readMethodTypes() = {
+          val thiz   = receiver.thisType memberType method
+          (thiz.paramTypes map javaType, javaType(thiz.finalResultType))
+        }
+        // Types, before and after erasure.
+        val (preParams, preReturn)   = enteringPhase(currentRun.erasurePhase)(readMethodTypes())
+        val (postParams, postReturn) = exitingPhase(currentRun.erasurePhase)(readMethodTypes())
+        val thisDescriptor           = asm.Type.getMethodDescriptor(preReturn, preParams: _*)
+        val callDescriptor           = asm.Type.getMethodDescriptor(postReturn, postParams: _*)
+
         val jowner   = javaName(receiver)
         val jname    = javaName(method)
-        val jtype    = javaType(method).getDescriptor()
+        val jtype    = callDescriptor
+        val oldJtype = javaType(method).getDescriptor()
+        if (oldJtype != jtype) {
+          println(s"!!!\nwas: $oldJtype\nnow: $jtype")
+        }
+        // val jtype    = javaType(method).getDescriptor()
 
         def dbg(invoke: String) {
           debuglog("%s %s %s.%s:%s".format(invoke, receiver.accessString, jowner, jname, jtype))
