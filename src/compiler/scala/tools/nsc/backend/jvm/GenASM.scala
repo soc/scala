@@ -2304,10 +2304,10 @@ abstract class GenASM extends SubComponent with BytecodeWriters with GenJVMASM {
 
         //   // (thiz.paramTypes map javaType, javaType(thiz.finalResultType))
         // }
-        // Types, before and after erasure.
+        // // Types, before and after erasure.
         // val (preParams, preReturn)   = enteringPhase(currentRun.erasurePhase)(readMethodTypes())
         // val (postParams, postReturn) = exitingPhase(currentRun.erasurePhase)(readMethodTypes())
-        // val callDescriptor           = erasure.javaSig(receiver, exitingPhase(currentRun.erasurePhase)(receiver.thisType memberType method)).get
+        // val callDescriptor           = erasure.javaSig(receiver, exitingPostErasure(receiver.thisType memberType method)) getOrElse oldJtype
         // asm.Type.getMethodDescriptor(postReturn, postParams: _*)
 
         // val thisDescriptor           = asm.Type.getMethodDescriptor(preReturn, preParams: _*)
@@ -2315,10 +2315,12 @@ abstract class GenASM extends SubComponent with BytecodeWriters with GenJVMASM {
 
         val jowner   = javaName(receiver)
         val jname    = javaName(method)
-        val jtype0   = enteringPhase(currentRun.erasurePhase)(method.owner.thisType memberType method)
+        // val jtype0   = exitingPostErasure(method.owner.thisType memberType method)
         // val jtype    = callDescriptor
         val oldJtype = javaType(method).getDescriptor()
-        val jtype    = erasure.javaSig(receiver, jtype0) getOrElse oldJtype
+        // val jtype    = erasure.javaSig(receiver, jtype0) getOrElse oldJtype
+        val jtype       = erasure.javaSig(receiver, exitingPostErasure(receiver.thisType memberType method)) getOrElse oldJtype
+
         if (oldJtype != jtype) {
           println(s"!!!\nwas: $oldJtype\nnow: $jtype")
         }
