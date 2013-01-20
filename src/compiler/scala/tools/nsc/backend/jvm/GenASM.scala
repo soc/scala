@@ -2294,20 +2294,32 @@ abstract class GenASM extends SubComponent with BytecodeWriters with GenJVMASM {
         )
 
         val receiver = if (useMethodOwner) methodOwner else hostSymbol
-        def readMethodTypes() = {
-          val thiz   = receiver.thisType memberType method
-          (thiz.paramTypes map javaType, javaType(thiz.finalResultType))
-        }
+        // def readMethodTypes() = {
+        //   val thiz   = receiver.thisType memberType method
+        //   println("site: " + siteSymbol.thisType.memberType(method))
+        //   println("host: " + hostSymbol.thisType.memberType(method))
+        //   println("owner: " + methodOwner.thisType.memberType(method))
+
+        //   def myJType(tp: Type) = erasure.javaSig(receiver, tp).get
+        //   (thiz.paramTypes map myJType, myJType(thiz.finalResultType))
+
+        //   // (thiz.paramTypes map javaType, javaType(thiz.finalResultType))
+        // }
         // Types, before and after erasure.
-        val (preParams, preReturn)   = enteringPhase(currentRun.erasurePhase)(readMethodTypes())
-        val (postParams, postReturn) = exitingPhase(currentRun.erasurePhase)(readMethodTypes())
-        val thisDescriptor           = asm.Type.getMethodDescriptor(preReturn, preParams: _*)
-        val callDescriptor           = asm.Type.getMethodDescriptor(postReturn, postParams: _*)
+        // val (preParams, preReturn)   = enteringPhase(currentRun.erasurePhase)(readMethodTypes())
+        // val (postParams, postReturn) = exitingPhase(currentRun.erasurePhase)(readMethodTypes())
+        // val callDescriptor           = erasure.javaSig(receiver, exitingPhase(currentRun.erasurePhase)(receiver.thisType memberType method)).get
+        // asm.Type.getMethodDescriptor(postReturn, postParams: _*)
+
+        // val thisDescriptor           = asm.Type.getMethodDescriptor(preReturn, preParams: _*)
+        // val callDescriptor           = asm.Type.getMethodDescriptor(postReturn, postParams: _*)
 
         val jowner   = javaName(receiver)
         val jname    = javaName(method)
-        val jtype    = callDescriptor
+        val jtype0   = enteringPhase(currentRun.erasurePhase)(method.owner.thisType memberType method)
+        // val jtype    = callDescriptor
         val oldJtype = javaType(method).getDescriptor()
+        val jtype    = erasure.javaSig(receiver, jtype0) getOrElse oldJtype
         if (oldJtype != jtype) {
           println(s"!!!\nwas: $oldJtype\nnow: $jtype")
         }
