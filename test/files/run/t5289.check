@@ -1,0 +1,6 @@
+public static java.lang.String S.g3(java.lang.String)
+public static java.lang.String S.g4(java.lang.String)
+public static java.net.URI S.f1(java.lang.String)
+public static java.net.URI S.f2(java.net.URI,java.lang.String)
+public static java.net.URI S.g1(java.lang.String)
+public static java.net.URI S.g2(java.net.URI,java.lang.String)
