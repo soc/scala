@@ -604,12 +604,21 @@ abstract class GenASM extends SubComponent with BytecodeWriters with GenJVMASM {
 
     def javaType(t: Type): asm.Type = javaType(toTypeKind(t))
 
-    def javaType(s: Symbol): asm.Type = {
-      if (s.isMethod) {
-        val resT: asm.Type = if (s.isClassConstructor) asm.Type.VOID_TYPE else javaType(s.tpe.resultType);
-        asm.Type.getMethodType( resT, (s.tpe.paramTypes map javaType): _*)
-      } else { javaType(s.tpe) }
+    def javaTypeIn(s: Symbol, in: Symbol): asm.Type = {
+      exitingPostErasure {
+        if (s.isMethod) {
+          val tpe1 = in.thisType memberType s
+          if (s.tpe_* != tpe1) {
+            println("!!!  " + s.tpe_*)
+            println("now  " + tpe1)
+          }
+          val resT: asm.Type = if (s.isClassConstructor) asm.Type.VOID_TYPE else javaType(tpe1.resultType);
+          asm.Type.getMethodType( resT, (tpe1.paramTypes map javaType): _*)
+        }
+        else javaType(s.tpe_*)
+      }
     }
+    def javaType(s: Symbol): asm.Type = javaTypeIn(s, s.enclClass)
 
     def javaArrayType(elem: asm.Type): asm.Type = { asm.Type.getObjectType("[" + elem.getDescriptor) }
 
@@ -2274,7 +2283,7 @@ abstract class GenASM extends SubComponent with BytecodeWriters with GenJVMASM {
         val receiver = if (useMethodOwner) methodOwner else hostSymbol
         val jowner   = javaName(receiver)
         val jname    = javaName(method)
-        val jtype    = javaType(method).getDescriptor()
+        val jtype    = javaTypeIn(method, receiver).getDescriptor()
 
         def dbg(invoke: String) {
           debuglog("%s %s %s.%s:%s".format(invoke, receiver.accessString, jowner, jname, jtype))
