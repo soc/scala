@@ -2293,6 +2293,7 @@ abstract class GenASM extends SubComponent with BytecodeWriters with GenJVMASM {
           || hostSymbol.isBottomClass
         )
         val receiver = if (useMethodOwner) methodOwner else hostSymbol
+        // println(s"style=$style ${method.fullLocationString} has receiver $receiver from $siteSymbol")
         val jowner   = javaName(receiver)
         val jname    = javaName(method)
         val jtype    = javaType(method).getDescriptor()
