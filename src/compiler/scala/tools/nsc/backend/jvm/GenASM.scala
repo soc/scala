@@ -2277,7 +2277,17 @@ abstract class GenASM extends SubComponent with BytecodeWriters with GenJVMASM {
         val jtype    = javaType(method).getDescriptor()
 
         def dbg(invoke: String) {
-          debuglog("%s %s %s.%s:%s".format(invoke, receiver.accessString, jowner, jname, jtype))
+          println(s"$invoke ${receiver.accessString} $jowner $jname $jtype")
+          val tp1 = method.tpe
+          val tp2 = enteringErasure(receiver.info memberType method)
+          val tp3 = erasure.erasure(method)(tp1)
+          val tp4 = erasure.erasure(method)(tp2)
+          if (tp1 =:= tp2) () else {
+            println(s"!!! tp1=$tp1")
+            println(s"!!! tp2=$tp2")
+            println(s"!!! tp3=$tp3")
+            println(s"!!! tp4=$tp4")
+          }
         }
 
         def initModule() {
