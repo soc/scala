@@ -1047,10 +1047,33 @@ abstract class GenASM extends SubComponent with BytecodeWriters with GenJVMASM {
 
     /** Add a forwarder for method m. Used only from addForwarders(). */
     private def addForwarder(isRemoteClass: Boolean, jclass: asm.ClassVisitor, module: Symbol, m: Symbol) {
-      val moduleName     = javaName(module)
-      val methodInfo     = module.thisType.memberInfo(m)
-      val paramJavaTypes: List[asm.Type] = methodInfo.paramTypes map javaType
-      // val paramNames     = 0 until paramJavaTypes.length map ("x_" + _)
+      val moduleName = javaName(module)
+      /** We have to examine the types both BEFORE and AFTER erasure.
+       *  Consider this scenario:
+       *
+       *        public class J<T>            { public T f(T x) { return null; } }
+       *    object S extends J[List[String]] { }
+       *
+       *  The static forwarder in S for method f must get a descriptor of:
+       *    (Lscala/collection/immutable/List;)Lscala/collection/immutable/List;
+       *  However the underlying method which S is calling is inherited in S$.
+       *  The actual implementation is in J, and it is erased with descriptor:
+       *    (Ljava/lang/Object;)Ljava/lang/Object;
+       *
+       *  So the invokevirtual must be constructed in terms of the type as seen
+       *  at the method implementation, but the return value must be cast to the
+       *  return type as seen as the instance for which forwarders are being derived.
+       *  !!! This issue is not limited to this spot. See SI-3452 etc.
+       */
+      def readForwarderTypes() = {
+        val thiz   = module.thisType memberType m
+        (thiz.paramTypes map javaType, javaType(thiz.finalResultType))
+      }
+      // Types, before and after erasure.
+      val (preParams, preReturn)   = enteringPhase(currentRun.erasurePhase)(readForwarderTypes())
+      val (postParams, postReturn) = exitingPhase(currentRun.erasurePhase)(readForwarderTypes())
+      val thisDescriptor           = asm.Type.getMethodDescriptor(preReturn, preParams: _*)
+      val callDescriptor           = asm.Type.getMethodDescriptor(postReturn, postParams: _*)
 
       /** Forwarders must not be marked final,
        *  as the JVM will not allow redefinition of a final static method,
@@ -1068,13 +1091,11 @@ abstract class GenASM extends SubComponent with BytecodeWriters with GenJVMASM {
       val (throws, others) = m.annotations partition (_.symbol == ThrowsClass)
       val thrownExceptions: List[String] = getExceptions(throws)
 
-      val jReturnType = javaType(methodInfo.resultType)
-      val mdesc = asm.Type.getMethodDescriptor(jReturnType, paramJavaTypes: _*)
-      val mirrorMethodName = javaName(m)
+      val mirrorMethodName                = javaName(m)
       val mirrorMethod: asm.MethodVisitor = jclass.visitMethod(
         flags,
         mirrorMethodName,
-        mdesc,
+        thisDescriptor,
         jgensig,
         mkArray(thrownExceptions)
       )
@@ -1089,19 +1110,19 @@ abstract class GenASM extends SubComponent with BytecodeWriters with GenJVMASM {
       //   visitCode ( visitFrame | visitXInsn | visitLabel | visitTryCatchBlock | visitLocalVariable | visitLineNumber )* visitMaxs ] visitEnd
 
       mirrorMethod.visitCode()
-
       mirrorMethod.visitFieldInsn(asm.Opcodes.GETSTATIC, moduleName, strMODULE_INSTANCE_FIELD, descriptor(module))
 
       var index = 0
-      for(jparamType <- paramJavaTypes) {
-        mirrorMethod.visitVarInsn(jparamType.getOpcode(asm.Opcodes.ILOAD), index)
-        assert(jparamType.getSort() != asm.Type.METHOD, jparamType)
-        index += jparamType.getSize()
+      for (p <- postParams) {
+        mirrorMethod.visitVarInsn(p.getOpcode(asm.Opcodes.ILOAD), index)
+        assert(p.getSort() != asm.Type.METHOD, p)
+        index += p.getSize()
       }
 
-      mirrorMethod.visitMethodInsn(asm.Opcodes.INVOKEVIRTUAL, moduleName, mirrorMethodName, javaType(m).getDescriptor)
-      mirrorMethod.visitInsn(jReturnType.getOpcode(asm.Opcodes.IRETURN))
-
+      mirrorMethod.visitMethodInsn(asm.Opcodes.INVOKEVIRTUAL, moduleName, mirrorMethodName, callDescriptor)
+      if (preReturn != postReturn)
+        mirrorMethod.visitTypeInsn(asm.Opcodes.CHECKCAST, preReturn.getInternalName)
+      mirrorMethod.visitInsn(preReturn.getOpcode(asm.Opcodes.IRETURN))
       mirrorMethod.visitMaxs(0, 0) // just to follow protocol, dummy arguments
       mirrorMethod.visitEnd()
 
@@ -2271,10 +2292,40 @@ abstract class GenASM extends SubComponent with BytecodeWriters with GenJVMASM {
           || !isInterfaceCall(hostSymbol) && isAccessibleFrom(methodOwner, siteSymbol)
           || hostSymbol.isBottomClass
         )
+
         val receiver = if (useMethodOwner) methodOwner else hostSymbol
+        // def readMethodTypes() = {
+        //   val thiz   = receiver.thisType memberType method
+        //   println("site: " + siteSymbol.thisType.memberType(method))
+        //   println("host: " + hostSymbol.thisType.memberType(method))
+        //   println("owner: " + methodOwner.thisType.memberType(method))
+
+        //   def myJType(tp: Type) = erasure.javaSig(receiver, tp).get
+        //   (thiz.paramTypes map myJType, myJType(thiz.finalResultType))
+
+        //   // (thiz.paramTypes map javaType, javaType(thiz.finalResultType))
+        // }
+        // // Types, before and after erasure.
+        // val (preParams, preReturn)   = enteringPhase(currentRun.erasurePhase)(readMethodTypes())
+        // val (postParams, postReturn) = exitingPhase(currentRun.erasurePhase)(readMethodTypes())
+        // val callDescriptor           = erasure.javaSig(receiver, exitingPostErasure(receiver.thisType memberType method)) getOrElse oldJtype
+        // asm.Type.getMethodDescriptor(postReturn, postParams: _*)
+
+        // val thisDescriptor           = asm.Type.getMethodDescriptor(preReturn, preParams: _*)
+        // val callDescriptor           = asm.Type.getMethodDescriptor(postReturn, postParams: _*)
+
         val jowner   = javaName(receiver)
         val jname    = javaName(method)
-        val jtype    = javaType(method).getDescriptor()
+        // val jtype0   = exitingPostErasure(method.owner.thisType memberType method)
+        // val jtype    = callDescriptor
+        val oldJtype = javaType(method).getDescriptor()
+        // val jtype    = erasure.javaSig(receiver, jtype0) getOrElse oldJtype
+        val jtype       = erasure.javaSig(receiver, exitingPostErasure(receiver.thisType memberType method)) getOrElse oldJtype
+
+        if (oldJtype != jtype) {
+          println(s"!!!\nwas: $oldJtype\nnow: $jtype")
+        }
+        // val jtype    = javaType(method).getDescriptor()
 
         def dbg(invoke: String) {
           debuglog("%s %s %s.%s:%s".format(invoke, receiver.accessString, jowner, jname, jtype))
