@@ -714,6 +714,8 @@ trait Opcodes { self: ICodes =>
       override def toString(): String = "dynamic"
     }
 
+    def Virtual = Dynamic
+
     /**
      * Special invoke:
      *   Static(true)  is used for calls to private members, ie `invokespecial` on JVM.
