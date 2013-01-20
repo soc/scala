@@ -2283,7 +2283,8 @@ abstract class GenASM extends SubComponent with BytecodeWriters with GenJVMASM {
         val receiver = if (useMethodOwner) methodOwner else hostSymbol
         val jowner   = javaName(receiver)
         val jname    = javaName(method)
-        val jtype    = javaTypeIn(method, receiver).getDescriptor()
+        val jtype    = if (useMethodOwner) javaTypeIn(method, receiver).getDescriptor() else javaType(
+        javaTypeIn(method, receiver).getDescriptor()
 
         def dbg(invoke: String) {
           debuglog("%s %s %s.%s:%s".format(invoke, receiver.accessString, jowner, jname, jtype))
