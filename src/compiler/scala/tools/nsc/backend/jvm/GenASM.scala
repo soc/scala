@@ -611,6 +611,17 @@ abstract class GenASM extends SubComponent with BytecodeWriters with GenJVMASM {
       } else { javaType(s.tpe) }
     }
 
+    def javaTypeIn(s: Symbol, receiver: Symbol): asm.Type = {
+      if (s.isConstructor)
+        return javaType(s)
+
+      val tpe            = enteringErasure(receiver.info memberType s)
+      val resT: asm.Type = if (s.isClassConstructor) asm.Type.VOID_TYPE else javaType(tpe.finalResultType)
+      val paramsT        = tpe.paramTypes map javaType
+
+      asm.Type.getMethodType( resT, (s.tpe.paramTypes map javaType): _*)
+    }
+
     def javaArrayType(elem: asm.Type): asm.Type = { asm.Type.getObjectType("[" + elem.getDescriptor) }
 
     def isDeprecated(sym: Symbol): Boolean = { sym.annotations exists (_ matches definitions.DeprecatedAttr) }
@@ -2293,10 +2304,20 @@ abstract class GenASM extends SubComponent with BytecodeWriters with GenJVMASM {
           || hostSymbol.isBottomClass
         )
         val receiver = if (useMethodOwner) methodOwner else hostSymbol
-        // println(s"style=$style ${method.fullLocationString} has receiver $receiver from $siteSymbol")
+        println(s"style=$style ${method.fullLocationString} has receiver $receiver from $siteSymbol")
+        if (receiver.info.decls.toList contains method) {
+          println(s"... ok, in $receiver decls")
+        }
+        else {
+          receiver.ancestors find (_.info.decls.toList contains method) match {
+            case Some(r) => println(s"... ok, in base class $r")
+            case _       => println("... nowhere to be found!")
+          }
+        }
+
         val jowner   = javaName(receiver)
         val jname    = javaName(method)
-        val jtype    = javaType(method).getDescriptor()
+        val jtype    = ( if (method.isConstructor) javaType(method) else javaTypeIn(method, receiver) ).getDescriptor()
 
         def dbg(invoke: String) {
           debuglog("%s %s %s.%s:%s".format(invoke, receiver.accessString, jowner, jname, jtype))
