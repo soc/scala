@@ -2296,6 +2296,71 @@ abstract class GenASM extends SubComponent with BytecodeWriters with GenJVMASM {
         val jname    = javaName(method)
         val jtype    = javaType(method).getDescriptor()
 
+        def checkFail() {
+          def typeIn(where: Symbol) = (where.thisType memberType method).asSeenFrom(siteSymbol.thisType, siteSymbol)
+          def pre(op: => Type) = enteringErasure(op)
+          def post(op: => Type) = exitingPostErasure(op)
+          def erased(tp: Type) = erasure.erasure(method)(erasure.prepareSigMap(tp))
+          def owners = List(call.hostClass, method.owner).distinct
+
+          val triples  = owners map (owner => ((owner, pre(typeIn(owner)), post(typeIn(owner)), erased(pre(typeIn(owner))))))
+          val all = triples flatMap { case (_, tp1, tp2, tp3) => List(tp2, tp3) }
+          if (all.tail forall (all.head =:= _)) return
+          // if (triples forall { case (_, tp1, tp2) => tp1 =:= tp2 }) return
+
+          val strs = triples map { case (owner, tp1, tp2, tp3) =>
+            // val label =  f"$siteSymbol%20s -> ${exitingTyper(owner.fullName)}%-40s"
+            val own_s = exitingTyper(owner.fullName)
+            // val sp   = " " * (label.length - 5)
+            // val pad  = "\n" + sp + "post:"
+            // val poststr = if (tp1 =:= tp2) "" else pad + "  " + tp2
+            if (tp2 =:= tp3)
+              s"""  in $own_s { ${List(tp1, tp2, tp3).distinct mkString "  /  "} }"""
+            else
+              s"""|  in $own_s {
+                  |     pre: $tp1
+                  |    post: $tp2
+                  |   pre+e: $tp3
+                  |  }""".stripMargin
+          }
+
+          println(s"From $siteSymbol {")
+          strs foreach println
+          println("}\n")
+          // val pairs = tps flatMap { case (label, tp) =>
+          //   val spaces: String = label map (_ => ' ')
+          //   List(
+          //     label -> tp,
+          //     spaces -> erased(tp)
+          //   )
+          // }
+          // pairs foreach { case (label, tp) => println(label + "    " + tp) }
+
+          // val etps = tps map erased
+
+
+          // val memberTpe     = enteringErasure(receiver.thisType.memberInfo(method))
+          // val bytecodeTpe   = exitingPosterasure(receiver.thisType.memberInfo(method))
+          // val normalizedTpe = enteringErasure(erasure.prepareSigMap(memberTpe))
+          // val enormalized   = erasure.erasure(method)(normalizedTpe)
+          // val distinct      = List(memberTpe, bytecodeTpe, normalizedTpe, enormalized).map(_.toString).distinct.size
+
+          // if (!method.isConstructor && distinct > 1) {
+          //   println(
+          //      s"""|genCallMethod($method, $style) (in ${method.effectiveOwner.fullLocationString})
+          //          |1) at receiver, seen  pre: $memberTpe
+          //          |2) at receiver, seen post: $bytecodeTpe
+          //          |3) #1
+          //          | pre-e,
+          //          |   bytecodeTpe: $bytecodeTpe
+          //          | normalizedTpe: $normalizedTpe
+          //          |enormalizedTpe: $enormalized
+          //       """.trim.stripMargin
+          //   )
+          // }
+        }
+        checkFail()
+
         def dbg(invoke: String) {
           debuglog("%s %s %s.%s:%s".format(invoke, receiver.accessString, jowner, jname, jtype))
         }
