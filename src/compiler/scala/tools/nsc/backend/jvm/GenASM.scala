@@ -604,21 +604,40 @@ abstract class GenASM extends SubComponent with BytecodeWriters with GenJVMASM {
 
     def javaType(t: Type): asm.Type = javaType(toTypeKind(t))
 
-    def javaTypeIn(s: Symbol, in: Symbol): asm.Type = {
-      exitingPostErasure {
-        if (s.isMethod) {
-          val tpe1 = in.thisType memberType s
-          if (s.tpe_* != tpe1) {
-            println("!!!  " + s.tpe_*)
-            println("now  " + tpe1)
-          }
-          val resT: asm.Type = if (s.isClassConstructor) asm.Type.VOID_TYPE else javaType(tpe1.resultType);
-          asm.Type.getMethodType( resT, (tpe1.paramTypes map javaType): _*)
-        }
-        else javaType(s.tpe_*)
+    def javaTypeOriginal(s: Symbol): asm.Type = {
+      if (s.isMethod) {
+        val resT: asm.Type = if (s.isClassConstructor) asm.Type.VOID_TYPE else javaType(s.tpe.resultType);
+        asm.Type.getMethodType( resT, (s.tpe.paramTypes map javaType): _*)
+      } else { javaType(s.tpe) }
+    }
+
+    def javaType(s: Symbol): asm.Type = {
+      val tp1 = javaTypeOriginal(s)
+      val tp2 = javaTypeNew(s)
+
+      if (tp1 == tp2) tp1 else {
+        println("!!!  " + tp1)
+        println("now  " + tp2)
+        tp1
       }
     }
-    def javaType(s: Symbol): asm.Type = javaTypeIn(s, s.enclClass)
+
+    def javaTypeNew(s: Symbol): asm.Type = {
+      if (s.isMethod && !s.isConstructor)
+        javaTypeOfMethodIn(s, s.enclClass.tpe_*)
+      else
+        javaTypeOriginal(s)
+    }
+
+    def javaTypeOfMethodIn(method: Symbol, host: Type): asm.Type = {
+      exitingPostErasure {
+        val tpe = host memberType method
+        val resT = if (method.isClassConstructor) asm.Type.VOID_TYPE else javaType(tpe.finalResultType)
+        val paramsT = tpe.paramTypes map (_.asSeenFrom(host, method.owner)) map javaType
+
+        asm.Type.getMethodType( resT, paramsT: _*)
+      }
+    }
 
     def javaArrayType(elem: asm.Type): asm.Type = { asm.Type.getObjectType("[" + elem.getDescriptor) }
 
@@ -2281,10 +2300,11 @@ abstract class GenASM extends SubComponent with BytecodeWriters with GenJVMASM {
           || hostSymbol.isBottomClass
         )
         val receiver = if (useMethodOwner) methodOwner else hostSymbol
+        println(s"${method.fullLocationString} has receiver $receiver from $siteSymbol")
+
         val jowner   = javaName(receiver)
         val jname    = javaName(method)
-        val jtype    = if (useMethodOwner) javaTypeIn(method, receiver).getDescriptor() else javaType(
-        javaTypeIn(method, receiver).getDescriptor()
+        val jtype    = ( if (useMethodOwner) javaType(method) else javaTypeOfMethodIn(method, receiver.tpe_*) ).getDescriptor()
 
         def dbg(invoke: String) {
           debuglog("%s %s %s.%s:%s".format(invoke, receiver.accessString, jowner, jname, jtype))
