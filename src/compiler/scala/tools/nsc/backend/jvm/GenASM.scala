@@ -2278,7 +2278,9 @@ abstract class GenASM extends SubComponent with BytecodeWriters with GenJVMASM {
         val hostSymbol  = call.hostClass
         val methodOwner = method.owner
         // info calls so that types are up to date; erasure may add lateINTERFACE to traits
-        hostSymbol.info ; methodOwner.info
+        siteSymbol.info
+        hostSymbol.info
+        methodOwner.info
 
         def isInterfaceCall(sym: Symbol) = (
              sym.isInterface && methodOwner != ObjectClass
@@ -2294,10 +2296,34 @@ abstract class GenASM extends SubComponent with BytecodeWriters with GenJVMASM {
         val receiver = if (useMethodOwner) methodOwner else hostSymbol
         val jowner   = javaName(receiver)
         val jname    = javaName(method)
-        val jtype    = javaType(method).getDescriptor()
+        val jtype    = {
+          val info1 = method.info.asSeenFrom(hostSymbol.thisType, hostSymbol)
+          if (method.info =:= info1)
+            javaType(method).getDescriptor()
+          else {
+            println("bippy")
+            javaType(info1).getDescriptor()
+          }
+        }
 
         def checkFail() {
-          def typeIn(where: Symbol) = (where.thisType memberType method).asSeenFrom(siteSymbol.thisType, siteSymbol)
+          def typeIn(where: Symbol) = {
+            val pre = classExistentialType(where)
+            val t1 = (
+              try (pre memberType method)
+              catch { case t: Throwable =>
+                println(s"[failed] $pre memberType $method (where=$where, receiver=$receiver, method.info=${method.info})")
+                t.printStackTrace
+                val t2 = method.info map (tp => if (tp.typeSymbol.isTypeParameter) tp.typeSymbol.info.bounds.hi.normalize else tp)
+                println(s"... t2=$t2")
+                t2
+              }
+            )
+            t1
+            // t1
+            // try t1.asSeenFrom(siteSymbol.typeConstructor, siteSymbol)
+            // catch { case t: Throwable => println(s"[discarded] $t") ; t1 }
+          }
           def pre(op: => Type) = enteringErasure(op)
           def post(op: => Type) = exitingPostErasure(op)
           def erased(tp: Type) = erasure.erasure(method)(erasure.prepareSigMap(tp))
@@ -2324,7 +2350,7 @@ abstract class GenASM extends SubComponent with BytecodeWriters with GenJVMASM {
                   |  }""".stripMargin
           }
 
-          println(s"From $siteSymbol {")
+          println(s"${method.fullLocationString} called from $siteSymbol {")
           strs foreach println
           println("}\n")
           // val pairs = tps flatMap { case (label, tp) =>
