@@ -612,6 +612,11 @@ trait Types extends api.Types { self: SymbolTable =>
       else Nil
     )
 
+    /** Overridden in AbstractTypeRef. */
+    def upperBoundChain: List[Type] = this :: Nil
+
+    def dealiasWidenUpperBoundChain: List[Type] = dealiasWidenChain flatMap (_.upperBoundChain)
+
     def etaExpand: Type = this
 
     /** Performs a single step of beta-reduction on types.
@@ -2284,6 +2289,7 @@ trait Types extends api.Types { self: SymbolTable =>
     private var symInfoCache: Type = _
     private var thisInfoCache: Type = _
 
+    override def upperBoundChain = this :: sym.info.bounds.hi.upperBoundChain
     override def isVolatile = {
       // need to be careful not to fall into an infinite recursion here
       // because volatile checking is done before all cycles are detected.
@@ -5389,6 +5395,11 @@ trait Types extends api.Types { self: SymbolTable =>
   }
 
   def isSameType2(tp1: Type, tp2: Type): Boolean = {
+    if (tp1 ne tp1.dealias)
+      return isSameType2(tp1.dealias, tp2)
+    if (tp2 ne tp2.dealias)
+      return isSameType2(tp1, tp2.dealias)
+
     tp1 match {
       case tr1: TypeRef =>
         tp2 match {
@@ -5524,29 +5535,34 @@ trait Types extends api.Types { self: SymbolTable =>
         return annotationsConform(tp1, tp2) && annotationsConform(tp2, tp1) && tp1.withoutAnnotations =:= tp2.withoutAnnotations
       case _ =>
     }
-    tp1 match {
-      case _: SingletonType =>
-        tp2 match {
-          case _: SingletonType =>
-            def chaseDealiasedUnderlying(tp: Type): Type = {
-              var origin = tp
-              var next = origin.underlying.dealias
-              while (next.isInstanceOf[SingletonType]) {
-                assert(origin ne next, origin)
-                origin = next
-                next = origin.underlying.dealias
-              }
-              origin
-            }
-            val origin1 = chaseDealiasedUnderlying(tp1)
-            val origin2 = chaseDealiasedUnderlying(tp2)
-            ((origin1 ne tp1) || (origin2 ne tp2)) && (origin1 =:= origin2)
-          case _ =>
-            false
-        }
-      case _ =>
-        false
-    }
+    isSameSingletonType(tp1, tp2)
+  }
+
+  def isSameSingletonType(tp1: Type, tp2: Type): Boolean = (tp1, tp2) match {
+    case (_: SingletonType, _: SingletonType) =>
+      // Chase singleton types, bounding from one alias to the next
+      // waiting for the ride to end. Is that an abstract type there?
+      // Then the ride's not over yet, because if
+      //   type Foo <: Bar.type   <and>    val x: Foo
+      // That implies x is an instance (the instance, actually) of Bar.type.
+      def chase(tp: Type): Type = {
+        def maybe(next: Type): Option[Type] =
+          if ((tp ne next) && isSingleType(next)) Some(chase(next)) else None
+
+        val next = (
+          maybe(tp.underlying)
+            orElse maybe(tp.dealias)
+            orElse ( if (tp.typeSymbol.isAbstractType) maybe(tp.bounds.hi) else None )
+        )
+        next.fold(tp)(chase)
+      }
+      val origin1 = chase(tp1)
+      val origin2 = chase(tp2)
+      ((origin1 ne tp1) || (origin2 ne tp2)) && (origin1 =:= origin2) && {
+        devWarning(s"Found hidden singleton equivalence $tp1 =:= $tp2 ($origin1 =:= $origin2)")
+        true
+      }
+    case _ => false
   }
 
   /** Are `tps1` and `tps2` lists of pairwise equivalent types? */
@@ -5814,15 +5830,26 @@ trait Types extends api.Types { self: SymbolTable =>
      *   - bind TypeVars  on the right, if lhs is not Annotated nor BoundedWildcard
      *   - handle common cases for first-kind TypeRefs on both sides as a fast path.
      */
-    def firstTry = tp2 match {
+    def firstTry: Boolean = tp2 match {
       // fast path: two typerefs, none of them HK
       case tr2: TypeRef =>
         tp1 match {
           case tr1: TypeRef =>
+
             val sym1 = tr1.sym
             val sym2 = tr2.sym
             val pre1 = tr1.pre
             val pre2 = tr2.pre
+
+            if (sym1.isAliasType || sym2.isAliasType) {
+              if (sym1.isAliasType && (tr1 eq tr1.dealias))
+                devWarning(s"Type dealiases to itself! $tr1")
+              else if (sym2.isAliasType && (tr2 eq tr2.dealias))
+                devWarning(s"Type dealiases to itself! $tr2")
+              else
+                return isSubType2(tr1.dealias, tr2.dealias, depth)
+            }
+
             (((if (sym1 == sym2) phase.erasedTypes || sym1.owner.hasPackageFlag || isSubType(pre1, pre2, depth)
                else (sym1.name == sym2.name && !sym1.isModuleClass && !sym2.isModuleClass &&
                      (isUnifiable(pre1, pre2) ||
@@ -5955,7 +5982,7 @@ trait Types extends api.Types { self: SymbolTable =>
     /** Fourth try, on the left:
      *   - handle typerefs, refined types, notnull and singleton types.
      */
-    def fourthTry = tp1 match {
+    def fourthTry: Boolean = tp1 match {
       case tr1 @ TypeRef(pre1, sym1, _) =>
         sym1 match {
           case NothingClass => true
@@ -5978,10 +6005,11 @@ trait Types extends api.Types { self: SymbolTable =>
             else false
 
           case _: TypeSymbol =>
-            if (sym1 hasFlag DEFERRED) {
-              val tp1a = tp1.bounds.hi
+            if (sym1.isAbstractType) {
+              val tp1a = tp1.bounds.hi.dealias
               isDifferentTypeConstructor(tp1, tp1a) && isSubType(tp1a, tp2, depth)
-            } else {
+            }
+            else {
               isSubType(tp1.normalize, tp2.normalize, depth)
             }
           case _ =>
@@ -5992,7 +6020,10 @@ trait Types extends api.Types { self: SymbolTable =>
       case _: SingletonType | _: NotNullType =>
         isSubType(tp1.underlying, tp2, depth)
       case _ =>
-        false
+        tp1.dealiasWidenUpperBoundChain filterNot (o1 => (o1 ne tp1) && (o1 <:< tp2)) match {
+          case hd :: _ => devWarning(s"Found hidden singleton conformance $tp1 <:< $tp2 ($hd <:< $tp2)") ; true
+          case _       => false
+        }
     }
 
     firstTry
