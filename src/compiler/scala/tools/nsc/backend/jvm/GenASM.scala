@@ -2259,8 +2259,11 @@ abstract class GenASM extends SubComponent with BytecodeWriters with GenJVMASM {
         // info calls so that types are up to date; erasure may add lateINTERFACE to traits
         hostSymbol.info ; methodOwner.info
 
+        // Dalvik can't handle invokeinterface on targets defined in java.lang.Object
+        // such as toString, so check the earliest owner if there are method overrides.
+        // See SI-5397.
         def isInterfaceCall(sym: Symbol) = (
-             sym.isInterface && methodOwner != ObjectClass
+             sym.isInterface && (method :: method.allOverriddenSymbols).last.owner != ObjectClass
           || sym.isJavaDefined && sym.isNonBottomSubClass(ClassfileAnnotationClass)
         )
         // whether to reference the type of the receiver or
