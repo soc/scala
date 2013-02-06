@@ -4380,9 +4380,44 @@ trait Types extends api.Types { self: SymbolTable =>
       case tp @ ThisType(_)                                            => thisTypeAsSeen(tp)
       case tp @ SingleType(_, sym)                                     => if (sym.isPackageClass) tp else singleTypeAsSeen(tp)
       case tp @ TypeRef(_, sym, _) if isTypeParamOfEnclosingClass(sym) => classParameterAsSeen(tp)
+      case tp @ AbstractType(pre, sym, args) if sym.hasCompleteInfo    => println(s"${sym.defStringSeenAs(sym.info)}") ; mapOver(tp)
       case _                                                           => mapOver(tp)
     }
+    //     def apply(tp: Type): Type = tp match {
+    //       case ThisType(sym)                                       => thisTypeAsSeen(tp)
+    //       case SingleType(_, sym)                                  => if (sym.isPackageClass) tp else singleTypeAsSeen(tp)
+    //       case ClassTypeParameter(_, _)                            => classTypeParameterAsSeen(tp)
+    //       case AbstractType(pre, sym, Nil) if rewriteAbstract(sym) =>
+    //         val sym1 = (sym matchingSymbol seenFromPrefix) orElse sym
+    //         val pre1 = this(pre)
+    //         val clone = internally(sym1.cloneSymbolImpl(pre1.typeSymbol, sym1.flags) setInfo this(sym1.info))
+    //         devWarning(
+    //           s"""|AsSeenFromMap($seenFromPrefix, $seenFromClass) cloning into $pre1
+    //               |   tp: $tp (defined in ${sym.owner})
+    //               |  was: ${sym.defString}
+    //               |  and: ${sym1.defString}
+    //               |  now: ${clone.defString}""".stripMargin)
 
+    //         mapOver(clone.tpe_*)
+    //       case _                                                   => mapOver(tp)
+    //     }
+
+    //     private def rewriteAbstract(sym: Symbol) = (
+    //          !internal
+    //       && sym.hasCompleteInfo
+    //       && sym.owner.isClass
+    //       && !noChangeToSymbols(sym :: Nil)
+    //     )
+
+    //     /** Recursion guard when transforming a symbol's info. */
+    //     private var internal = false
+    //     private def internally[T](body: => T): T = {
+    //       val saved = internal
+    //       internal = true
+    //       try body finally internal = saved
+    // >>>>>>> 1c745c7205... SI-6161, ThisTypes in asSeenFrom.
+
+    private val prefixClasses = seenFromPrefix.typeSymbol.ownerChain takeWhile (p => !p.isPackage)
     private var _capturedSkolems: List[Symbol] = Nil
     private var _capturedParams: List[Symbol]  = Nil
     private val isStablePrefix = seenFromPrefix.isStable
@@ -4407,6 +4442,18 @@ trait Types extends api.Types { self: SymbolTable =>
       && sym.owner.isClass
       && isBaseClassOfEnclosingClass(sym.owner)
     )
+    private val openSymbols = mutable.Set[Symbol]()
+    override protected def noChangeToSymbols(origSyms: List[Symbol]): Boolean = {
+      def loop(syms: List[Symbol]): Boolean = syms match {
+        case Nil                      => true
+        case x :: _ if openSymbols(x) => log(s"AsSeenFromMap recursion guard caught " + x); false
+        case x :: xs                  =>
+          openSymbols += x
+          try { (x.info eq this(x.info)) && loop(xs) }
+          finally openSymbols -= x
+      }
+      loop(origSyms)
+    }
 
     /** Creates an existential representing a type parameter which appears
      *  in the prefix of a ThisType.
@@ -4621,7 +4668,7 @@ trait Types extends api.Types { self: SymbolTable =>
 
     protected def toType(fromtp: Type, sym: Symbol) = fromtp match {
       case TypeRef(pre, _, args) => copyTypeRef(fromtp, pre, sym, args)
-      case SingleType(pre, _) => singleType(pre, sym)
+      case SingleType(pre, _)    => singleType(pre, sym)
     }
     @tailrec private def subst(sym: Symbol, from: List[Symbol], to: List[Symbol]): Symbol = (
       if (from.isEmpty) sym
@@ -7097,6 +7144,13 @@ trait Types extends api.Types { self: SymbolTable =>
   def objToAny(tp: Type): Type =
     if (!phase.erasedTypes && tp.typeSymbol == ObjectClass) AnyClass.tpe
     else tp
+
+  object AbstractType {
+    def unapply(tp: Type) = tp match {
+      case TypeRef(pre, sym, args) if sym.isAbstractType && !sym.isTypeParameterOrSkolem => Some((pre, sym, args))
+      case _                                                                             => None
+    }
+  }
 
   val shorthands = Set(
     "scala.collection.immutable.List",
