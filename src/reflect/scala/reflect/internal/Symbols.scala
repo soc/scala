@@ -746,17 +746,13 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
     def isCompileTimeOnly       = hasAnnotation(CompileTimeOnlyAttr)
     def compileTimeOnlyMessage  = getAnnotation(CompileTimeOnlyAttr) flatMap (_ stringArg 0)
 
-    /** Is this symbol an accessor method for outer? */
-    final def isOuterAccessor = {
-      hasFlag(STABLE | ARTIFACT) &&
-      originalName == nme.OUTER
-    }
+    /** Is this symbol an accessor for an $outer? */
+    final def isOuterAccessor = isOuterMember && isMethod
 
-    /** Is this symbol an accessor method for outer? */
-    final def isOuterField = {
-      hasFlag(ARTIFACT) &&
-      originalName == nme.OUTER_LOCAL
-    }
+    /** Is this symbol a field storing an $outer? */
+    final def isOuterField = isOuterMember && !isMethod
+
+    def isOuterMember = (this hasFlag ARTIFACT) && (originalName == nme.OUTER)
 
     /** Does this symbol denote a stable value? */
     def isStable = false
@@ -1778,7 +1774,7 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
     /** If this is an accessor, the accessed symbol.  Otherwise, this symbol. */
     def accessedOrSelf: Symbol = if (hasAccessorFlag) accessed else this
 
-    /** For an outer accessor: The class from which the outer originates.
+    /** For an outer accessor or field: the class from which the outer originates.
      *  For all other symbols: NoSymbol
      */
     def outerSource: Symbol = NoSymbol
@@ -2473,8 +2469,13 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
     }
 
     override def outerSource: Symbol =
-      if (originalName == nme.OUTER) initialize.referenced
-      else NoSymbol
+      if (isOuterMember) initialize.referenced else NoSymbol
+
+    // def eligibleForField(clazz: Symbol) = (
+    //      clazz.isEffectivelyFinal
+    //   && clazz == accessor.owner
+    //   && clazz.thisType == base.tpe
+    // )
 
     def setModuleClass(clazz: Symbol): TermSymbol = {
       assert(isModule, this)

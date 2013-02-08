@@ -66,13 +66,6 @@ abstract class ExplicitOuter extends InfoTransform
     }
   }
 
-  private def outerField(clazz: Symbol): Symbol = {
-    val result = clazz.info.member(nme.OUTER_LOCAL)
-    assert(result != NoSymbol, "no outer field in "+clazz+" at "+phase)
-
-    result
-  }
-
   private val innerClassConstructorParamName: TermName = newTermName("arg" + nme.OUTER)
 
   class RemoveBindingsTransformer(toRemove: Set[Symbol]) extends Transformer {
@@ -225,13 +218,57 @@ abstract class ExplicitOuter extends InfoTransform
      *  Will return `EmptyTree` if there is no outer accessor because of a premature self reference.
      */
     private def outerSelect(base: Tree): Tree = {
-      val baseSym = base.tpe.typeSymbol.toInterface
-      val outerAcc = outerAccessor(baseSym)
+      val baseSym  = base.tpe.typeSymbol.toInterface
+      val accessor = baseSym.outerSource
+
+      info.decls collectFirst (_.outerSource == baseSym) getOrElse NoSymbol
+
+      def constructing = baseSym.ownersIterator exists isUnderConstruction
+
+      def eligibleForField(clazz: Symbol) = (
+           clazz.isEffectivelyFinal
+        && clazz == accessor.owner
+        && clazz.thisType == base.tpe
+      )
+
+      val field = if (eligibleForField(currentClass)) currentClass.info member nme.OUTER_LOCAL else NoSymbol
+      val outerPointer =
+
+      def outerPointer = (
+        if (eligibleForField)
+          currentClass.info member nme.OUTER_LOCAL
+
+
+         ++ baseSym.info.decls)
+
+        (baseSym.info.decls filter (_.outerSource == baseSym)
+          orElse
+        (currentClass.info.decls member nme.OUTER_LOCAL)
+      )
+
+      val outerAccessor    = outerAccessor1 orElse outerAccessor2
+      def eligibleOuterField = (
+           ownerInCurrent(outerAccessor)
+        && outerAccessor.owner.isEffectivelyFinal
+        && base.tpe =:= currentClass.thisType
+      )
+      def outerField = currentClass.info member nme.OUTER_LOCAL filter (s => ownerInCurrent(s) && eligibleOuterField)
+
+      if (outerAccessor.exists || constructing)
+        localTyper typed gen.mkApplyIfNeeded(Select(base, outerField orElse outerAccessor))
+      else
+        EmptyTree // e.g neg/t6666.scala - the caller will report the error with more information.
+
+
+
+      localTyper typed gen.mkApplyIfNeeded(Select(base, outerField orElse outerAccessor))
+
       if (outerAcc == NoSymbol && baseSym.ownersIterator.exists(isUnderConstruction)) {
          // e.g neg/t6666.scala
-         // The caller will report the error with more information.
+
          EmptyTree
-      } else {
+      }
+      else {
         val currentClass = this.currentClass //todo: !!! if this line is removed, we get a build failure that protected$currentClass need an override modifier
         // outerFld is the $outer field of the current class, if the reference can
         // use it (i.e. reference is allowed to be of the form this.$outer),
