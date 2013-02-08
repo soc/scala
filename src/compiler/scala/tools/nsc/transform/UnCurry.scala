@@ -214,7 +214,16 @@ abstract class UnCurry extends InfoTransform
      *     }
      *     new $anon()
      *   }
-     *
+     *  
+     *  However, due to challenges with anon classes in constructors, if the inConstructorFlag is set
+     *  then instead the body is inlined directly into the apply method of the anonymous class
+     *  
+     *   {
+     *     class $anon() extends AbstractFunctionN[T_1, .., T_N, R] with Serializable {
+     *       def apply(x_1: T_1, ..., x_N: T_n): R = body
+     *     }
+     *     new $anon()
+     *   }
      */
     def transformFunction(fun: Function): Tree = {
       fun.tpe match {
@@ -248,7 +257,7 @@ abstract class UnCurry extends InfoTransform
            * @bodyF function that turns the method symbol and list of value params
            *        into a body for the method
            */
-          def createMethod(owner: Symbol, name: TermName, additionalFlags: Int)(bodyF: (Symbol, List[ValDef]) => Tree) = {
+          def createMethod(owner: Symbol, name: TermName, additionalFlags: Long)(bodyF: (Symbol, List[ValDef]) => Tree) = {
             val methSym = owner.newMethod(name, fun.pos, FINAL | additionalFlags)
             val vparams = fun.vparams map (_.duplicate)
             
@@ -270,12 +279,18 @@ abstract class UnCurry extends InfoTransform
             methDef
             
           }
+
           
+          val liftedMethodDef = if ((inConstructorFlag & INCONSTRUCTOR) != 0)
+            // if we're in a constructor, for now we fall back to putting the body of the lambda directly in the anonymous class
+            None
+          else {
           // method definition with the same arguments, return type, and body as the original lambda
-          val liftedMethodDef = createMethod(fun.symbol.owner, tpnme.ANON_FUN_NAME.toTermName, SYNTHETIC){
-            case(methSym, vparams) => 
-              fun.body.substituteSymbols(fun.vparams map (_.symbol), vparams map (_.symbol))
-              fun.body changeOwner (fun.symbol -> methSym)
+            Some(createMethod(fun.symbol.owner, tpnme.ANON_FUN_NAME.toTermName, ARTIFACT){
+              case(methSym, vparams) => 
+                fun.body.substituteSymbols(fun.vparams map (_.symbol), vparams map (_.symbol))
+                fun.body changeOwner (fun.symbol -> methSym)
+            })
           }
 
           // anonymous subclass of FunctionN with an apply method that calls the method defined in liftedMethodDef
@@ -283,11 +298,18 @@ abstract class UnCurry extends InfoTransform
             val parents = addSerializable(abstractFunctionForFunctionType(fun.tpe))
             val anonClass = fun.symbol.owner newAnonymousFunctionClass(fun.pos, inConstructorFlag) addAnnotation serialVersionUIDAnnotation
             anonClass setInfo ClassInfoType(parents, newScope, anonClass)
-            // apply method with same arguments and return type as orignal lambda. It calls the method defined by liftedMethodDef
+            // apply method with same arguments and return type as orignal lambda.
             val applyMethodDef = createMethod(anonClass, nme.apply, NO_FLAGS) {
               case (methSym, vparams) =>
-                val args = vparams map {vparam => Ident(vparam.symbol)}
-                Apply(liftedMethodDef.symbol, args:_*)
+                liftedMethodDef map {meth => 
+                  // if we have a lifted method then the anon's method will just call it
+                  val args = vparams map {vparam => Ident(vparam.symbol)}
+                  Apply(meth.symbol, args:_*)
+                } getOrElse {
+                  // if we don't have a lifted method then we need to stuff the lambda's body into the apply method
+                  fun.body.substituteSymbols(fun.vparams map (_.symbol), vparams map (_.symbol))
+                  fun.body changeOwner (fun.symbol -> methSym)                 
+                }               
             }
             anonClass.info.decls enter applyMethodDef.symbol
             ClassDef(anonClass, NoMods, ListOfNil, List(applyMethodDef), fun.pos)
@@ -295,7 +317,7 @@ abstract class UnCurry extends InfoTransform
 
           localTyper.typedPos(fun.pos) {
             Block(
-              List(liftedMethodDef, anonymousClassDef),
+              List(liftedMethodDef, Some(anonymousClassDef)).flatten,
               Typed(New(anonymousClassDef.symbol), TypeTree(fun.tpe)))
           }
 
