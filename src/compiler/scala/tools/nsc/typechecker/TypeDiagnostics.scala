@@ -174,9 +174,16 @@ trait TypeDiagnostics {
   }
 
   // todo: use also for other error messages
+  private def existentialOrigin(sym: Symbol): String = {
+    def skip(s: Symbol) = (
+      (s hasFlag EXISTENTIAL) || s.hasMeaninglessName || s.isAnonOrRefinementClass || s.isAnonymousFunction
+    )
+    val namedOwner = sym.ownerChain find (s => !skip(s))
+    namedOwner.fold("")(s => s" (${sym.name} originated in ${s.fullLocationString})")
+  }
   def existentialContext(tp: Type) = tp.skolemsExceptMethodTypeParams match {
     case Nil  => ""
-    case xs   => " where " + (disambiguate(xs map (_.existentialToString)) mkString ", ")
+    case xs   => " where " + (disambiguate(xs map (x => x.existentialToString + existentialOrigin(x))) mkString ", ")
   }
 
   def varianceWord(sym: Symbol): String =
@@ -313,10 +320,15 @@ trait TypeDiagnostics {
     def typeQualify()  = if (sym.isTypeParameterOrSkolem) postQualify()
     def nameQualify()  = if (trueOwner.isPackageClass) preQualify() else postQualify()
 
-    def trueOwner  = tp.typeSymbol.effectiveOwner
-    def aliasOwner = tp.typeSymbolDirect.effectiveOwner
+    def tsym = tp.typeSymbol
+    def asym = tp.typeSymbolDirect
 
-    def sym_==(other: TypeDiag)    = tp.typeSymbol == other.tp.typeSymbol
+    def trueOwner   = tsym.effectiveOwner
+    def aliasOwner  = asym.effectiveOwner
+    def namedOwners = tsym.ownerChain filterNot (s => (s hasFlag EXISTENTIAL) || s.hasMeaninglessName || s.isAnonOrRefinementClass || s.isAnonymousFunction)
+    def namedOwner  = if (namedOwners.isEmpty) trueOwner else namedOwners.head
+
+    def sym_==(other: TypeDiag)    = tsym.initialize == other.tsym.initialize
     def owner_==(other: TypeDiag)  = trueOwner == other.trueOwner
     def string_==(other: TypeDiag) = tp.toString == other.tp.toString
     def name_==(other: TypeDiag)   = sym.name == other.sym.name
@@ -327,15 +339,14 @@ trait TypeDiagnostics {
       else 1
 
     override def toString = {
-      """
-      |tp = %s
-      |tp.typeSymbol = %s
-      |tp.typeSymbol.owner = %s
-      |tp.typeSymbolDirect = %s
-      |tp.typeSymbolDirect.owner = %s
-      """.stripMargin.format(
-        tp, tp.typeSymbol, tp.typeSymbol.owner, tp.typeSymbolDirect, tp.typeSymbolDirect.owner
-      )
+      s"""
+        |  tp = $tp
+        | sym = ${sym.ownerChain mkString " -> "}
+        |flag = ${sym.initialize.debugFlagString}
+        |owns = $namedOwner
+        |tsym = ${tsym.ownerChain mkString " -> "}
+        |asym = ${asym.ownerChain mkString " -> "}
+        """.stripMargin
     }
   }
   /** This is tricky stuff - we need to traverse types deeply to
@@ -392,9 +403,20 @@ trait TypeDiagnostics {
           !(mod(td1) string_== mod(td2))
         }
         def maybeDisambiguateWith(modifyFn: TypeDiag => Unit) {
+          // Console.err.println(List(td1, td2) map (s => (s.sym.ownerChain, s.namedOwner, s.sym.debugFlagString, s.sym.isExistentialSkolem)) mkString "\n")
+
+          // Console.err.println(atPhase(currentRun.typerPhase)(td1.sym.ownerChain mkString " -> "))
+          // Console.err.println(atPhase(currentRun.typerPhase)(td2.sym.ownerChain mkString " -> "))
+          // Console.err.println(td1)
+          // Console.err.println(td2)
           if ((td1 string_== td2) && helps(modifyFn))
             List(td1, td2) foreach modifyFn
         }
+        // def existentiallyQualify(td: TypeDiag) {
+        //   Console.err.println(s"existentiallyQualify $td")
+        //   // if (td.sym hasFlag EXISTENTIAL)
+        //     td modifyName (_ + s"(originating in ${td.namedOwner})")
+        // }
         // If the types print identically, qualify them:
         //   a) If the dealiased owner is a package, the full path
         //   b) Otherwise, append (in <owner>)
@@ -409,8 +431,19 @@ trait TypeDiagnostics {
         //   a) If they are type parameters with different owners, append (in <owner>)
         //   b) Failing that, the best we can do is append "(some other)" to the latter.
         maybeDisambiguateWith(_.typeQualify())
-        if (td1 string_== td2)
-          td2.modifyName("(some other)" + _)
+        // maybeDisambiguateWith(existentiallyQualify)
+        if (td1 string_== td2) {
+          /*if ((td1.sym hasFlag EXISTENTIAL) && (td2.sym hasFlag EXISTENTIAL)) {
+            td1 modifyName (_ + s"(originating in ${td1.namedOwner})")
+            td2 modifyName (s =>
+              if (td1.namedOwner.name.toString == td2.namedOwner.name.toString)
+                s + s"(separately originating in ${td1.namedOwner})"
+              else
+                s + s"(originating in ${td2.namedOwner})"
+            )
+          }
+          else */td2.modifyName("(some other)" + _)
+        }
       }
       // performing the actual operation
       op
