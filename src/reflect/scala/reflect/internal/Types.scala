@@ -6949,6 +6949,206 @@ trait Types extends api.Types { self: SymbolTable =>
         throw new NoCommonType(tps)
     }
 
+  def matchAtBaseClass(base: Symbol)(tp1: Type, tp2: Type) =
+    (tp1 baseType base) =:= (tp2 baseType base)
+
+  /** Type operations relative to a prefix.  All operations work on Symbols,
+   *  and the types are the member types of those symbols in the prefix.
+   */
+  class RelativeTo(val prefix: Type) {
+    def this(clazz: Symbol) = this(clazz.thisType)
+    private implicit def symbolToType(sym: Symbol): Type = prefix memberType sym
+
+    def erasureOf(sym: Symbol)       = erasure.erasure(sym)(sym: Type)
+    def signature(sym: Symbol)       = sym defStringSeenAs (sym: Type)
+    def erasedSignature(sym: Symbol) = sym defStringSeenAs erasureOf(sym)
+
+    def isSameType(sym1: Symbol, sym2: Symbol): Boolean    = sym1 =:= sym2
+    def isSubType(sym1: Symbol, sym2: Symbol): Boolean     = sym1 <:< sym2
+    def isSuperType(sym1: Symbol, sym2: Symbol): Boolean   = sym2 <:< sym1
+    def isSameErasure(sym1: Symbol, sym2: Symbol): Boolean = erasureOf(sym1) =:= erasureOf(sym2)
+    def matches(sym1: Symbol, sym2: Symbol): Boolean       = (sym1: Type) matches (sym2: Type)
+
+    override def toString = s"RelativeTo($prefix)"
+  }
+
+  type TFunction2[T]    = (Type, Type) => T
+  type TFunction2Map[T] = TFunction2[T] => TFunction2[T]
+
+  def erasedOp[T](sym: Symbol): TFunction2Map[T] = {
+    fn => ((tp1, tp2) => fn(erasure.erasure(sym)(tp1), erasure.erasure(sym)(tp2)))
+  }
+
+  // case class FixedSymbolView(name: String, pre: Type, sym: Symbol, ph: Phase) {
+  //   val memberType = atPhase(ph)(pre memberType sym)
+  //   val defString  = sym defStringSeenAs memberType
+
+  //   override def toString = s"$name: $defString"
+  // }
+
+  case class FixedSymbolView(name: String, pre: Type, sym: Symbol) {
+    // def atPhase(ph: Phase) = atPhase(ph)(this.toString)
+
+    override def toString = {
+      val memberType = pre memberType sym
+      val defString  = sym defStringSeenAs memberType
+
+      s"$name: $defString"
+    }
+  }
+
+  class PrefixViews(val prefixes: List[() => Type], prefixSemantics: String) {
+    def this(prefixes: List[Type]) = this(prefixes map (() => _), "Fixed Prefixes")
+
+    def add (pre: => Type): PrefixViews = new PrefixViews(prefixes :+ (() => pre), prefixSemantics)
+    // def erasures: PrefixViews = new PrefixViews(prefixes map (fn => erasure.erasure(fn())), prefixSemantics)
+
+    def mapFn0[T](f: () => T, g: T => T): () => T = (() => g(f()))
+
+    def baseType(baseClass: Symbol): PrefixViews = map(_ baseType baseClass)
+    def map(g: Type => Type): PrefixViews = new PrefixViews(prefixes map (fn => mapFn0(fn, g)), prefixSemantics)
+      // (() => g(fn())), prefixSemantics))
+
+    // def addErasures(sym: Symbol): PrefixViews = prefixes.foldLeft(this: PrefixViews)((res, fn) =>
+    //   res add erasure.erasure(sym)(fn())
+    // )
+
+    class PrefixView(val symbols: List[Symbol]) {
+      val creationPhase = phase
+      def prefixNames = 1 to prefixes.length map ("Pre" + _) toList
+      def symbolNames = 1 to symbols.length map ("Sym" + _) toList
+      def prefixLets  = (prefixNames, prefixes).zipped map ((name, preFn) => s"Let $name = ${preFn()}")
+      def symbolLets  = (symbolNames, symbols).zipped  map ((name, sym) => s"Let $name = ${sym.fullLocationString}")
+
+      def prefixesString = prefixLets mkString "\n"
+      def symbolsString  = symbolLets mkString "\n"
+      def typesString    = memberTypeStrings mkString "\n"
+
+      def mapTypes[T](f: (String, Type, Symbol, Type) => T): List[T] = {
+        (symbolNames, symbols).zipped flatMap ((symName, sym) =>
+          (prefixNames, prefixes).zipped map { (preName, preFn) =>
+            val pre = preFn()
+            f(preName + "#" + symName, pre, sym, pre memberType sym)
+          }
+        )
+      }
+
+      def views = mapTypes((name, pre, sym, tpe) => FixedSymbolView(name, pre, sym))
+      def viewsString = List(prefixesString, symbolsString, views.mkString("Views {\n  ", "\n  ", "\n}")).mkString("\n", "\n", "")
+      // def fixedAtPhase(ph: Phase) = mapTypes((name, pre, sym, tpe) => FixedSymbolView(name, pre, sym, ph))
+
+      lazy val memberTypes: Map[String, Type] = mapTypes((name, pre, sym, tpe) => (name, tpe)).toMap
+      def memberTypeStrings = mapTypes((name, pre, sym, tpe) => s"$name is ${sym defStringSeenAs tpe}")
+
+      override def toString = s"""
+        |$prefixSemantics {
+        |  $prefixesString
+        |  $symbolsString
+        |
+        |  $typesString
+        |}""".stripMargin.trim
+    }
+
+    def freeze: PrefixViews = new PrefixViews(prefixes map (f => f()))
+    def apply(symbols: List[Symbol]) = new PrefixView(symbols)
+  }
+
+  object PrefixViews {
+    def empty = new PrefixViews(Nil, "Empty")
+
+    def fixed(pre1: Type, pre2: Type): PrefixViews = new PrefixViews(List(() => pre1, () => pre2), "Fixed Prefixes")
+    def fluid(pre1: => Type, pre2: => Type): PrefixViews = new PrefixViews(List(() => pre1, () => pre2), "Fluid Prefixes")
+  }
+
+
+  class SymbolRelationship(val clazz: Symbol, val prefix: Type) {
+    def this(prefix: Type) = this(prefix.typeSymbol, prefix)
+    def this(clazz: Symbol) = this(clazz, clazz.thisType)
+
+    val relatively = new RelativeTo(prefix)
+
+    def apply(sym1: Symbol, sym2: Symbol) {
+      val same       = "%5s:" format relatively.isSameType(sym1, sym2)
+      val sub        = "%5s:" format relatively.isSubType(sym1, sym2)
+      val ssuper     = "%5s:" format relatively.isSuperType(sym1, sym2)
+      val sameErased = "%5s:" format relatively.isSameErasure(sym1, sym2)
+      val matches    = "%5s:" format relatively.matches(sym1, sym2)
+
+      // printAfterEachPhase(s"""
+      //   |Considering relative to $prefix
+      //   |    lhs: ${sym1.defString}
+      //   |     is: ${relatively signature sym1}
+      //   | erased: ${relatively erasedSignature sym1}
+      //   |    rhs: ${sym2.defString}
+      //   |     is: ${relatively signature sym2}
+      //   | erased: ${relatively erasedSignature sym2}
+      //   |
+      //   |  $same lhs =:= rhs
+      //   |  $sub lhs <:< rhs
+      //   |  $ssuper rhs <:< lhs
+      //   |  $sameErased |lhs| =:= |rhs|
+      //   |  $matches lhs matches rhs
+      //   |""".stripMargin.trim
+      // )
+    }
+  }
+
+  class InPrefixes(_pre1: => Type, _pre2: => Type) {
+    inpre =>
+
+    def pre1 = _pre1
+    def pre2 = _pre2
+
+    class ForMember(sym: Symbol) {
+      def rel1 = new RelativeTo(pre1)
+      def rel2 = new RelativeTo(pre2)
+
+      def tp1 = pre1 memberType sym
+      def tp2 = pre2 memberType sym
+      def apply[T](op: (Type, Type) => T): T = op(tp1, tp2)
+      private def erase(tp: Type) = erasure.erasure(sym)(tp)
+
+      def isSameType    = apply[Boolean](_ =:= _)
+      def isSubType     = apply[Boolean](_ <:< _)
+      def isSuperType   = apply[Boolean]((t1, t2) => t2 <:< t1)
+      def isSameErasure = apply[Boolean]((t1, t2) => erase(t1) =:= erase(t2))
+
+      override def toString = s"""
+        |Considering $sym in prefixes $pre1 and $pre2 {
+        |  Let T1 = ${rel1 signature sym}
+        |  Let T2 = ${rel2 signature sym}
+        |
+        |     (T1 =:= T2) $isSameType
+        |     (T1 <:< T2) $isSubType
+        |    isSuperType: $isSuperType
+        |  isSameErasure: $isSameErasure
+        |}""".stripMargin.trim
+    }
+
+    def atBase(baseClass: Symbol) = new InPrefixes(pre1 baseType baseClass, pre2 baseType baseClass)
+
+    def forTerm(name: String)  = forName(name: TermName)
+    def forType(name: String)  = forName(name: TypeName)
+    def forName(name: Name)    = new ForMember(pre1 member name)
+    def forMember(sym: Symbol) = new ForMember(sym)
+
+    override def toString = s"InPrefixes($pre1, $pre2)"
+  }
+
+  /** Type operations as seen from a base class.  All operations work on Types,
+   *  and the base types of the arguments are taken against the Symbol `base`
+   *  before performing the operation.
+   */
+  class BasedOn(base: Symbol) {
+    def typeArgs(tp: Type)               = (tp baseType base).typeArgs
+    def typeParams(tp: Type)             = (tp baseType base).typeParams
+    def matches(tp1: Type, tp2: Type)    = (tp1 baseType base) matches (tp2 baseType base)
+    def members(tp: Type)                = (tp baseType base).members
+    def isSameType(tp1: Type, tp2: Type) = (tp1 baseType base) =:= (tp2 baseType base)
+
+    override def toString = s"BasedOn($base)"
+  }
+
 // Errors and Diagnostics -----------------------------------------------------
 
   /** A throwable signalling a type error */
