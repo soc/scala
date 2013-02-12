@@ -917,6 +917,8 @@ abstract class Erasure extends AddInterfaces
           while (e1 ne null) {
             if (exitingPostErasure(e1.sym.info =:= e.sym.info))
               doubleDefError(new SymbolPair(base, e.sym, e1.sym))
+            else
+              log(s"distinct infos: ${e1.sym.info}  <and>  ${e.sym.info}")
 
             e1 = decls lookupNextEntry e1
           }
@@ -945,9 +947,10 @@ abstract class Erasure extends AddInterfaces
         )
         override def matches(sym1: Symbol, sym2: Symbol) = true
       }
-      opc.iterator collect { case pair if pair.sameTypeAfterPostErasure && !pair.memberTypesMatch =>
+      for (pair <- opc.iterator) {
         log(pair)
-        doubleDefError(pair)
+        if (pair.sameTypeAfterPostErasure && !pair.memberTypesMatch)
+          doubleDefError(pair)
       }
     }
 
