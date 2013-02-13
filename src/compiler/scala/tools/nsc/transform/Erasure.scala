@@ -588,11 +588,6 @@ abstract class Erasure extends AddInterfaces
      *  @return     the unboxed tree
      */
     private def unbox1(tree: Tree, pt: Type): Tree = tree match {
-/*
-      case Boxed(unboxed) =>
-        println("unbox shorten: "+tree) // this never seems to kick in during build and test; therefore disabled.
-        adaptToType(unboxed, pt)
- */
       case LabelDef(_, _, _) =>
         val ldef = deriveLabelDef(tree)(unbox(_, pt))
         ldef setType ldef.rhs.tpe
@@ -772,33 +767,23 @@ abstract class Erasure extends AddInterfaces
     /** A replacement for the standard typer's `typed1` method.
      */
     override def typed1(tree: Tree, mode: Mode, pt: Type): Tree = {
-      val tree1 = try {
-        tree match {
-          case InjectDerivedValue(arg) =>
-            (tree.attachments.get[TypeRefAttachment]: @unchecked) match {
-              case Some(itype) =>
-                val tref = itype.tpe
-                val argPt = enteringPhase(currentRun.erasurePhase)(erasedValueClassArg(tref))
-                log(s"transforming inject $arg -> $tref/$argPt")
-                val result = typed(arg, mode, argPt)
-                log(s"transformed inject $arg -> $tref/$argPt = $result:${result.tpe}")
-                return result setType ErasedValueType(tref)
+      def fallback(t: Tree) = super.typed1(adaptMember(t), mode, pt)
 
-            }
-          case _ =>
-            super.typed1(adaptMember(tree), mode, pt)
-        }
-      } catch {
-        case er: TypeError =>
-          Console.println("exception when typing " + tree+"/"+tree.getClass)
-          Console.println(er.msg + " in file " + context.owner.sourceFile)
-          er.printStackTrace
-          abort("unrecoverable error")
-        case ex: Exception =>
-          //if (settings.debug.value)
-          try Console.println("exception when typing " + tree)
-          finally throw ex
-          throw ex
+      val tree1 = tree match {
+        case InjectDerivedValue(arg) =>
+          pt match {
+            case ErasedValueType(originalType) =>
+              val Some(tpt)    = tree.attachments.get[TypeRefAttachment]
+              val tref         = tpt.tpe
+              val attachedType = enteringErasure(erasedValueClassArg(tref))
+              val result       = typed(arg, mode, attachedType)
+
+              log(s"transforming inject $arg -> $attachedType (originalType = $originalType)")
+              return result setType ErasedValueType(tref)
+            case _ =>
+              return fallback(arg)
+          }
+        case _ => fallback(tree)
       }
 
       def adaptCase(cdef: CaseDef): CaseDef = {
