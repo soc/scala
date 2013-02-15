@@ -94,10 +94,23 @@ abstract class SymbolLoaders {
    */
   def enterClassAndModule(root: Symbol, name: String, completer: SymbolLoader) {
     val clazz = enterClass(root, name, completer)
-    val module = enterModule(root, name, completer)
-    if (!clazz.isAnonymousClass) {
-      assert(clazz.companionModule == module, module)
-      assert(module.companionClass == clazz, clazz)
+    if (name endsWith "$") {
+      val o = clazz.companionSymbol
+      val mc = o.moduleClass
+      val in1 = root.info member (name: TermName)
+      val in2 = root.info member (name.init: TermName)
+
+      if (List(o, mc, in1, in2) exists (_ != NoSymbol)) {
+        println(s"enterClassAndModule($root, $name, _)")
+        println(s"   c=$clazz\n   o=$o\n  mc=$mc\n in1=$in1\n in2=$in2")
+      }
+    }
+    else {
+      val module = enterModule(root, name, completer)
+      if (!clazz.isAnonymousClass) {
+        assert(clazz.companionModule == module, module)
+        assert(module.companionClass == clazz, clazz)
+      }
     }
   }
 

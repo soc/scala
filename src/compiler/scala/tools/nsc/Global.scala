@@ -1378,8 +1378,25 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
     def compiles(sym: Symbol): Boolean =
       if (sym == NoSymbol) false
       else if (symSource.isDefinedAt(sym)) true
-      else if (!sym.isTopLevel) compiles(sym.enclosingTopLevelClass)
-      else if (sym.isModuleClass) compiles(sym.sourceModule)
+      else if (!sym.isTopLevel) {
+        val clazz = sym.enclosingTopLevelClass
+        compiles(clazz) && {
+          def loop(owner: Symbol): Boolean = (
+               ((owner member sym.name).alternatives contains sym)
+            || (owner.info.decls exists loop)
+          )
+          loop(clazz) || {
+            devWarning(s"compiles($sym) is superficially true, but cannot find symbol anywhere under $clazz")
+            false
+          }
+        }
+      }
+      else if (sym.isModuleClass) compiles(sym.sourceModule) && {
+        (sym.sourceModule.moduleClass eq sym) || {
+          devWarning(s"compiles($sym) is superficially true, but sym.sourceModule.moduleClass != sym")
+          false
+        }
+      }
       else false
 
     /** Is this run allowed to redefine the given symbol? Usually this is true

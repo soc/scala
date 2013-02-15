@@ -1079,7 +1079,11 @@ abstract class ClassfileParser {
       val owner       = getOwner(jflags)
       val scope       = getScope(jflags)
       val innerClass  = owner.newClass(name.toTypeName, NoPosition, sflags) setInfo completer
-      val innerModule = owner.newModule(name.toTermName, NoPosition, sflags) setInfo completer
+      val innerModuleName: TermName = if (name endsWith "$") {
+        println(s"Let's call innerModule ${name.toString.init} not $name")
+        name.toString.init
+      } else name.toString
+      val innerModule = owner.newModule(innerModuleName, NoPosition, sflags) setInfo completer
 
       innerModule.moduleClass setInfo global.loaders.moduleClassLoader
       List(innerClass, innerModule.moduleClass) foreach (_.associatedFile = file)
