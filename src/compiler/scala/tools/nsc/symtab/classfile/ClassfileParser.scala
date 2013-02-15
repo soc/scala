@@ -88,15 +88,14 @@ abstract class ClassfileParser {
   }
 
   def parse(file: AbstractFile, root: Symbol): Unit = {
-    debuglog("[class] >> " + root.fullName)
-
+    log(s"parse(${file.path}, ${root.fullNameString}")
     pushBusy(root) {
       this.in           = new AbstractFileReader(file)
       this.clazz        = if (root.isModule) root.companionClass else root
       // WARNING! do no use clazz.companionModule to find staticModule.
       // In a situation where root can be defined, but its companionClass not,
       // this would give incorrect results (see SI-5031 in separate compilation scenario)
-      this.staticModule = if (root.isModule) root else root.companionModule
+      this.staticModule = logResult(s"root=$root, staticModule")(if (root.isModule) root else root.companionModule)
       this.isScala      = false
 
       parseHeader
@@ -127,7 +126,7 @@ abstract class ClassfileParser {
     private val len = in.nextChar
     private val starts = new Array[Int](len)
     private val values = new Array[AnyRef](len)
-    private val internalized = new Array[Name](len)
+    private val internalized = new Array[TypeName](len)
 
     { var i = 1
       while (i < starts.length) {
@@ -172,7 +171,7 @@ abstract class ClassfileParser {
         errorBadIndex(index)
 
       if (internalized(index) == null)
-        internalized(index) = getName(index).replace('/', '.')
+        internalized(index) = getName(index).replace('/', '.').toTypeName
 
       internalized(index)
     }
@@ -436,7 +435,7 @@ abstract class ClassfileParser {
   }
 
   /** Return the class symbol of the given name. */
-  def classNameToSymbol(name: Name): Symbol = {
+  def classNameToSymbol(name: Name): Symbol = logResult(s"classNameToSymbol(${name.longString}") {
     def loadClassSymbol(name: Name): Symbol = {
       val file = global.classPath findSourceFile ("" +name) getOrElse {
         // SI-5593 Scaladoc's current strategy is to visit all packages in search of user code that can be documented
@@ -446,52 +445,41 @@ abstract class ClassfileParser {
           warning("Class " + name + " not found - continuing with a stub.")
         return NoSymbol.newClass(name.toTypeName)
       }
-      val completer     = new global.loaders.ClassfileLoader(file)
-      var owner: Symbol = rootMirror.RootClass
-      var sym: Symbol   = NoSymbol
-      var ss: Name      = null
-      var start         = 0
-      var end           = name indexOf '.'
+      val completer = new global.loaders.ClassfileLoader(file)
 
-      while (end > 0) {
-        ss = name.subName(start, end)
-        sym = owner.info.decls lookup ss
-        if (sym == NoSymbol) {
-          sym = owner.newPackage(ss.toTermName) setInfo completer
-          sym.moduleClass setInfo completer
-          owner.info.decls enter sym
-        }
-        owner = sym.moduleClass
-        start = end + 1
-        end = name.indexOf('.', start)
+      nme.segments(name.toString, name.isTermName).foldLeft(rootMirror.RootClass: Symbol)((owner, segment) =>
+        owner.info.decls lookup segment orElse logResult(s"  [cfp] creating ${segment.longString} in ${owner.fullNameString}")(
+          if (owner.isClass)
+            owner newClass segment.toTypeName setInfoAndEnter completer
+          else {
+            val mod = owner.moduleClass newModule segment.toTermName setInfo completer
+            owner.moduleClass.info.decls enter mod
+            owner.info.decls enter mod
+            mod.moduleClass setInfo completer
+            mod
+          }
+        )
+      )
+    }
+
+    def lookupClass(name: Name) = logResult(s"lookupClass(${name.longString})")(
+      try {
+        if (name.pos('.') == name.length)
+          definitions.getMember(rootMirror.EmptyPackageClass, name.toTypeName)
+        else
+          rootMirror.getClassByName(name) // see tickets #2464, #3756
+      } catch {
+        case _: FatalError => loadClassSymbol(name)
       }
-      ss = name.subName(0, start)
-      owner.info.decls lookup ss orElse {
-        sym = owner.newClass(ss.toTypeName) setInfoAndEnter completer
-        debuglog("loaded "+sym+" from file "+file)
-        sym
-      }
-    }
+    )
 
-    def lookupClass(name: Name) = try {
-      if (name.pos('.') == name.length)
-        definitions.getMember(rootMirror.EmptyPackageClass, name.toTypeName)
-      else
-        rootMirror.getClassByName(name) // see tickets #2464, #3756
-    } catch {
-      case _: FatalError => loadClassSymbol(name)
+    val result = innerClasses get name match {
+      case Some(entry) => innerClasses classSymbol entry.externalName
+      case _           => lookupClass(name)
     }
-
-    innerClasses.get(name) match {
-      case Some(entry) =>
-        //println("found inner class " + name)
-        val res = innerClasses.classSymbol(entry.externalName)
-        //println("\trouted to: " + res)
-        res
-      case None =>
-        //if (name.toString.contains("$")) println("No inner class: " + name + innerClasses + " while parsing " + in.file.name)
-        lookupClass(name)
-    }
+    if (result.isClass && name.isTermName) result.companionModule
+    else if (result.isModule && name.isTypeName) result.companionClass
+    else result
   }
 
   var sawPrivateConstructor = false
@@ -585,14 +573,14 @@ abstract class ClassfileParser {
 
   /** Add type parameters of enclosing classes */
   def addEnclosingTParams(clazz: Symbol) {
-    var sym = clazz.owner
+    var sym = clazz.effectiveOwner
     while (sym.isClass && !sym.isModuleClass) {
 //      println("adding tparams of " + sym)
       for (t <- sym.tpe.typeArgs) {
 //        println("\tadding " + (t.typeSymbol.name + "->" + t.typeSymbol))
         classTParams = classTParams + (t.typeSymbol.name -> t.typeSymbol)
       }
-      sym = sym.owner
+      sym = sym.effectiveOwner
     }
   }
 
@@ -1168,53 +1156,77 @@ abstract class ClassfileParser {
   }
 
   object innerClasses extends mutable.HashMap[Name, InnerClassEntry] {
+    private def getMember(owner: Symbol, name: Name, static: Boolean): Symbol =
+      logResult(s"getMember(${owner.kindString} ${owner.fullNameString}, ${name.longString})/static=$static")(
+        if (static)
+          if (owner == clazz) staticScope.lookup(name)
+          else owner.companionModule.info.member(name)
+        else
+          if (owner == clazz) instanceScope.lookup(name)
+          else owner.info.member(name)
+      )
+    //
+    /** Return the symbol of `innerName`, having the given `externalName`. */
+    private def innerSymbol(externalName: Name, innerName: Name, static: Boolean): Symbol =
+      logResult(s"innerSymbol(${externalName.longString} ${innerName.longString}, static=$static)")(innerClasses.get(externalName) match {
+        case Some(entry) =>
+          val innerName1 = if (innerName.toString endsWith "$") (innerName.toString.init: TermName) else innerName
+          val sym        = if (static) moduleSymbol(entry.outerName) else classSymbol(entry.outerName)
+          val s          = (
+            // if loading during initialization of `definitions` typerPhase is not yet set.
+            // in that case we simply load the member at the current phase
+            if (currentRun.typerPhase != null)
+              enteringTyper(getMember(sym, innerName1, static))
+            else
+              getMember(sym, innerName1, static) orElse (
+                if (sym.isModule)
+                  getMember(sym.moduleClass, innerName1, static)
+                else
+                  NoSymbol
+              )
+          )
+
+          if (s eq NoSymbol) log(s"""
+            |currentRun.typerPhase=${currentRun.typerPhase}
+            |    external=${externalName.longString}
+            |   outerName=${entry.outerName.longString}
+            |     in.file=${in.file}
+            |         sym=${sym.fullNameString}
+            | sym.members=${sym.info.members mkString ", "}
+            | staticScope=${staticScope.toList mkString ", "}
+            | instanScope=${instanceScope.toList mkString ", "}
+            |   companion=${sym.companionSymbol.fullNameString}
+            |""".stripMargin
+          )
+
+          assert(s ne NoSymbol, s)
+          s
+
+        case None =>
+          classNameToSymbol(externalName)
+    })
+
     /** Return the class symbol for `externalName`. It looks it up in its outer class.
      *  Forces all outer class symbols to be completed.
      *
      *  If the given name is not an inner class, it returns the symbol found in `definitions`.
      */
-    def classSymbol(externalName: Name): Symbol = {
-      /** Return the symbol of `innerName`, having the given `externalName`. */
-      def innerSymbol(externalName: Name, innerName: Name, static: Boolean): Symbol = {
-        def getMember(sym: Symbol, name: Name): Symbol =
-          if (static)
-            if (sym == clazz) staticScope.lookup(name)
-            else sym.companionModule.info.member(name)
-          else
-            if (sym == clazz) instanceScope.lookup(name)
-            else sym.info.member(name)
-
-        innerClasses.get(externalName) match {
-          case Some(entry) =>
-            val outerName = nme.stripModuleSuffix(entry.outerName)
-            val sym = classSymbol(outerName)
-            val s =
-              // if loading during initialization of `definitions` typerPhase is not yet set.
-              // in that case we simply load the member at the current phase
-              if (currentRun.typerPhase != null)
-                enteringTyper(getMember(sym, innerName.toTypeName))
-              else
-                getMember(sym, innerName.toTypeName)
-
-            assert(s ne NoSymbol,
-              "" + ((externalName, outerName, innerName, sym.fullLocationString)) + " / " +
-              " while parsing " + ((in.file, busy)) +
-              sym + "." + innerName + " linkedModule: " + sym.companionModule + sym.companionModule.info.members
-            )
-            s
-
-          case None =>
-            classNameToSymbol(externalName)
-        }
+    def moduleSymbol(externalName: Name): Symbol = logResult(s"moduleSymbol(${externalName.longString})")(
+      innerClasses.get(externalName) match {
+        case Some(entry) =>
+          innerSymbol(entry.externalName, entry.originalName, isStatic(entry.jflags))
+        case None =>
+          classNameToSymbol(externalName.toTermName)
       }
-
-      get(externalName) match {
+    )
+    def classSymbol(externalName: Name): Symbol = logResult(s"classSymbol(${externalName.longString})")(
+      innerClasses.get(externalName) match {
         case Some(entry) =>
           innerSymbol(entry.externalName, entry.originalName, isStatic(entry.jflags))
         case None =>
           classNameToSymbol(externalName)
       }
-    }
+    )
   }
 
   class LazyAliasType(alias: Symbol) extends LazyType with FlagAgnosticCompleter {

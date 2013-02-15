@@ -25,8 +25,14 @@ abstract class SymbolLoaders {
   import SymbolLoadersStats._
 
   protected def enterIfNew(owner: Symbol, member: Symbol, completer: SymbolLoader): Symbol = {
-    assert(owner.info.decls.lookup(member.name) == NoSymbol, owner.fullName + "." + member.name)
-    owner.info.decls enter member
+    if (owner.info.decls.lookup(member.name).alternatives contains member) {
+      log(s"enterIfNew($owner, $member, _) says we're already cool.")
+    }
+    else {
+      // assert(owner.info.decls.lookup(member.name) == NoSymbol, owner.fullName + "." + member.name)
+      owner.info.decls enter member
+    }
+
     member
   }
 
@@ -34,19 +40,45 @@ abstract class SymbolLoaders {
    *  and give them `completer` as type.
    */
   def enterClass(owner: Symbol, name: String, completer: SymbolLoader): Symbol = {
-    val clazz = owner.newClass(newTypeName(name))
-    clazz setInfo completer
-    enterIfNew(owner, clazz, completer)
+    owner.info member (name: TypeName) filter (_.isClass) match {
+      case clazz: ClassSymbol =>
+        log(s"Found existing class symbol $clazz in $owner")
+        clazz
+      case _ =>
+        val clazz = owner.newClass(newTypeName(name))
+        clazz setInfo completer
+        enterIfNew(owner, clazz, completer)
+    }
   }
 
   /** Enter module with given `name` into scope of `root`
    *  and give them `completer` as type.
    */
   def enterModule(owner: Symbol, name: String, completer: SymbolLoader): Symbol = {
-    val module = owner.newModule(newTermName(name))
-    module setInfo completer
-    module.moduleClass setInfo moduleClassLoader
-    enterIfNew(owner, module, completer)
+    if (name endsWith "$")
+      enterModuleClass(owner, name, completer).sourceModule
+    else owner.info member (name: TermName) filter (_.isModule) match {
+      case module: ModuleSymbol =>
+        log(s"Found existing module symbol $module in $owner")
+        module
+      case _ =>
+        val module = owner.newModule(name: TermName)
+        module setInfo completer
+        module.moduleClass setInfo moduleClassLoader
+        enterIfNew(owner, module, completer)
+    }
+  }
+
+  private def enterModuleClass(owner: Symbol, name: String, completer: SymbolLoader): Symbol = {
+    val module = owner.info decl (name.init: TermName) orElse enterModule(owner, name.init, completer) match {
+      case x: ModuleSymbol => x
+      case x               => abort(s"ModuleSymbol required here: " + x)
+    }
+    logResult(s"enterModuleClass(${owner.fullName}, $name, _)")(
+      module.moduleClass
+        orElse connectModuleToClass(module, owner.newModuleClassSymbol(name: TypeName)).moduleClass
+        setInfo completer
+    )
   }
 
   /** Enter package with given `name` into scope of `root`
@@ -93,32 +125,16 @@ abstract class SymbolLoaders {
    *  and give them `completer` as type.
    */
   def enterClassAndModule(root: Symbol, name: String, completer: SymbolLoader) {
-    if (name endsWith "$") {
-      println(s"enterClassAndModule($root / ${shortClassOfInstance(root)}, $name, _)")
-      root.newModuleClassSymbol(name: TypeName) setInfo completer
-      return
+    if (name endsWith "$")
+      enterModuleClass(root, name, completer)
+    else {
+      val clazz  = enterClass(root, name, completer)
+      val module = enterModule(root, name, completer)
+      if (!clazz.isAnonymousClass) {
+        assert(clazz.companionModule == module, module)
+        assert(module.companionClass == clazz, clazz)
+      }
     }
-    val clazz = enterClass(root, name, completer)
-    val module = enterModule(root, name, completer)
-    if (!clazz.isAnonymousClass) {
-      assert(clazz.companionModule == module, module)
-      assert(module.companionClass == clazz, clazz)
-    }
-
-    // println(s"enterClassAndModule($root / ${shortClassOfInstance(root)}, $name, _) clazz=$clazz/${shortClassOfInstance(clazz)}")
-    // if (name endsWith "$") {
-    //   val o = clazz.companionSymbol
-    //   val mc = o.moduleClass
-    //   val in1 = root.info member (name: TermName)
-    //   val in2 = root.info member (name.init: TermName)
-
-    //   if (List(o, mc, in1, in2) exists (_ != NoSymbol)) {
-    //     println(s"enterClassAndModule($root, $name, _)")
-    //     println(s"   c=$clazz\n   o=$o\n  mc=$mc\n in1=$in1\n in2=$in2")
-    //   }
-    // }
-    // else {
-    // }
   }
 
   /** In batch mode: Enter class and module with given `name` into scope of `root`
@@ -128,6 +144,7 @@ abstract class SymbolLoaders {
    *  (overridden in interactive.Global).
    */
   def enterToplevelsFromSource(root: Symbol, name: String, src: AbstractFile) {
+    log(s"enterToplevelsFromSource($root, $name, ${src.path}")
     enterClassAndModule(root, name, new SourcefileLoader(src))
   }
 
@@ -228,10 +245,17 @@ abstract class SymbolLoaders {
         sym setInfo tpe
     }
     private def initRoot(root: Symbol) {
-      if (root.rawInfo == this)
+      if (root.rawInfo == this) {
+        log(s"initRoot($root) with moduleClass=${root.moduleClass} marked absent")
         List(root, root.moduleClass) foreach markAbsent
-      else if (root.isClass && !root.isModuleClass)
+      }
+      else if (root.isClass && !root.isModuleClass) {
+        log(s"initRoot($root) having raw info loaded")
         root.rawInfo.load(root)
+      }
+      else {
+        log(s"initRoot($root) ignored")
+      }
     }
   }
 
