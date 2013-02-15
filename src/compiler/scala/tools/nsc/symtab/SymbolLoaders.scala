@@ -60,7 +60,10 @@ abstract class SymbolLoaders {
     else owner.info member (name: TermName) filter (_.isModule) match {
       case module: ModuleSymbol =>
         log(s"Found existing module symbol $module in $owner")
-        module
+        module setInfo completer
+        module.moduleClass setInfo moduleClassLoader
+        enterIfNew(owner, module, completer)
+        // module
       case _ =>
         val module = owner.newModule(name: TermName)
         module setInfo completer

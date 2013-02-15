@@ -735,7 +735,7 @@ abstract class ClassfileParser {
               tp
           }
 
-          val classSym = classNameToSymbol(subName(c => c == ';' || c == '<'))
+          val classSym = classNameToSymbol(subName(c => c == ';' || c == '<').toTypeName)
           assert(!classSym.isOverloaded, classSym.alternatives)
           var tpe = processClassType(processInner(classSym.tpe_*))
           while (sig.charAt(index) == '.') {
@@ -1170,37 +1170,39 @@ abstract class ClassfileParser {
     private def innerSymbol(externalName: Name, innerName: Name, static: Boolean): Symbol =
       logResult(s"innerSymbol(${externalName.longString} ${innerName.longString}, static=$static)")(innerClasses.get(externalName) match {
         case Some(entry) =>
-          val innerName1 = if (innerName.toString endsWith "$") (innerName.toString.init: TermName) else innerName
-          val sym        = if (static) moduleSymbol(entry.outerName) else classSymbol(entry.outerName)
-          val s          = (
+          val innerName1  = if (innerName.toString endsWith "$") (innerName.toString.init: TermName) else innerName
+          val outerSymbol = if (static) moduleSymbol(entry.outerName) else classSymbol(entry.outerName)
+          def search() = (
+            getMember(outerSymbol, innerName1, static) orElse (
+              getMember(outerSymbol.moduleClass, innerName1, static)
+            )
+          )
+          val innerSymbol = (
             // if loading during initialization of `definitions` typerPhase is not yet set.
             // in that case we simply load the member at the current phase
-            if (currentRun.typerPhase != null)
-              enteringTyper(getMember(sym, innerName1, static))
-            else
-              getMember(sym, innerName1, static) orElse (
-                if (sym.isModule)
-                  getMember(sym.moduleClass, innerName1, static)
-                else
-                  NoSymbol
-              )
+            if (currentRun.typerPhase == null) search()
+            else enteringTyper(search())
           )
 
-          if (s eq NoSymbol) log(s"""
-            |currentRun.typerPhase=${currentRun.typerPhase}
-            |    external=${externalName.longString}
-            |   outerName=${entry.outerName.longString}
-            |     in.file=${in.file}
-            |         sym=${sym.fullNameString}
-            | sym.members=${sym.info.members mkString ", "}
-            | staticScope=${staticScope.toList mkString ", "}
-            | instanScope=${instanceScope.toList mkString ", "}
-            |   companion=${sym.companionSymbol.fullNameString}
+          if (innerSymbol eq NoSymbol) log(s"""
+            |innerSymbol(${externalName.longString}, ${innerName.longString}, static=$static) {
+            |     typerPhase=${currentRun.typerPhase}
+            |      outerName=${entry.outerName.longString}
+            |        in.file=${in.file}
+            |    outerSymbol=${outerSymbol.kindString + " " + outerSymbol.fullNameString}
+            |    staticScope=${staticScope.toList mkString ", "}
+            |    instanScope=${instanceScope.toList mkString ", "}
+            |      companion=${outerSymbol.companionSymbol.fullNameString}
+            |  outer.members=${outerSymbol.info.members mkString ", "}
+            |   comp.members=${outerSymbol.companionSymbol.info.members mkString ", "}
+            |}
             |""".stripMargin
           )
+          if (innerSymbol eq NoSymbol)
+            printCaller("")(())
 
-          assert(s ne NoSymbol, s)
-          s
+          assert(innerSymbol ne NoSymbol, innerSymbol)
+          innerSymbol
 
         case None =>
           classNameToSymbol(externalName)
