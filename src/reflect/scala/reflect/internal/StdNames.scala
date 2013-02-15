@@ -892,8 +892,8 @@ trait StdNames {
   /** For fully qualified type names.
    */
   object fulltpnme extends TypeNames {
-    val RuntimeNothing: NameType = "scala.runtime.Nothing$"
-    val RuntimeNull: NameType    = "scala.runtime.Null$"
+    val RuntimeNothing: TypeName = "scala.runtime.Nothing"
+    val RuntimeNull: TypeName    = "scala.runtime.Null"
   }
 
   /** Java binary names, like scala/runtime/Nothing$.

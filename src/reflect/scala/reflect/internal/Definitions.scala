@@ -290,8 +290,8 @@ trait Definitions extends api.StandardDefinitions {
       def AnyVal_getClass = getMemberMethod(AnyValClass, nme.getClass_)
 
     // bottom types
-    lazy val RuntimeNothingClass  = getClassByName(fulltpnme.RuntimeNothing)
-    lazy val RuntimeNullClass     = getClassByName(fulltpnme.RuntimeNull)
+    lazy val RuntimeNothingClass  = requiredModule[scala.runtime.Nothing.type].moduleClass
+    lazy val RuntimeNullClass     = requiredModule[scala.runtime.Null.type].moduleClass
 
     sealed abstract class BottomClassSymbol(name: TypeName, parent: Symbol) extends ClassSymbol(ScalaPackageClass, NoPosition, name) {
       locally {

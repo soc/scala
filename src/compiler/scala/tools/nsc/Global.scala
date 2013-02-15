@@ -1382,7 +1382,7 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
         val clazz = sym.enclosingTopLevelClass
         compiles(clazz) && {
           def loop(owner: Symbol): Boolean = (
-               ((owner member sym.name).alternatives contains sym)
+               ((owner.info member sym.name).alternatives contains sym)
             || (owner.info.decls exists loop)
           )
           loop(clazz) || {

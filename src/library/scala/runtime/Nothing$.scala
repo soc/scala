@@ -13,4 +13,4 @@ package scala.runtime
  * to `scala.Nothing`. If such type appears in method
  * signatures, it is erased to this one.
  */
-sealed abstract class Nothing$ extends Throwable
+object Nothing extends Throwable

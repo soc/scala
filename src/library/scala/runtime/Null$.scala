@@ -13,4 +13,4 @@ package scala.runtime
  * `scala.Null`. If such type appears in method signatures, it is erased
  * to this one.
  */
-sealed abstract class Null$
+object Null

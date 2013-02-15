@@ -11,7 +11,7 @@ import scala.compat.Platform.currentTime
 import scala.tools.nsc.util.{ ClassPath }
 import classfile.ClassfileParser
 import scala.reflect.internal.MissingRequirementError
-import scala.reflect.internal.util.Statistics
+import scala.reflect.internal.util.{ Statistics, shortClassOfInstance }
 import scala.reflect.io.{ AbstractFile, NoAbstractFile }
 
 /** This class ...
@@ -93,25 +93,32 @@ abstract class SymbolLoaders {
    *  and give them `completer` as type.
    */
   def enterClassAndModule(root: Symbol, name: String, completer: SymbolLoader) {
-    val clazz = enterClass(root, name, completer)
     if (name endsWith "$") {
-      val o = clazz.companionSymbol
-      val mc = o.moduleClass
-      val in1 = root.info member (name: TermName)
-      val in2 = root.info member (name.init: TermName)
+      println(s"enterClassAndModule($root / ${shortClassOfInstance(root)}, $name, _)")
+      root.newModuleClassSymbol(name: TypeName) setInfo completer
+      return
+    }
+    val clazz = enterClass(root, name, completer)
+    val module = enterModule(root, name, completer)
+    if (!clazz.isAnonymousClass) {
+      assert(clazz.companionModule == module, module)
+      assert(module.companionClass == clazz, clazz)
+    }
 
-      if (List(o, mc, in1, in2) exists (_ != NoSymbol)) {
-        println(s"enterClassAndModule($root, $name, _)")
-        println(s"   c=$clazz\n   o=$o\n  mc=$mc\n in1=$in1\n in2=$in2")
-      }
-    }
-    else {
-      val module = enterModule(root, name, completer)
-      if (!clazz.isAnonymousClass) {
-        assert(clazz.companionModule == module, module)
-        assert(module.companionClass == clazz, clazz)
-      }
-    }
+    // println(s"enterClassAndModule($root / ${shortClassOfInstance(root)}, $name, _) clazz=$clazz/${shortClassOfInstance(clazz)}")
+    // if (name endsWith "$") {
+    //   val o = clazz.companionSymbol
+    //   val mc = o.moduleClass
+    //   val in1 = root.info member (name: TermName)
+    //   val in2 = root.info member (name.init: TermName)
+
+    //   if (List(o, mc, in1, in2) exists (_ != NoSymbol)) {
+    //     println(s"enterClassAndModule($root, $name, _)")
+    //     println(s"   c=$clazz\n   o=$o\n  mc=$mc\n in1=$in1\n in2=$in2")
+    //   }
+    // }
+    // else {
+    // }
   }
 
   /** In batch mode: Enter class and module with given `name` into scope of `root`

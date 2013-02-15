@@ -269,7 +269,7 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
     }
 
     final def newModuleClassSymbol(name: TypeName, pos: Position = NoPosition, newFlags: Long = 0L): ModuleClassSymbol =
-      newClassSymbol(name, pos, newFlags).asInstanceOf[ModuleClassSymbol]
+      newClassSymbol(name, pos, newFlags | MODULE).asInstanceOf[ModuleClassSymbol]
 
     final def newTypeSkolemSymbol(name: TypeName, origin: AnyRef, pos: Position = NoPosition, newFlags: Long = 0L): TypeSkolem =
       createTypeSkolemSymbol(name, origin, pos, newFlags)
