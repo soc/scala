@@ -89,7 +89,9 @@ abstract class ClassfileParser {
 
   def parse(file: AbstractFile, root: Symbol): Unit = {
     log(s"parse(${file.path}, ${root.fullNameString}")
-    pushBusy(root) {
+    if (!file.exists)
+      log(s"No actual file corresponds to $file/root=$root")
+    else pushBusy(root) {
       this.in           = new AbstractFileReader(file)
       this.clazz        = if (root.isModule) root.companionClass else root
       // WARNING! do no use clazz.companionModule to find staticModule.
@@ -100,7 +102,10 @@ abstract class ClassfileParser {
 
       parseHeader
       this.pool = new ConstantPool
-      parseClass()
+      if (clazz eq NoSymbol) {
+        log(s"Parse ended with clazz at NoSymbol: file=$file, root=$root, companion=${root.companionSymbol}")
+      }
+      else parseClass()
     }
   }
 
@@ -448,6 +453,7 @@ abstract class ClassfileParser {
       val completer = new global.loaders.ClassfileLoader(file)
 
       nme.segments(name.toString, name.isTermName).foldLeft(rootMirror.RootClass: Symbol)((owner, segment) =>
+
         owner.info.decls lookup segment orElse logResult(s"  [cfp] creating ${segment.longString} in ${owner.fullNameString}")(
           if (owner.isClass)
             owner newClass segment.toTypeName setInfoAndEnter completer

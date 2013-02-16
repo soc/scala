@@ -10,6 +10,7 @@ import java.io.IOException
 import scala.compat.Platform.currentTime
 import scala.tools.nsc.util.{ ClassPath }
 import classfile.ClassfileParser
+import scala.reflect.NameTransformer
 import scala.reflect.internal.MissingRequirementError
 import scala.reflect.internal.util.{ Statistics, shortClassOfInstance }
 import scala.reflect.io.{ AbstractFile, NoAbstractFile }
@@ -25,12 +26,20 @@ abstract class SymbolLoaders {
   import SymbolLoadersStats._
 
   protected def enterIfNew(owner: Symbol, member: Symbol, completer: SymbolLoader): Symbol = {
-    if (owner.info.decls.lookup(member.name).alternatives contains member) {
-      log(s"enterIfNew($owner, $member, _) says we're already cool.")
-    }
+    if ((owner eq NoSymbol) || (member eq NoSymbol))
+      log(s"Tried to enter $member into scope of $owner")
+    else if ((owner.info member member.name).alternatives contains member)
+      log(s"enterIfNew($owner, $member, _) finds $member already present, " + owner.info.members.mkString(", "))
     else {
-      // assert(owner.info.decls.lookup(member.name) == NoSymbol, owner.fullName + "." + member.name)
-      owner.info.decls enter member
+      if (owner.info.decls eq EmptyScope)
+        log(s"enterIfNew($owner, $member, _) found EmptyScope on $owner")
+      else {
+        owner.info.decls enter member
+        // if (owner.isModule && (owner.moduleClass ne NoSymbol) && (owner.moduleClass.inf
+        //   owner.moduleClass.info.decls enter member
+        // if (owner.isModuleClass && (owner.sourceModule ne NoSymbol))
+        //   owner.sourceModule.info.decls enter member
+      }
     }
 
     member
@@ -40,14 +49,33 @@ abstract class SymbolLoaders {
    *  and give them `completer` as type.
    */
   def enterClass(owner: Symbol, name: String, completer: SymbolLoader): Symbol = {
+    nestedNames(name) foreach { case ((hd, tl)) =>
+      owner.info member (hd: TermName) orElse owner.info.member(hd: TypeName) match {
+        case owner1 if (owner1 eq owner)    => return owner
+        case owner1 if (owner1 ne NoSymbol) => return enterClass(owner1, tl, completer)
+        case _                              =>
+      }
+    }
     owner.info member (name: TypeName) filter (_.isClass) match {
       case clazz: ClassSymbol =>
         log(s"Found existing class symbol $clazz in $owner")
-        clazz
-      case _ =>
-        val clazz = owner.newClass(newTypeName(name))
         clazz setInfo completer
         enterIfNew(owner, clazz, completer)
+        // clazz
+      case _ =>
+        val clazz = owner.newClass(newTypeName(name))
+        log(s"Created new class symbol $clazz in $owner")
+        clazz setInfo completer
+        enterIfNew(owner, clazz, completer)
+    }
+  }
+
+  private def nestedNames(name: String): Option[(String, String)] = {
+    (NameTransformer decode name split '$').toList filterNot (_ == "") match {
+      case x :: xs if xs.nonEmpty && !xs.contains("anonfun") && !xs.contains("anon") =>
+        val s = NameTransformer encode x
+        Some((s, name stripPrefix s + "$"))
+      case _ => None
     }
   }
 
@@ -55,6 +83,14 @@ abstract class SymbolLoaders {
    *  and give them `completer` as type.
    */
   def enterModule(owner: Symbol, name: String, completer: SymbolLoader): Symbol = {
+    nestedNames(name) foreach { case ((hd, tl)) =>
+      owner.info member (hd: TermName) match {
+        case owner1 if (owner1 eq owner)    => return owner
+        case owner1 if (owner1 ne NoSymbol) => return enterModule(owner1, tl, completer)
+        case _                              =>
+      }
+    }
+
     if (name endsWith "$")
       enterModuleClass(owner, name, completer).sourceModule
     else owner.info member (name: TermName) filter (_.isModule) match {
@@ -66,6 +102,7 @@ abstract class SymbolLoaders {
         // module
       case _ =>
         val module = owner.newModule(name: TermName)
+        log(s"Created new module symbol $module in $owner")
         module setInfo completer
         module.moduleClass setInfo moduleClassLoader
         enterIfNew(owner, module, completer)
@@ -73,7 +110,13 @@ abstract class SymbolLoaders {
   }
 
   private def enterModuleClass(owner: Symbol, name: String, completer: SymbolLoader): Symbol = {
-    val module = owner.info decl (name.init: TermName) orElse enterModule(owner, name.init, completer) match {
+    nestedNames(name) foreach { case ((hd, tl)) =>
+      owner.info member (hd: TermName) match {
+        case NoSymbol =>
+        case owner1   => return logResult(s"Found intermediate owner($owner, $name) == $owner1")(enterModuleClass(owner1.moduleClass, tl, completer))
+      }
+    }
+    val module = owner.info member (name.init: TermName) orElse enterModule(owner, name.init, completer) match {
       case x: ModuleSymbol => x
       case x               => abort(s"ModuleSymbol required here: " + x)
     }
@@ -128,14 +171,29 @@ abstract class SymbolLoaders {
    *  and give them `completer` as type.
    */
   def enterClassAndModule(root: Symbol, name: String, completer: SymbolLoader) {
+    nestedNames(name) foreach { case ((hd, tl)) =>
+      root.info.member(hd: TermName) orElse root.info.member(hd: TypeName) match {
+        case NoSymbol =>
+        case root1   => logResult(s"Found intermediate owner($root, $name) == $root1")(enterClassAndModule(root1.moduleClass, tl, completer)) ; return
+      }
+    }
     if (name endsWith "$")
       enterModuleClass(root, name, completer)
     else {
       val clazz  = enterClass(root, name, completer)
       val module = enterModule(root, name, completer)
       if (!clazz.isAnonymousClass) {
-        assert(clazz.companionModule == module, module)
-        assert(module.companionClass == clazz, clazz)
+        log(s"enterClassAndModule($root, $name, _)")
+        assert(clazz.companionModule == module, (clazz.fullLocationString, module.fullLocationString))
+        assert(module.companionClass == clazz, (clazz.fullLocationString, module.fullLocationString))
+        if ((name != "package$") && (name startsWith "package$")) {
+          log(s"Suspiciously entered $clazz and $module based on root=$root, name=$name")
+          log(s"... root contains " + root.info.decls.mkString(", "))
+          val pkgObject = root.info member nme.PACKAGE
+          val modClass = pkgObject.moduleClass
+
+          enterClassAndModule(modClass, name stripPrefix "package$", completer)
+        }
       }
     }
   }
@@ -165,6 +223,7 @@ abstract class SymbolLoaders {
   /** Initialize toplevel class and module symbols in `owner` from class path representation `classRep`
    */
   def initializeFromClassPath(owner: Symbol, classRep: ClassPath[platform.BinaryRepr]#ClassRep) {
+    log(s"initializeFromClassPath($owner, $classRep)")
     ((classRep.binary, classRep.source) : @unchecked) match {
       case (Some(bin), Some(src))
       if platform.needCompile(bin, src) && !binaryOnly(owner, classRep.name) =>
