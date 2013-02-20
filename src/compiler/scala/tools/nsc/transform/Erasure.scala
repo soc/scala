@@ -73,11 +73,12 @@ abstract class Erasure extends AddInterfaces
   // * higher-order type parameters
   // * type parameters appearing in method parameters
   // * type members not visible in an enclosing template
-  private def isTypeParameterInSig(sym: Symbol, initialSymbol: Symbol) = (
+  private def isTypeParameterInSig(sym: Symbol, initialSymbol: Symbol) = printResult(s"isTypeParameterInSig($sym, ${initialSymbol.fullLocationString})")(
     !sym.isHigherOrderTypeParameter &&
     sym.isTypeParameterOrSkolem && (
-      (initialSymbol.enclClassChain.exists(sym isNestedIn _)) ||
-      (initialSymbol.isMethod && initialSymbol.typeParams.contains(sym))
+         (initialSymbol.enclClassChain.exists(sym isNestedIn _))
+      || (initialSymbol.isMethod && initialSymbol.typeParams.contains(sym))
+      || (initialSymbol.enclClassChain.exists(_.typeParams contains sym))
     )
   )
 
@@ -163,10 +164,14 @@ abstract class Erasure extends AddInterfaces
     }
   }
 
-  private def hiBounds(bounds: TypeBounds): List[Type] = bounds.hi.dealiasWiden match {
-    case RefinedType(parents, _) => parents map (_.dealiasWiden)
-    case tp                      => tp :: Nil
-  }
+  private def hiBounds(tparam: Symbol): List[Type] = printResult(s"hiBounds($tparam)")(
+    enteringErasure {
+      tparam.info.bounds.hi.dealiasWiden match {
+        case RefinedType(parents, _) => parents map (_.dealiasWiden)
+        case tp                      => tp :: Nil
+      }
+    }
+  )
 
   private def isErasedValueType(tpe: Type) = tpe.isInstanceOf[ErasedValueType]
 
@@ -191,14 +196,15 @@ abstract class Erasure extends AddInterfaces
     }
     def boxedSig(tp: Type) = jsig(tp, primitiveOK = false)
     def boundsSig(bounds: List[Type]) = {
-      val (isTrait, isClass) = bounds partition (_.typeSymbol.isTrait)
+      val (isClass, isOther) = bounds partition (b => b.typeSymbol.isClass && !b.typeSymbol.isTrait)
       val classPart = isClass match {
-        case Nil    => ":" // + boxedSig(ObjectClass.tpe)
-        case x :: _ => ":" + boxedSig(x)
+        case Nil      => ":"
+        case x :: Nil => ":" + boxedSig(x)
+        case xs       => devWarning(s"More than one class among parents? " + xs) ; xs map boxedSig mkString (":", ":", "")
       }
-      classPart :: (isTrait map boxedSig) mkString ":"
+      classPart :: (isOther map boxedSig) mkString ":"
     }
-    def paramSig(tsym: Symbol) = tsym.name + boundsSig(hiBounds(tsym.info.bounds))
+    def paramSig(tsym: Symbol) = tsym.name + boundsSig(hiBounds(tsym))
     def polyParamSig(tparams: List[Symbol]) = (
       if (tparams.isEmpty) ""
       else tparams map paramSig mkString ("<", "", ">")
@@ -219,7 +225,7 @@ abstract class Erasure extends AddInterfaces
         case TypeRef(pre, sym, args) =>
           def argSig(tp: Type) =
             if (existentiallyBound contains tp.typeSymbol) {
-              val bounds = tp.typeSymbol.info.bounds
+              val bounds = enteringErasure(tp.typeSymbol.info.bounds)
               if (!(AnyRefClass.tpe <:< bounds.hi)) "+" + boxedSig(bounds.hi)
               else if (!(bounds.lo <:< NullClass.tpe)) "-" + boxedSig(bounds.lo)
               else "*"
