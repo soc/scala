@@ -66,19 +66,19 @@ abstract class CleanUp extends Transform with Bridges { //ast.TreeDSL {
             val typer1 = erasure.newTyper(encl.make(b, b.symbol))
             // val typer1 = erasure.newTyper(erasure.analyzer.rootContext(unit, b, true))
             val b1 = typer1 typed b
-            println(s"""
-              | tree  $b
-              |typed  $b1
-              |  sym  ${b.symbol.defString}
-              """.stripMargin)
+            // println(s"""
+            //   | tree  $b
+            //   |typed  $b1
+            //   |  sym  ${b.symbol.defString}
+            //   """.stripMargin)
 
             b1
           }
-          currentClass.info.members.toList.groupBy(_.defString) collect {
-            case (x, xs) if xs.length > 1 =>
-              println("Dups!")
-              xs map (_.fullLocationString) foreach println
-          }
+          // currentClass.info.members.toList.groupBy(_.defString) collect {
+          //   case (x, xs) if xs.length > 1 =>
+          //     println("Dups!")
+          //     xs map (_.fullLocationString) foreach println
+          // }
 
           // val bridges1 = bridges map { b =>
 
@@ -107,7 +107,7 @@ abstract class CleanUp extends Transform with Bridges { //ast.TreeDSL {
           // bridges1
       }
 
-      currentClass.info.members.toList.flatMap(_.alternatives).map(m => m.defStringSeenAs(currentClass.info memberType m)).sorted foreach println
+      // currentClass.info.members.toList.flatMap(_.alternatives).map(m => m.defStringSeenAs(currentClass.info memberType m)).sorted foreach println
 
       clearStatics()
       val newBody = transformTrees(body ::: bridgesToAdd)
