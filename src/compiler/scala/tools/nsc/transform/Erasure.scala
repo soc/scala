@@ -1024,7 +1024,7 @@ abstract class Erasure extends AddInterfaces
           assert(!currentOwner.isImplClass)
           //Console.println("checking no dble defs " + tree)//DEBUG
           checkNoDoubleDefs(tree.symbol.owner)
-          treeCopy.Template(tree, parents, emptyValDef, addBridges(unit, body, currentOwner))
+          treeCopy.Template(tree, parents, emptyValDef, body) // addBridges(unit, body, currentOwner))
           // treeCopy.Template(tree, parents, emptyValDef, body)
 
         case Match(selector, cases) =>
@@ -1076,7 +1076,7 @@ abstract class Erasure extends AddInterfaces
       }
     }
 
-    /** The main transform function: Pretransfom the tree, and then
+    /** The main transform function: Pretransform the tree, and then
      *  re-type it at phase erasure.next.
      */
     override def transform(tree: Tree): Tree = {

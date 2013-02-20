@@ -28,19 +28,24 @@ trait Bridges extends ast.TreeDSL {
    *   No bridge is added if there is already a bridge to `m0` with the erased
    *   type of `m1` in the template.
    */
-  private def bridgeDefs(unit: CompilationUnit, owner: Symbol): (List[Tree], immutable.Set[Symbol]) = {
+  def bridgeDefs(unit: CompilationUnit, owner: Symbol): (List[Tree], immutable.Set[Symbol]) = {
     assert(phase == currentRun.erasurePhase, phase)
-    debuglog("computing bridges for " + owner)
-    new ComputeBridges(unit, owner) compute()
+    if (owner.isTrait)
+      (Nil, Set())
+    else {
+      debuglog("computing bridges for " + owner)
+      new ComputeBridges(unit, owner) compute()
+    }
   }
 
-  def addBridges(unit: CompilationUnit, stats: List[Tree], base: Symbol): List[Tree] =
-    if (base.isTrait) stats
-    else {
-      val (bridges, toBeRemoved) = bridgeDefs(unit, base)
-      if (bridges.isEmpty) stats
-      else (stats filterNot (stat => toBeRemoved contains stat.symbol)) ::: bridges
+  def addBridges(unit: CompilationUnit, stats: List[Tree], base: Symbol): List[Tree] = (
+    bridgeDefs(unit, base) match {
+      case (bridges, removals) if bridges.nonEmpty =>
+        stats.filterNot(removals contains _.symbol) ::: bridges
+      case _ =>
+        stats
     }
+  )
 
   private class ComputeBridges(unit: CompilationUnit, root: Symbol) {
     assert(phase == currentRun.erasurePhase, phase)
