@@ -167,8 +167,25 @@ abstract class Mixin extends InfoTransform with ast.TreeDSL {
    *  This is not correct! See test run/t3452b for an example
    *  of runtime failure.
    */
-  def cloneAndAddMember(mixinClass: Symbol, mixinMember: Symbol, clazz: Symbol): Symbol =
-    addMember(clazz, cloneBeforeErasure(mixinClass, mixinMember, clazz))
+  def cloneAndAddMember(mixinClass: Symbol, mixinMember: Symbol, clazz: Symbol): Symbol = {
+    val classMember       = cloneBeforeErasure(mixinClass, mixinMember, clazz)
+    val classMemberDef    = addMember(clazz, classMember)
+    val memberInfoInTrait = mixinClass.info memberType mixinMember
+    val memberInfoInClass = clazz.info memberType mixinMember
+
+    enteringErasure {
+      if (!memberInfoInTrait.matches(memberInfoInClass)) {
+        logResult(s"Adding bridge for mixin member") {
+          enteringErasure {
+            val bridge    = gen.newBridgeMethod(clazz, mixinMember, classMember)
+            val bridgeDef = gen.newBridgeDefDef(clazz, bridge, classMember)
+            addMember(clazz, bridge)
+          }
+        }
+      }
+    }
+    classMember
+  }
 
   def cloneBeforeErasure(mixinClass: Symbol, mixinMember: Symbol, clazz: Symbol): Symbol = {
     val newSym = enteringErasure {
@@ -177,7 +194,6 @@ abstract class Mixin extends InfoTransform with ast.TreeDSL {
       // info) as they are seen from the class.  We can't use the member that we get from the
       // implementation class, as it's a clone that was made after erasure, and thus it does not
       // know its info at the beginning of erasure anymore.
-      //   Optimize: no need if mixinClass has no typeparams.
       val sym = mixinMember cloneSymbol clazz
       // Optimize: no need if mixinClass has no typeparams.
       if (mixinClass.typeParams.isEmpty) sym
@@ -189,6 +205,7 @@ abstract class Mixin extends InfoTransform with ast.TreeDSL {
     // (no need for asSeenFrom as phase.erasedTypes)
     // TODO: verify we need the updateInfo and document why
     // addMember(clazz, newSym)
+    newSym.info
     newSym
     // updateInfo (mixinMember.info cloneInfo newSym)
   }
