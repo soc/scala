@@ -64,8 +64,18 @@ abstract class CleanUp extends Transform with Bridges { //ast.TreeDSL {
             b.symbol.info
             val encl = erasure.rootContext(unit, unit.body, true)
             val typer1 = erasure.newTyper(encl.make(b, b.symbol))
+            val pt1 = bridgeErasure(currentClass)(b.symbol.info)
+            // val pt0 = enteringErasure((currentClass.info memberType b.symbol).asSeenFrom(currentClass.thisType, b.symbol.owner))
+            // val pt1 = (currentClass.info memberType b.symbol).asSeenFrom(currentClass.thisType, b.symbol.owner)
+            // val pt1 = bridgeErasure(b.symbol)(pt0)
+            // b.symbol.info))
+            if (b.symbol.info =:= pt1) () else {
+              println("b   = " + b.symbol.info)
+              // println("pt0 = " + pt0)
+              println("pt1 = " + pt1)
+            }
             // val typer1 = erasure.newTyper(erasure.analyzer.rootContext(unit, b, true))
-            val b1 = typer1 typed b
+            val b1 = typer1.typed(b) //, pt = pt1)
             // println(s"""
             //   | tree  $b
             //   |typed  $b1

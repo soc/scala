@@ -662,8 +662,29 @@ abstract class Mixin extends InfoTransform with ast.TreeDSL {
         if (sym.pos == NoPosition) clazz.pos else sym.pos
 
       /** Add tree at given position as new definition */
-      def addDef(pos: Position, tree: Tree) {
-        newDefs += attributedDef(pos, tree)
+      def addDef(pos: Position, tree: Tree) = {
+        val b = tree.symbol
+        val info1 = enteringErasure(b.info.asSeenFrom(clazz.thisType, b.owner))
+        val info2 = erasure.specialErasure(clazz)(info1)
+        if (b.info =:= info2) () else {
+          val b1 = b.cloneSymbol(clazz).setInfo(info2)
+          newDefs += attributedDef(pos, tree.duplicate setSymbol b1)
+        }
+        //  b else b.cloneSymbol(clazz).setInfo(info2)
+        // tree setSymbol b1
+        // println("info  = " + b.info)
+        // println("info1 = " + info1)
+        // println("info2 = " + info2)
+        // println("clazz is " + clazz + ", b.owners = " + b.ownerChain)
+        // val defn = enteringErasure(attributedDef(pos, tree))
+        // val encl = rootContext(unit, unit.body, true)
+        // val typer1 = erasure.newTyper(encl.make(tree, b))
+
+        // val pt1 = specialErasure(currentClass)(b.info)
+        // val defn = typer1.typed(tree)
+        val defn = attributedDef(pos, tree)
+        newDefs += defn
+        defn
       }
 
       /** Add new method definition.
@@ -671,7 +692,9 @@ abstract class Mixin extends InfoTransform with ast.TreeDSL {
        *  @param sym   The method symbol.
        *  @param rhs   The method body.
        */
-      def addDefDef(sym: Symbol, rhs: Tree = EmptyTree) = addDef(position(sym), DefDef(sym, rhs))
+      def addDefDef(sym: Symbol, rhs: Tree = EmptyTree) = {
+        printResult(s"Mixing adding defdef for $sym")(addDef(position(sym), DefDef(sym, rhs)))
+      }
       def addValDef(sym: Symbol, rhs: Tree = EmptyTree) = addDef(position(sym), ValDef(sym, rhs))
 
       /** Add `newdefs` to `stats`, removing any abstract method definitions

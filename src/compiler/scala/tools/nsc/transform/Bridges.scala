@@ -140,6 +140,7 @@ trait Bridges extends ast.TreeDSL {
     }
 
     def checkPair(member: Symbol, other: Symbol) {
+      println(s"checkPair(\n  ${member.defString} in ${member.owner}\n  ${other.defString} in ${other.owner}\n)")
       val otpe = bridgeErasure(root)(other.tpe)
       val bridgeNeeded = exitingErasure (
         !(other.tpe =:= member.tpe) &&
@@ -175,7 +176,7 @@ trait Bridges extends ast.TreeDSL {
         }
 
         bridgesScope enter bridge
-        bridges ::= makeBridgeDefDef(bridge, member, other)
+        bridges ::= printResult("bridge in " + root + " for " + bridge.defString)(makeBridgeDefDef(bridge, member, other))
       }
     }
 
