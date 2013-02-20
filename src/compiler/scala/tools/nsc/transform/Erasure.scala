@@ -458,17 +458,7 @@ abstract class Erasure extends AddInterfaces
       if (!bridgeNeeded)
         return
 
-      val newFlags = (member.flags | BRIDGE | ARTIFACT) & ~(ACCESSOR | DEFERRED | LAZY | lateDEFERRED)
-      val bridge   = other.cloneSymbolImpl(root, newFlags) setPos root.pos
-
-      debuglog("generating bridge from %s (%s): %s to %s: %s".format(
-        other, flagsToString(newFlags),
-        otpe + other.locationString, member,
-        specialErasure(root)(member.tpe) + member.locationString)
-      )
-
-      // the parameter symbols need to have the new owner
-      bridge setInfo (otpe cloneInfo bridge)
+      val bridge = gen.newBridgeMethod(root, other, member)
       bridgeTarget(bridge) = member
 
       if (!(member.tpe exists (_.typeSymbol.isDerivedValueClass)) ||
@@ -483,8 +473,7 @@ abstract class Erasure extends AddInterfaces
         bridges ::= makeBridgeDefDef(bridge, member, other)
       }
     }
-
-    def makeBridgeDefDef(bridge: Symbol, member: Symbol, other: Symbol) = exitingErasure {
+    def makeBridgeDefDef(bridge: Symbol, member: Symbol, other: Symbol) = {
       // type checking ensures we can safely call `other`, but unless `member.tpe <:< other.tpe`,
       // calling `member` is not guaranteed to succeed in general, there's
       // nothing we can do about this, except for an unapply: when this subtype test fails,
@@ -510,15 +499,13 @@ abstract class Erasure extends AddInterfaces
           IF (typeTest) THEN bridgingCall ELSE zero
         } else bridgingCall
       }
-      val rhs = member.tpe match {
-        case MethodType(Nil, ConstantType(c)) => Literal(c)
-        case _                                =>
-          val sel: Tree    = Select(This(root), member)
-          val bridgingCall = (sel /: bridge.paramss)((fun, vparams) => Apply(fun, vparams map Ident))
 
-          maybeWrap(bridgingCall)
+      exitingErasure {
+        val bridgeDef = gen.newBridgeDefDef(root, bridge, member)
+        val rhs       = maybeWrap(bridgeDef.rhs)
+
+        deriveDefDef(bridgeDef)(maybeWrap)
       }
-      atPos(bridge.pos)(DefDef(bridge, rhs))
     }
   }
 

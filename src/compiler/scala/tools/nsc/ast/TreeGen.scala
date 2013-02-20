@@ -19,6 +19,31 @@ abstract class TreeGen extends scala.reflect.internal.TreeGen with TreeDSL {
   import global._
   import definitions._
 
+  private def bridgeMethodFlags(originalMethod: Symbol) =
+    (originalMethod.flags | BRIDGE | ARTIFACT) & ~(ACCESSOR | DEFERRED | LAZY | lateDEFERRED)
+
+  /** Create a bridge in `clazz` with the info of `unimplemented` which forwards
+   *  to the method `implemented`.
+   */
+  def newBridgeMethod(clazz: Symbol, unimplemented: Symbol, implemented: Symbol) = {
+    val unimplementedInfo = erasure.specialErasure(clazz)(unimplemented.info)
+    val bridge            = implemented.cloneSymbol(newOwner = clazz, newFlags = bridgeMethodFlags(implemented))
+
+    bridge setInfo (unimplementedInfo cloneInfo bridge)
+  }
+
+  /** Create a bridge DefDef in `clazz` based on bridge method symbol `bridge`
+   *  which forwards to method implementation `implemented`.
+   */
+  def newBridgeDefDef(clazz: Symbol, bridge: Symbol, implemented: Symbol) = atPos(bridge.pos)(
+    DefDef(bridge, implemented.info match {
+      case MethodType(Nil, ConstantType(c)) => Literal(c)
+      case _                                =>
+        val sel: Tree = Select(This(clazz), implemented)
+        (sel /: bridge.paramss)((fun, vparams) => Apply(fun, vparams map Ident))
+    })
+  )
+
   def mkCheckInit(tree: Tree): Tree = {
     val tpe =
       if (tree.tpe != null || !tree.hasSymbolField) tree.tpe
