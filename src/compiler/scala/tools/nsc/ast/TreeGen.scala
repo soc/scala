@@ -29,7 +29,7 @@ abstract class TreeGen extends scala.reflect.internal.TreeGen with TreeDSL {
     val unimplementedInfo = erasure.specialErasure(clazz)(unimplemented.info)
     val bridge            = implemented.cloneSymbol(newOwner = clazz, newFlags = bridgeMethodFlags(implemented))
 
-    bridge.asInstanceOf[TermSymbol] setAlias implemented
+    // bridge.asInstanceOf[TermSymbol] setAlias implemented
     bridge setInfo (unimplementedInfo cloneInfo bridge)
   }
 
