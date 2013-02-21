@@ -79,7 +79,6 @@ abstract class Erasure extends AddInterfaces
     sym.isTypeParameterOrSkolem && (
          (initialSymbol.enclClassChain.exists(sym isNestedIn _))
       || (initialSymbol.isMethod && initialSymbol.typeParams.contains(sym))
-      || (initialSymbol.enclClassChain.exists(_.typeParams contains sym))
     )
   )
 
@@ -165,9 +164,9 @@ abstract class Erasure extends AddInterfaces
     }
   }
 
-  private def hiBounds(tparam: Symbol): List[Type] = printResult(s"hiBounds($tparam)")(
+  private def hiBounds(tparam: Symbol, sym0: Symbol): List[Type] = printResult(s"hiBounds($tparam)")(
     enteringErasure {
-      tparam.info.bounds.hi.dealiasWiden match {
+      tparam.info.bounds.hi.dealiasWiden/*.asSeenFrom(sym0.enclClass.info, sym0.enclClass)*/ match {
         case RefinedType(parents, _) => parents map (_.dealiasWiden)
         case tp                      => tp :: Nil
       }
@@ -180,6 +179,8 @@ abstract class Erasure extends AddInterfaces
    *  type for constructors.
    */
   def javaSig(sym0: Symbol, info: Type): Option[String] = enteringErasure {
+    println(s"javaSig($sym0, $info)")
+
     val isTraitSignature = sym0.enclClass.isTrait
 
     def superSig(parents: List[Type]) = {
@@ -205,7 +206,7 @@ abstract class Erasure extends AddInterfaces
       }
       classPart :: (isOther map boxedSig) mkString ":"
     }
-    def paramSig(tsym: Symbol) = tsym.name + boundsSig(hiBounds(tsym))
+    def paramSig(tsym: Symbol) = tsym.name + boundsSig(hiBounds(tsym, sym0))
     def polyParamSig(tparams: List[Symbol]) = (
       if (tparams.isEmpty) ""
       else tparams map paramSig mkString ("<", "", ">")
