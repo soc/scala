@@ -828,7 +828,12 @@ abstract class GenASM extends SubComponent with BytecodeWriters with GenJVMASM {
 
       if (!needsGenericSignature(sym)) { return null }
 
-      val memberTpe = enteringErasure(owner.info memberInfo sym)
+      // val memberTpe = enteringErasure(sym.info.asSeenFrom(owner.thisType, owner))
+      val memberTpe = enteringErasure(owner.thisType memberInfo sym)
+      // ).asSeenFrom(owner.thisType, owner)
+      // val memberTpe1 = enteringErasure(sym.info.asSeenFrom(owner.enclClass.thisType, owner.enclClass))
+      println(s"getGenericSignature($sym, $owner)/memberTpe=$memberTpe")
+      // val methodTpe1 = enteringErasure((owner.info memberType sym).asSeenFrom(owner.thisType, owner))
 
       val jsOpt: Option[String] = erasure.javaSig(sym, memberTpe)
       if (jsOpt.isEmpty) { return null }
