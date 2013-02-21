@@ -73,7 +73,7 @@ abstract class Erasure extends AddInterfaces
   // * higher-order type parameters
   // * type parameters appearing in method parameters
   // * type members not visible in an enclosing template
-  private def isTypeParameterInSig(sym: Symbol, initialSymbol: Symbol) = printResult(s"isTypeParameterInSig($sym, ${initialSymbol.fullLocationString})")(
+  private def isTypeParameterInSig(sym: Symbol, initialSymbol: Symbol) = /*printResult(s"isTypeParameterInSig($sym, ${initialSymbol.fullLocationString})")*/(
     !sym.isHigherOrderTypeParameter &&
     sym.isTypeParameterOrSkolem && (
          (initialSymbol.enclClassChain.exists(sym isNestedIn _))
@@ -163,7 +163,7 @@ abstract class Erasure extends AddInterfaces
     }
   }
 
-  private def hiBounds(tparam: Symbol, sym0: Symbol): List[Type] = printResult(s"hiBounds($tparam)")(
+  private def hiBounds(tparam: Symbol, sym0: Symbol): List[Type] = /*printResult(s"hiBounds($tparam)")*/(
     enteringErasure {
       tparam.info.bounds.hi.dealiasWiden/*.asSeenFrom(sym0.enclClass.info, sym0.enclClass)*/ match {
         case RefinedType(parents, _) => parents map (_.dealiasWiden)
@@ -178,7 +178,7 @@ abstract class Erasure extends AddInterfaces
    *  type for constructors.
    */
   def javaSig(sym0: Symbol, info: Type): Option[String] = enteringErasure {
-    println(s"javaSig($sym0, $info)")
+    // println(s"javaSig($sym0, $info)")
 
     val isTraitSignature = sym0.enclClass.isTrait
 
