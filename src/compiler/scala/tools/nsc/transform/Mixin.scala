@@ -40,11 +40,11 @@ abstract class Mixin extends InfoTransform with ast.TreeDSL {
   private def phBefore = currentRun.erasurePhase
   private def phAfter  = currentRun.posterasurePhase.next
 
-  private def trueTypeIn(member: Symbol, clazz: Symbol): Type =
-    enteringErasure(clazz.info memberInfo member)
+  private def trueTypeIn(member: Symbol, clazz: Symbol)(clazzInfo: Symbol => Type): Type =
+    enteringErasure(clazzInfo(clazz) memberInfo member)
 
   private def trueErasureIn(member: Symbol, clazz: Symbol): Type =
-    enteringErasure(erasure.specialErasure(clazz)(trueTypeIn(member, clazz)))
+    enteringErasure(erasure.specialErasure(clazz)(trueTypeIn(member, clazz)(_.info))
 
   private def sameErasureIn(clazz: Symbol)(m1: Symbol, m2: Symbol): Boolean = {
     val info1 = trueErasureIn(m1, clazz)
@@ -196,14 +196,28 @@ abstract class Mixin extends InfoTransform with ast.TreeDSL {
    *  This is not correct! See test run/t3452b for an example
    *  of runtime failure.
    */
-  def cloneAndAddMember(traitMember: Symbol, clazz: Symbol): Symbol =
-    addMember(clazz, cloneBeforeErasure(traitMember, clazz))
+  def cloneAndAddMember(traitMember: Symbol, clazz: Symbol): Symbol = {
+    val newMember = addMember(clazz, cloneAsSeenFrom(traitMember, clazz, clazz))
+    val bridge    = cloneAsSeenFrom(newMember, clazz, traitMember.owner)
 
-  def cloneBeforeErasure(traitMember: Symbol, clazz: Symbol): Symbol = {
+    if (sameErasureIn(clazz)(newMember, traitMember)) {
+      warning(s"sameErasureIn($clazz)($newMember, $traitMember)")
+      newMember
+    }
+    else {
+      val bridge = cloneAsSeenFrom(traitMember, clazz, traitMember.owner)
+      warning(s"Need this $bridge in $clazz")
+      newMember
+    }
+  }
+
+  def cloneAsSeenFrom(member: Symbol, clazz: Symbol, seenFrom: Symbol): Symbol =
+    cloneBeforeErasure(member, clazz)(trueTypeIn(_, seenFrom))
+
+  def cloneBeforeErasure(member: Symbol, clazz: Symbol)(infoFn: Symbol => Type): Symbol = {
     val clone = enteringErasure {
-      val clone = traitMember cloneSymbol clazz
-      val info  = traitMember.info cloneInfo clone
-      clone updateInfo info
+      val clone = member cloneSymbol clazz
+      clone updateInfo (infoFn(member) cloneInfo clone)
     }
     clone.info
     clone
