@@ -186,9 +186,10 @@ abstract class Mixin extends InfoTransform with ast.TreeDSL {
 
     def forwarderInfo   = onTypeInOwnerEnteringPhase(classMember, clazz, phBefore)(erasure.specialErasure(clazz)(_))
     def traitMemberInfo = onTypeInOwnerEnteringPhase(traitMember, traitMember.enclClass, phBefore)(erasure.specialErasure(traitMember.enclClass)(_))
+    def nonUniversal    = exitingTyper(traitMember isSubClass ObjectClass)
     def matches         = forwarderInfo matches traitMemberInfo
 
-    if (!matches) {
+    if (nonUniversal && !matches) {
       warning(s"""
         |Bridge required for trait forwarder from $clazz to $implClass
         |      class signature: ${classMember.defStringSeenAs(forwarderInfo)}
@@ -200,8 +201,12 @@ abstract class Mixin extends InfoTransform with ast.TreeDSL {
 
       // forwarderBridges(clazz) ::= logResult(s"Adding bridge definition tree to $clazz")(bridgeDef)
       addMember(clazz, gen.newBridgeMethod(clazz, traitMember, classMember))
-      // enteringErasure(logResult(s"New bridge for mixin member") {
-      // })
+
+      /** alternate to try
+      val bridge = gen.newBridgeMethod(clazz, traitMember, classMember)
+      bridge.asInstanceOf[TermSymbol] setAlias classMember
+      addMember(clazz, bridge)
+      **/
     }
 
     classMember
