@@ -39,7 +39,7 @@ abstract class Mixin extends InfoTransform with ast.TreeDSL {
   )
   private def phBefore = currentRun.erasurePhase
   private def phAfter  = currentRun.posterasurePhase.next
-  private val forwarderBridges = perRunCaches.newMap[Symbol, List[DefDef]]() withDefaultValue Nil
+  // private val forwarderBridges = perRunCaches.newMap[Symbol, List[DefDef]]() withDefaultValue Nil
 
 // --------- helper functions -----------------------------------------------
 
@@ -195,11 +195,11 @@ abstract class Mixin extends InfoTransform with ast.TreeDSL {
         |     bridge signature: ${traitMember.defStringSeenAs(traitMemberInfo)}
         |""".stripMargin.trim)
 
-      val bridge    = gen.newBridgeMethod(clazz, traitMember, classMember)
-      val bridgeDef = gen.newBridgeDefDef(clazz, bridge, classMember)
+      // val bridge    = gen.newBridgeMethod(clazz, traitMember, classMember)
+      // val bridgeDef = gen.newBridgeDefDef(clazz, bridge, classMember)
 
-      forwarderBridges(clazz) ::= logResult(s"Adding bridge definition tree to $clazz")(bridgeDef)
-      addMember(clazz, bridge)
+      // forwarderBridges(clazz) ::= logResult(s"Adding bridge definition tree to $clazz")(bridgeDef)
+      addMember(clazz, gen.newBridgeMethod(clazz, traitMember, classMember))
       // enteringErasure(logResult(s"New bridge for mixin member") {
       // })
     }
@@ -214,7 +214,9 @@ abstract class Mixin extends InfoTransform with ast.TreeDSL {
         (clazz.thisType baseType traitMember.owner) memberInfo traitMember
       )
     }
-    newSym updateInfo (traitMember.info cloneInfo newSym)
+    newSym
+    // enteringErasure {
+    // newSym updateInfo (traitMember.info cloneInfo newSym)
   }
 
   //   // since we used `mixinMember` from the interface that represents the trait that's
@@ -1210,16 +1212,23 @@ abstract class Mixin extends InfoTransform with ast.TreeDSL {
             // add fields
             addValDef(sym)
           }
+          // add superaccessors and forwarder bridges
+          else if (sym.isBridge) {
+            sym.info
+            sym.alias.info
+            val rhs = gen.newBridgeRHS(clazz, sym, sym.alias)
+            logResult(s"Adding bridge definition tree to $sym / ${sym.alias}")(rhs)
+            addDefDef(sym, rhs)
+          }
           else if (sym.isSuperAccessor) {
-            // add superaccessors
             addDefDef(sym)
           }
           else {
             // add forwarders
             if (sym.isMacro)
               log(s"No forwarder generated for macro $sym")
-            else if (sym.isBridge)
-              log(s"No forwarder generated for late bridge $sym")
+            // else if (sym.isBridge)
+            //   log(s"No forwarder generated for late bridge $sym")
             else {
               assert(sym.alias != NoSymbol, sym.fullLocationString + " " + sym.defString)
               // debuglog("New forwarder: " + sym.defString + " => " + sym.alias.defString)
@@ -1278,10 +1287,10 @@ abstract class Mixin extends InfoTransform with ast.TreeDSL {
           // mark fields which can be nulled afterward
           lazyValNullables = nullableFields(templ) withDefaultValue Set()
           // add all new definitions to current class or interface
-          val stats  = addNewDefs(currentOwner, body)
-          val stats1 = forwarderBridges(currentOwner) map (dd => localTyper.typed(dd))
-          val stats2 = if (stats1.isEmpty) stats else stats ::: stats1
-          treeCopy.Template(tree, parents1, self, stats2)
+          // val stats  = addNewDefs(currentOwner, body)
+          // val stats1 = forwarderBridges(currentOwner) map (dd => localTyper.typed(dd))
+          // val stats2 = if (stats1.isEmpty) stats else stats ::: stats1
+          treeCopy.Template(tree, parents1, self, addNewDefs(currentOwner, body))
 
         // remove widening casts
         case Apply(TypeApply(Select(qual, _), targ :: _), _) if isCastSymbol(sym) && (qual.tpe <:< targ.tpe) =>

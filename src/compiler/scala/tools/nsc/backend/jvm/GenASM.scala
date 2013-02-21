@@ -1064,7 +1064,8 @@ abstract class GenASM extends SubComponent with BytecodeWriters with GenJVMASM {
       // TODO: evaluate the other flags we might be dropping on the floor here.
       // TODO: ACC_SYNTHETIC ?
       val flags = PublicStatic | (
-        if (m.isVarargsMethod) asm.Opcodes.ACC_VARARGS else 0
+          ( if (m.isVarargsMethod) asm.Opcodes.ACC_VARARGS else 0 )
+        | ( if (m.isBridge) asm.Opcodes.ACC_BRIDGE else 0 )
       )
 
       // TODO needed? for(ann <- m.annotations) { ann.symbol.initialize }
