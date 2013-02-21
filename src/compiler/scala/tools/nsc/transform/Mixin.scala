@@ -202,10 +202,25 @@ abstract class Mixin extends InfoTransform with ast.TreeDSL {
   }
 
   def cloneBeforeErasure(implClass: Symbol, traitMember: Symbol, clazz: Symbol): Symbol = {
-    enteringErasure {
+    val clone = enteringErasure {
       val clone = traitMember cloneSymbol clazz
-      clone updateInfo (traitMember.info cloneInfo clone)
+      val info  = clazz.thisType memberInfo traitMember cloneInfo clone
+      clone setInfo info
     }
+    clone.info
+    clone
+
+    //   modifyInfo (info =>
+    //     clazz.info memberInfo traitMember
+    //   )
+    // )
+    // enteringErasure {
+    //   val clone = traitMember cloneSymbol clazz
+    //   clone
+    // }
+    // clone.info
+    // clone
+    // clone updateInfo (traitMember.info cloneInfo clone)
 
     // val clone = enteringErasure {
     //   traitMember cloneSymbol clazz modifyInfo (info =>

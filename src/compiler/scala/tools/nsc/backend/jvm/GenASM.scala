@@ -839,7 +839,7 @@ abstract class GenASM extends SubComponent with BytecodeWriters with GenJVMASM {
       if (jsOpt.isEmpty) { return null }
 
       val sig = jsOpt.get
-      log(sig) // This seems useful enough in the general case.
+      log(s"$sym    $sig") // This seems useful enough in the general case.
 
           def wrap(op: => Unit) = {
             try   { op; true }
