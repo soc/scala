@@ -29,6 +29,18 @@ abstract class Mixin extends InfoTransform with ast.TreeDSL {
   /** Map a lazy, mixedin field accessor to it's trait member accessor */
   private val initializer = perRunCaches.newMap[Symbol, Symbol]
 
+  private def onTypeInOwnerEnteringPhase[T](method: Symbol, owner: Symbol, ph: scala.reflect.internal.Phase)(f: Type => T): T = {
+    enteringPhase(ph)(f(owner.info memberInfo method))
+  }
+  private def erasureAsSeenAtPhase(method: Symbol, owner: Symbol, ph: scala.reflect.internal.Phase): String = (
+    onTypeInOwnerEnteringPhase(method, owner, ph)(tpe =>
+      method defStringSeenAs erasure.specialErasure(owner)(tpe)
+    )
+  )
+  private def phBefore = currentRun.erasurePhase
+  private def phAfter  = currentRun.posterasurePhase.next
+  private val forwarderBridges = perRunCaches.newMap[Symbol, List[DefDef]]() withDefaultValue Nil
+
 // --------- helper functions -----------------------------------------------
 
   /** A member of a trait is implemented statically if its implementation after the
@@ -169,17 +181,27 @@ abstract class Mixin extends InfoTransform with ast.TreeDSL {
    */
   def cloneAndAddMember(implClass: Symbol, traitMember: Symbol, clazz: Symbol): Symbol = {
     val classMember       = cloneBeforeErasure(implClass, traitMember, clazz)
+    classMember.info
     val classMemberDef    = addMember(clazz, classMember)
-    def memberInfoInImpl  = implClass.info memberInfo traitMember
-    def memberInfoInClass = clazz.info memberInfo traitMember
-    def matches           = memberInfoInImpl matches memberInfoInClass
+
+    def forwarderInfo   = onTypeInOwnerEnteringPhase(classMember, clazz, phBefore)(erasure.specialErasure(clazz)(_))
+    def traitMemberInfo = onTypeInOwnerEnteringPhase(traitMember, traitMember.enclClass, phBefore)(erasure.specialErasure(traitMember.enclClass)(_))
+    def matches         = forwarderInfo matches traitMemberInfo
 
     if (!matches) {
-      enteringErasure(logResult(s"New bridge for mixin member") {
-        val bridge    = gen.newBridgeMethod(clazz, traitMember, classMember)
-        val bridgeDef = gen.newBridgeDefDef(clazz, bridge, classMember)
-        addMember(clazz, bridge)
-      })
+      warning(s"""
+        |Bridge required for trait forwarder from $clazz to $implClass
+        |      class signature: ${classMember.defStringSeenAs(forwarderInfo)}
+        |     bridge signature: ${traitMember.defStringSeenAs(traitMemberInfo)}
+        |""".stripMargin.trim)
+
+      val bridge    = gen.newBridgeMethod(clazz, traitMember, classMember)
+      val bridgeDef = gen.newBridgeDefDef(clazz, bridge, classMember)
+
+      forwarderBridges(clazz) ::= logResult(s"Adding bridge definition tree to $clazz")(bridgeDef)
+      addMember(clazz, bridge)
+      // enteringErasure(logResult(s"New bridge for mixin member") {
+      // })
     }
 
     classMember
@@ -319,24 +341,40 @@ abstract class Mixin extends InfoTransform with ast.TreeDSL {
         if (classMember eq NoSymbol) {
           val isLateDeferred = clazz.info.findMember(implMember.name, 0, lateDEFERRED, false).alternatives contains traitMember
           if (isLateDeferred) {
-            val forwarder    = cloneAndAddMixinMember(implClass, traitMember).asInstanceOf[TermSymbol] setAlias implMember
+            val forwarder = cloneAndAddMixinMember(implClass, traitMember).asInstanceOf[TermSymbol] setAlias implMember
             // forwarder.info
+            log(s"Added trait forwarder to ${clazz.fullLocationString} for $traitMember defined in $mixinInterface")
             // clazz.info
             // mixinInterface.info
+            // def forwarderInfo   = onTypeInOwnerEnteringPhase(forwarder, clazz, phBefore)(x => x)
+            // def traitMemberInfo = onTypeInOwnerEnteringPhase(traitMember, mixinInterface, phBefore)(x => x)
 
-            def forwarderSig = forwarder defStringSeenAs (clazz.info memberInfo forwarder)
-            def inTraitSig   = traitMember defStringSeenAs (mixinInterface.info memberInfo traitMember)
-            def inImplSig    = implMember defStringSeenAs (implClass.info memberInfo implMember)
+            // if (forwarderInfo =:= traitMemberInfo) () else {
+            //   def defStrings(label: String, method: Symbol, owner: Symbol): String = {
+            //     val s1 = s"$label, erased  pre-erasure: ${erasureAsSeenAtPhase(method, owner, phBefore)}\n"
+            //     val s2 = s"$label, erased post-erasure: ${erasureAsSeenAtPhase(method, owner, phAfter)}\n"
+            //     s1 + s2
+            //   }
+            //   def forwarderSig  = defStrings(" forwarder", forwarder, clazz)
+            //   def inTraitSig    = defStrings("  in trait", traitMember, mixinInterface)
+            //   def inImplSig     = defStrings("  in  impl", implMember, implClass)
+            //   def allDefStrings = forwarderSig + inTraitSig + inImplSig
 
-            log(s"""
-              |Adding impl class forwarder to ${clazz.fullLocationString} for $traitMember in $mixinInterface
-              |  in trait, before erasure: ${enteringErasure(inTraitSig)}
-              |  in  impl, before erasure: ${enteringErasure(inImplSig)}
-              | forwarder, before erasure: ${enteringErasure(forwarderSig)}
-              |  in trait,  after erasure: ${exitingErasure(inTraitSig)}
-              |  in  impl,  after erasure: ${exitingErasure(inImplSig)}
-              | forwarder,  after erasure: ${exitingErasure(forwarderSig)}
-              |""".stripMargin)
+            //   warning(s"Adding impl class forwarder to ${clazz.fullLocationString} for $traitMember in $mixinInterface\n" + allDefStrings)
+            // }
+            // def forwarderSig = forwarder defStringSeenAs (clazz.info memberInfo forwarder)
+            // def inTraitSig   = traitMember defStringSeenAs (mixinInterface.info memberInfo traitMember)
+            // def inImplSig    = implMember defStringSeenAs (implClass.info memberInfo implMember)
+
+            // log(s"""
+            //   |Adding impl class forwarder to ${clazz.fullLocationString} for $traitMember in $mixinInterface
+            //   |  in trait, before erasure: ${enteringErasure(inTraitSig)}
+            //   |  in trait,  after erasure: ${exitingErasure(inTraitSig)}
+            //   |  in  impl, before erasure: ${enteringErasure(inImplSig)}
+            //   | forwarder, before erasure: ${enteringErasure(forwarderSig)}
+            //   |  in  impl,  after erasure: ${exitingErasure(inImplSig)}
+            //   | forwarder,  after erasure: ${exitingErasure(forwarderSig)}
+            //   |""".stripMargin)
             // println(s"""
             //   |In $clazz
             //   |       implClass=$implClass
@@ -1178,9 +1216,15 @@ abstract class Mixin extends InfoTransform with ast.TreeDSL {
           }
           else {
             // add forwarders
-            assert(sym.alias != NoSymbol, sym)
-            // debuglog("New forwarder: " + sym.defString + " => " + sym.alias.defString)
-            if (!sym.isMacro) addDefDef(sym, Apply(staticRef(sym.alias), gen.mkAttributedThis(clazz) :: sym.paramss.head.map(Ident)))
+            if (sym.isMacro)
+              log(s"No forwarder generated for macro $sym")
+            else if (sym.isBridge)
+              log(s"No forwarder generated for late bridge $sym")
+            else {
+              assert(sym.alias != NoSymbol, sym.fullLocationString + " " + sym.defString)
+              // debuglog("New forwarder: " + sym.defString + " => " + sym.alias.defString)
+              addDefDef(sym, Apply(staticRef(sym.alias), gen.mkAttributedThis(clazz) :: sym.paramss.head.map(Ident)))
+            }
           }
         }
       }
@@ -1234,7 +1278,10 @@ abstract class Mixin extends InfoTransform with ast.TreeDSL {
           // mark fields which can be nulled afterward
           lazyValNullables = nullableFields(templ) withDefaultValue Set()
           // add all new definitions to current class or interface
-          treeCopy.Template(tree, parents1, self, addNewDefs(currentOwner, body))
+          val stats  = addNewDefs(currentOwner, body)
+          val stats1 = forwarderBridges(currentOwner) map (dd => localTyper.typed(dd))
+          val stats2 = if (stats1.isEmpty) stats else stats ::: stats1
+          treeCopy.Template(tree, parents1, self, stats2)
 
         // remove widening casts
         case Apply(TypeApply(Select(qual, _), targ :: _), _) if isCastSymbol(sym) && (qual.tpe <:< targ.tpe) =>

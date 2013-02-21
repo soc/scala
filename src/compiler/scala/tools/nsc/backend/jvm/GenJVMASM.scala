@@ -36,7 +36,8 @@ trait GenJVMASM {
   protected val ExcludedForwarderFlags = {
     import Flags._
     // Should include DEFERRED but this breaks findMember.
-    ( CASE | SPECIALIZED | LIFTED | PROTECTED | STATIC | EXPANDEDNAME | BridgeAndPrivateFlags | MACRO )
+    ( CASE | SPECIALIZED | LIFTED | PRIVATE | VBRIDGE | PROTECTED | STATIC | EXPANDEDNAME | MACRO )
+    // ( CASE | SPECIALIZED | LIFTED | PROTECTED | STATIC | EXPANDEDNAME | BridgeAndPrivateFlags | MACRO )
   }
 
   protected def isJavaEntryPoint(icls: IClass) = {
