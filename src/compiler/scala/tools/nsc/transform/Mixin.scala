@@ -39,6 +39,23 @@ abstract class Mixin extends InfoTransform with ast.TreeDSL {
   )
   private def phBefore = currentRun.erasurePhase
   private def phAfter  = currentRun.posterasurePhase.next
+
+  private def trueTypeIn(member: Symbol, clazz: Symbol): Type =
+    enteringErasure(clazz.info memberInfo member)
+
+  private def trueErasureIn(member: Symbol, clazz: Symbol): Type =
+    enteringErasure(erasure.specialErasure(clazz)(trueTypeIn(member, clazz)))
+
+  private def sameErasureIn(clazz: Symbol)(m1: Symbol, m2: Symbol): Boolean = {
+    val info1 = trueErasureIn(m1, clazz)
+    val info2 = trueErasureIn(m2, clazz)
+
+    (info1 =:= info2) || {
+      warning(s"In $clazz, $m1 needs a bridge:\n  $info1\n  $info2")
+      false
+    }
+  }
+
   // private val forwarderBridges = perRunCaches.newMap[Symbol, List[DefDef]]() withDefaultValue Nil
 
 // --------- helper functions -----------------------------------------------
@@ -181,24 +198,8 @@ abstract class Mixin extends InfoTransform with ast.TreeDSL {
    */
   def cloneAndAddMember(implClass: Symbol, traitMember: Symbol, clazz: Symbol): Symbol = {
     val classMember       = cloneBeforeErasure(implClass, traitMember, clazz)
-    classMember.info
-    val classMemberDef    = addMember(clazz, classMember)
-    // implClass.info //memberInfo traitMember
-    // clazz.info //memberInfo traitMember
-    // def memberInfoInImpl  = implClass.info memberInfo traitMember
-    // def memberInfoInClass = clazz.info memberInfo traitMember
-    // def matches           = memberInfoInImpl matches memberInfoInClass
-
-    // if (!matches) {
-    //   enteringErasure(logResult(s"New bridge for mixin member") {
-    //     val bridge    = gen.newBridgeMethod(clazz, traitMember, classMember)
-    //     val bridgeDef = gen.newBridgeDefDef(clazz, bridge, classMember)
-    //     addMember(clazz, bridge)
-    //   })
-    // }
-
+    addMember(clazz, classMember)
     classMember
-    // updateInfo (traitMember.info cloneInfo classMember)
   }
 
   def cloneBeforeErasure(implClass: Symbol, traitMember: Symbol, clazz: Symbol): Symbol = {
@@ -358,10 +359,10 @@ abstract class Mixin extends InfoTransform with ast.TreeDSL {
           val isLateDeferred = clazz.info.findMember(implMember.name, 0, lateDEFERRED, false).alternatives contains traitMember
           if (isLateDeferred) {
             val forwarder = cloneAndAddMixinMember(implClass, traitMember).asInstanceOf[TermSymbol] setAlias implMember
-            val erased = enteringErasure(erasure.specialErasure(clazz)(forwarder.info))
-
-            log(s"${clazz.fullLocationString} requires forwarder for $mixinInterface#$traitMember")
-            log(s"  ${forwarder.defStringSeenAs(erased)} ====> ${implMember.defString}")
+            if (sameErasureIn(clazz)(forwarder, traitMember))
+              log(s"${clazz.fullLocationString} requires forwarder for $mixinInterface#$traitMember")
+            else
+              log(s"${clazz.fullLocationString} requires forwarder AND BRIDGE for $mixinInterface#$traitMember")
           }
         }
       }
@@ -1176,8 +1177,6 @@ abstract class Mixin extends InfoTransform with ast.TreeDSL {
             // add forwarders
             if (sym.isMacro)
               log(s"No forwarder generated for macro $sym")
-            // else if (sym.isBridge)
-            //   log(s"No forwarder generated for late bridge $sym")
             else {
               assert(sym.alias != NoSymbol, sym.fullLocationString + " " + sym.defString)
               // debuglog("New forwarder: " + sym.defString + " => " + sym.alias.defString)
