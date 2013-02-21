@@ -170,7 +170,13 @@ abstract class Mixin extends InfoTransform with ast.TreeDSL {
   /** Add given member to given class, and mark member as mixed-in.
    */
   def addMember(clazz: Symbol, member: Symbol): Symbol = {
-    log(s"new member of $clazz: ${member.defString}")
+    def info0 = enteringErasure(erasure.specialErasure(clazz)(clazz.info memberInfo member)) //member.info.asSeenFrom(clazz.thisType, clazz))
+    def info1 = enteringErasure(erasure.specialErasure(clazz)(info0))
+
+    val def0 = member.defStringSeenAs(info0)
+    val def1 = member.defStringSeenAs(info1)
+
+    log(s"new member of $clazz: $def0" + ( if (def0 == def1) "" else " / " + def1 ))
     clazz.info.decls enter member setFlag MIXEDIN
   }
   /** Warning: subtle issues at play!
@@ -183,45 +189,31 @@ abstract class Mixin extends InfoTransform with ast.TreeDSL {
     def cloneWithInfo(info: Type): TermSymbol = {
       val member = enteringErasure {
         val clone = traitMember cloneSymbol clazz
-        clone updateInfo (info cloneInfo clone)
+        clone modifyInfo (_.asSeenFrom(clazz.thisType, clazz))
+        // clone updateInfo (info cloneInfo clone)
       }
-      member.info
+      member updateInfo (traitMember.info cloneInfo member)
+      // member.info
       addMember(clazz, member)
       member.asInstanceOf[TermSymbol]
     }
 
-    val info1 = enteringErasure(erasure.specialErasure(clazz)(clazz.info memberInfo traitMember))
-    val info2 = enteringErasure(erasure.specialErasure(clazz)(traitMember.info))
+    // was: clazz.info memberInfo traitMember
+    def basis1 = clazz.info baseType traitMember.owner memberInfo traitMember
+    def basis2 = traitMember.owner.info memberInfo traitMember
 
+    val info1 = enteringErasure(erasure.specialErasure(clazz)(basis1))
+    val info2 = enteringErasure(erasure.specialErasure(clazz)(basis2))
     val member1 = cloneWithInfo(info1)
-    if (info1 =:= info2) member1 :: Nil
+
+    if (info1 =:= info2)
+      List(member1)
     else {
       val member2 = cloneWithInfo(info2)
       member2 setFlag BRIDGE
       List(member1, member2)
     }
   }
-
-
-  //   val infos = if (info1 =:= info2) info1 :: Nil else info1 :: info2 :: Nil
-
-  //   infos map { info =>
-  //     val member = enteringErasure {
-  //       val clone = traitMember cloneSymbol clazz
-  //       clone updateInfo (info cloneInfo clone)
-  //     }
-  //     member.info
-  //     addMember(clazz, member)
-  //     member.asInstanceOf[TermSymbol]
-  //   }
-  // }
-
-  // def cloneBeforeErasure(traitMember: Symbol, clazz: Symbol): Symbol = {
-  //   enteringErasure {
-  //     val clone = traitMember cloneSymbol clazz
-  //     clone updateInfo (traitMember.info cloneInfo clone)
-  //   }
-  // }
 
   def needsExpandedSetterName(field: Symbol) = !field.isLazy && (
     if (field.isMethod) field.hasStableFlag
