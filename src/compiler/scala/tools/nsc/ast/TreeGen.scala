@@ -29,19 +29,23 @@ abstract class TreeGen extends scala.reflect.internal.TreeGen with TreeDSL {
     val unimplementedInfo = erasure.specialErasure(clazz)(unimplemented.info)
     val bridge            = implemented.cloneSymbol(newOwner = clazz, newFlags = bridgeMethodFlags(implemented))
 
+    // bridge.asInstanceOf[TermSymbol] setAlias implemented
     bridge setInfo (unimplementedInfo cloneInfo bridge)
   }
 
   /** Create a bridge DefDef in `clazz` based on bridge method symbol `bridge`
    *  which forwards to method implementation `implemented`.
    */
-  def newBridgeDefDef(clazz: Symbol, bridge: Symbol, implemented: Symbol) = atPos(bridge.pos)(
-    DefDef(bridge, implemented.info match {
+  def newBridgeDefDef(clazz: Symbol, bridge: Symbol, virtualTarget: Symbol) =
+    atPos(bridge.pos)(DefDef(bridge, newBridgeRHS(clazz, bridge, virtualTarget)))
+
+  def newBridgeRHS(clazz: Symbol, bridge: Symbol, virtualTarget: Symbol) = atPos(bridge.pos)(
+    virtualTarget.info match {
       case MethodType(Nil, ConstantType(c)) => Literal(c)
       case _                                =>
-        val sel: Tree = Select(This(clazz), implemented)
+        val sel: Tree = Select(This(clazz), virtualTarget)
         (sel /: bridge.paramss)((fun, vparams) => Apply(fun, vparams map Ident))
-    })
+    }
   )
 
   def mkCheckInit(tree: Tree): Tree = {
