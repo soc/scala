@@ -248,15 +248,15 @@ abstract class Mixin extends InfoTransform with ast.TreeDSL {
 
   def cloneAndAddMixinMember(traitMember: Symbol, clazz: Symbol): List[Symbol] = {
     val calc = Erasures(clazz, traitMember.owner, traitMember)
-    val (info1, info2) = calc.erasures
-    println(s"cloneAndAddMember($traitMember, $clazz, $info1, $info2)")
-    val clone1 = addMember(clazz, cloneBeforeErasure(traitMember, clazz)(info2))
-      // clazz.info memberInfo traitMember))
-    if (calc.sameErasures)
+    val info1 = calc.erasedInClass
+    val info2 = calc.erasedInBase
+    val clone1 = addMember(clazz, cloneBeforeErasure(traitMember, clazz, info1))
+    if (info1 =:= info2)
       return clone1 :: Nil
 
-    log("" + calc)
-    List(clone1, addMember(clazz, cloneBeforeErasure(traitMember, clazz)(info1)))
+    log("Bridge required for new mixin member:\n" + calc)
+    val clone2 = addMember(clazz, cloneBeforeErasure(traitMember, clazz, info2))
+    List(clone1, clone2)
   }
 
   def cloneAndAddForwarders(traitMember: Symbol, clazz: Symbol, implMember: Symbol) {
@@ -267,14 +267,14 @@ abstract class Mixin extends InfoTransform with ast.TreeDSL {
   }
 
   def cloneAndAddFieldAccessor(member: Symbol, clazz: Symbol): Symbol = {
-    addMember(clazz, cloneBeforeErasure(member, clazz)(member.info))
+    addMember(clazz, cloneBeforeErasure(member, clazz, enteringErasure(member.info)))
   }
 
-  def cloneBeforeErasure(traitMember: Symbol, clazz: Symbol)(infoFn: => Type): Symbol = {
+  def cloneBeforeErasure(traitMember: Symbol, clazz: Symbol, info: Type): Symbol = {
     val clone = enteringErasure {
       val flags = (traitMember.flags | MIXEDIN) & ~(DEFERRED | lateDEFERRED)
       val clone = traitMember.cloneSymbol(newOwner = clazz, newFlags = flags)
-      clone setPos clazz.pos updateInfo (infoFn cloneInfo clone)
+      clone setPos clazz.pos updateInfo (info cloneInfo clone)
     }
     clone.info
     clone
