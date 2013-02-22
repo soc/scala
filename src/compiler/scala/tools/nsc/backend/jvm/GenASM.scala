@@ -802,66 +802,13 @@ abstract class GenASM extends SubComponent with BytecodeWriters with GenJVMASM {
       annot.args.isEmpty &&
       !annot.matches(DeprecatedAttr)
 
-    // @M don't generate java generics sigs for (members of) implementation
-    // classes, as they are monomorphic (TODO: ok?)
-    private def needsGenericSignature(sym: Symbol) = !(
-      // PP: This condition used to include sym.hasExpandedName, but this leads
-      // to the total loss of generic information if a private member is
-      // accessed from a closure: both the field and the accessor were generated
-      // without it.  This is particularly bad because the availability of
-      // generic information could disappear as a consequence of a seemingly
-      // unrelated change.
-         settings.Ynogenericsig.value
-      || sym.isArtifact
-      || sym.isLiftedMethod
-      || sym.isBridge
-      || (sym.ownerChain exists (_.isImplClass))
-    )
-
     def getCurrentCUnit(): CompilationUnit
 
     /** @return
      *   - `null` if no Java signature is to be added (`null` is what ASM expects in these cases).
      *   - otherwise the signature in question
      */
-    def getGenericSignature(sym: Symbol, owner: Symbol): String = {
-
-      if (!needsGenericSignature(sym)) { return null }
-
-      val memberTpe = enteringErasure(owner.thisType.memberInfo(sym))
-
-      val jsOpt: Option[String] = erasure.javaSig(sym, memberTpe)
-      if (jsOpt.isEmpty) { return null }
-
-      val sig = jsOpt.get
-      log(sig) // This seems useful enough in the general case.
-
-          def wrap(op: => Unit) = {
-            try   { op; true }
-            catch { case _: Throwable => false }
-          }
-
-      if (settings.Xverify.value) {
-        // Run the signature parser to catch bogus signatures.
-        val isValidSignature = wrap {
-          // Alternative: scala.tools.reflect.SigParser (frontend to sun.reflect.generics.parser.SignatureParser)
-          import scala.tools.asm.util.CheckClassAdapter
-          if (sym.isMethod)    { CheckClassAdapter checkMethodSignature sig } // requires asm-util.jar
-          else if (sym.isTerm) { CheckClassAdapter checkFieldSignature  sig }
-          else                 { CheckClassAdapter checkClassSignature  sig }
-        }
-
-        if(!isValidSignature) {
-          getCurrentCUnit().warning(sym.pos,
-              """|compiler bug: created invalid generic signature for %s in %s
-                 |signature: %s
-                 |if this is reproducible, please report bug at https://issues.scala-lang.org/
-              """.trim.stripMargin.format(sym, sym.owner.skipPackageObject.fullName, sig))
-          return null
-        }
-      }
-      sig
-    }
+    def getGenericSignature(sym: Symbol, owner: Symbol): String = erasure.jvmSignature(sym, owner).orNull
 
     def ubytesToCharArray(bytes: Array[Byte]): Array[Char] = {
       val ca = new Array[Char](bytes.size)
