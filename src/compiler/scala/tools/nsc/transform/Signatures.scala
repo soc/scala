@@ -47,6 +47,13 @@ trait Signatures extends scala.reflect.internal.transform.Erasure {
   override protected def verifyJavaErasure = settings.Xverify.value || settings.debug.value
   def needsJavaSig(tp: Type) = !settings.Ynogenericsig.value && NeedsSigCollector.collect(tp)
 
+  private def visibleTypeParameters(where: Symbol): Map[Name, Symbol] = {
+    where.ownerChain.flatMap(_.typeParams).foldLeft(Map[Name, Symbol]())((res, tparam) =>
+      if (res contains tparam.name) res
+      else res + (tparam.name -> tparam)
+    )
+  }
+
   // only refer to type params that will actually make it into the sig, this excludes:
   // * higher-order type parameters
   // * type parameters appearing in method parameters
