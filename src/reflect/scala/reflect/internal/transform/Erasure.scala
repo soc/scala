@@ -10,6 +10,23 @@ trait Erasure {
   import global._
   import definitions._
 
+  // @M #2585 when generating a java generic signature that includes
+  // a selection of an inner class p.I, (p = `pre`, I = `cls`) must
+  // rewrite to p'.I, where p' refers to the class that directly defines
+  // the nested class I.
+  //
+  // See also #2585 marker in javaSig: there, type arguments must be
+  // included (use pre.baseType(cls.owner)).
+  //
+  // This requires that cls.isClass.
+  protected def rebindInnerClass(pre: Type, cls: Symbol): Type = {
+    if (cls.owner.isClass) cls.owner.tpe_* else pre // why not cls.isNestedClass?
+  }
+  protected def unboundedGenericArrayLevel(tp: Type): Int = tp match {
+    case GenericArray(level, core) if !(core <:< AnyRefClass.tpe) => level
+    case _ => 0
+  }
+
   /** An extractor object for generic arrays */
   object GenericArray {
 
@@ -52,24 +69,6 @@ trait Erasure {
       case _ =>
         None
     }
-  }
-
-  protected def unboundedGenericArrayLevel(tp: Type): Int = tp match {
-    case GenericArray(level, core) if !(core <:< AnyRefClass.tpe) => level
-    case _ => 0
-  }
-
-  // @M #2585 when generating a java generic signature that includes
-  // a selection of an inner class p.I, (p = `pre`, I = `cls`) must
-  // rewrite to p'.I, where p' refers to the class that directly defines
-  // the nested class I.
-  //
-  // See also #2585 marker in javaSig: there, type arguments must be
-  // included (use pre.baseType(cls.owner)).
-  //
-  // This requires that cls.isClass.
-  protected def rebindInnerClass(pre: Type, cls: Symbol): Type = {
-    if (cls.owner.isClass) cls.owner.tpe_* else pre // why not cls.isNestedClass?
   }
 
   def unboxDerivedValueClassMethod(clazz: Symbol): Symbol =
