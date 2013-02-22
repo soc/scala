@@ -37,6 +37,44 @@ abstract class Mixin extends InfoTransform with ast.TreeDSL {
       method defStringSeenAs erasure.specialErasure(owner)(tpe)
     )
   )
+
+  case class Erasures(clazz: Symbol, base: Symbol, member: Symbol) {
+    private def erase(info: Type): Type = erasure.specialErasure(member matchingSymbol prefix)(info)
+
+    lazy val prefix          = clazz.thisType baseType base
+    lazy val defined         = enteringErasure(member.info.asSeenFrom(prefix, base))
+    lazy val inherited       = enteringErasure(prefix memberInfo member)
+    lazy val erasedInherited = erase(inherited)
+    lazy val erasedDefined   = erase(defined)
+
+    def sameErasures = erasedInherited =:= erasedDefined
+    def erasures = (erasedDefined, erasedInherited)
+
+    override def toString = s"""
+      |${member.fullLocationString} as seen in $prefix
+      |  UD ${member.defStringSeenAs(defined)}
+      |  ED ${member.defStringSeenAs(erasedDefined)}
+      |  UI ${member.defStringSeenAs(inherited)}
+      |  EI ${member.defStringSeenAs(erasedInherited)}
+      |""".stripMargin
+  }
+
+  class ErasureCalculation(val clazz: Symbol, val member: Symbol) {
+    def inBaseClass(base: Symbol) = Erasures(clazz, base, member)
+    def allErasures               = clazz.baseClasses map inBaseClass
+    def inClass                   = inBaseClass(clazz)
+    def inTrait                   = inBaseClass(member.owner)
+
+    override def toString = "" + inClass + "\n" + inTrait
+  }
+
+  private def erasureSeenFrom(clazz: Symbol, baseClass: Symbol)(method: Symbol): Type = {
+    val pre      = enteringErasure(clazz.info baseType baseClass)
+    val info     = enteringErasure(pre memberInfo method)
+    val matching = method matchingSymbol pre
+    erasure.specialErasure(matching)(info)
+  }
+
   private def phBefore = currentRun.erasurePhase
   private def phAfter  = currentRun.posterasurePhase.next
   // private val forwarderBridges = perRunCaches.newMap[Symbol, List[DefDef]]() withDefaultValue Nil
@@ -202,19 +240,15 @@ abstract class Mixin extends InfoTransform with ast.TreeDSL {
   // }
 
   def cloneAndAddMixinMember(traitMember: Symbol, clazz: Symbol): List[Symbol] = {
-    val clone1 = addMember(clazz, cloneBeforeErasure(traitMember, clazz)(traitMember.info))
-    if (traitMember.isAbstractOverride)
+    val calc = new ErasureCalculation(clazz, traitMember)
+    val (info1, info2) = calc.inClass.erasures
+    val clone1 = addMember(clazz, cloneBeforeErasure(traitMember, clazz)(info2))
+      // clazz.info memberInfo traitMember))
+    if (calc.inClass.sameErasures)
       return clone1 :: Nil
 
-    val clone2 = cloneBeforeErasure(traitMember, clazz)(clazz.info memberInfo traitMember)
-    val same   = clone1.info =:= clone2.info
-
-    if (same) List(clone1) else {
-      clone1 setFlag BRIDGE
-      addMember(clazz, clone2)
-      log(s"Added bridge for trait forwarder in $clazz for signatures:\n  ${clone1.defString}\n  ${clone2.defString}")
-      List(clone2, clone1)
-    }
+    log("" + calc)
+    List(clone1, addMember(clazz, cloneBeforeErasure(traitMember, clazz)(info1)))
   }
 
   def cloneAndAddForwarders(traitMember: Symbol, clazz: Symbol, implMember: Symbol) {
