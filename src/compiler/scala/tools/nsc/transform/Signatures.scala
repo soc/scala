@@ -148,6 +148,23 @@ trait Signatures extends scala.reflect.internal.transform.Erasure {
   //   }
   // }
 
+  // if ((settings.check containsName phaseName)) {
+  //   val normalizedTpe = enteringErasure(erasure.prepareSigMap(memberTpe))
+  //   val bytecodeTpe = owner.thisType.memberInfo(sym)
+  //   if (!sym.isType && !sym.isConstructor && !(erasure.erasure(sym)(normalizedTpe) =:= bytecodeTpe)) {
+  //     getCurrentCUnit().warning(sym.pos,
+  //         """|compiler bug: created generic signature for %s in %s that does not conform to its erasure
+  //            |signature: %s
+  //            |original type: %s
+  //            |normalized type: %s
+  //            |erasure type: %s
+  //            |if this is reproducible, please report bug at http://issues.scala-lang.org/
+  //         """.trim.stripMargin.format(sym, sym.owner.skipPackageObject.fullName, sig, memberTpe, normalizedTpe, bytecodeTpe))
+  //      return null
+  //   }
+  // }
+
+
   private def hiBounds(bounds: TypeBounds): List[Type] = bounds.hi.dealiasWiden match {
     case RefinedType(parents, _) => parents map (_.dealiasWiden)
     case tp                      => tp :: Nil
