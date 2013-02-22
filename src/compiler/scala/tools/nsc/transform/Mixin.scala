@@ -438,12 +438,14 @@ abstract class Mixin extends InfoTransform with ast.TreeDSL {
             devWarning(s"Overridden concrete accessor: ${mixinMember.fullLocationString}")
           else {
             // mixin field accessors
-            val mixedInAccessor = cloneAndAddMixinMember(mixinMember, clazz).head
+            val mixedInAccessors = cloneAndAddMixinMember(mixinMember, clazz)
             if (mixinMember.isLazy) {
-              initializer(mixedInAccessor) = (
-                Mixin.this.implClass(implClass).info.decl(mixinMember.name)
-                  orElse abort("Could not find initializer for " + mixinMember.name)
-              )
+              mixedInAccessors foreach { mixedInAccessor =>
+                initializer(mixedInAccessor) = (
+                  Mixin.this.implClass(implClass).info.decl(mixinMember.name)
+                    orElse abort("Could not find initializer for " + mixinMember.name)
+                )
+              }
             }
             if (!mixinMember.isSetter)
               mixinMember.tpe match {
