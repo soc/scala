@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+#
+# wrapper around partest for fine-grained test selection via ack
+
+pathfilter () {
+  for path in $(perl -pe 's#^(test/files/[^/]+/[^/.]+).*$#$1#'); do
+    if [[ -d "$path" ]]; then
+      echo "$path"
+    elif [[ -f "$path.scala" ]]; then
+      echo "$path.scala"
+    fi
+  done
+}
+
+pathfilter | sort -u
