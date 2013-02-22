@@ -42,25 +42,32 @@ abstract class Mixin extends InfoTransform with ast.TreeDSL {
     private def erase(root: Symbol, info: Type): Type =
       enteringErasure(erasure.specialErasure(root)(info))
 
+    private def seenIn(baseClass: Symbol) = (tp: Type) => tp.asSeenFrom(baseClass.thisType, baseClass)
+    private def seenInClass(tp: Type): Type = seenIn(clazz)(tp)
+    private def seenInBase(tp: Type): Type  = seenIn(base)(tp)
+
     private def findMatching(enclosing: Symbol): Symbol = {
-      val matching = enteringErasure(member.matchingSymbol(enclosing.info, admit = BRIDGE))
+      val matching = enteringErasure(member.matchingSymbol(enclosing.info)) //, admit = BRIDGE))
       if (matching.owner == enclosing) matching else enclosing
     }
 
-    lazy val inClass       = enteringErasure(clazz.info memberInfo member)
-    lazy val inBase        = enteringErasure(base.info memberInfo member)
-    lazy val erasedInClass = erase(findMatching(clazz), inClass)
-    lazy val erasedInBase  = erase(findMatching(base), inBase)
+    // lazy val inClass             = enteringErasure(clazz.info memberInfo member)
+    // lazy val inBase              = enteringErasure(base.info memberInfo member)
+    lazy val inClass             = enteringErasure(seenInClass(member.info))
+    lazy val inBase              = enteringErasure(seenInBase(member.info))
+    lazy val erasedInClass       = erase(findMatching(clazz), inClass)
+    lazy val erasedInBase        = erase(findMatching(base), inBase)
+    lazy val erasedInBaseInClass = seenInClass(erasedInBase)
 
-    def sameErasures = erasedInBase =:= erasedInClass
-    def erasures     = (erasedInBase, erasedInClass)
+    def sameErasures = erasedInBaseInClass =:= erasedInClass
 
     override def toString = s"""
       |$member as seen in $clazz and $base (U/E is (un)erased, C/B is class vs. base class)
-      |  UC ${member.defStringSeenAs(inClass)}
-      |  EC ${member.defStringSeenAs(erasedInClass)}
-      |  UB ${member.defStringSeenAs(inBase)}
-      |  EB ${member.defStringSeenAs(erasedInBase)}
+      |  UC    ${member.defStringSeenAs(inClass)}
+      |  EC    ${member.defStringSeenAs(erasedInClass)}
+      |  UB    ${member.defStringSeenAs(inBase)}
+      |  EB    ${member.defStringSeenAs(erasedInBase)}
+      |  EB->C ${member.defStringSeenAs(erasedInBaseInClass)}
       |""".stripMargin
   }
 
