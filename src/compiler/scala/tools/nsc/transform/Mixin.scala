@@ -39,19 +39,23 @@ abstract class Mixin extends InfoTransform with ast.TreeDSL {
   )
 
   case class Erasures(clazz: Symbol, base: Symbol, member: Symbol) {
-    private def erase(info: Type): Type = erasure.specialErasure(member matchingSymbol prefix)(info)
+    private def erase(start: Symbol, info: Type): Type = enteringErasure(erasure.specialErasure(start)(info))
+    private def findMatching(enclosing: Symbol): Symbol = {
+      val matching = enteringErasure(member.matchingSymbol(enclosing.info, admit = BRIDGE))
+      if (matching.owner == enclosing) matching else enclosing
+    }
 
-    lazy val prefix          = clazz.thisType baseType base
-    lazy val defined         = enteringErasure(member.info.asSeenFrom(prefix, base))
-    lazy val inherited       = enteringErasure(prefix memberInfo member)
-    lazy val erasedInherited = erase(inherited)
-    lazy val erasedDefined   = erase(defined)
+    lazy val defined         = enteringErasure(clazz.info memberInfo member)
+    lazy val inherited       = enteringErasure(base.info memberInfo member)
+    // lazy val inherited       = enteringErasure(clazz.info baseType base memberInfo member)
+    lazy val erasedInherited = erase(findMatching(clazz), inherited)
+    lazy val erasedDefined   = erase(findMatching(base), defined)
 
     def sameErasures = erasedInherited =:= erasedDefined
     def erasures = (erasedDefined, erasedInherited)
 
     override def toString = s"""
-      |${member.fullLocationString} as seen in $prefix
+      |${member.fullLocationString} as seen in $clazz
       |  UD ${member.defStringSeenAs(defined)}
       |  ED ${member.defStringSeenAs(erasedDefined)}
       |  UI ${member.defStringSeenAs(inherited)}
@@ -59,21 +63,23 @@ abstract class Mixin extends InfoTransform with ast.TreeDSL {
       |""".stripMargin
   }
 
-  class ErasureCalculation(val clazz: Symbol, val member: Symbol) {
-    def inBaseClass(base: Symbol) = Erasures(clazz, base, member)
-    def allErasures               = clazz.baseClasses map inBaseClass
-    def inClass                   = inBaseClass(clazz)
-    def inTrait                   = inBaseClass(member.owner)
+  // class ErasureCalculation(val clazz: Symbol, val member: Symbol) {
+  //   clazz.info
 
-    override def toString = "" + inClass + "\n" + inTrait
-  }
+  //   def inBaseClass(base: Symbol) = Erasures(clazz, base, member)
+  //   // def allErasures               = clazz.baseClasses map inBaseClass
+  //   lazy val inClass                   = inBaseClass(clazz)
+  //   // def inTrait                   = inBaseClass(member.owner)
 
-  private def erasureSeenFrom(clazz: Symbol, baseClass: Symbol)(method: Symbol): Type = {
-    val pre      = enteringErasure(clazz.info baseType baseClass)
-    val info     = enteringErasure(pre memberInfo method)
-    val matching = method matchingSymbol pre
-    erasure.specialErasure(matching)(info)
-  }
+  //   override def toString = "" + inClass// + "\n" + inTrait
+  // }
+
+  // private def erasureSeenFrom(clazz: Symbol, baseClass: Symbol)(method: Symbol): Type = {
+  //   val pre      = enteringErasure(clazz.info baseType baseClass)
+  //   val info     = enteringErasure(pre memberInfo method)
+  //   val matching = method matchingSymbol pre
+  //   erasure.specialErasure(matching)(info)
+  // }
 
   private def phBefore = currentRun.erasurePhase
   private def phAfter  = currentRun.posterasurePhase.next
@@ -240,11 +246,12 @@ abstract class Mixin extends InfoTransform with ast.TreeDSL {
   // }
 
   def cloneAndAddMixinMember(traitMember: Symbol, clazz: Symbol): List[Symbol] = {
-    val calc = new ErasureCalculation(clazz, traitMember)
-    val (info1, info2) = calc.inClass.erasures
+    val calc = Erasures(clazz, traitMember.owner, traitMember)
+    val (info1, info2) = calc.erasures
+    println(s"cloneAndAddMember($traitMember, $clazz, $info1, $info2)")
     val clone1 = addMember(clazz, cloneBeforeErasure(traitMember, clazz)(info2))
       // clazz.info memberInfo traitMember))
-    if (calc.inClass.sameErasures)
+    if (calc.sameErasures)
       return clone1 :: Nil
 
     log("" + calc)
