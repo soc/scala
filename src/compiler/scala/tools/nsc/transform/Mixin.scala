@@ -29,37 +29,38 @@ abstract class Mixin extends InfoTransform with ast.TreeDSL {
   /** Map a lazy, mixedin field accessor to it's trait member accessor */
   private val initializer = perRunCaches.newMap[Symbol, Symbol]
 
-  private def onTypeInOwnerEnteringPhase[T](method: Symbol, owner: Symbol, ph: scala.reflect.internal.Phase)(f: Type => T): T = {
-    enteringPhase(ph)(f(owner.info memberInfo method))
-  }
-  private def erasureAsSeenAtPhase(method: Symbol, owner: Symbol, ph: scala.reflect.internal.Phase): String = (
-    onTypeInOwnerEnteringPhase(method, owner, ph)(tpe =>
-      method defStringSeenAs erasure.specialErasure(owner)(tpe)
-    )
-  )
+  // private def onTypeInOwnerEnteringPhase[T](method: Symbol, owner: Symbol, ph: scala.reflect.internal.Phase)(f: Type => T): T = {
+  //   enteringPhase(ph)(f(owner.info memberInfo method))
+  // }
+  // private def erasureAsSeenAtPhase(method: Symbol, owner: Symbol, ph: scala.reflect.internal.Phase): String = (
+  //   onTypeInOwnerEnteringPhase(method, owner, ph)(tpe =>
+  //     method defStringSeenAs erasure.specialErasure(owner)(tpe)
+  //   )
+  // )
 
   case class Erasures(clazz: Symbol, base: Symbol, member: Symbol) {
-    private def erase(start: Symbol, info: Type): Type = enteringErasure(erasure.specialErasure(start)(info))
+    private def erase(root: Symbol, info: Type): Type =
+      enteringErasure(erasure.specialErasure(root)(info))
+
     private def findMatching(enclosing: Symbol): Symbol = {
       val matching = enteringErasure(member.matchingSymbol(enclosing.info, admit = BRIDGE))
       if (matching.owner == enclosing) matching else enclosing
     }
 
-    lazy val defined         = enteringErasure(clazz.info memberInfo member)
-    lazy val inherited       = enteringErasure(base.info memberInfo member)
-    // lazy val inherited       = enteringErasure(clazz.info baseType base memberInfo member)
-    lazy val erasedInherited = erase(findMatching(clazz), inherited)
-    lazy val erasedDefined   = erase(findMatching(base), defined)
+    lazy val inClass       = enteringErasure(clazz.info memberInfo member)
+    lazy val inBase        = enteringErasure(base.info memberInfo member)
+    lazy val erasedInClass = erase(findMatching(clazz), inClass)
+    lazy val erasedInBase  = erase(findMatching(base), inBase)
 
-    def sameErasures = erasedInherited =:= erasedDefined
-    def erasures = (erasedDefined, erasedInherited)
+    def sameErasures = erasedInBase =:= erasedInClass
+    def erasures     = (erasedInBase, erasedInClass)
 
     override def toString = s"""
-      |${member.fullLocationString} as seen in $clazz
-      |  UD ${member.defStringSeenAs(defined)}
-      |  ED ${member.defStringSeenAs(erasedDefined)}
-      |  UI ${member.defStringSeenAs(inherited)}
-      |  EI ${member.defStringSeenAs(erasedInherited)}
+      |$member as seen in $clazz and $base (U/E is (un)erased, C/B is class vs. base class)
+      |  UC ${member.defStringSeenAs(inClass)}
+      |  EC ${member.defStringSeenAs(erasedInClass)}
+      |  UB ${member.defStringSeenAs(inBase)}
+      |  EB ${member.defStringSeenAs(erasedInBase)}
       |""".stripMargin
   }
 
