@@ -29,6 +29,18 @@ abstract class Mixin extends InfoTransform with ast.TreeDSL {
   /** Map a lazy, mixedin field accessor to it's trait member accessor */
   private val initializer = perRunCaches.newMap[Symbol, Symbol]
 
+  private def onTypeInOwnerEnteringPhase[T](method: Symbol, owner: Symbol, ph: scala.reflect.internal.Phase)(f: Type => T): T = {
+    enteringPhase(ph)(f(owner.info memberInfo method))
+  }
+  private def erasureAsSeenAtPhase(method: Symbol, owner: Symbol, ph: scala.reflect.internal.Phase): String = (
+    onTypeInOwnerEnteringPhase(method, owner, ph)(tpe =>
+      method defStringSeenAs erasure.specialErasure(owner)(tpe)
+    )
+  )
+  private def phBefore = currentRun.erasurePhase
+  private def phAfter  = currentRun.posterasurePhase.next
+  // private val forwarderBridges = perRunCaches.newMap[Symbol, List[DefDef]]() withDefaultValue Nil
+
 // --------- helper functions -----------------------------------------------
 
   /** A member of a trait is implemented statically if its implementation after the
@@ -167,32 +179,78 @@ abstract class Mixin extends InfoTransform with ast.TreeDSL {
    *  This is not correct! See test run/t3452b for an example
    *  of runtime failure.
    */
-  def cloneAndAddMember(implClass: Symbol, traitMember: Symbol, clazz: Symbol): Symbol = {
-    val classMember       = cloneBeforeErasure(implClass, traitMember, clazz)
-    val classMemberDef    = addMember(clazz, classMember)
-    def memberInfoInImpl  = implClass.info memberInfo traitMember
-    def memberInfoInClass = clazz.info memberInfo traitMember
-    def matches           = memberInfoInImpl matches memberInfoInClass
+  // def cloneAndAddMember(traitMember: Symbol, clazz: Symbol): Symbol = {
+  //   val classMember = cloneBeforeErasure(traitMember, clazz)(_.info)
+  //   cloneBeforeErasure(traitMember, clazz)(clazz.info memberInfo _)
 
-    if (!matches) {
-      enteringErasure(logResult(s"New bridge for mixin member") {
-        val bridge    = gen.newBridgeMethod(clazz, traitMember, classMember)
-        val bridgeDef = gen.newBridgeDefDef(clazz, bridge, classMember)
-        addMember(clazz, bridge)
-      })
+  //   // val classMemberDef    =
+  //   addMember(clazz, classMember)
+  //   // def memberInfoInImpl  = implClass.info memberInfo traitMember
+  //   // def memberInfoInClass = clazz.info memberInfo traitMember
+  //   // def matches           = memberInfoInImpl matches memberInfoInClass
+
+  //   // if (!matches) {
+  //   //   enteringErasure(logResult(s"New bridge for mixin member") {
+  //   //     val bridge    = gen.newBridgeMethod(clazz, traitMember, classMember)
+  //   //     val bridgeDef = gen.newBridgeDefDef(clazz, bridge, classMember)
+  //   //     addMember(clazz, bridge)
+  //   //   })
+  //   // }
+
+  //   classMember
+  //   // updateInfo (traitMember.info cloneInfo classMember)
+  // }
+
+  def cloneAndAddMixinMember(traitMember: Symbol, clazz: Symbol): List[Symbol] = {
+    val clone1 = cloneBeforeErasure(traitMember, clazz)(traitMember.info)
+    val clone2 = cloneBeforeErasure(traitMember, clazz)(clazz.info memberInfo traitMember)
+    val same   = clone1.info =:= clone2.info
+    addMember(clazz, clone1)
+
+    if (same) List(clone1) else {
+      clone1 setFlag BRIDGE
+      addMember(clazz, clone2)
+      List(clone2, clone1)
     }
-
-    classMember
-    // updateInfo (traitMember.info cloneInfo classMember)
   }
 
-  def cloneBeforeErasure(implClass: Symbol, traitMember: Symbol, clazz: Symbol): Symbol = {
-    val newSym = enteringErasure {
-      traitMember cloneSymbol clazz modifyInfo (info =>
-        (clazz.thisType baseType traitMember.owner) memberInfo traitMember
-      )
+  def cloneAndAddForwarders(traitMember: Symbol, clazz: Symbol, implMember: Symbol) {
+    cloneAndAddMixinMember(traitMember, clazz) foreach {
+      case sym: TermSymbol => sym setAlias implMember
+      case sym             => devWarning(s"Non-term symbol showed up as clone? $sym")
     }
-    newSym updateInfo (traitMember.info cloneInfo newSym)
+  }
+
+  def cloneBeforeErasure(traitMember: Symbol, clazz: Symbol)(infoFn: => Type): Symbol = {
+    enteringErasure {
+      val flags = (traitMember.flags | MIXEDIN) & ~(DEFERRED | lateDEFERRED)
+      val clone = traitMember.cloneSymbol(newOwner = clazz, newFlags = flags)
+      clone setPos clazz.pos updateInfo (infoFn cloneInfo clone)
+    }
+
+    // -      traitMember cloneSymbol clazz modifyInfo (info =>
+    // -        (clazz.thisType baseType traitMember.owner) memberInfo traitMember
+    // -      )
+    // val clone1 = enteringErasure {
+    //   val clone = traitMember cloneSymbol clazz
+    //   clone updateInfo (traitMember.info cloneInfo clone)
+    // }
+    // val clone2 = enteringErasure {
+    //   val clone = traitMember cloneSymbol clazz
+    //   clone updateInfo (clazz.info memberInfo traitMember cloneInfo clone)
+    // }
+    // if (clone1.info =:= clone2.info) () else {
+    //   println(s"${clone1.defString}  <===>  ${clone2.defString}")
+    // }
+    // clone1
+
+    // enteringErasure {
+    //   val clone = traitMember cloneSymbol clazz modifyInfo (info =>
+    //     (clazz.thisType baseType traitMember.owner) memberInfo traitMember
+    //   )
+    //   clone updateInfo clone.info
+    // }
+    // newSym updateInfo (traitMember.info cloneInfo newSym)
   }
 
   //   // since we used `mixinMember` from the interface that represents the trait that's
@@ -302,11 +360,6 @@ abstract class Mixin extends InfoTransform with ast.TreeDSL {
    *      - for every module in T, add a module
    */
   def addMixedinMembers(clazz: Symbol, unit: CompilationUnit) {
-    def cloneAndAddMixinMember(implClass: Symbol, traitMember: Symbol): Symbol = (
-      cloneAndAddMember(implClass, traitMember, clazz)
-           setPos clazz.pos
-        resetFlag DEFERRED | lateDEFERRED
-    )
 
     /** Mix in members of implementation class implClass into class clazz */
     def mixinImplClassMembers(implClass: Symbol, mixinInterface: Symbol) {
@@ -319,24 +372,25 @@ abstract class Mixin extends InfoTransform with ast.TreeDSL {
         if (classMember eq NoSymbol) {
           val isLateDeferred = clazz.info.findMember(implMember.name, 0, lateDEFERRED, false).alternatives contains traitMember
           if (isLateDeferred) {
-            val forwarder    = cloneAndAddMixinMember(implClass, traitMember).asInstanceOf[TermSymbol] setAlias implMember
-            // forwarder.info
-            // clazz.info
-            // mixinInterface.info
+            cloneAndAddForwarders(traitMember, clazz, implMember)
+            // val forwarder    = cloneAndAddMixinMember(traitMember, clazz).asInstanceOf[TermSymbol] setAlias implMember
+            // // forwarder.info
+            // // clazz.info
+            // // mixinInterface.info
 
-            def forwarderSig = forwarder defStringSeenAs (clazz.info memberInfo forwarder)
-            def inTraitSig   = traitMember defStringSeenAs (mixinInterface.info memberInfo traitMember)
-            def inImplSig    = implMember defStringSeenAs (implClass.info memberInfo implMember)
+            // def forwarderSig = forwarder defStringSeenAs (clazz.info memberInfo forwarder)
+            // def inTraitSig   = traitMember defStringSeenAs (mixinInterface.info memberInfo traitMember)
+            // def inImplSig    = implMember defStringSeenAs (implClass.info memberInfo implMember)
 
-            log(s"""
-              |Adding impl class forwarder to ${clazz.fullLocationString} for $traitMember in $mixinInterface
-              |  in trait, before erasure: ${enteringErasure(inTraitSig)}
-              |  in  impl, before erasure: ${enteringErasure(inImplSig)}
-              | forwarder, before erasure: ${enteringErasure(forwarderSig)}
-              |  in trait,  after erasure: ${exitingErasure(inTraitSig)}
-              |  in  impl,  after erasure: ${exitingErasure(inImplSig)}
-              | forwarder,  after erasure: ${exitingErasure(forwarderSig)}
-              |""".stripMargin)
+            // log(s"""
+            //   |Adding impl class forwarder to ${clazz.fullLocationString} for $traitMember in $mixinInterface
+            //   |  in trait, before erasure: ${enteringErasure(inTraitSig)}
+            //   |  in  impl, before erasure: ${enteringErasure(inImplSig)}
+            //   | forwarder, before erasure: ${enteringErasure(forwarderSig)}
+            //   |  in trait,  after erasure: ${exitingErasure(inTraitSig)}
+            //   |  in  impl,  after erasure: ${exitingErasure(inImplSig)}
+            //   | forwarder,  after erasure: ${exitingErasure(forwarderSig)}
+            //   |""".stripMargin)
             // println(s"""
             //   |In $clazz
             //   |       implClass=$implClass
@@ -383,7 +437,7 @@ abstract class Mixin extends InfoTransform with ast.TreeDSL {
             devWarning(s"Overridden concrete accessor: ${mixinMember.fullLocationString}")
           else {
             // mixin field accessors
-            val mixedInAccessor = cloneAndAddMixinMember(implClass, mixinMember)
+            val mixedInAccessor = cloneAndAddMixinMember(mixinMember, clazz).head
             if (mixinMember.isLazy) {
               initializer(mixedInAccessor) = (
                 Mixin.this.implClass(implClass).info.decl(mixinMember.name)
