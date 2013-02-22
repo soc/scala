@@ -210,6 +210,7 @@ abstract class Mixin extends InfoTransform with ast.TreeDSL {
     if (same) List(clone1) else {
       clone1 setFlag BRIDGE
       addMember(clazz, clone2)
+      log(s"Added bridge for trait forwarder in $clazz for signatures:\n  ${clone1.defString}\n  ${clone2.defString}")
       List(clone2, clone1)
     }
   }
