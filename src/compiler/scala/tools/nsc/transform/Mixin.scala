@@ -37,6 +37,15 @@ abstract class Mixin extends InfoTransform with ast.TreeDSL {
       method defStringSeenAs erasure.specialErasure(owner)(tpe)
     )
   )
+  private def samePreErasureInOwners(owner1: Symbol, owner2: Symbol)(member: Symbol): Boolean = {
+    enteringPhase(phBefore) {
+      val info1 = erasure.specialErasure(owner1)(owner1.info memberInfo member)
+      val info2 = erasure.specialErasure(owner2)(owner2.info memberInfo member)
+
+      info1 =:= info2
+    }
+  }
+
   private def phBefore = currentRun.erasurePhase
   private def phAfter  = currentRun.posterasurePhase.next
   // private val forwarderBridges = perRunCaches.newMap[Symbol, List[DefDef]]() withDefaultValue Nil
@@ -202,17 +211,18 @@ abstract class Mixin extends InfoTransform with ast.TreeDSL {
   // }
 
   def cloneAndAddMixinMember(traitMember: Symbol, clazz: Symbol): List[Symbol] = {
+    if (traitMember.isAbstractOverride || samePreErasureInOwners(clazz, traitMember.owner)(traitMember))
+      return addMember(clazz, cloneBeforeErasure(traitMember, clazz)(clazz.info memberInfo traitMember)) :: Nil
+
     val clone1 = cloneBeforeErasure(traitMember, clazz)(traitMember.info)
     val clone2 = cloneBeforeErasure(traitMember, clazz)(clazz.info memberInfo traitMember)
-    val same   = clone1.info =:= clone2.info
     addMember(clazz, clone1)
 
-    if (same) List(clone1) else {
-      clone1 setFlag BRIDGE
-      addMember(clazz, clone2)
-      log(s"Added bridge for trait forwarder in $clazz for signatures:\n  ${clone1.defString}\n  ${clone2.defString}")
-      List(clone2, clone1)
-    }
+    List(clone1, clone2) foreach (s => println(s"matchingSymbol for $s: " + clazz.matchingSymbol(s.info)))
+    clone1 setFlag BRIDGE
+    addMember(clazz, clone2)
+    log(s"Added bridge for trait forwarder in $clazz for signatures:\n  ${clone1.defString}\n  ${clone2.defString}")
+    List(clone2, clone1)
   }
 
   def cloneAndAddForwarders(traitMember: Symbol, clazz: Symbol, implMember: Symbol) {
@@ -440,12 +450,10 @@ abstract class Mixin extends InfoTransform with ast.TreeDSL {
             // mixin field accessors
             val mixedInAccessors = cloneAndAddMixinMember(mixinMember, clazz)
             if (mixinMember.isLazy) {
-              mixedInAccessors foreach { mixedInAccessor =>
-                initializer(mixedInAccessor) = (
-                  Mixin.this.implClass(implClass).info.decl(mixinMember.name)
-                    orElse abort("Could not find initializer for " + mixinMember.name)
-                )
-              }
+              initializer(mixedInAccessors.head) = (
+                Mixin.this.implClass(implClass).info.decl(mixinMember.name)
+                  orElse abort("Could not find initializer for " + mixinMember.name)
+              )
             }
             if (!mixinMember.isSetter)
               mixinMember.tpe match {
@@ -1160,7 +1168,7 @@ abstract class Mixin extends InfoTransform with ast.TreeDSL {
         case MethodType(Nil, ConstantType(c)) => Literal(c)
         case _ =>
           // if it is a mixed-in lazy value, complete the accessor
-          if (sym.isLazy && sym.isGetter) {
+          if (sym.isLazy && sym.isGetter && (initializer contains sym)) {
             val isUnit    = sym.tpe.resultType.typeSymbol == UnitClass
             val initCall  = Apply(staticRef(initializer(sym)), gen.mkAttributedThis(clazz) :: Nil)
             val selection = Select(This(clazz), sym.accessed)
