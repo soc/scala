@@ -8,7 +8,7 @@ package internal
 
 import scala.collection.{ mutable, immutable }
 import scala.collection.mutable.ListBuffer
-import util.{ Statistics, shortClassOfInstance }
+import util.{ Statistics, shortClassOfInstance, Origins }
 import Flags._
 import scala.annotation.tailrec
 import scala.reflect.io.{ AbstractFile, NoAbstractFile }
@@ -212,7 +212,7 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
 // ------ creators -------------------------------------------------------------------
 
     final def newValue(name: TermName, pos: Position = NoPosition, newFlags: Long = 0L): TermSymbol =
-      newTermSymbol(name, pos, newFlags)
+      if (isPastTyper) Origins("newValue", 2)(newTermSymbol(name, pos, newFlags)) else newTermSymbol(name, pos, newFlags)
     final def newVariable(name: TermName, pos: Position = NoPosition, newFlags: Long = 0L): TermSymbol =
       newTermSymbol(name, pos, MUTABLE | newFlags)
     final def newValueParameter(name: TermName, pos: Position = NoPosition, newFlags: Long = 0L): TermSymbol =
@@ -222,7 +222,7 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
     final def newLocalDummy(pos: Position): TermSymbol =
       newTermSymbol(nme.localDummyName(this), pos) setInfo NoType
     final def newMethod(name: TermName, pos: Position = NoPosition, newFlags: Long = 0L): MethodSymbol =
-      createMethodSymbol(name, pos, METHOD | newFlags)
+      if (isPastTyper) Origins("newMethod", 2)(createMethodSymbol(name, pos, METHOD | newFlags)) else createMethodSymbol(name, pos, METHOD | newFlags)
     final def newMethodSymbol(name: TermName, pos: Position = NoPosition, newFlags: Long = 0L): MethodSymbol =
       createMethodSymbol(name, pos, METHOD | newFlags)
     final def newLabel(name: TermName, pos: Position = NoPosition): MethodSymbol =
@@ -396,7 +396,7 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
       owner.newTypeSkolemSymbol(name.toTypeName, this, pos, flags)
 
     final def newClass(name: TypeName, pos: Position = NoPosition, newFlags: Long = 0L): ClassSymbol =
-      newClassSymbol(name, pos, newFlags)
+      if (isPastTyper) Origins("newClass", 2)(newClassSymbol(name, pos, newFlags)) else newClassSymbol(name, pos, newFlags)
 
     /** A new class with its info set to a ClassInfoType with given scope and parents. */
     def newClassWithInfo(name: TypeName, parents: List[Type], scope: Scope, pos: Position = NoPosition, newFlags: Long = 0L): ClassSymbol = {
