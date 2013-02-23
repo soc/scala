@@ -848,7 +848,14 @@ abstract class Erasure extends AddInterfaces
      *    but their erased types are the same.
      */
     private def checkNoDoubleDefs(root: Symbol) {
+      if (root.isSpecialized) {
+        log(s"Skipping double defs check on specialized class $root")
+        return
+      }
+
       def doubleDefError(sym1: Symbol, sym2: Symbol) {
+        // log(s"doubleDefError(${sym1.fullLocationString}, ${sym2.fullLocationString}")
+
         // the .toString must also be computed at the earlier phase
         val tpe1 = exitingRefchecks(root.thisType.memberType(sym1))
         val tpe2 = exitingRefchecks(root.thisType.memberType(sym2))
@@ -873,7 +880,7 @@ abstract class Erasure extends AddInterfaces
         if (e.sym.isTerm) {
           var e1 = decls.lookupNextEntry(e)
           while (e1 ne null) {
-            if (exitingPostErasure(e1.sym.info =:= e.sym.info)) doubleDefError(e.sym, e1.sym)
+            if (exitingPostErasure(e1.sym.tpe_* =:= e.sym.tpe_*)) doubleDefError(e.sym, e1.sym)
             e1 = decls.lookupNextEntry(e1)
           }
         }
@@ -881,25 +888,18 @@ abstract class Erasure extends AddInterfaces
       }
 
       val opc = new overridingPairs.Cursor(root) {
-        override def exclude(sym: Symbol): Boolean = (
-             !sym.isTerm || sym.isPrivate || super.exclude(sym)
-          // specialized members have no type history before 'specialize', causing double def errors for curried defs
-          || !sym.hasTypeAt(currentRun.refchecksPhase.id)
-        )
-
-        override def matches(sym1: Symbol, sym2: Symbol): Boolean =
-          exitingPostErasure(sym1.tpe =:= sym2.tpe)
+        override def exclude(sym: Symbol) = !sym.isTerm || sym.isPrivate || super.exclude(sym)
+        override def matches(sym1: Symbol, sym2: Symbol) = exitingPostErasure(sym1.tpe_* =:= sym2.tpe_*)
       }
       while (opc.hasNext) {
         if (!exitingRefchecks(
               root.thisType.memberType(opc.overriding) matches
               root.thisType.memberType(opc.overridden))) {
-          debuglog("" + opc.overriding.locationString + " " +
-                     opc.overriding.infosString +
-                     opc.overridden.locationString + " " +
-                     opc.overridden.infosString)
+          log("root.thisType: " + root.thisType + " " + root.thisType)
+          log("" + opc.overriding.infoHistoryString(root.thisType))
+          log("" + opc.overridden.infoHistoryString(root.thisType))
           doubleDefError(opc.overriding, opc.overridden)
-        }
+      }
         opc.next
       }
     }
