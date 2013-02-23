@@ -19,7 +19,7 @@ import scala.collection.generic.ParMapFactory
 import scala.collection.generic.CanCombineFrom
 import scala.collection.generic.GenericParMapTemplate
 import scala.collection.generic.GenericParMapCompanion
-import scala.collection.immutable.{ HashMap, TrieIterator }
+import scala.collection.immutable.{ HashMap, TrieIterator, ListMap }
 import scala.annotation.unchecked.uncheckedVariance
 import scala.collection.parallel.Task
 
@@ -313,7 +313,7 @@ extends scala.collection.parallel.BucketCombiner[(K, V), ParHashMap[K, V], (K, V
         val evaledvalue = hm1.value.result
         new HashMap.HashMap1[K, Repr](hm1.key, hm1.hash, evaledvalue, null)
       case hmc: HashMap.HashMapCollision1[_, _] =>
-        val evaledkvs = hmc.kvs map { p => (p._1, p._2.result) }
+        val evaledkvs: ListMap[K,Repr] = hmc.kvs map { p => (p._1, p._2.result) }
         new HashMap.HashMapCollision1[K, Repr](hmc.hash, evaledkvs)
       case htm: HashMap.HashTrieMap[k, v] =>
         var i = 0

@@ -11,9 +11,9 @@
 package scala.collection
 package immutable
 
-import generic._
-import immutable.{RedBlackTree => RB}
-import mutable.{ Builder, SetBuilder }
+import scala.collection.generic._
+import scala.collection.immutable.{ RedBlackTree => RB }
+import scala.collection.mutable.{ Builder, SetBuilder }
 
 /** $factoryInfo
  *  @define Coll `immutable.TreeSet`

@@ -79,7 +79,7 @@ extends ParMap[K, V]
 
   override def size = {
     val in = ctrie.readRoot()
-    val r = in.gcasRead(ctrie)
+    val r: BasicNode = in.gcasRead(ctrie)
     r match {
       case tn: TNode[_, _] => tn.cachedSize(ctrie)
       case ln: LNode[_, _] => ln.cachedSize(ctrie)
