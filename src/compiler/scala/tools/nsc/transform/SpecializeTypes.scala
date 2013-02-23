@@ -807,7 +807,7 @@ abstract class SpecializeTypes extends InfoTransform with TypingTransformers {
    */
   private def normalizeMember(owner: Symbol, sym: Symbol, outerEnv: TypeEnv): List[Symbol] = {
     sym :: (
-      if (!sym.isMethod || enteringTyper(sym.typeParams.isEmpty)) Nil
+      if (!sym.isMethod || enteringTyper(sym.typeParams.isEmpty) || sym.hasAnnotation(UnspecializedClass)) Nil
       else {
         // debuglog("normalizeMember: " + sym.fullNameAsName('.').decode)
         var specializingOn = specializedParams(sym)
@@ -899,7 +899,7 @@ abstract class SpecializeTypes extends InfoTransform with TypingTransformers {
       specMember
     }
 
-    if (sym.isMethod) {
+    if (sym.isMethod && !sym.hasAnnotation(UnspecializedClass)) {
       val stvars = specializedTypeVars(sym)
       if (stvars.nonEmpty)
         debuglog("specialized %s on %s".format(sym.fullLocationString, stvars.map(_.name).mkString(", ")))
@@ -1385,8 +1385,11 @@ abstract class SpecializeTypes extends InfoTransform with TypingTransformers {
     override def transform(tree: Tree): Tree =
       reportError { transform1(tree) } {_ => tree}
 
-    def transform1(tree: Tree) = {
+    def transform1(tree: Tree): Tree = {
       val symbol = tree.symbol
+      if ((symbol ne null) && (symbol hasAnnotation UnspecializedClass))
+        return super.transform(tree)
+
       /** The specialized symbol of 'tree.symbol' for tree.tpe, if there is one */
       def specSym(qual: Tree): Symbol = {
         val env = unify(symbol.tpe, tree.tpe, emptyEnv, false)

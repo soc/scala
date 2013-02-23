@@ -62,6 +62,8 @@ trait Signatures extends scala.reflect.internal.transform.Erasure {
   class SignatureMap(val member: Symbol, val owner: Symbol) {
     private val prefix            = owner.thisType
     private val unerased          = enteringErasure(prefix memberInfo member)
+    private val matching          = member matchingSymbol owner.thisType
+    private val root              = if (matching.ownerChain contains owner) matching else owner
     private var inBoxedPosition   = false
     private val isGeneric         = member.info.typeParams.nonEmpty
     private val isTraitSignature  = member.isTrait
@@ -152,7 +154,7 @@ trait Signatures extends scala.reflect.internal.transform.Erasure {
       }
 
       // If args isEmpty, Array is being used as a type constructor
-      if (isTypeParameterInSig(sym, member))
+      if (isTypeParameterInSig(sym, root))
         "" + TVAR_TAG + sym.name + ";"
       else if (isPrimitiveValueClass(sym)) {
         if (inBoxedPosition) jsig(ObjectClass.tpe)
@@ -181,6 +183,16 @@ trait Signatures extends scala.reflect.internal.transform.Erasure {
       else "*"
     }
 
+    private def msg(tp: Type) = enteringErasure {
+      s"""|Confused by appearance of $tp while calculating signature of $member
+          |      defined in ${member.owner.defString}
+          |  calculating in ${owner.defString}
+          |  member: ${member.defString}
+          |  erased: ${exitingPostErasure(member.defString)}
+          | matching: $matching in ${matching.owner}
+          |     root: $root in ${root.owner}
+          |""".stripMargin
+    }
     object jsig extends (Type => String) {
       def boxed(tp: Type): String = {
         val saved = inBoxedPosition
@@ -195,13 +207,18 @@ trait Signatures extends scala.reflect.internal.transform.Erasure {
         case RefinedType(parent :: _, _)   => boxed(parent)
         case ClassInfoType(parents, _, _)  => superSig(parents)
         case tp @ TypeRef(_, _, _)         => typeRefSig(tp)
+        case WildcardType                  => devWarning(msg(WildcardType)) ; jsig(ObjectClass.tpe)
         case tp                            =>
           val etp = erasure(member)(tp)
-          if (etp eq tp) throw new UnknownSig
+          if (etp eq tp) throw new UnknownSig(tp)
           else jsig(etp)
       }
     }
+    class UnknownSig(val tp: Type) extends Exception {
+      override def toString = msg(tp)
+    }
   }
+
 
   private def newCalculator(member: Symbol, owner: Symbol): String = {
     val calc = new SignatureMap(member, owner)
@@ -523,6 +540,4 @@ trait Signatures extends scala.reflect.internal.transform.Erasure {
   //   }
   //   else None
   // }
-
-  class UnknownSig extends Exception
 }
