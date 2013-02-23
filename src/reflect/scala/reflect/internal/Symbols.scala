@@ -1746,44 +1746,24 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
       if (clone.thisSym != clone)
         clone.typeOfThis = (clone.typeOfThis cloneInfo clone)
 
-      def nextInfo(info: Type) = info cloneInfo clone
-
-      if (hasInfoHistory && (clone.isClass || clone.isMethod)) {
+      if (hasCloneableHistory) {
         log(s"Cloning ${infoHistory.size}-info type history in $fullName into owner $newOwner")
         cloneInfoHistory(clone)
-
-        // if (sys.props.contains("cloneall")) {
-        //   cloneInfoHistory(clone)
-        //   // for ((phid, phinfo) <- infoHistory) {
-        //   //   val ph = phaseOf(phid)
-        //   //   atPhase(ph) {
-        //   //     val newInfo = nextInfo(phinfo)
-        //   //     if (phinfo eq newInfo) {
-        //   //       log(s"At phase $ph no cloning because $info is unchanged.")
-        //   //       clone setInfo phinfo
-        //   //     }
-        //   //     else {
-        //   //       log(s"At phase $ph a ${shortClassOfInstance(phinfo)} is cloned from $phinfo to $newInfo")
-        //   //       clone setInfo newInfo
-        //   //     }
-        //   //   }
-        //   // }
-        // }
-        // else {
-        //   log(s"...not really, we'll abandon " + infoHistoryString(enclClass.thisType))
-        //   clone setInfo (this.info cloneInfo clone)
-        // }
       }
       else clone setInfo (this.info cloneInfo clone)
 
       clone
     }
+    def hasCloneableHistory = (
+          hasInfoHistory
+      && !isValueParameter
+    )
 
     def cloneInfoHistory(clone: Symbol): Symbol = {
       for ((phid, phinfo) <- infoHistory) {
         val ph = phaseOf(phid)
         atPhase(ph) {
-          clone setInfo new LazyClonedInfo(this, ph)
+          clone setInfo (phinfo cloneInfo clone) //new LazyClonedInfo(this, ph)
         }
       }
       clone
@@ -3427,14 +3407,14 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
     if (settings.debug.value) printStackTrace()
   }
 
-  class LazyClonedInfo(clonedFrom: Symbol, ph: Phase) extends LazyType {
-    override def complete(sym: Symbol): Unit = {
-      logResult(s"LazyClonedInfo($clonedFrom, $ph).complete($sym)")(
-        // sym setInfo atPhase(ph)(clonedFrom.info cloneInfo sym)
-        atPhase(ph)(sym setInfo (clonedFrom.info cloneInfo sym))
-      )
-    }
-  }
+  // class LazyClonedInfo(clonedFrom: Symbol, ph: Phase) extends LazyType {
+  //   override def complete(sym: Symbol): Unit = {
+  //     logResult(s"LazyClonedInfo($clonedFrom, $ph).complete($sym)")(
+  //       // sym setInfo atPhase(ph)(clonedFrom.info cloneInfo sym)
+  //       atPhase(ph)(sym setInfo (clonedFrom.info cloneInfo sym))
+  //     )
+  //   }
+  // }
 
   /** A class for type histories */
   private sealed case class TypeHistory(var validFrom: Period, info: Type, prev: TypeHistory) {

@@ -205,9 +205,9 @@ abstract class Mixin extends InfoTransform with ast.TreeDSL {
        *  always accessors and deferred. */
       def newGetter(field: Symbol): Symbol = {
         // println("creating new getter for "+ field +" : "+ field.info +" at "+ field.locationString+(field hasFlag MUTABLE))
-        val newFlags = field.flags & ~PrivateLocal | ACCESSOR | lateDEFERRED | ( if (field.isMutable) 0 else STABLE )
+        val flags = field.flags & ~PrivateLocal | ACCESSOR | lateDEFERRED | ( if (field.isMutable) 0 else STABLE ) | METHOD
         // TODO preserve pre-erasure info?
-        clazz.newMethod(nme.getterName(field.name.toTermName), field.pos, newFlags) setInfo MethodType(Nil, field.info)
+        field.cloneSymbol(newOwner = clazz, newFlags = flags) modifyInfo (MethodType(Nil, _))
       }
 
       /** Create a new setter. Setters are never private or local. They are
