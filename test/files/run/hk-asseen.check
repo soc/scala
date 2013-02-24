@@ -1,0 +1,20 @@
+abstract trait BaseLike[+A, +Repr] extends AnyRef
+abstract trait Base[+A] extends hkm.this.GenBase[A]
+abstract trait Bippizable[+A, +BipRepr <: hkm.this.BippyMarker] extends AnyRef
+abstract trait BippyMarker extends AnyRef
+abstract trait Builder[-Elem, +To >: DD[Z]] extends AnyRef
+abstract trait GenBaseLike[+A, +Repr] extends hkm.this.GenBase[A] with hkm.this.Bippizable[A,hkm.this.Bippy.type]
+abstract trait GenBase[+A] extends AnyRef
+abstract trait GenComp[+CC[X] <: hkm.this.GenBase[X]] extends AnyRef
+abstract trait ViewLike[+A, +Coll, +This <: hkm.this.View[A,Coll] with hkm.this.ViewLike[A,Coll,This]] extends hkm.this.BaseLike[A,This]
+abstract trait View[+A, +Coll] extends hkm.this.ViewLike[A,Coll,hkm.this.View[A,Coll]]
+abstract trait BaseLike[+A, +Repr] extends AnyRef
+abstract trait Base[+A] extends hkm.this.GenBase[A]
+abstract trait Bippizable[+A, +BipRepr <: hk.BippyMarker] extends AnyRef
+abstract trait BippyMarker extends AnyRef
+abstract trait Builder[-Elem, +To >: List[Int]] extends AnyRef
+abstract trait GenBaseLike[+A, +Repr] extends hkm.this.GenBase[A] with hkm.this.Bippizable[A,hkm.this.Bippy.type]
+abstract trait GenBase[+A] extends AnyRef
+abstract trait GenComp[+CC[X] <: hk.GenBase[X]] extends AnyRef
+abstract trait ViewLike[+A, +Coll, +This <: hk.View[A,Coll] with hk.ViewLike[A,Coll,This]] extends hkm.this.BaseLike[A,This]
+abstract trait View[+A, +Coll] extends hkm.this.ViewLike[A,Coll,hkm.this.View[A,Coll]]

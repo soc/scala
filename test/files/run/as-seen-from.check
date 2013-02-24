@@ -1,0 +1,3 @@
+Test.Apple1{val bippy: this.Apple2{val bippy: this.Apple3}}
+Test.bippy.Apple2{val bippy: this.Apple3}
+Base2.<refinement>.type
