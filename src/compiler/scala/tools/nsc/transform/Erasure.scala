@@ -883,7 +883,7 @@ abstract class Erasure extends AddInterfaces
       }
 
       val opc = new overridingPairs.Cursor(root) {
-        override def exclude(sym: Symbol) = !sym.isTerm || sym.isSpecialized || sym.isPrivate || super.exclude(sym)
+        override def exclude(sym: Symbol) = !sym.isTerm || sym.isPrivate || sym.isSpecialized || super.exclude(sym)
         override def matches(sym1: Symbol, sym2: Symbol) = exitingPostErasure(sym1.info =:= sym2.info)
       }
       while (opc.hasNext) {

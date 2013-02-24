@@ -214,8 +214,12 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
     /** Create local dummy for template (owner of local blocks) */
     final def newLocalDummy(pos: Position): TermSymbol =
       newTermSymbol(nme.localDummyName(this), pos) setInfo NoType
-    final def newMethod(name: TermName, pos: Position = NoPosition, newFlags: Long = 0L): MethodSymbol =
+    final def newMethod(name: TermName, pos: Position = NoPosition, newFlags: Long = 0L): MethodSymbol = {
+      if (isPastTyper)
+        printCaller(s"$this.newMethod($name, newFlags = ${calculateFlagString(newFlags)}")(())
+
       createMethodSymbol(name, pos, METHOD | newFlags)
+    }
     final def newMethodSymbol(name: TermName, pos: Position = NoPosition, newFlags: Long = 0L): MethodSymbol =
       createMethodSymbol(name, pos, METHOD | newFlags)
     final def newLabel(name: TermName, pos: Position = NoPosition): MethodSymbol =
@@ -1751,21 +1755,22 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
     }
 
     def hasCloneableHistory = (
-          hasInfoHistory
-      && !isValueParameter
+         (isMethod || isClass)
+      && hasInfoHistory
     )
 
     private def cloneInfoHistory(clone: Symbol) {
       if (hasCloneableHistory) {
-        log(s"Cloning ${infoHistory.size}-info type history in $fullName into owner ${clone.owner}")
+        log(s"Cloning ${infoHistory.size}-info type history from ${this.fullLocationString} into new owner ${clone.owner}")
+        log(infosString)
         for ((pid, phinfo) <- infoHistory)
           atPhase(phaseOf(pid))(clone setInfo (phinfo cloneInfo clone))
+
+        val (pid, pinfo) = clone.infoHistory.head
+        val ph = phaseWithId(pid)
+        log(f"$ph%15s: ${clone.defStringSeenAs(pinfo)}")
       }
       else clone setInfo (this.info cloneInfo clone)
-      val (pid, pinfo) = clone.infoHistory.head
-      val ph = phaseWithId(pid)
-      log(f"$ph%15s: ${clone.defStringSeenAs(pinfo)}")
-      // log(f"$ph%15s: $clone")
     }
 
     /** The known infos associated with this symbol and the phase
