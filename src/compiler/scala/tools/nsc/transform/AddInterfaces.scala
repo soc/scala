@@ -148,6 +148,7 @@ abstract class AddInterfaces extends InfoTransform { self: Erasure =>
       }
 
       for (sym <- ifaceDecls) {
+        // sym.info
         if (isInterfaceMember(sym)) {
           if (needsImplMethod(sym)) {
             val clone = sym.cloneSymbol(implClass).resetFlag(lateDEFERRED)

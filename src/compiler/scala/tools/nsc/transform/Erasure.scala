@@ -848,11 +848,6 @@ abstract class Erasure extends AddInterfaces
      *    but their erased types are the same.
      */
     private def checkNoDoubleDefs(root: Symbol) {
-      if (root.isSpecialized) {
-        log(s"Skipping double defs check on specialized class $root")
-        return
-      }
-
       def doubleDefError(sym1: Symbol, sym2: Symbol) {
         // log(s"doubleDefError(${sym1.fullLocationString}, ${sym2.fullLocationString}")
 
@@ -880,7 +875,7 @@ abstract class Erasure extends AddInterfaces
         if (e.sym.isTerm) {
           var e1 = decls.lookupNextEntry(e)
           while (e1 ne null) {
-            if (exitingPostErasure(e1.sym.tpe_* =:= e.sym.tpe_*)) doubleDefError(e.sym, e1.sym)
+            if (exitingPostErasure(e1.sym.info =:= e.sym.info)) doubleDefError(e.sym, e1.sym)
             e1 = decls.lookupNextEntry(e1)
           }
         }
@@ -888,8 +883,8 @@ abstract class Erasure extends AddInterfaces
       }
 
       val opc = new overridingPairs.Cursor(root) {
-        override def exclude(sym: Symbol) = !sym.isTerm || sym.isPrivate || sym.isSpecialized || super.exclude(sym)
-        override def matches(sym1: Symbol, sym2: Symbol) = exitingPostErasure(sym1.tpe_* =:= sym2.tpe_*)
+        override def exclude(sym: Symbol) = !sym.isTerm || sym.isSpecialized || sym.isPrivate || super.exclude(sym)
+        override def matches(sym1: Symbol, sym2: Symbol) = exitingPostErasure(sym1.info =:= sym2.info)
       }
       while (opc.hasNext) {
         if (!exitingRefchecks(
@@ -1190,9 +1185,11 @@ abstract class Erasure extends AddInterfaces
             }
           } else tree
         case Template(parents, self, body) =>
-          assert(!currentOwner.isImplClass)
-          //Console.println("checking no dble defs " + tree)//DEBUG
-          checkNoDoubleDefs(tree.symbol.owner)
+          assert(!currentOwner.isImplClass, currentOwner)
+          // Save the work on a specialized class, which won't be introducing new
+          // double definitions which didn't exist in the unspecialized class.
+          if (!tree.symbol.owner.isSpecialized)
+            checkNoDoubleDefs(tree.symbol.owner)
           treeCopy.Template(tree, parents, emptyValDef, addBridges(body, currentOwner))
 
         case Match(selector, cases) =>

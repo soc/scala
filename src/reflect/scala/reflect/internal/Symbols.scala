@@ -1746,27 +1746,26 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
       if (clone.thisSym != clone)
         clone.typeOfThis = (clone.typeOfThis cloneInfo clone)
 
-      if (hasCloneableHistory) {
-        log(s"Cloning ${infoHistory.size}-info type history in $fullName into owner $newOwner")
-        cloneInfoHistory(clone)
-      }
-      else clone setInfo (this.info cloneInfo clone)
-
+      cloneInfoHistory(clone)
       clone
     }
+
     def hasCloneableHistory = (
           hasInfoHistory
       && !isValueParameter
     )
 
-    def cloneInfoHistory(clone: Symbol): Symbol = {
-      for ((phid, phinfo) <- infoHistory) {
-        val ph = phaseOf(phid)
-        atPhase(ph) {
-          clone setInfo (phinfo cloneInfo clone) //new LazyClonedInfo(this, ph)
-        }
+    private def cloneInfoHistory(clone: Symbol) {
+      if (hasCloneableHistory) {
+        log(s"Cloning ${infoHistory.size}-info type history in $fullName into owner ${clone.owner}")
+        for ((pid, phinfo) <- infoHistory)
+          atPhase(phaseOf(pid))(clone setInfo (phinfo cloneInfo clone))
       }
-      clone
+      else clone setInfo (this.info cloneInfo clone)
+      val (pid, pinfo) = clone.infoHistory.head
+      val ph = phaseWithId(pid)
+      log(f"$ph%15s: ${clone.defStringSeenAs(pinfo)}")
+      // log(f"$ph%15s: $clone")
     }
 
     /** The known infos associated with this symbol and the phase
@@ -3407,15 +3406,6 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
     if (settings.debug.value) printStackTrace()
   }
 
-  // class LazyClonedInfo(clonedFrom: Symbol, ph: Phase) extends LazyType {
-  //   override def complete(sym: Symbol): Unit = {
-  //     logResult(s"LazyClonedInfo($clonedFrom, $ph).complete($sym)")(
-  //       // sym setInfo atPhase(ph)(clonedFrom.info cloneInfo sym)
-  //       atPhase(ph)(sym setInfo (clonedFrom.info cloneInfo sym))
-  //     )
-  //   }
-  // }
-
   /** A class for type histories */
   private sealed case class TypeHistory(var validFrom: Period, info: Type, prev: TypeHistory) {
     assert((prev eq null) || phaseId(validFrom) > phaseId(prev.validFrom), this)
@@ -3425,11 +3415,6 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
       val elems = toList.reverse map (th => s"  ${phaseOf(th.validFrom)}:${runId(th.validFrom)} ${th.info}")
       elems.mkString("TypeHistory(\n  ", "\n  ", "\n)")
     }
-
-    // s"""
-    //   |TypeHistory)"""
-
-    //   "TypeHistory(" + phaseOf(validFrom)+":"+runId(validFrom) + "," + info + "," + prev + ")"
 
     def cloneHistory(owner: Symbol): TypeHistory = {
       val newPrev = if (prev eq null) null else prev.cloneHistory(owner)
