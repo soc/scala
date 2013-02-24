@@ -1524,7 +1524,7 @@ trait Infer extends Checkable {
         // todo: missing test case for bests.isEmpty
         bests match {
           case best :: Nil                              => tree setSymbol best setType (pre memberType best)
-          case best :: competing :: _ if alts0.nonEmpty => 
+          case best :: competing :: _ if alts0.nonEmpty =>
             // SI-6912 Don't give up and leave an OverloadedType on the tree.
             //         Originally I wrote this as `if (secondTry) ... `, but `tryTwice` won't attempt the second try
             //         unless an error is issued. We're not issuing an error, in the assumption that it would be
@@ -1699,7 +1699,7 @@ trait Infer extends Checkable {
           }
           else if (sym.isOverloaded) {
             val xs      = sym.alternatives
-            val tparams = new AsSeenFromMap(pre, xs.head.owner) mapOver xs.head.typeParams
+            val tparams = newAsSeenFromMap(pre, xs.head.owner) mapOver xs.head.typeParams
             val bounds  = tparams map (_.tpeHK) // see e.g., #1236
             val tpe     = PolyType(tparams, OverloadedType(AntiPolyType(pre, bounds), xs))
 
