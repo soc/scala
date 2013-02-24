@@ -215,8 +215,8 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
     final def newLocalDummy(pos: Position): TermSymbol =
       newTermSymbol(nme.localDummyName(this), pos) setInfo NoType
     final def newMethod(name: TermName, pos: Position = NoPosition, newFlags: Long = 0L): MethodSymbol = {
-      if (isPastTyper)
-        printCaller(s"$this.newMethod($name, newFlags = ${calculateFlagString(newFlags)}")(())
+      // if (isPastTyper)
+      //   printCaller(s"$this.newMethod($name, newFlags = ${calculateFlagString(newFlags)}")(())
 
       createMethodSymbol(name, pos, METHOD | newFlags)
     }
