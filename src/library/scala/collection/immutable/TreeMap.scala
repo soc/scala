@@ -108,7 +108,7 @@ class TreeMap[A, +B] private (tree: RB.Tree[A, B])(implicit val ordering: Orderi
   private[this] def countWhile(p: ((A, B)) => Boolean): Int = {
     var result = 0
     val it = iterator
-    while (it.hasNext && p(it.next)) result += 1
+    while (it.hasNext && p(it.next())) result += 1
     result
   }
   override def dropWhile(p: ((A, B)) => Boolean) = drop(countWhile(p))
@@ -189,9 +189,13 @@ class TreeMap[A, +B] private (tree: RB.Tree[A, B])(implicit val ordering: Orderi
    *  @return the new iterator
    */
   override def iterator: Iterator[(A, B)] = RB.iterator(tree)
+  override def iteratorFrom(start: A): Iterator[(A, B)] = RB.iterator(tree, Some(start))
 
   override def keysIterator: Iterator[A] = RB.keysIterator(tree)
+  override def keysIteratorFrom(start: A): Iterator[A] = RB.keysIterator(tree, Some(start))
+  
   override def valuesIterator: Iterator[B] = RB.valuesIterator(tree)
+  override def valuesIteratorFrom(start: A): Iterator[B] = RB.valuesIterator(tree, Some(start))
 
   override def contains(key: A): Boolean = RB.contains(tree, key)
   override def isDefinedAt(key: A): Boolean = RB.contains(tree, key)

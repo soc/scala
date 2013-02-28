@@ -89,7 +89,7 @@ class TreeSet[A] private (tree: RB.Tree[A, Unit])(implicit val ordering: Orderin
   private[this] def countWhile(p: A => Boolean): Int = {
     var result = 0
     val it = iterator
-    while (it.hasNext && p(it.next)) result += 1
+    while (it.hasNext && p(it.next())) result += 1
     result
   }
   override def dropWhile(p: A => Boolean) = drop(countWhile(p))
@@ -144,6 +144,7 @@ class TreeSet[A] private (tree: RB.Tree[A, Unit])(implicit val ordering: Orderin
    *  @return the new iterator
    */
   def iterator: Iterator[A] = RB.keysIterator(tree)
+  override def keysIteratorFrom(start: A): Iterator[A] = RB.keysIterator(tree, Some(start))
 
   override def foreach[U](f: A =>  U) = RB.foreachKey(tree, f)
 

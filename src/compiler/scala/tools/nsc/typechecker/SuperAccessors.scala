@@ -67,7 +67,10 @@ abstract class SuperAccessors extends transform.Transform with transform.TypingT
           case t                                  => t
         }
         acc setInfoAndEnter (tpe cloneInfo acc)
-        storeAccessorDefinition(clazz, DefDef(acc, EmptyTree))
+        // Diagnostic for SI-7091
+        if (!accDefs.contains(clazz))
+          reporter.error(sel.pos, s"Internal error: unable to store accessor definition in ${clazz}. clazz.isPackage=${clazz.isPackage}. Accessor required for ${sel} (${showRaw(sel)})")
+        else storeAccessorDefinition(clazz, DefDef(acc, EmptyTree))
         acc
       }
 
@@ -126,11 +129,11 @@ abstract class SuperAccessors extends transform.Transform with transform.TypingT
       val clazz = sup.symbol
 
       if (sym.isDeferred) {
-        val member = sym.overridingSymbol(clazz);
+        val member = sym.overridingSymbol(clazz)
         if (mix != tpnme.EMPTY || member == NoSymbol ||
             !(member.isAbstractOverride && member.isIncompleteIn(clazz)))
           unit.error(sel.pos, ""+sym.fullLocationString+" is accessed from super. It may not be abstract "+
-                               "unless it is overridden by a member declared `abstract' and `override'");
+                               "unless it is overridden by a member declared `abstract' and `override'")
       } else if (mix == tpnme.EMPTY && !sym.owner.isTrait){
         // SI-4989 Check if an intermediate class between `clazz` and `sym.owner` redeclares the method as abstract.
         val intermediateClasses = clazz.info.baseClasses.tail.takeWhile(_ != sym.owner)
@@ -288,6 +291,7 @@ abstract class SuperAccessors extends transform.Transform with transform.TypingT
                      currentClass.isTrait
                   && sym.isProtected
                   && sym.enclClass != currentClass
+                  && !sym.owner.isPackageClass // SI-7091 no accessor needed package owned (ie, top level) symbols
                   && !sym.owner.isTrait
                   && (sym.owner.enclosingPackageClass != currentClass.enclosingPackageClass)
                   && (qual.symbol.info.member(sym.name) ne NoSymbol)
@@ -328,8 +332,8 @@ abstract class SuperAccessors extends transform.Transform with transform.TypingT
               lhs.symbol.isJavaDefined &&
               needsProtectedAccessor(lhs.symbol, tree.pos)) {
             debuglog("Adding protected setter for " + tree)
-            val setter = makeSetter(lhs);
-            debuglog("Replaced " + tree + " with " + setter);
+            val setter = makeSetter(lhs)
+            debuglog("Replaced " + tree + " with " + setter)
             transform(localTyper.typed(Apply(setter, List(qual, rhs))))
           } else
             super.transform(tree)

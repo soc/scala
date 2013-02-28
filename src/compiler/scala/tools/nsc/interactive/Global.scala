@@ -69,7 +69,6 @@ class Global(settings: Settings, _reporter: Reporter, projectName: String = "") 
     if (verboseIDE) println("[%s][%s]".format(projectName, msg))
 
   override def forInteractive = true
-  override def forScaladoc = settings.isScaladoc
 
   /** A map of all loaded files to the rich compilation units that correspond to them.
    */
@@ -367,7 +366,7 @@ class Global(settings: Settings, _reporter: Reporter, projectName: String = "") 
                 .format(waitLoadedTypeResponses.size, getParsedEnteredResponses.size))
             checkNoResponsesOutstanding()
 
-            log.flush();
+            log.flush()
             scheduler = new NoWorkScheduler
             throw ShutdownReq
           }
@@ -1026,7 +1025,7 @@ class Global(settings: Settings, _reporter: Reporter, projectName: String = "") 
     getUnit(source) match {
       case Some(unit) =>
         if (unit.isUpToDate) {
-          debugLog("already typed");
+          debugLog("already typed")
           response set unit.body
         } else if (ignoredFiles(source.file)) {
           response.raise(lastException.getOrElse(CancelException))

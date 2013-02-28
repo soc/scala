@@ -101,14 +101,9 @@ trait TypeDiagnostics {
       "\n(Note that variables need to be initialized to be defined)"
     else ""
 
-  /** Only prints the parameter names if they're not synthetic,
-   *  since "x$1: Int" does not offer any more information than "Int".
-   */
   private def methodTypeErrorString(tp: Type) = tp match {
     case mt @ MethodType(params, resultType)  =>
-      def forString =
-        if (params exists (_.isSynthetic)) params map (_.tpe)
-        else params map (_.defString)
+      def forString = params map (_.defString)
 
        forString.mkString("(", ",", ")") + resultType
     case x                                    => x.toString
@@ -579,7 +574,7 @@ trait TypeDiagnostics {
 
     /** Report a type error.
      *
-     *  @param pos0   The position where to report the error
+     *  @param pos    The position where to report the error
      *  @param ex     The exception that caused the error
      */
     def reportTypeError(context0: Context, pos: Position, ex: TypeError) {
