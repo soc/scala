@@ -4391,7 +4391,7 @@ trait Types extends api.Types { self: SymbolTable =>
       case tp @ ThisType(_)                                            => thisTypeAsSeen(tp)
       case tp @ SingleType(_, sym)                                     => if (sym.isPackageClass) tp else singleTypeAsSeen(tp)
       case tp @ TypeRef(_, sym, _) if isTypeParamOfEnclosingClass(sym) => classParameterAsSeen(tp)
-      case tp @ AbstractType(pre, sym, args) if rewriteAbstract(sym)   => printResult(s"pre=$pre ${sym.defStringSeenAs(sym.info)}")(cloneAbstract(sym))
+      case tp @ AbstractType(pre, sym, args) if rewriteAbstract(sym)   => cloneAbstract(sym)//printResult(s"pre=$pre ${sym.defStringSeenAs(sym.info)}")(cloneAbstract(sym))
       case _                                                           => mapOver(tp)
     }
     //     def apply(tp: Type): Type = tp match {
