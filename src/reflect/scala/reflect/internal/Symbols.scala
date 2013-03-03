@@ -1687,11 +1687,18 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
     /** Overridden in NullClass and NothingClass for custom behavior.
      */
     def isSubClass(that: Symbol): Boolean = isNonBottomSubClass(that) || {
-      ((this ne thisSym) && (typeOfThis.typeSymbol isNonBottomSubClass that) && util.Origins("isSubClass") {
-        println(s"Oops !($fullLocationString isSubClass ${that.fullLocationString}), but ${typeOfThis.typeSymbol.fullLocationString} is.")
-        true
-      })
+      selfIsSubClass(that) && util.Origins("isSubClass")(false)
     }
+    //   ((this ne thisSym) && (typeOfThis.typeSymbol isNonBottomSubClass that) && util.Origins("isSubClass") {
+    //     println(s"Oops !($fullLocationString isSubClass ${that.fullLocationString}), but ${typeOfThis.typeSymbol.fullLocationString} is.")
+    //     true
+    //   })
+    // }
+
+    def selfIsSubClass(that: Boolean) = (
+         (this isNonBottomSubClass that)
+      || ((this ne thisSym) && (typeOfThis.typeSymbol isNonBottomSubClass that))
+    )
 
     final def isNumericSubClass(that: Symbol): Boolean =
       definitions.isNumericSubClass(this, that)

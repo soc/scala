@@ -532,8 +532,7 @@ abstract class SuperAccessors extends transform.Transform with transform.TypingT
      *     - C is declared in the same package as sym's owner
      */
     private def hostForAccessorOf(sym: Symbol, referencingClass: Symbol): Symbol = {
-      if (referencingClass.isSubClass(sym.owner.enclClass)
-          || referencingClass.thisSym.isSubClass(sym.owner.enclClass)
+      if (referencingClass.selfIsSubClass(sym.owner.enclClass)
           || referencingClass.enclosingPackageClass == sym.owner.enclosingPackageClass) {
         assert(referencingClass.isClass, referencingClass)
         referencingClass

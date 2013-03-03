@@ -169,8 +169,8 @@ trait Checkable {
     def areUnrelatedClasses(sym1: Symbol, sym2: Symbol) = (
          sym1.isClass
       && sym2.isClass
-      && !(sym1 isSubClass sym2)
-      && !(sym2 isSubClass sym1)
+      && !(sym1 selfIsSubClass sym2)
+      && !(sym2 selfIsSubClass sym1)
     )
     /** Are all children of these symbols pairwise irreconcilable? */
     def allChildrenAreIrreconcilable(sym1: Symbol, sym2: Symbol) = (
