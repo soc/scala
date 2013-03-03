@@ -4462,19 +4462,33 @@ trait Types extends api.Types { self: SymbolTable =>
       val TypeRef(pre, sym, args) = tp
 
       def loop(pre: Type, clazz: Symbol): Type = {
-        if (clazz == sym.owner) {
-          val declaredSym = sym matchingSymbol pre filter (_.owner isSubClass clazz) orElse {
-            val clone = sym.cloneSymbol(clazz, newFlags = sym.flags | SYNTHETIC | ARTIFACT) modifyInfo this
-            // println(s"loop($pre, $clazz) clones $clone: pre.decls=${pre.decls.toList}")
-            pre.decls enter clone
-          }
-          typeRef(pre, declaredSym, args mapConserve this)
+        if (skipPrefixOf(pre, clazz))
+          mapOver(tp)
+        else sym matchingSymbol pre filter (_.owner isSubClass clazz) match {
+          case NoSymbol =>
+            loop((pre baseType clazz).prefix, clazz.owner)
+          case member   =>
+            mapOver(typeRef(pre, member, args mapConserve this))
         }
-        else
-          loop((pre baseType clazz).prefix, clazz.owner)
       }
       loop(seenFromPrefix, seenFromClass)
     }
+
+    //     if (sym.owner isSubClass clazz)
+    //       typeRef(pre, declaredSym, args mapConserve this)
+
+    //     if (clazz == sym.owner) {
+    //       val declaredSym = sym matchingSymbol pre filter (_.owner isSubClass clazz) orElse {
+    //         val clone = sym.cloneSymbol(clazz, newFlags = sym.flags | SYNTHETIC | ARTIFACT) modifyInfo this
+    //         log(s"$this cloned abstract type $clone into ($pre, $clazz)") // clones $clone: pre.decls=${pre.decls.toList}")
+    //         pre.decls enter clone
+    //       }
+    //       typeRef(pre, declaredSym, args mapConserve this)
+    //     }
+    //     else
+    //       loop((pre baseType clazz).prefix, clazz.owner)
+    //   }
+    // }
 
     // 0) @pre: `classParam` is a class type parameter
     // 1) Walk the owner chain of `seenFromClass` until we find the class which owns `classParam`
