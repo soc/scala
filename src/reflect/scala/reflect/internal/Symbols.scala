@@ -1689,7 +1689,7 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
     def isSubClass(that: Symbol): Boolean = isNonBottomSubClass(that) || {
       ((this ne thisSym) && (typeOfThis.typeSymbol isNonBottomSubClass that) && util.Origins("isSubClass") {
         println(s"Oops !($fullLocationString isSubClass ${that.fullLocationString}), but ${typeOfThis.typeSymbol.fullLocationString} is.")
-        false
+        true
       })
     }
 
