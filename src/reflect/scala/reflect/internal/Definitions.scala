@@ -596,9 +596,10 @@ trait Definitions extends api.StandardDefinitions {
     def unspecializedSymbol(sym: Symbol): Symbol = {
       if (sym hasFlag SPECIALIZED) {
         // add initialization from its generic class constructor
-        val genericName = nme.unspecializedName(sym.name)
-        val member = sym.owner.info.decl(genericName.toTypeName)
-        member
+        if (sym.owner.hasRawInfo)
+          sym.owner.info.decl(nme.unspecializedName(sym.name).toTypeName)
+        else
+          sym
       }
       else sym
     }
