@@ -4381,17 +4381,19 @@ trait Types extends api.Types { self: SymbolTable =>
       && sym.owner.isClass
       && !noChangeToSymbols(sym :: Nil)
     )
-    private def cloneAbstract(sym: Symbol): Type = (
-      sym cloneSymbol seenFromPrefix.typeSymbol
-        modifyInfo this
-        tpe_*
-    )
+    private def cloneAbstract(tp: Type): Type = {
+      val TypeRef(pre, sym, args) = tp
+      println(s"seenFromPrefix=$seenFromPrefix pre=$pre")
+      val clone = sym cloneSymbol seenFromPrefix.typeSymbol modifyInfo this
+      typeRef(seenFromPrefix, clone, args mapConserve this)
+    }
 
     def apply(tp: Type): Type = tp match {
       case tp @ ThisType(_)                                            => thisTypeAsSeen(tp)
       case tp @ SingleType(_, sym)                                     => if (sym.isPackageClass) tp else singleTypeAsSeen(tp)
       case tp @ TypeRef(_, sym, _) if isTypeParamOfEnclosingClass(sym) => classParameterAsSeen(tp)
-      case tp @ AbstractType(pre, sym, args) if rewriteAbstract(sym)   => cloneAbstract(sym)//printResult(s"pre=$pre ${sym.defStringSeenAs(sym.info)}")(cloneAbstract(sym))
+      case tp @ AbstractType(pre, sym, args) if rewriteAbstract(sym)   => abstractTypeAsSeen(tp) // cloneAbstract(tp)
+      // printResult(s"pre=$pre ${sym.defStringSeenAs(sym.info)}")(cloneAbstract(sym))
       case _                                                           => mapOver(tp)
     }
     //     def apply(tp: Type): Type = tp match {
@@ -4515,6 +4517,25 @@ trait Types extends api.Types { self: SymbolTable =>
         ErrorType
       else
         abort(s"something is wrong: cannot make sense of type application\n  $lhs\n  $rhs")
+    }
+
+    private def abstractTypeAsSeen(abstractType: Type): Type = {
+      val TypeRef(pre, absym, args) = abstractType
+      println(s"$this.abstractType(TypeRef($pre, $absym, $args))/info=${absym.info}")
+
+      def loop(pre: Type, clazz: Symbol): Type = {
+        println(s"loop($pre, $clazz)")
+        // have to deconst because it may be a Class[T]
+        def nextBase = (pre.widen baseType clazz)
+        //@M! see test pos/tcpoly_return_overriding.scala why mapOver is necessary
+        if (skipPrefixOf(pre, clazz))
+          mapOver(abstractType)
+        else if (!matchesPrefixAndClass(pre, clazz)(absym.owner))
+          loop(nextBase.prefix, clazz.owner)
+        else
+          printResult(s"bingo")(typeRef(pre, absym, args))
+      }
+      loop(seenFromPrefix, seenFromClass)
     }
 
     // 0) @pre: `classParam` is a class type parameter
