@@ -4529,7 +4529,7 @@ trait Types extends api.Types { self: SymbolTable =>
 
       if ((pre ne pre1) || (absym.info ne info1)) {
         val clone = absym.cloneSymbol setInfo info1
-        return printResult(s"bingo")(typeRef(pre1, clone, args mapConserve this))
+        return printResult(s"bingo")(typeRef(seenFromPrefix, clone, args mapConserve this))
       }
 
       def loop(pre: Type, clazz: Symbol): Type = {
