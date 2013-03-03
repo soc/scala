@@ -4382,7 +4382,7 @@ trait Types extends api.Types { self: SymbolTable =>
       && sym.isAbstractType
       && !sym.isTypeParameterOrSkolem
       && isBaseClassOfEnclosingClass(sym.owner)
-      && (sym.info ne this(sym.info))
+      && !noChangeToSymbols(sym :: Nil)
     )
 
     def apply(tp: Type): Type = tp match {
