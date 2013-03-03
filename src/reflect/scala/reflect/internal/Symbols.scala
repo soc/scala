@@ -1695,7 +1695,7 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
     //   })
     // }
 
-    def selfIsSubClass(that: Boolean) = (
+    def selfIsSubClass(that: Symbol): Boolean = (
          (this isNonBottomSubClass that)
       || ((this ne thisSym) && (typeOfThis.typeSymbol isNonBottomSubClass that))
     )
