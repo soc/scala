@@ -7140,13 +7140,6 @@ trait Types extends api.Types { self: SymbolTable =>
     if (!phase.erasedTypes && tp.typeSymbol == ObjectClass) AnyClass.tpe
     else tp
 
-  object AbstractType {
-    def unapply(tp: Type) = tp match {
-      case TypeRef(pre, sym, args) if sym.isAbstractType && !sym.isTypeParameterOrSkolem => Some((pre, sym, args))
-      case _                                                                             => None
-    }
-  }
-
   val shorthands = Set(
     "scala.collection.immutable.List",
     "scala.collection.immutable.Nil",
