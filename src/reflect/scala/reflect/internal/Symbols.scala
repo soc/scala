@@ -1695,9 +1695,16 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
     //   })
     // }
 
+    def isSubClassWithoutSelf(that: Symbol): Boolean = (
+      isNonBottomSubClass(that)
+    )
+
     def selfIsSubClass(that: Symbol): Boolean = (
          (this isNonBottomSubClass that)
-      || ((this ne thisSym) && (typeOfThis.typeSymbol isNonBottomSubClass that) && util.Origins("selfIsSubClass") { println(s"Changed to yes on $this <: $that") ; true })
+      || ((this ne thisSym) && (typeOfThis.typeSymbol isNonBottomSubClass that) && util.Origins("selfIsSubClass") {
+            printCaller(s"[$phase] after self type, $this <: $that")
+            true
+          })
     )
 
     final def isNumericSubClass(that: Symbol): Boolean =
