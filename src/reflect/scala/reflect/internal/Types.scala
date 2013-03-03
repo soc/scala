@@ -4389,7 +4389,7 @@ trait Types extends api.Types { self: SymbolTable =>
       val TypeRef(pre, sym, args) = tp
       try {
         if (rewriteAbstract(sym))
-          printResult(s"$this.abstractTypeAsSeen($tp)")(abstractTypeAsSeen(tp))
+          logResult(s"$this.abstractTypeAsSeen($tp)")(abstractTypeAsSeen(tp))
         else
           mapOver(tp)
       }
