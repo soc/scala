@@ -4463,8 +4463,13 @@ trait Types extends api.Types { self: SymbolTable =>
 
       def loop(pre: Type, clazz: Symbol): Type = {
         if (clazz == sym.owner) {
-          val declaredSym = sym matchingSymbol pre filter (_.owner == clazz) orElse {
-            pre.decls enter (sym.cloneSymbol(clazz, newFlags = sym.flags | SYNTHETIC | ARTIFACT) modifyInfo this)
+          val matches = (sym matchingSymbol pre).alternatives
+          matches foreach (m => println(m.fullLocationString + " is match"))
+          val matches1 = matches filter (_.owner == clazz)
+          val declaredSym = sym matchingSymbol pre filter (_.owner isSubClass clazz) orElse {
+            val clone = sym.cloneSymbol(clazz, newFlags = sym.flags | SYNTHETIC | ARTIFACT) modifyInfo this
+            println(s"loop($pre, $clazz) clones $clone: pre.decls=${pre.decls.toList}")
+            pre.decls enter clone
           }
           typeRef(pre, declaredSym, args mapConserve this)
         }
