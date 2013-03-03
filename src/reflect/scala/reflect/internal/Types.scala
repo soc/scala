@@ -738,10 +738,22 @@ trait Types extends api.Types { self: SymbolTable =>
         else {
           val m     = newAsSeenFromMap(pre.normalize, clazz)
           val tp    = m(this)
-          val tp1   = existentialAbstraction(m.capturedParams, tp)
+          val tp1   = (
+            if (m.capturedTypeMembers.isEmpty) tp
+            else {
+              println(s"captured: ${m.capturedTypeMembers}")
+              val tps = m.capturedTypeMembers.distinct
+              val syms = tps map (_.typeSymbolDirect)
 
-          if (m.capturedSkolems.isEmpty) tp1
-          else deriveType(m.capturedSkolems, _.cloneSymbol setFlag CAPTURED)(tp1)
+              tp.substSym(syms, cloneSymbolsAtOwnerAndModify(syms, pre.typeSymbol, m))
+            }
+          )
+          val tp2   = existentialAbstraction(m.capturedParams, tp1)
+          val tp3 = (
+            if (m.capturedSkolems.isEmpty) tp2
+            else deriveType(m.capturedSkolems, _.cloneSymbol setFlag CAPTURED)(tp2)
+          )
+          tp3
         }
       } finally if (Statistics.canEnable) Statistics.popTimer(typeOpsStack, start)
     }
@@ -4389,7 +4401,7 @@ trait Types extends api.Types { self: SymbolTable =>
     // }
     def capturedParams: List[Symbol]  = _capturedParams
     def capturedSkolems: List[Symbol] = _capturedSkolems
-    def capturedTypeMembers: List[Symbol] = _capturedTypeMembers
+    def capturedTypeMembers: List[Type] = _capturedTypeMembers
 
     private def rewriteAbstract(sym: Symbol) = (
          sym.hasCompleteInfo
@@ -4448,7 +4460,7 @@ trait Types extends api.Types { self: SymbolTable =>
     private val prefixClasses = seenFromPrefix.typeSymbol.ownerChain takeWhile (p => !p.isPackage)
     private var _capturedSkolems: List[Symbol] = Nil
     private var _capturedParams: List[Symbol]  = Nil
-    private var _capturedTypeMembers: List[Symbol]  = Nil
+    private var _capturedTypeMembers: List[Type]  = Nil
     private val isStablePrefix = seenFromPrefix.isStable
 
     // isBaseClassOfEnclosingClassOrInfoIsNotYetComplete would be a more accurate
@@ -4538,17 +4550,32 @@ trait Types extends api.Types { self: SymbolTable =>
     private def abstractTypeAsSeen(tp: Type): Type = {
       val TypeRef(pre, sym, args) = tp
       val pre1 = this(pre)
+      val memberSym = sym matchingSymbol seenFromPrefix
+      val declaredSym = if (memberSym.owner == seenFromPrefix) memberSym else NoSymbol
       val info0 = sym.info
       val info1 = this(info0)
 
-      if (info0 ne info1) {
-        // println(s"$this.abstractType(TypeRef($pre, $absym, $args))/info=$info0")
+      if ((pre eq pre1) && (info0 eq info1))
+        mapOver(tp)
+      else if (declaredSym.exists)
+        printResult("declared")(mapOver(typeRef(pre1, declaredSym, args mapConserve this)))
+      else {
+        val newSym = sym.cloneSymbol(pre1.typeSymbol) setFlag SYNTHETIC setInfo info1
+        pre1.decls enter newSym
         println(s"$this")
         println(s"  pre0=$pre  info0=$info0")
         println(s"  pre1=$pre1 info1=$info1")
-        println("")
+        printResult("created")(newSym.tpe_*)
+
+        // println(s"$this.abstractType(TypeRef($pre, $absym, $args))/info=$info0")
+        // _capturedTypeMembers ::= tp
+        // mapOver(tp)
+        // println("")
+
+        // if (!capturedTypeMembers.contains(sym))
+          // _capturedTypeMembers ::= sym
       }
-      mapOver(tp)
+      // mapOver(tp)
       // if ((pre ne pre1) || (info0 ne info1)) {
       //   // captureSkolems(absym :: Nil)
       //   mapOver(abstractType)
