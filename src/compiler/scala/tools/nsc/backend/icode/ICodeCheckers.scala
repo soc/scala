@@ -422,16 +422,9 @@ abstract class ICodeCheckers {
                 checkBool(method.owner == clasz.symbol,
                           "Cannot call private method of " + method.owner.fullName
                           + " from " + clasz.symbol.fullName)
-              else if (method.isProtected) {
-                val isProtectedOK = (
-                  (clasz.symbol isSubClass method.owner) ||
-                  (clasz.symbol.typeOfThis.typeSymbol isSubClass method.owner)  // see pos/bug780.scala
-                )
-
-                checkBool(isProtectedOK,
-                          "Cannot call protected method of " + method.owner.fullName
-                          + " from " + clasz.symbol.fullName)
-              }
+              else if (method.isProtected)
+                checkBool(clasz.symbol selfIsSubClass method.owner,
+                  s"Cannot call protected method of ${method.owner.fullName} from ${clasz.symbol.fullName}")
 
             case ARRAY(_) =>
               checkBool(receiver.toType.member(method.name) != NoSymbol,
