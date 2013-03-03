@@ -4555,6 +4555,18 @@ trait Types extends api.Types { self: SymbolTable =>
       val info0 = sym.info
       val info1 = this(info0)
 
+      val msym1 = sym matchingSymbol seenFromPrefix
+      val msym2 = sym matchingSymbol pre1
+      println(s"msym1=${msym1.defString} msym2=${msym2.defString}")
+
+      if (pre0 ne pre1)
+        mapOver(appliedType(memberSym, args))
+      else if (info0 ne info1) {
+        mapOver(typeRef(pre1, declaredSym, args mapConserve this))))
+      }
+      else mapOver(tp)
+
+      /*** Bueno
       if ((pre eq pre1) && (info0 eq info1))
         mapOver(tp)
       else if (declaredSym.exists)
@@ -4566,6 +4578,8 @@ trait Types extends api.Types { self: SymbolTable =>
         println(s"  pre0=$pre  info0=$info0")
         println(s"  pre1=$pre1 info1=$info1")
         printResult("created")(newSym.tpe_*)
+      }
+      ***/
 
         // println(s"$this.abstractType(TypeRef($pre, $absym, $args))/info=$info0")
         // _capturedTypeMembers ::= tp
@@ -4574,7 +4588,6 @@ trait Types extends api.Types { self: SymbolTable =>
 
         // if (!capturedTypeMembers.contains(sym))
           // _capturedTypeMembers ::= sym
-      }
       // mapOver(tp)
       // if ((pre ne pre1) || (info0 ne info1)) {
       //   // captureSkolems(absym :: Nil)
