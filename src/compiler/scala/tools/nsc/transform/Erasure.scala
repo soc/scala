@@ -748,7 +748,7 @@ abstract class Erasure extends AddInterfaces
               assert(qual1.symbol.isStable, qual1.symbol)
               val applied = Apply(qual1, List()) setPos qual1.pos setType qual1.tpe.resultType
               adaptMember(selectFrom(applied))
-            } else if (!(qual1.isInstanceOf[Super] || (qual1.tpe.typeSymbol selfIsSubClass tree.symbol.owner))) {
+            } else if (!(qual1.isInstanceOf[Super] || (qual1.tpe.typeSymbol isSubClass tree.symbol.owner))) {
               assert(tree.symbol.owner != ArrayClass)
               selectFrom(cast(qual1, tree.symbol.owner.tpe))
             } else {
