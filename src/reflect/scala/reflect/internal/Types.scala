@@ -4389,7 +4389,7 @@ trait Types extends api.Types { self: SymbolTable =>
       case tp @ ThisType(_)                                            => thisTypeAsSeen(tp)
       case tp @ SingleType(_, sym)                                     => if (sym.isPackageClass) tp else singleTypeAsSeen(tp)
       case tp @ TypeRef(_, sym, _) if isTypeParamOfEnclosingClass(sym) => classParameterAsSeen(tp)
-      case tp @ TypeRef(pre, sym, args) if rewriteAbstract(sym)        => abstractTypeAsSeen(tp)
+      case tp @ TypeRef(pre, sym, args) if rewriteAbstract(sym)        => printResult(s"$this.abstractTypeAsSeen($tp)")(abstractTypeAsSeen(tp))
       case _                                                           => mapOver(tp)
     }
 
