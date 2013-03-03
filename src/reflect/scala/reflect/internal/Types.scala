@@ -4382,11 +4382,14 @@ trait Types extends api.Types { self: SymbolTable =>
       && sym.isAbstractType
       && !sym.isTypeParameterOrSkolem
       && isBaseClassOfEnclosingClass(sym.owner)
+      && sym.typeParams.isEmpty
       && !noChangeToSymbols(sym :: Nil)
     )
 
+    private val openSymbols = mutable.Set[Symbol]()
     private def mapOverTypeRef(tp: TypeRef): Type = {
       val TypeRef(pre, sym, args) = tp
+      // println(s"mapOverTypeRef(_, $sym, _)")
       try {
         if (rewriteAbstract(sym))
           logResult(s"$this.abstractTypeAsSeen($tp)")(abstractTypeAsSeen(tp))
@@ -4394,21 +4397,32 @@ trait Types extends api.Types { self: SymbolTable =>
           mapOver(tp)
       }
       catch {
-        case _: CyclicReference => copyTypeRef(tp, this(pre), sym, args mapConserve this)
+        case _: CyclicReference => tp///mapOver(tp)
+          // copyTypeRef(tp, this(pre), sym, args mapConserve this)
           // tp
       }
     }
     override protected def noChangeToSymbols(origSyms: List[Symbol]): Boolean = {
-      if (origSyms exists (m => m.info contains m)) true
+      if (origSyms exists openSymbols) true
+      else if (origSyms exists (m => m.info contains m)) true
       else super.noChangeToSymbols(origSyms)
     }
+
+    // protected def noChangeToSymbols(origSyms: List[Symbol]): Boolean = {
+    //   @tailrec def loop(syms: List[Symbol]): Boolean = syms match {
+    //     case Nil     => true
+    //     case x :: xs => (x.info eq applyToSymbolInfo(x)) && loop(xs)
+    //   }
+    //   loop(origSyms)
+    // }
 
     def apply(tp: Type): Type = tp match {
       case tp @ ThisType(_)                                            => thisTypeAsSeen(tp)
       case tp @ SingleType(_, sym)                                     => if (sym.isPackageClass) tp else singleTypeAsSeen(tp)
+      case tp @ TypeRef(pre, _, _) if pre.isTrivial                    => mapOver(tp)
       case tp @ TypeRef(_, sym, _) if isTypeParamOfEnclosingClass(sym) => classParameterAsSeen(tp)
-      case tp @ TypeRef(_, _, _)                                       => mapOverTypeRef(tp)
-      // case tp @ TypeRef(pre, sym, args) if rewriteAbstract(sym)     => printResult(s"$this.abstractTypeAsSeen($tp)")(abstractTypeAsSeen(tp))
+      case tp @ TypeRef(_, sym, _) if openSymbols(sym)                 => mapOver(tp)
+      case tp @ TypeRef(_, sym, _)                                     => openSymbols += sym ; try mapOverTypeRef(tp) finally openSymbols -= sym
       case _                                                           => mapOver(tp)
     }
 
