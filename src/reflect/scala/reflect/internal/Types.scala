@@ -4379,6 +4379,9 @@ trait Types extends api.Types { self: SymbolTable =>
     private def rewriteAbstract(sym: Symbol) = (
          sym.hasCompleteInfo
       && sym.owner.isClass
+      && sym.isAbstractType
+      && !sym.isTypeParameterOrSkolem
+      && isBaseClassOfEnclosingClass(sym.owner)
       && (sym.info ne this(sym.info))
     )
 
@@ -4386,7 +4389,7 @@ trait Types extends api.Types { self: SymbolTable =>
       case tp @ ThisType(_)                                            => thisTypeAsSeen(tp)
       case tp @ SingleType(_, sym)                                     => if (sym.isPackageClass) tp else singleTypeAsSeen(tp)
       case tp @ TypeRef(_, sym, _) if isTypeParamOfEnclosingClass(sym) => classParameterAsSeen(tp)
-      case tp @ AbstractType(pre, sym, args) if rewriteAbstract(sym)   => abstractTypeAsSeen(tp)
+      case tp @ TypeRef(pre, sym, args) if rewriteAbstract(sym)        => abstractTypeAsSeen(tp)
       case _                                                           => mapOver(tp)
     }
 
