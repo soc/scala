@@ -4416,26 +4416,6 @@ trait Types extends api.Types { self: SymbolTable =>
       && isBaseClassOfEnclosingClass(sym.owner)
     )
 
-    private def isAbstractTypeFromEnclosingClass(sym: Symbol): Boolean = (
-         sym.isAbstractType
-      && !sym.isTypeParameter
-      && sym.owner.isClass
-      && isBaseClassOfEnclosingClass(sym.owner)
-    )
-
-    // private val openSymbols = mutable.Set[Symbol]()
-    // override protected def noChangeToSymbols(origSyms: List[Symbol]): Boolean = {
-    //   def loop(syms: List[Symbol]): Boolean = syms match {
-    //     case Nil                      => true
-    //     case x :: _ if openSymbols(x) => log(s"AsSeenFromMap recursion guard caught " + x); false
-    //     case x :: xs                  =>
-    //       openSymbols += x
-    //       try { (x.info eq this(x.info)) && loop(xs) }
-    //       finally openSymbols -= x
-    //   }
-    //   loop(origSyms)
-    // }
-
     /** Creates an existential representing a type parameter which appears
      *  in the prefix of a ThisType.
      */
