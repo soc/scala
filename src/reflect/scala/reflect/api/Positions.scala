@@ -18,7 +18,7 @@ trait Positions {
    *  The main documentation entry about positions is located at [[scala.reflect.api.Position]].
    *  @group Positions
    */
-  type Position >: Null <: scala.reflect.api.Position { type Pos = self.Position }
+  type Position >: Null <: scala.reflect.api.Position { type Pos = Position }
 
   /** A tag that preserves the identity of the `Position` abstract type from erasure.
    *  Can be used for pattern matching, instance tests, serialization and likes.
