@@ -4376,11 +4376,22 @@ trait Types extends api.Types { self: SymbolTable =>
     def capturedParams: List[Symbol]  = _capturedParams
     def capturedSkolems: List[Symbol] = _capturedSkolems
 
+    private def rewriteAbstract(sym: Symbol) = (
+         sym.hasCompleteInfo
+      && sym.owner.isClass
+      && !noChangeToSymbols(sym :: Nil)
+    )
+    private def cloneAbstract(sym: Symbol): Type = (
+      sym cloneSymbol seenFromPrefix.typeSymbol
+        modifyInfo this
+        tpe_*
+    )
+
     def apply(tp: Type): Type = tp match {
       case tp @ ThisType(_)                                            => thisTypeAsSeen(tp)
       case tp @ SingleType(_, sym)                                     => if (sym.isPackageClass) tp else singleTypeAsSeen(tp)
       case tp @ TypeRef(_, sym, _) if isTypeParamOfEnclosingClass(sym) => classParameterAsSeen(tp)
-      case tp @ AbstractType(pre, sym, args) if sym.hasCompleteInfo    => println(s"${sym.defStringSeenAs(sym.info)}") ; mapOver(tp)
+      case tp @ AbstractType(pre, sym, args) if rewriteAbstract(sym)   => printResult(s"pre=$pre ${sym.defStringSeenAs(sym.info)}")(cloneAbstract(sym))
       case _                                                           => mapOver(tp)
     }
     //     def apply(tp: Type): Type = tp match {
@@ -4442,18 +4453,26 @@ trait Types extends api.Types { self: SymbolTable =>
       && sym.owner.isClass
       && isBaseClassOfEnclosingClass(sym.owner)
     )
-    private val openSymbols = mutable.Set[Symbol]()
-    override protected def noChangeToSymbols(origSyms: List[Symbol]): Boolean = {
-      def loop(syms: List[Symbol]): Boolean = syms match {
-        case Nil                      => true
-        case x :: _ if openSymbols(x) => log(s"AsSeenFromMap recursion guard caught " + x); false
-        case x :: xs                  =>
-          openSymbols += x
-          try { (x.info eq this(x.info)) && loop(xs) }
-          finally openSymbols -= x
-      }
-      loop(origSyms)
-    }
+
+    private def isAbstractTypeFromEnclosingClass(sym: Symbol): Boolean = (
+         sym.isAbstractType
+      && !sym.isTypeParameter
+      && sym.owner.isClass
+      && isBaseClassOfEnclosingClass(sym.owner)
+    )
+
+    // private val openSymbols = mutable.Set[Symbol]()
+    // override protected def noChangeToSymbols(origSyms: List[Symbol]): Boolean = {
+    //   def loop(syms: List[Symbol]): Boolean = syms match {
+    //     case Nil                      => true
+    //     case x :: _ if openSymbols(x) => log(s"AsSeenFromMap recursion guard caught " + x); false
+    //     case x :: xs                  =>
+    //       openSymbols += x
+    //       try { (x.info eq this(x.info)) && loop(xs) }
+    //       finally openSymbols -= x
+    //   }
+    //   loop(origSyms)
+    // }
 
     /** Creates an existential representing a type parameter which appears
      *  in the prefix of a ThisType.
