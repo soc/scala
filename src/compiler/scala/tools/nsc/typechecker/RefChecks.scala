@@ -344,8 +344,8 @@ abstract class RefChecks extends InfoTransform with scala.reflect.internal.trans
         // return if we already checked this combination elsewhere
         if (member.owner != clazz) {
           def deferredCheck        = member.isDeferred || !other.isDeferred
-          def subOther(s: Symbol)  = s selfIsSubClass other.owner
-          def subMember(s: Symbol) = s selfIsSubClass member.owner
+          def subOther(s: Symbol)  = s isSubClassIgnoringSelf other.owner
+          def subMember(s: Symbol) = s isSubClassIgnoringSelf member.owner
 
           if (subOther(member.owner) && deferredCheck) {
             //Console.println(infoString(member) + " shadows1 " + infoString(other) " in " + clazz);//DEBUG
