@@ -4549,22 +4549,72 @@ trait Types extends api.Types { self: SymbolTable =>
 
     private def abstractTypeAsSeen(tp: Type): Type = {
       val TypeRef(pre, sym, args) = tp
-      val pre1 = this(pre)
-      val memberSym = sym matchingSymbol seenFromPrefix
-      val declaredSym = if (memberSym.owner == seenFromPrefix) memberSym else NoSymbol
-      val info0 = sym.info
-      val info1 = this(info0)
+      println(s"$this.abstractTypeAsSeen($pre, $sym, $args)/info=${sym.info}")
+      println(s".. sym.owner=${sym.owner}")
 
-      val msym1 = sym matchingSymbol seenFromPrefix
-      val msym2 = sym matchingSymbol pre1
-      println(s"msym1=${msym1.defString} msym2=${msym2.defString}")
+      if (sym.info eq this(sym.info))
+        return mapOver(tp)
 
-      if (pre0 ne pre1)
-        mapOver(appliedType(memberSym, args))
-      else if (info0 ne info1) {
-        mapOver(typeRef(pre1, declaredSym, args mapConserve this))))
+      // val pre1 = this(pre)
+      // val newSym = mapOver(sym :: Nil).head
+
+      // def info0 = sym.info
+      // def info1 = this(sym.info)
+      // def memberSym = sym matchingSymbol pre1
+      // def declaredSym = memberSym filter (_.owner == seenFromClass)
+      // def symInPrefix = declaredSym orElse {
+      //   val newSym = sym.cloneSymbol(seenFromClass) setFlag SYNTHETIC setInfo info1
+      //   pre1.decls enter newSym
+      //   println(s"Enter $newSym into $pre1 decls")
+      //   println(s"info is ${newSym.info}")
+      //   newSym
+      // }
+      // def memberSym = sym matchingSymbol seenFromPrefix
+
+      // def declaredSym = memberSym orElse {
+      //   val newSym = sym.cloneSymbol(pre1.typeSymbol) setFlag SYNTHETIC setInfo info1
+      //   pre1.decls enter newSym
+      // }
+      // val declaredSym = if (memberSym.owner == seenFromPrefix) memberSym else NoSymbol
+
+      // val msym1 = sym matchingSymbol seenFromPrefix
+      // val msym2 = sym matchingSymbol pre1
+      // println(s"msym1=${msym1.defString} msym2=${msym2.defString}")
+
+      def loop(pre: Type, clazz: Symbol): Type = {
+        println(s"loop($pre, $clazz) / sym=${sym.fullLocationString}")
+
+        // have to deconst because it may be a Class[T]
+        def nextBase = (pre baseType clazz).deconst
+        //@M! see test pos/tcpoly_return_overriding.scala why mapOver is necessary
+        // if (skipPrefixOf(pre, clazz))
+          // mapOver(tp)
+        // else
+        if (clazz != sym.owner)
+          loop(nextBase.prefix, clazz.owner)
+        else nextBase match {
+          case TypeRef(_, _, _) =>
+            val declaredSym = sym matchingSymbol pre filter (_.owner == clazz) orElse {
+              val newSym = sym.cloneSymbol(clazz) setFlag (SYNTHETIC|ARTIFACT) modifyInfo this
+              pre.decls enter newSym
+              println(s"Enter $newSym into $pre decls")
+              println(s"info is ${newSym.info}")
+              newSym
+            }
+            typeRef(pre, declaredSym, args mapConserve this)
+          case t                          =>
+            abort(s"$sym in ${sym.owner} cannot be instantiated from ${seenFromPrefix.widen}")
+        }
       }
-      else mapOver(tp)
+      loop(seenFromPrefix, seenFromClass)
+
+
+      // if (pre ne pre1)
+      //   mapOver(appliedType(symInPrefix, args mapConserve this: _*))
+      // else if (info0 ne info1)
+      //   mapOver(typeRef(pre, symInPrefix, args mapConserve this))
+      // else
+      //   mapOver(tp)
 
       /*** Bueno
       if ((pre eq pre1) && (info0 eq info1))
