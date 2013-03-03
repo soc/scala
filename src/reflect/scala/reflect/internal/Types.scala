@@ -4390,7 +4390,6 @@ trait Types extends api.Types { self: SymbolTable =>
       case _                                                           => mapOver(tp)
     }
 
-    private val prefixClasses = seenFromPrefix.typeSymbol.ownerChain takeWhile (p => !p.isPackage)
     private var _capturedSkolems: List[Symbol] = Nil
     private var _capturedParams: List[Symbol]  = Nil
     private val isStablePrefix = seenFromPrefix.isStable
