@@ -1279,9 +1279,9 @@ abstract class GenASM extends SubComponent with BytecodeWriters with GenJVMASM {
           var leaves = List.empty[Symbol]
           while(!rest.isEmpty) {
             val candidate = rest.head
-            val nonLeaf = leaves exists { lsym => lsym isSubClass candidate }
-            if(!nonLeaf) {
-              leaves = candidate :: (leaves filterNot { lsym => candidate isSubClass lsym })
+            val nonLeaf = leaves exists { lsym => lsym selfIsSubClass candidate }
+            if (!nonLeaf) {
+              leaves = candidate :: (leaves filterNot { lsym => candidate selfIsSubClass lsym })
             }
             rest = rest.tail
           }

@@ -45,12 +45,11 @@ abstract class ExplicitOuter extends InfoTransform
     case TypeRef(pre, sym, _)   =>
       val owner = clazz.owner
 
-      //println(s"have same outer $parent $clazz $sym ${sym.owner} $owner $pre")
-
-      sym.isClass && owner.isClass &&
-      (owner isSubClass sym.owner) &&
-      owner.thisType =:= pre
-
+      (    sym.isClass
+        && owner.isClass
+        && (owner selfIsSubClass sym.owner)
+        && (owner.thisType =:= pre)
+      )
     case _                      => false
   }
 
