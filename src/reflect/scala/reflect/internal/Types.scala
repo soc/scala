@@ -4406,56 +4406,16 @@ trait Types extends api.Types { self: SymbolTable =>
     private def rewriteAbstract(sym: Symbol) = (
          sym.hasCompleteInfo
       && sym.owner.isClass
-      && !noChangeToSymbols(sym :: Nil)
+      && (sym.info ne this(sym.info))
     )
-    // private def cloneAbstract(tp: Type): Type = {
-    //   val TypeRef(pre, sym, args) = tp
-    //   println(s"seenFromPrefix=$seenFromPrefix pre=$pre")
-    //   val clone = sym cloneSymbol seenFromPrefix.typeSymbol modifyInfo this
-    //   typeRef(seenFromPrefix, clone, args mapConserve this)
-    // }
 
     def apply(tp: Type): Type = tp match {
       case tp @ ThisType(_)                                            => thisTypeAsSeen(tp)
       case tp @ SingleType(_, sym)                                     => if (sym.isPackageClass) tp else singleTypeAsSeen(tp)
       case tp @ TypeRef(_, sym, _) if isTypeParamOfEnclosingClass(sym) => classParameterAsSeen(tp)
-      case tp @ AbstractType(pre, sym, args) if rewriteAbstract(sym)   => abstractTypeAsSeen(tp) // cloneAbstract(tp)
-      // printResult(s"pre=$pre ${sym.defStringSeenAs(sym.info)}")(cloneAbstract(sym))
+      case tp @ AbstractType(pre, sym, args) if rewriteAbstract(sym)   => abstractTypeAsSeen(tp)
       case _                                                           => mapOver(tp)
     }
-    //     def apply(tp: Type): Type = tp match {
-    //       case ThisType(sym)                                       => thisTypeAsSeen(tp)
-    //       case SingleType(_, sym)                                  => if (sym.isPackageClass) tp else singleTypeAsSeen(tp)
-    //       case ClassTypeParameter(_, _)                            => classTypeParameterAsSeen(tp)
-    //       case AbstractType(pre, sym, Nil) if rewriteAbstract(sym) =>
-    //         val sym1 = (sym matchingSymbol seenFromPrefix) orElse sym
-    //         val pre1 = this(pre)
-    //         val clone = internally(sym1.cloneSymbolImpl(pre1.typeSymbol, sym1.flags) setInfo this(sym1.info))
-    //         devWarning(
-    //           s"""|AsSeenFromMap($seenFromPrefix, $seenFromClass) cloning into $pre1
-    //               |   tp: $tp (defined in ${sym.owner})
-    //               |  was: ${sym.defString}
-    //               |  and: ${sym1.defString}
-    //               |  now: ${clone.defString}""".stripMargin)
-
-    //         mapOver(clone.tpe_*)
-    //       case _                                                   => mapOver(tp)
-    //     }
-
-    //     private def rewriteAbstract(sym: Symbol) = (
-    //          !internal
-    //       && sym.hasCompleteInfo
-    //       && sym.owner.isClass
-    //       && !noChangeToSymbols(sym :: Nil)
-    //     )
-
-    //     /** Recursion guard when transforming a symbol's info. */
-    //     private var internal = false
-    //     private def internally[T](body: => T): T = {
-    //       val saved = internal
-    //       internal = true
-    //       try body finally internal = saved
-    // >>>>>>> 1c745c7205... SI-6161, ThisTypes in asSeenFrom.
 
     private val prefixClasses = seenFromPrefix.typeSymbol.ownerChain takeWhile (p => !p.isPackage)
     private var _capturedSkolems: List[Symbol] = Nil
@@ -4549,64 +4509,28 @@ trait Types extends api.Types { self: SymbolTable =>
 
     private def abstractTypeAsSeen(tp: Type): Type = {
       val TypeRef(pre, sym, args) = tp
-      println(s"$this.abstractTypeAsSeen($pre, $sym, $args)/info=${sym.info}")
-      println(s".. sym.owner=${sym.owner}")
-
-      if (sym.info eq this(sym.info))
-        return mapOver(tp)
-
-      // val pre1 = this(pre)
-      // val newSym = mapOver(sym :: Nil).head
-
-      // def info0 = sym.info
-      // def info1 = this(sym.info)
-      // def memberSym = sym matchingSymbol pre1
-      // def declaredSym = memberSym filter (_.owner == seenFromClass)
-      // def symInPrefix = declaredSym orElse {
-      //   val newSym = sym.cloneSymbol(seenFromClass) setFlag SYNTHETIC setInfo info1
-      //   pre1.decls enter newSym
-      //   println(s"Enter $newSym into $pre1 decls")
-      //   println(s"info is ${newSym.info}")
-      //   newSym
-      // }
-      // def memberSym = sym matchingSymbol seenFromPrefix
-
-      // def declaredSym = memberSym orElse {
-      //   val newSym = sym.cloneSymbol(pre1.typeSymbol) setFlag SYNTHETIC setInfo info1
-      //   pre1.decls enter newSym
-      // }
-      // val declaredSym = if (memberSym.owner == seenFromPrefix) memberSym else NoSymbol
-
-      // val msym1 = sym matchingSymbol seenFromPrefix
-      // val msym2 = sym matchingSymbol pre1
-      // println(s"msym1=${msym1.defString} msym2=${msym2.defString}")
 
       def loop(pre: Type, clazz: Symbol): Type = {
-        println(s"loop($pre, $clazz) / sym=${sym.fullLocationString}")
-
-        // have to deconst because it may be a Class[T]
-        def nextBase = (pre baseType clazz).deconst
-        //@M! see test pos/tcpoly_return_overriding.scala why mapOver is necessary
-        // if (skipPrefixOf(pre, clazz))
-          // mapOver(tp)
-        // else
-        if (clazz != sym.owner)
-          loop(nextBase.prefix, clazz.owner)
-        else nextBase match {
-          case TypeRef(_, _, _) =>
-            val declaredSym = sym matchingSymbol pre filter (_.owner == clazz) orElse {
-              val newSym = sym.cloneSymbol(clazz) setFlag (SYNTHETIC|ARTIFACT) modifyInfo this
-              pre.decls enter newSym
-              println(s"Enter $newSym into $pre decls")
-              println(s"info is ${newSym.info}")
-              newSym
-            }
-            typeRef(pre, declaredSym, args mapConserve this)
-          case t                          =>
-            abort(s"$sym in ${sym.owner} cannot be instantiated from ${seenFromPrefix.widen}")
+        if (clazz == sym.owner) {
+          val declaredSym = sym matchingSymbol pre filter (_.owner == clazz) orElse {
+            pre.decls enter (sym.cloneSymbol(clazz, newFlags = sym.flags | SYNTHETIC | ARTIFACT) modifyInfo this)
+          }
+          typeRef(pre, declaredSym, args mapConserve this)
         }
+        else
+          loop((pre baseType clazz).prefix, clazz.owner)
       }
       loop(seenFromPrefix, seenFromClass)
+    }
+
+      //   if (clazz != sym.owner)
+      //     loop(nextBase.prefix, clazz.owner)
+      //   else nextBase match {
+      //     case TypeRef(_, _, _) =>
+      //     case t                          =>
+      //       abort(s"$sym in ${sym.owner} cannot be instantiated from ${seenFromPrefix.widen}")
+      //   }
+      // }
 
 
       // if (pre ne pre1)
