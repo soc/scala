@@ -4521,7 +4521,16 @@ trait Types extends api.Types { self: SymbolTable =>
 
     private def abstractTypeAsSeen(abstractType: Type): Type = {
       val TypeRef(pre, absym, args) = abstractType
+      val pre1 = this(pre)
+      val info1 = this(absym.info)
+
       println(s"$this.abstractType(TypeRef($pre, $absym, $args))/info=${absym.info}")
+      println(s"pre1=$pre1 info1=$info1")
+
+      if ((pre ne pre1) || (absym.info ne info1)) {
+        val clone = absym.cloneSymbol setInfo info1
+        return printResult(s"bingo")(typeRef(pre1, clone, args mapConserve this))
+      }
 
       def loop(pre: Type, clazz: Symbol): Type = {
         println(s"loop($pre, $clazz)")
