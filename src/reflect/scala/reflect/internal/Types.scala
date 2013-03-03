@@ -738,22 +738,10 @@ trait Types extends api.Types { self: SymbolTable =>
         else {
           val m     = newAsSeenFromMap(pre.normalize, clazz)
           val tp    = m(this)
-          val tp1   = (
-            if (m.capturedTypeMembers.isEmpty) tp
-            else {
-              println(s"captured: ${m.capturedTypeMembers}")
-              val tps = m.capturedTypeMembers.distinct
-              val syms = tps map (_.typeSymbolDirect)
+          val tp1   = existentialAbstraction(m.capturedParams, tp)
 
-              tp.substSym(syms, cloneSymbolsAtOwnerAndModify(syms, pre.typeSymbol, m))
-            }
-          )
-          val tp2   = existentialAbstraction(m.capturedParams, tp1)
-          val tp3 = (
-            if (m.capturedSkolems.isEmpty) tp2
-            else deriveType(m.capturedSkolems, _.cloneSymbol setFlag CAPTURED)(tp2)
-          )
-          tp3
+          if (m.capturedSkolems.isEmpty) tp1
+          else deriveType(m.capturedSkolems, _.cloneSymbol setFlag CAPTURED)(tp1)
         }
       } finally if (Statistics.canEnable) Statistics.popTimer(typeOpsStack, start)
     }
@@ -2320,14 +2308,6 @@ trait Types extends api.Types { self: SymbolTable =>
       }
     }
 
-    override def cloneInfo(owner: Symbol) = {
-      println(s"AbstractTypeRef $this.cloneInfo(owner=$owner)")
-      // val sym1 = cloneSymbolsAtOwner(sym :: Nil, owner).head
-      // sym1.info
-      super.cloneInfo(owner)
-      // createFromClonedSymbolsAtOwner(quantified, owner, underlying)(newExistentialType)
-    }
-
     override def thisInfo   = {
       val symInfo = sym.info
       if (thisInfoCache == null || (symInfo ne symInfoCache)) {
@@ -2379,12 +2359,6 @@ trait Types extends api.Types { self: SymbolTable =>
         finalizeHash(mix(h, args.hashCode()), 3)
       else
         finalizeHash(h, 2)
-    }
-
-    override def cloneInfo(owner: Symbol) = {
-      println(s"$this.cloneInfo(owner=$owner)")
-      super.cloneInfo(owner)
-      // createFromClonedSymbolsAtOwner(quantified, owner, underlying)(newExistentialType)
     }
 
     // @M: propagate actual type params (args) to `tp`, by replacing
@@ -4401,7 +4375,6 @@ trait Types extends api.Types { self: SymbolTable =>
     // }
     def capturedParams: List[Symbol]  = _capturedParams
     def capturedSkolems: List[Symbol] = _capturedSkolems
-    def capturedTypeMembers: List[Type] = _capturedTypeMembers
 
     private def rewriteAbstract(sym: Symbol) = (
          sym.hasCompleteInfo
@@ -4420,7 +4393,6 @@ trait Types extends api.Types { self: SymbolTable =>
     private val prefixClasses = seenFromPrefix.typeSymbol.ownerChain takeWhile (p => !p.isPackage)
     private var _capturedSkolems: List[Symbol] = Nil
     private var _capturedParams: List[Symbol]  = Nil
-    private var _capturedTypeMembers: List[Type]  = Nil
     private val isStablePrefix = seenFromPrefix.isStable
 
     // isBaseClassOfEnclosingClassOrInfoIsNotYetComplete would be a more accurate
@@ -4521,69 +4493,6 @@ trait Types extends api.Types { self: SymbolTable =>
           loop((pre baseType clazz).prefix, clazz.owner)
       }
       loop(seenFromPrefix, seenFromClass)
-    }
-
-      //   if (clazz != sym.owner)
-      //     loop(nextBase.prefix, clazz.owner)
-      //   else nextBase match {
-      //     case TypeRef(_, _, _) =>
-      //     case t                          =>
-      //       abort(s"$sym in ${sym.owner} cannot be instantiated from ${seenFromPrefix.widen}")
-      //   }
-      // }
-
-
-      // if (pre ne pre1)
-      //   mapOver(appliedType(symInPrefix, args mapConserve this: _*))
-      // else if (info0 ne info1)
-      //   mapOver(typeRef(pre, symInPrefix, args mapConserve this))
-      // else
-      //   mapOver(tp)
-
-      /*** Bueno
-      if ((pre eq pre1) && (info0 eq info1))
-        mapOver(tp)
-      else if (declaredSym.exists)
-        printResult("declared")(mapOver(typeRef(pre1, declaredSym, args mapConserve this)))
-      else {
-        val newSym = sym.cloneSymbol(pre1.typeSymbol) setFlag SYNTHETIC setInfo info1
-        pre1.decls enter newSym
-        println(s"$this")
-        println(s"  pre0=$pre  info0=$info0")
-        println(s"  pre1=$pre1 info1=$info1")
-        printResult("created")(newSym.tpe_*)
-      }
-      ***/
-
-        // println(s"$this.abstractType(TypeRef($pre, $absym, $args))/info=$info0")
-        // _capturedTypeMembers ::= tp
-        // mapOver(tp)
-        // println("")
-
-        // if (!capturedTypeMembers.contains(sym))
-          // _capturedTypeMembers ::= sym
-      // mapOver(tp)
-      // if ((pre ne pre1) || (info0 ne info1)) {
-      //   // captureSkolems(absym :: Nil)
-      //   mapOver(abstractType)
-      //   // val clone = absym.cloneSymbol setInfo info1
-      //   // printResult(s"bingo")(typeRef(seenFromPrefix, clone, args mapConserve this))
-      // }
-      // else mapOver(abstractType)
-
-      // def loop(pre: Type, clazz: Symbol): Type = {
-      //   println(s"loop($pre, $clazz)")
-      //   // have to deconst because it may be a Class[T]
-      //   def nextBase = (pre.widen baseType clazz)
-      //   //@M! see test pos/tcpoly_return_overriding.scala why mapOver is necessary
-      //   if (skipPrefixOf(pre, clazz))
-      //     mapOver(abstractType)
-      //   else if (!matchesPrefixAndClass(pre, clazz)(absym.owner))
-      //     loop(nextBase.prefix, clazz.owner)
-      //   else
-      //     printResult(s"bingo")(typeRef(pre, absym, args))
-      // }
-      // loop(seenFromPrefix, seenFromClass)
     }
 
     // 0) @pre: `classParam` is a class type parameter
