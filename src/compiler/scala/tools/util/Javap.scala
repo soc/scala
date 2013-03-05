@@ -98,7 +98,7 @@ class JavapClass(
    *  it represents.
    */
   def tryFile(path: String): Option[Array[Byte]] =
-    (Try (File(path.asClassResource)) filter (_.exists) map (_.toByteArray)).toOption
+    (Try (File(path.asClassResource)) filter (_.exists) map (_.toByteArray())).toOption
 
   /** Assume the string is a fully qualified class name and try to
    *  find the class object it represents.
@@ -125,10 +125,10 @@ class JavapClass(
           if (res.isDefined && loadable(res.get)) res else None
         }
         // try loading translated+suffix
-        val res = loadableOrNone(false)
+        val res = loadableOrNone(strip = false)
         // some synthetics lack a dollar, (e.g., suffix = delayedInit$body)
         // so as a hack, if prefix$$suffix fails, also try prefix$suffix
-        if (res.isDefined) res else loadableOrNone(true)
+        if (res.isDefined) res else loadableOrNone(strip = true)
       } else None
     }
     val p = path.asClassName   // scrub any suffix
@@ -209,7 +209,7 @@ class JavapClass(
           }
           filtering
         }
-        for (line <- Source.fromString(preamble + written).getLines; if checkFilter(line))
+        for (line <- Source.fromString(preamble + written).getLines(); if checkFilter(line))
           printWriter write line+lineSeparator
         printWriter.flush()
       }
@@ -371,7 +371,7 @@ class JavapClass(
           case x => Failure(x)
         }
       } lastly {
-        reporter.clear
+        reporter.clear()
       }
     override def apply(raw: Boolean, options: Seq[String])(inputs: Seq[Input]): List[JpResult] = (inputs map {
       case (claas, Success(_))  => applyOne(raw, options, claas, inputs).get
@@ -649,7 +649,7 @@ object JavapClass {
       val fs = if (isReplish) {
         def outed(d: AbstractFile, p: Seq[String]): Option[AbstractFile] = {
           if (p.isEmpty) Option(d)
-          else Option(d.lookupName(p.head, true)) flatMap (f => outed(f, p.tail))
+          else Option(d.lookupName(p.head, directory = true)) flatMap (f => outed(f, p.tail))
         }
         outed(intp.get.replOutput.dir, splat.init) map { d =>
           listFunsInAbsFile(name, member, d) map packaged

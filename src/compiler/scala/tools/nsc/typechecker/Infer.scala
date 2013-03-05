@@ -491,7 +491,7 @@ trait Infer extends Checkable {
           }
           //println("try to solve "+tvars+" "+tparams)
           (solvedTypes(tvars, tparams, tparams map varianceInType(varianceType),
-                      false, lubDepth(List(restpe, pt))), tvars)
+                      upper = false, lubDepth(List(restpe, pt))), tvars)
         } catch {
           case ex: NoInstance => (null, null)
         }
@@ -607,7 +607,7 @@ trait Infer extends Checkable {
           )
         ))
       }
-      buf.result
+      buf.result()
     }
 
     /** Return inferred type arguments, given type parameters, formal parameters,
@@ -618,7 +618,7 @@ trait Infer extends Checkable {
     *
     *  @param   tparams         the type parameters of the method
     *  @param   formals         the value parameter types of the method
-    *  @param   restp           the result type of the method
+    *  @param   restpe          the result type of the method
     *  @param   argtpes         the argument types of the application
     *  @param   pt              the expected return type of the application
     *  @return  @see adjustTypeArgs
@@ -667,7 +667,7 @@ trait Infer extends Checkable {
       }
       val targs = solvedTypes(
         tvars, tparams, tparams map varianceInTypes(formals),
-        false, lubDepth(formals) max lubDepth(argtpes)
+        upper = false, lubDepth(formals) max lubDepth(argtpes)
       )
       // Can warn about inferring Any/AnyVal as long as they don't appear
       // explicitly anywhere amongst the formal, argument, result, or expected type.
@@ -830,14 +830,11 @@ trait Infer extends Checkable {
      *  such that function type `ftpe` is applicable to
      *  `argtpes` and its result conform to `pt`?
      *
-     *  @param undetparams ...
      *  @param ftpe        the type of the function (often a MethodType)
-     *  @param argtpes     the argument types; a NamedType(name, tp) for named
+     *  @param argtpes0    the argument types; a NamedType(name, tp) for named
      *    arguments. For each NamedType, if `name` does not exist in `ftpe`, that
      *    type is set to `Unit`, i.e. the corresponding argument is treated as
      *    an assignment expression (@see checkNames).
-     *  @param pt          ...
-     *  @return            ...
      */
     private def isApplicable(undetparams: List[Symbol], ftpe: Type,
                              argtpes0: List[Type], pt: Type): Boolean =
@@ -917,7 +914,7 @@ trait Infer extends Checkable {
      */
     private[typechecker] def isApplicableSafe(undetparams: List[Symbol], ftpe: Type,
                                               argtpes0: List[Type], pt: Type): Boolean = {
-      val silentContext = context.makeSilent(false)
+      val silentContext = context.makeSilent(reportAmbiguousErrors = false)
       val typer0 = newTyper(silentContext)
       val res1 = typer0.infer.isApplicable(undetparams, ftpe, argtpes0, pt)
       if (pt != WildcardType && silentContext.hasErrors) {
@@ -1104,7 +1101,7 @@ trait Infer extends Checkable {
       }
 
     def checkKindBounds(tparams: List[Symbol], targs: List[Type], pre: Type, owner: Symbol): List[String] = {
-      checkKindBounds0(tparams, targs, pre, owner, true) map {
+      checkKindBounds0(tparams, targs, pre, owner, explainErrors = true) map {
         case (targ, tparam, kindErrors) =>
           kindErrors.errorMessage(targ, tparam)
       }
@@ -1192,7 +1189,7 @@ trait Infer extends Checkable {
      *  @param fn          fn: the function that needs to be instantiated.
      *  @param undetparams the parameters that need to be determined
      *  @param args        the actual arguments supplied in the call.
-     *  @param pt          the expected type of the function application
+     *  @param pt0         the expected type of the function application
      *  @return            The type parameters that remain uninstantiated,
      *                     and that thus have not been substituted.
      */
@@ -1243,7 +1240,7 @@ trait Infer extends Checkable {
      *
      *  @param tree        the constuctor that needs to be instantiated
      *  @param undetparams the undetermined type parameters
-     *  @param pt          the expected result type of the instance
+     *  @param pt0         the expected result type of the instance
      */
     def inferConstructorInstance(tree: Tree, undetparams: List[Symbol], pt0: Type) {
       val pt       = abstractTypesToBounds(pt0)
@@ -1266,7 +1263,7 @@ trait Infer extends Checkable {
             val variances  =
               if (ctorTp.paramTypes.isEmpty) undetparams map varianceInType(ctorTp)
               else undetparams map varianceInTypes(ctorTp.paramTypes)
-            val targs      = solvedTypes(tvars, undetparams, variances, true, lubDepth(List(resTp, pt)))
+            val targs      = solvedTypes(tvars, undetparams, variances, upper = true, lubDepth(List(resTp, pt)))
             // checkBounds(tree, NoPrefix, NoSymbol, undetparams, targs, "inferred ")
             // no checkBounds here. If we enable it, test bug602 fails.
             // TODO: reinstate checkBounds, return params that fail to meet their bounds to undetparams
@@ -1320,51 +1317,46 @@ trait Infer extends Checkable {
       }
     }
 
-    def instBounds(tvar: TypeVar): (Type, Type) = {
-      val tparam = tvar.origin.typeSymbol
-      val instType = toOrigin(tvar.constr.inst)
+    def instBounds(tvar: TypeVar): TypeBounds = {
+      val tparam               = tvar.origin.typeSymbol
+      val instType             = toOrigin(tvar.constr.inst)
+      val TypeBounds(lo, hi)   = tparam.info.bounds
       val (loBounds, hiBounds) =
-        if (instType != NoType && isFullyDefined(instType)) (List(instType), List(instType))
+        if (isFullyDefined(instType)) (List(instType), List(instType))
         else (tvar.constr.loBounds, tvar.constr.hiBounds)
-      val lo = lub(tparam.info.bounds.lo :: loBounds map toOrigin)
-      val hi = glb(tparam.info.bounds.hi :: hiBounds map toOrigin)
-      (lo, hi)
+
+      TypeBounds(
+        lub(lo :: loBounds map toOrigin),
+        glb(hi :: hiBounds map toOrigin)
+      )
     }
 
     def isInstantiatable(tvars: List[TypeVar]) = {
       val tvars1 = tvars map (_.cloneInternal)
       // Note: right now it's not clear that solving is complete, or how it can be made complete!
       // So we should come back to this and investigate.
-      solve(tvars1, tvars1 map (_.origin.typeSymbol), tvars1 map (_ => Variance.Covariant), false)
+      solve(tvars1, tvars1 map (_.origin.typeSymbol), tvars1 map (_ => Variance.Covariant), upper = false)
     }
 
-    // this is quite nasty: it destructively changes the info of the syms of e.g., method type params (see #3692, where the type param T's bounds were set to >: T <: T, so that parts looped)
+    // this is quite nasty: it destructively changes the info of the syms of e.g., method type params
+    // (see #3692, where the type param T's bounds were set to > : T <: T, so that parts looped)
     // the changes are rolled back by restoreTypeBounds, but might be unintentially observed in the mean time
     def instantiateTypeVar(tvar: TypeVar) {
-      val tparam = tvar.origin.typeSymbol
-      if (false &&
-          tvar.constr.inst != NoType &&
-          isFullyDefined(tvar.constr.inst) &&
-          (tparam.info.bounds containsType tvar.constr.inst)) {
-        context.nextEnclosing(_.tree.isInstanceOf[CaseDef]).pushTypeBounds(tparam)
-        tparam setInfo tvar.constr.inst
-        tparam resetFlag DEFERRED
-        debuglog("new alias of " + tparam + " = " + tparam.info)
-      } else {
-        val (lo, hi) = instBounds(tvar)
-        if (lo <:< hi) {
-          if (!((lo <:< tparam.info.bounds.lo) && (tparam.info.bounds.hi <:< hi)) // bounds were improved
-             && tparam != lo.typeSymbolDirect && tparam != hi.typeSymbolDirect) { // don't create illegal cycles
-            context.nextEnclosing(_.tree.isInstanceOf[CaseDef]).pushTypeBounds(tparam)
-            tparam setInfo TypeBounds(lo, hi)
-            debuglog("new bounds of " + tparam + " = " + tparam.info)
-          } else {
-            debuglog("redundant: "+tparam+" "+tparam.info+"/"+lo+" "+hi)
-          }
-        } else {
-          debuglog("inconsistent: "+tparam+" "+lo+" "+hi)
+      val tparam                    = tvar.origin.typeSymbol
+      val TypeBounds(lo0, hi0)      = tparam.info.bounds
+      val tb @ TypeBounds(lo1, hi1) = instBounds(tvar)
+
+      if (lo1 <:< hi1) {
+        if (lo1 <:< lo0 && hi0 <:< hi1) // bounds unimproved
+          log(s"redundant bounds: discarding TypeBounds($lo1, $hi1) for $tparam, no improvement on TypeBounds($lo0, $hi0)")
+        else if (tparam == lo1.typeSymbolDirect || tparam == hi1.typeSymbolDirect)
+          log(s"cyclical bounds: discarding TypeBounds($lo1, $hi1) for $tparam because $tparam appears as bounds")
+        else {
+          context.enclosingCaseDef pushTypeBounds tparam
+          tparam setInfo logResult(s"updated bounds: $tparam from ${tparam.info} to")(tb)
         }
       }
+      else log(s"inconsistent bounds: discarding TypeBounds($lo1, $hi1)")
     }
 
     /** Type intersection of simple type tp1 with general type tp2.
@@ -1527,7 +1519,7 @@ trait Infer extends Checkable {
         // todo: missing test case for bests.isEmpty
         bests match {
           case best :: Nil                              => tree setSymbol best setType (pre memberType best)
-          case best :: competing :: _ if alts0.nonEmpty => 
+          case best :: competing :: _ if alts0.nonEmpty =>
             // SI-6912 Don't give up and leave an OverloadedType on the tree.
             //         Originally I wrote this as `if (secondTry) ... `, but `tryTwice` won't attempt the second try
             //         unless an error is issued. We're not issuing an error, in the assumption that it would be
@@ -1600,7 +1592,7 @@ trait Infer extends Checkable {
      *  with pt = WildcardType.
      *  Otherwise, if there is no best alternative, error.
      *
-     *  @param argtpes contains the argument types. If an argument is named, as
+     *  @param argtpes0 contains the argument types. If an argument is named, as
      *    "a = 3", the corresponding type is `NamedType("a", Int)'. If the name
      *    of some NamedType does not exist in an alternative's parameter names,
      *    the type is replaces by `Unit`, i.e. the argument is treated as an

@@ -11,7 +11,7 @@ import mutable.{LinkedHashMap, SynchronizedMap, HashSet, SynchronizedSet}
 import scala.util.control.ControlThrowable
 import scala.tools.nsc.io.{ AbstractFile, LogReplay, Logger, NullLogger, Replayer }
 import scala.tools.nsc.util.MultiHashMap
-import scala.reflect.internal.util.{ SourceFile, BatchSourceFile, Position, RangePosition, NoPosition }
+import scala.reflect.internal.util.{ SourceFile, BatchSourceFile, Position, NoPosition }
 import scala.tools.nsc.reporters._
 import scala.tools.nsc.symtab._
 import scala.tools.nsc.typechecker.DivergentImplicit
@@ -21,14 +21,14 @@ import scala.language.implicitConversions
 
 /** The main class of the presentation compiler in an interactive environment such as an IDE
  */
-class Global(settings: Settings, _reporter: Reporter, projectName: String = "")  extends {
+class Global(settings: Settings, _reporter: Reporter, projectName: String = "") extends {
   /* Is the compiler initializing? Early def, so that the field is true during the
    *  execution of the super constructor.
    */
   private var initializing = true
+  override val useOffsetPositions = false
 } with scala.tools.nsc.Global(settings, _reporter)
   with CompilerControl
-  with RangePositions
   with ContextTrees
   with RichCompilationUnits
   with ScratchPadMaker
@@ -69,7 +69,6 @@ class Global(settings: Settings, _reporter: Reporter, projectName: String = "") 
     if (verboseIDE) println("[%s][%s]".format(projectName, msg))
 
   override def forInteractive = true
-  override def forScaladoc = settings.isScaladoc
 
   /** A map of all loaded files to the rich compilation units that correspond to them.
    */
@@ -367,7 +366,7 @@ class Global(settings: Settings, _reporter: Reporter, projectName: String = "") 
                 .format(waitLoadedTypeResponses.size, getParsedEnteredResponses.size))
             checkNoResponsesOutstanding()
 
-            log.flush();
+            log.flush()
             scheduler = new NoWorkScheduler
             throw ShutdownReq
           }
@@ -747,10 +746,10 @@ class Global(settings: Settings, _reporter: Reporter, projectName: String = "") 
         try {
           val tp1 = pre.memberType(alt) onTypeError NoType
           val tp2 = adaptToNewRunMap(sym.tpe) substSym (originalTypeParams, sym.owner.typeParams)
-          matchesType(tp1, tp2, false) || {
+          matchesType(tp1, tp2, alwaysMatchSimple = false) || {
             debugLog(s"findMirrorSymbol matchesType($tp1, $tp2) failed")
             val tp3 = adaptToNewRunMap(sym.tpe) substSym (originalTypeParams, alt.owner.typeParams)
-            matchesType(tp1, tp3, false) || {
+            matchesType(tp1, tp3, alwaysMatchSimple = false) || {
               debugLog(s"findMirrorSymbol fallback matchesType($tp1, $tp3) failed")
               false
             }
@@ -910,8 +909,8 @@ class Global(settings: Settings, _reporter: Reporter, projectName: String = "") 
     val locals = new Members[ScopeMember]
     val enclosing = new Members[ScopeMember]
     def addScopeMember(sym: Symbol, pre: Type, viaImport: Tree) =
-      locals.add(sym, pre, false) { (s, st) =>
-        new ScopeMember(s, st, context.isAccessible(s, pre, false), viaImport)
+      locals.add(sym, pre, implicitlyAdded = false) { (s, st) =>
+        new ScopeMember(s, st, context.isAccessible(s, pre, superAccess = false), viaImport)
       }
     def localsToEnclosing() = {
       enclosing.addNonShadowed(locals)
@@ -1013,7 +1012,7 @@ class Global(settings: Settings, _reporter: Reporter, projectName: String = "") 
         val vtree = viewApply(view)
         val vpre = stabilizedType(vtree)
         for (sym <- vtree.tpe.members) {
-          addTypeMember(sym, vpre, false, view.tree.symbol)
+          addTypeMember(sym, vpre, inherited = false, view.tree.symbol)
         }
       }
       //println()
@@ -1026,7 +1025,7 @@ class Global(settings: Settings, _reporter: Reporter, projectName: String = "") 
     getUnit(source) match {
       case Some(unit) =>
         if (unit.isUpToDate) {
-          debugLog("already typed");
+          debugLog("already typed")
           response set unit.body
         } else if (ignoredFiles(source.file)) {
           response.raise(lastException.getOrElse(CancelException))

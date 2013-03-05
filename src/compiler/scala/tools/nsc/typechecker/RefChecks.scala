@@ -95,7 +95,7 @@ abstract class RefChecks extends InfoTransform with scala.reflect.internal.trans
 
   class RefCheckTransformer(unit: CompilationUnit) extends Transformer {
 
-    var localTyper: analyzer.Typer = typer;
+    var localTyper: analyzer.Typer = typer
     var currentApplication: Tree = EmptyTree
     var inPattern: Boolean = false
     var checkedCombinations = Set[List[Type]]()
@@ -386,11 +386,11 @@ abstract class RefChecks extends InfoTransform with scala.reflect.internal.trans
           if (!isOverrideAccessOK) {
             overrideAccessError()
           } else if (other.isClass) {
-            overrideError("cannot be used here - class definitions cannot be overridden");
+            overrideError("cannot be used here - class definitions cannot be overridden")
           } else if (!other.isDeferred && member.isClass) {
-            overrideError("cannot be used here - classes can only override abstract types");
+            overrideError("cannot be used here - classes can only override abstract types")
           } else if (other.isEffectivelyFinal) { // (1.2)
-            overrideError("cannot override final member");
+            overrideError("cannot override final member")
           } else if (!other.isDeferred && !member.isAnyOverride && !member.isSynthetic) { // (*)
             // (*) Synthetic exclusion for (at least) default getters, fixes SI-5178. We cannot assign the OVERRIDE flag to
             // the default getter: one default getter might sometimes override, sometimes not. Example in comment on ticket.
@@ -449,7 +449,7 @@ abstract class RefChecks extends InfoTransform with scala.reflect.internal.trans
             // @M: substSym
 
             if( !(sameLength(member.typeParams, other.typeParams) && (memberTp.substSym(member.typeParams, other.typeParams) =:= otherTp)) ) // (1.6)
-              overrideTypeError();
+              overrideTypeError()
           }
           else if (other.isAbstractType) {
             //if (!member.typeParams.isEmpty) // (1.7)  @MAT
@@ -502,7 +502,7 @@ abstract class RefChecks extends InfoTransform with scala.reflect.internal.trans
                 case rt: RefinedType if !(rt =:= otherTp) && !(checkedCombinations contains rt.parents) =>
                   // might mask some inconsistencies -- check overrides
                   checkedCombinations += rt.parents
-                  val tsym = rt.typeSymbol;
+                  val tsym = rt.typeSymbol
                   if (tsym.pos == NoPosition) tsym setPos member.pos
                   checkAllOverrides(tsym, typesOnly = true)
                 case _ =>
@@ -523,9 +523,9 @@ abstract class RefChecks extends InfoTransform with scala.reflect.internal.trans
       val opc = new overridingPairs.Cursor(clazz)
       while (opc.hasNext) {
         //Console.println(opc.overriding/* + ":" + opc.overriding.tpe*/ + " in "+opc.overriding.fullName + " overrides " + opc.overridden/* + ":" + opc.overridden.tpe*/ + " in "+opc.overridden.fullName + "/"+ opc.overridden.hasFlag(DEFERRED));//debug
-        if (!opc.overridden.isClass) checkOverride(opc.overriding, opc.overridden);
+        if (!opc.overridden.isClass) checkOverride(opc.overriding, opc.overridden)
 
-        opc.next
+        opc.next()
       }
       printMixinOverrideErrors()
 
@@ -726,8 +726,11 @@ abstract class RefChecks extends InfoTransform with scala.reflect.internal.trans
       else if (clazz.isTrait && !(clazz isSubClass AnyValClass)) {
         // For non-AnyVal classes, prevent abstract methods in interfaces that override
         // final members in Object; see #4431
-        for (decl <- clazz.info.decls.iterator) {
-          val overridden = decl.overriddenSymbol(ObjectClass)
+        for (decl <- clazz.info.decls) {
+          // Have to use matchingSymbol, not a method involving overridden symbols,
+          // because the scala type system understands that an abstract method here does not
+          // override a concrete method in Object. The jvm, however, does not.
+          val overridden = decl.matchingSymbol(ObjectClass, ObjectClass.tpe)
           if (overridden.isFinal)
             unit.error(decl.pos, "trait cannot redefine final method from class AnyRef")
         }
@@ -782,7 +785,7 @@ abstract class RefChecks extends InfoTransform with scala.reflect.internal.trans
           // for (bc <- clazz.info.baseClasses.tail) Console.println("" + bc + " has " + bc.info.decl(member.name) + ":" + bc.info.decl(member.name).tpe);//DEBUG
 
           val nonMatching: List[Symbol] = clazz.info.member(member.name).alternatives.filterNot(_.owner == clazz).filterNot(_.isFinal)
-          def issueError(suffix: String) = unit.error(member.pos, member.toString() + " overrides nothing" + suffix);
+          def issueError(suffix: String) = unit.error(member.pos, member.toString() + " overrides nothing" + suffix)
           nonMatching match {
             case Nil =>
               issueError("")
@@ -837,7 +840,7 @@ abstract class RefChecks extends InfoTransform with scala.reflect.internal.trans
           case tp1 :: tp2 :: _ =>
             unit.error(clazz.pos, "illegal inheritance;\n " + clazz +
                        " inherits different type instances of " + baseClass +
-                       ":\n" + tp1 + " and " + tp2);
+                       ":\n" + tp1 + " and " + tp2)
             explainTypes(tp1, tp2)
             explainTypes(tp2, tp1)
         }
@@ -902,7 +905,7 @@ abstract class RefChecks extends InfoTransform with scala.reflect.internal.trans
         val e = currentLevel.scope.lookupEntry(sym.name)
         if ((e ne null) && sym == e.sym) {
           var l = currentLevel
-          while (l.scope != e.owner) l = l.outer;
+          while (l.scope != e.owner) l = l.outer
           val symindex = symIndex(sym)
           if (l.maxindex < symindex) {
             l.refpos = pos
@@ -1090,7 +1093,7 @@ abstract class RefChecks extends InfoTransform with scala.reflect.internal.trans
     /* Convert a reference to a case factory of type `tpe` to a new of the class it produces. */
     def toConstructor(pos: Position, tpe: Type): Tree = {
       val rtpe = tpe.finalResultType
-      assert(rtpe.typeSymbol hasFlag CASE, tpe);
+      assert(rtpe.typeSymbol hasFlag CASE, tpe)
       localTyper.typedOperator {
         atPos(pos) {
           Select(New(TypeTree(rtpe)), rtpe.typeSymbol.primaryConstructor)
@@ -1499,8 +1502,8 @@ abstract class RefChecks extends InfoTransform with scala.reflect.internal.trans
         // on Unit, in which case we had better let it slide.
         val isOk = (
              sym.isGetter
-          || sym.allOverriddenSymbols.exists(over => !(over.tpe.resultType =:= sym.tpe.resultType))
           || (sym.name containsName nme.DEFAULT_GETTER_STRING)
+          || sym.allOverriddenSymbols.exists(over => !(over.tpe.resultType =:= sym.tpe.resultType))
         )
         if (!isOk)
           unit.warning(sym.pos, s"side-effecting nullary methods are discouraged: suggest defining as `def ${sym.name.decode}()` instead")

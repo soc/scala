@@ -28,12 +28,12 @@ class AbstractFileClassLoader(val root: AbstractFile, parent: ClassLoader)
     val pathParts          = name split '/'
 
     for (dirPart <- pathParts.init) {
-      file = file.lookupName(dirPart, true)
+      file = file.lookupName(dirPart, directory = true)
       if (file == null)
         return null
     }
 
-    file.lookupName(pathParts.last, false) match {
+    file.lookupName(pathParts.last, directory = false) match {
       case null   => null
       case file   => file
     }
@@ -47,12 +47,12 @@ class AbstractFileClassLoader(val root: AbstractFile, parent: ClassLoader)
     val pathParts          = dirNameToPath(name) split '/'
 
     for (dirPart <- pathParts) {
-      file = file.lookupName(dirPart, true)
+      file = file.lookupName(dirPart, directory = true)
       if (file == null)
         return null
     }
 
-    return file
+    file
   }
 
   // parent delegation in JCL uses getResource; so either add parent.getResAsStream

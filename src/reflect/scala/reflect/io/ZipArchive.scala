@@ -39,8 +39,8 @@ object ZipArchive {
    */
   def fromURL(url: URL): URLZipArchive = new URLZipArchive(url)
 
-  private def dirName(path: String)  = splitPath(path, true)
-  private def baseName(path: String) = splitPath(path, false)
+  private def dirName(path: String)  = splitPath(path, front = true)
+  private def baseName(path: String) = splitPath(path, front = false)
   private def splitPath(path0: String, front: Boolean): String = {
     val isDir = path0.charAt(path0.length - 1) == '/'
     val path  = if (isDir) path0.substring(0, path0.length - 1) else path0
@@ -61,13 +61,13 @@ abstract class ZipArchive(override val file: JFile) extends AbstractFile with Eq
 
   override def underlyingSource = Some(this)
   def isDirectory = true
-  def lookupName(name: String, directory: Boolean) = unsupported
-  def lookupNameUnchecked(name: String, directory: Boolean) = unsupported
-  def create()  = unsupported
-  def delete()  = unsupported
-  def output    = unsupported
-  def container = unsupported
-  def absolute  = unsupported
+  def lookupName(name: String, directory: Boolean) = unsupported()
+  def lookupNameUnchecked(name: String, directory: Boolean) = unsupported()
+  def create()  = unsupported()
+  def delete()  = unsupported()
+  def output    = unsupported()
+  def container = unsupported()
+  def absolute  = unsupported()
 
   private def walkIterator(its: Iterator[AbstractFile]): Iterator[AbstractFile] = {
     its flatMap { f =>

@@ -242,10 +242,7 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
   protected def newCompiler(settings: Settings, reporter: Reporter): ReplGlobal = {
     settings.outputDirs setSingleOutput replOutput.dir
     settings.exposeEmptyPackage.value = true
-    if (settings.Yrangepos.value)
-      new Global(settings, reporter) with ReplGlobal with interactive.RangePositions { override def toString: String = "<global>" }
-    else
-      new Global(settings, reporter) with ReplGlobal { override def toString: String = "<global>" }
+    new Global(settings, reporter) with ReplGlobal { override def toString: String = "<global>" }
   }
 
   /** Parent classloader.  Overridable. */
@@ -535,8 +532,8 @@ class IMain(initialSettings: Settings, protected val out: JPrintWriter) extends 
    *  The return value is whether the line was interpreter successfully,
    *  e.g. that there were no parse errors.
    */
-  def interpret(line: String): IR.Result = interpret(line, false)
-  def interpretSynthetic(line: String): IR.Result = interpret(line, true)
+  def interpret(line: String): IR.Result = interpret(line, synthetic = false)
+  def interpretSynthetic(line: String): IR.Result = interpret(line, synthetic = true)
   def interpret(line: String, synthetic: Boolean): IR.Result = {
     def loadAndRunReq(req: Request) = {
       classLoader.setAsContext()

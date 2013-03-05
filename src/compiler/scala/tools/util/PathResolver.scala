@@ -135,11 +135,11 @@ object PathResolver {
     }
     else {
       val settings = new Settings()
-      val rest = settings.processArguments(args.toList, false)._2
+      val rest = settings.processArguments(args.toList, processAll = false)._2
       val pr = new PathResolver(settings)
       println(" COMMAND: 'scala %s'".format(args.mkString(" ")))
       println("RESIDUAL: 'scala %s'\n".format(rest.mkString(" ")))
-      pr.result.show
+      pr.result.show()
     }
   }
 }

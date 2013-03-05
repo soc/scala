@@ -133,22 +133,14 @@ trait Scanners extends ScannersCommon {
     /** Should doc comments be built? */
     def buildDocs: Boolean = forScaladoc
 
-    /** buffer for the documentation comment
+    /** holder for the documentation comment
      */
-    var docBuffer: StringBuilder = null
-    var docPos: Position = null
+    var docComment: DocComment = null
 
-    /** Return current docBuffer and set docBuffer to null */
     def flushDoc: DocComment = {
-      val ret = if (docBuffer != null) DocComment(docBuffer.toString, docPos) else null
-      docBuffer = null
+      val ret = docComment
+      docComment = null
       ret
-    }
-
-    /** add the given character to the documentation buffer
-     */
-    protected def putDocChar(c: Char) {
-      if (docBuffer ne null) docBuffer.append(c)
     }
 
     protected def foundComment(value: String, start: Int, end: Int) = ()
@@ -227,11 +219,11 @@ trait Scanners extends ScannersCommon {
           while (!sepRegions.isEmpty && sepRegions.head != RBRACE)
             sepRegions = sepRegions.tail
           if (!sepRegions.isEmpty) sepRegions = sepRegions.tail
-          docBuffer = null
+          docComment = null
         case RBRACKET | RPAREN =>
           if (!sepRegions.isEmpty && sepRegions.head == lastToken)
             sepRegions = sepRegions.tail
-          docBuffer = null
+          docComment = null
         case ARROW =>
           if (!sepRegions.isEmpty && sepRegions.head == lastToken)
             sepRegions = sepRegions.tail
@@ -374,7 +366,7 @@ trait Scanners extends ScannersCommon {
                 getOperatorRest()
             }
           }
-          fetchLT
+          fetchLT()
         case '~' | '!' | '@' | '#' | '%' |
              '^' | '*' | '+' | '-' | /*'<' | */
              '>' | '?' | ':' | '=' | '&' |
@@ -411,7 +403,7 @@ trait Scanners extends ScannersCommon {
             }
             getNumber()
           }
-          fetchZero
+          fetchZero()
         case '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' =>
           base = 10
           getNumber()
@@ -452,7 +444,7 @@ trait Scanners extends ScannersCommon {
               }
             }
           }
-          fetchDoubleQuote
+          fetchDoubleQuote()
         case '\'' =>
           def fetchSingleQuote() = {
             nextChar()
@@ -471,7 +463,7 @@ trait Scanners extends ScannersCommon {
               }
             }
           }
-          fetchSingleQuote
+          fetchSingleQuote()
         case '.' =>
           nextChar()
           if ('0' <= ch && ch <= '9') {
@@ -520,7 +512,7 @@ trait Scanners extends ScannersCommon {
               nextChar()
             }
           }
-          fetchOther
+          fetchOther()
       }
     }
 
@@ -537,7 +529,7 @@ trait Scanners extends ScannersCommon {
             nextChar()
           } while ((ch != CR) && (ch != LF) && (ch != SU))
         } else {
-          docBuffer = null
+          docComment = null
           var openComments = 1
           appendToComment()
           nextChar()
@@ -545,24 +537,23 @@ trait Scanners extends ScannersCommon {
           var buildingDocComment = false
           if (ch == '*' && buildDocs) {
             buildingDocComment = true
-            docBuffer = new StringBuilder("/**")
           }
           while (openComments > 0) {
             do {
               do {
                 if (ch == '/') {
-                  nextChar(); putDocChar(ch); appendToComment()
+                  nextChar(); appendToComment()
                   if (ch == '*') {
-                    nextChar(); putDocChar(ch); appendToComment()
+                    nextChar(); appendToComment()
                     openComments += 1
                   }
                 }
                 if (ch != '*' && ch != SU) {
-                  nextChar(); putDocChar(ch); appendToComment()
+                  nextChar(); appendToComment()
                 }
               } while (ch != '*' && ch != SU)
               while (ch == '*') {
-                nextChar(); putDocChar(ch); appendToComment()
+                nextChar(); appendToComment()
               }
             } while (ch != '/' && ch != SU)
             if (ch == '/') nextChar()
@@ -924,7 +915,7 @@ trait Scanners extends ScannersCommon {
       }
     }
 
-    def intVal: Long = intVal(false)
+    def intVal: Long = intVal(negated = false)
 
     /** Convert current strVal, base to double value
     */
@@ -956,7 +947,7 @@ trait Scanners extends ScannersCommon {
       }
     }
 
-    def floatVal: Double = floatVal(false)
+    def floatVal: Double = floatVal(negated = false)
 
     def checkNoLetter() {
       if (isIdentifierPart(ch) && ch >= ' ')
@@ -1297,7 +1288,8 @@ trait Scanners extends ScannersCommon {
     }
 
     override def foundDocComment(value: String, start: Int, end: Int) {
-      docPos = new RangePosition(unit.source, start, start, end)
+      val docPos = new RangePosition(unit.source, start, start, end)
+      docComment = new DocComment(value, docPos)
       unit.comment(docPos, value)
     }
   }
@@ -1305,7 +1297,16 @@ trait Scanners extends ScannersCommon {
   class ParensAnalyzer(unit: CompilationUnit, patches: List[BracePatch]) extends UnitScanner(unit, patches) {
     val balance = mutable.Map(RPAREN -> 0, RBRACKET -> 0, RBRACE -> 0)
 
+    /** The source code with braces and line starts annotated with [NN] showing the index */
+    private def markedSource = {
+      val code   = unit.source.content
+      val braces = code.indices filter (idx => "{}\n" contains code(idx)) toSet;
+      val mapped = code.indices map (idx => if (braces(idx)) s"${code(idx)}[$idx]" else "" + code(idx))
+      mapped.mkString("")
+    }
+
     init()
+    log(s"ParensAnalyzer for ${unit.source} of length ${unit.source.content.length}\n```\n$markedSource\n```")
 
     /** The offset of the first token on this line, or next following line if blank
      */
@@ -1439,7 +1440,7 @@ trait Scanners extends ScannersCommon {
               while (lin < lineStart.length && column(lineStart(lin)) > lindent)
                 lin += 1
               if (lin < lineStart.length) {
-                val patches1 = insertPatch(patches, BracePatch(lineStart(lin), true))
+                val patches1 = insertPatch(patches, BracePatch(lineStart(lin), inserted = true))
                 //println("patch for "+bp+"/"+imbalanceMeasure+"/"+new ParensAnalyzer(unit, patches1).imbalanceMeasure)
                 /*if (improves(patches1))*/
                 patches1
@@ -1460,7 +1461,7 @@ trait Scanners extends ScannersCommon {
           else {
             val patches1 = delete(nested)
             if (patches1 ne patches) patches1
-            else insertPatch(patches, BracePatch(roff, false))
+            else insertPatch(patches, BracePatch(roff, inserted = false))
           }
       }
       delete(bracePairs)
