@@ -11,7 +11,7 @@ import Flags._
 import scala.collection._
 import scala.language.postfixOps
 
-abstract class CleanUp extends Transform with ast.TreeDSL {
+abstract class CleanUp extends Transform with Bridges { //ast.TreeDSL {
   import global._
   import definitions._
   import CODE._
@@ -19,6 +19,8 @@ abstract class CleanUp extends Transform with ast.TreeDSL {
 
   /** the following two members override abstract members in Transform */
   val phaseName: String = "cleanup"
+
+  protected def bridgeErasure(sym: Symbol)(tp: Type): Type = erasure.specialErasure(sym)(tp)
 
   protected def newTransformer(unit: CompilationUnit): Transformer =
     new CleanUpTransformer(unit)
@@ -47,8 +49,69 @@ abstract class CleanUp extends Transform with ast.TreeDSL {
     }
     private def transformTemplate(tree: Tree) = {
       val Template(_, _, body) = tree
+      val bridges0 = enteringErasure(bridgeDefs(unit, currentClass))
+      currentClass.info
+
+      val bridgesToAdd = bridges0 match {
+        case (bridges, removals) =>
+            // localTyper.context.asInstanceOf[global.erasure.Context])
+          if (removals.nonEmpty)
+            println("!!! Removals: " + removals)
+
+          // bridges foreach (_.symbol.info)
+          // bridges foreach println
+          val bridges1 = bridges map { b =>
+            b.symbol.info
+            b.symbol setInfo bridgeErasure(currentClass)(enteringErasure(currentClass.thisType memberInfo b.symbol))
+            val encl = erasure.rootContext(unit, unit.body, true)
+            val typer1 = erasure.newTyper(encl.make(b, b.symbol))
+            // val typer1 = erasure.newTyper(erasure.analyzer.rootContext(unit, b, true))
+            val b1 = typer1 typed b
+            // println(s"""
+            //   | tree  $b
+            //   |typed  $b1
+            //   |  sym  ${b.symbol.defString}
+            //   """.stripMargin)
+
+            b1
+          }
+          // currentClass.info.members.toList.groupBy(_.defString) collect {
+          //   case (x, xs) if xs.length > 1 =>
+          //     println("Dups!")
+          //     xs map (_.fullLocationString) foreach println
+          // }
+
+          // val bridges1 = bridges map { b =>
+
+          // }
+            // newTyper(rootContext(unit, tree, true)).typed(tree2)
+
+          bridges1
+          // val typer1 = newTyper(rootContext(unit,
+          // newTyper(rootContext(unit, tree, true)).typed(tree2)
+          // bridges foreach println
+          // val bridges1 = bridges map { b =>
+          //   val pt1 = enteringErasure(currentClass.thisType memberInfo b.symbol)
+          //   val pt2 = bridgeErasure(b.symbol)(pt1)
+          //     // b.symbol.info.asSeenFrom(currentClass.thisType, currentClass))
+          //   println("At phase " + phase + " typing " + b)
+          //   println("b.symbol = " + b.symbol.defString)
+          //   println("pt1 = " + pt1 + " pt2 = " + pt2)
+
+          //   localTyper.typed(b, pt = pt2)
+          // }
+          // // (b => b setType printResult("")(b.symbol.info))
+          // // (b => typer.typed(b, b.symbol.tpe_*))
+          // //(erasure.newTransformer(unit) transform _)
+          //  // (b => typer typed b)
+          // // bridges1 foreach (b => println(b + " " + b.tpe))
+          // bridges1
+      }
+
+      // currentClass.info.members.toList.flatMap(_.alternatives).map(m => m.defStringSeenAs(currentClass.info memberType m)).sorted foreach println
+
       clearStatics()
-      val newBody = transformTrees(body)
+      val newBody = transformTrees(body ::: bridgesToAdd)
       val templ   = deriveTemplate(tree)(_ => transformTrees(newStaticMembers.toList) ::: newBody)
       try addStaticInits(templ) // postprocess to include static ctors
       finally clearStatics()
