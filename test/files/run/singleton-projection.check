@@ -1,0 +1,9 @@
+foo.Lorax.type
+foo.Lorax.Wog.type
+foo.Lorax.Wog
+foo.Lorax
+x$1.Zax.type forSome { val x$1: foo.Lorax }
+foo.Lorax#Zax
+bar.T1[_$1]#T2[_$2]#Bob
+x$2.Bob.type forSome { val x$2: bar.T1[_$3]#T2[_$4]; type _$3; type _$4 }
+x$3.Q.type forSome { val x$3: Test.X[_$5]#Y[_$6]#Z[_$7]; type _$5 <: Int; type _$6 >: Null; type _$7 <: List[_] }

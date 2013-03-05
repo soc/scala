@@ -277,6 +277,21 @@ self =>
     def o2p(offset: Int): Position
     def r2p(start: Int, mid: Int, end: Int): Position
 
+    def peekahead() = {
+      in.prev copyFrom in
+      in.nextToken()
+    }
+    def pushback() = {
+      in.next copyFrom in
+      in copyFrom in.prev
+    }
+    def peekAheadFor(expected: Int): Boolean = {
+      peekahead()
+      val result = in.token == expected
+      try result
+      finally if (result) in.skipToken() else pushback()
+    }
+
     /** whether a non-continuable syntax error has been seen */
     private var lastErrorOffset : Int = -1
 
@@ -889,11 +904,38 @@ self =>
       }
 
       private def typeProjection(t: Tree): Tree = {
-        val hashOffset = in.skipToken()
-        val nameOffset = in.offset
-        val name       = identForType(skipIt = false)
-        val point      = if (name == tpnme.ERROR) hashOffset else nameOffset
-        atPos(t.pos.startOrPoint, point)(SelectFromTypeTree(t, name))
+        val start       = in.offset
+        val hashOffset  = in.skipToken()
+        val nameOffset  = in.offset
+        val name        = identForType(skipIt = false)
+        val point       = if (name == tpnme.ERROR) hashOffset else nameOffset
+        val isSingleton = (in.token == DOT) && peekAheadFor(TYPE)
+
+        atPos(t.pos.startOrPoint, point)(
+          if (isSingleton) {
+            // This corresponds to T#X.type, meaning the singleton
+            // type of a value whose stable path is not known. For instance,
+            // the type of this expression is X#Y.type.
+            //   class X { object Y } ; (new X).Y
+            //
+            // The type can otherwise be expressed with existentials:
+            //   x.Y.type forSome { val x: X }
+            //
+            // and that is the translation performed here.
+            val pname     = freshTermName("x$")
+            val id        = atPos(start)(Ident(pname))
+            val param     = atPos(id.pos.focus)(makeSyntheticParam(pname))
+            val singleton = SingletonTypeTree(Select(id, name.toTermName)) // x$.name.type
+            val (tpt, whereClauses) = t match {
+              case ExistentialTypeTree(tpt, whereClauses) => ((tpt, whereClauses))
+              case _                                      => (t, Nil)
+            }
+
+            val vdef = ValDef(NoMods, pname, tpt, EmptyTree)
+            ExistentialTypeTree(singleton, vdef :: whereClauses)
+          }
+          else SelectFromTypeTree(t, name)
+        )
       }
       def simpleTypeRest(t: Tree): Tree = in.token match {
         case HASH     => simpleTypeRest(typeProjection(t))
@@ -1793,14 +1835,6 @@ self =>
         var top = simplePattern(badPattern3)
         // after peekahead
         def acceptWildStar() = atPos(top.pos.startOrPoint, in.prev.offset)(Star(stripParens(top)))
-        def peekahead() = {
-          in.prev copyFrom in
-          in.nextToken()
-        }
-        def pushback() = {
-          in.next copyFrom in
-          in copyFrom in.prev
-        }
         // See SI-3189, SI-4832 for motivation. Cf SI-3480 for counter-motivation.
         // TODO: dredge out the remnants of regexp patterns.
         // /{/ peek for _*) or _*} (for xml escape)
