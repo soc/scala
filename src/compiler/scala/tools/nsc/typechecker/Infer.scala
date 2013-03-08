@@ -625,20 +625,14 @@ trait Infer extends Checkable {
     *
     *  @throws                  NoInstance
     */
-    def methTypeArgs(tparams: List[Symbol], formals0: List[Type], restpe: Type,
-                     argtpes0: List[Type], pt: Type): AdjustedTypeArgs.Result = {
-      if (!sameLength(formals0, argtpes0))
+    def methTypeArgs(tparams: List[Symbol], formals: List[Type], restpe: Type,
+                     argtpes: List[Type], pt: Type): AdjustedTypeArgs.Result = {
+      val tvars = tparams map freshVar
+      if (!sameLength(formals, argtpes))
         throw new NoInstance("parameter lists differ in length")
 
-      println(s"methTypeArgs($tparams, $formals0, $restpe, $argtpes0, $pt")
+      val restpeInst = restpe.instantiateTypeParams(tparams, tvars)
 
-        // def protoTypeArgs(tparams: List[Symbol], formals: List[Type], restpe: Type,
-        //                   pt: Type): List[Type] = {
-
-      val tvars = tparams map freshVar
-      def substitute(tp: Type): Type = tp.instantiateTypeParams(tparams, tvars)
-
-      val restpeInst = substitute(restpe)
       // first check if typevars can be fully defined from the expected type.
       // The return value isn't used so I'm making it obvious that this side
       // effects, because a function called "isXXX" is not the most obvious
@@ -655,24 +649,25 @@ trait Infer extends Checkable {
       //
       // throw new DeferredNoInstance(() =>
       //   "result type " + normalize(restpe) + " is incompatible with expected type " + pt)
-      // tvars filterNot isFullyDefined foreach (_.constr.inst = NoType)
-      tvars foreach (_.constr.inst = NoType)
+
+      for (tvar <- tvars)
+        if (!isFullyDefined(tvar)) tvar.constr.inst = NoType
 
       // Then define remaining type variables from argument types.
-      val argtpes = argtpes0 map (arg => substitute(arg.deconst))
-      val formals = formals0 map substitute
+      map2(argtpes, formals) { (argtpe, formal) =>
+        val tp1 = argtpe.deconst.instantiateTypeParams(tparams, tvars)
+        val pt1 = formal.instantiateTypeParams(tparams, tvars)
 
-      foreach2(argtpes, formals)((arg, formal) =>
         // Note that isCompatible side-effects: subtype checks involving typevars
         // are recorded in the typevar's bounds (see TypeConstraint)
-        if (!isCompatible(arg, formal)) {
+        if (!isCompatible(tp1, pt1)) {
           throw new DeferredNoInstance(() =>
-            "argument expression's type is not compatible with formal parameter type" + foundReqMsg(arg, formal))
+            "argument expression's type is not compatible with formal parameter type" + foundReqMsg(tp1, pt1))
         }
-      )
+      }
       val targs = solvedTypes(
-        tvars, tparams, tparams map varianceInTypes(formals0),
-        upper = false, lubDepth(formals0) max lubDepth(argtpes0)
+        tvars, tparams, tparams map varianceInTypes(formals),
+        upper = false, lubDepth(formals) max lubDepth(argtpes)
       )
       // Can warn about inferring Any/AnyVal as long as they don't appear
       // explicitly anywhere amongst the formal, argument, result, or expected type.
@@ -693,7 +688,7 @@ trait Infer extends Checkable {
           }
         )
       }
-      adjustTypeArgs(tparams, tvars, targs, substitute(restpe))
+      adjustTypeArgs(tparams, tvars, targs, restpe)
     }
 
     /** One must step carefully when assessing applicability due to
