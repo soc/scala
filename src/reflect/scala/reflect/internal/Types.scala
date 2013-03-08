@@ -778,9 +778,21 @@ trait Types extends api.Types { self: SymbolTable =>
     /** Substitute types `to` for occurrences of references to
      *  symbols `from` in this type.
      */
-    def subst(from: List[Symbol], to: List[Type]): Type =
+    def subst(from: List[Symbol], to: List[Type]): Type = /*printResult(s"$this.subst($from, $to)")*/ {
       if (from.isEmpty) this
       else new SubstTypeMap(from, to) apply this
+      // {
+      //   val substmap = new SubstTypeMap(from, to)
+      //   val args1 = typeArgs map substmap
+
+
+      //   val res = new SubstTypeMap(from, to) apply this
+      //   if (this ne res)
+      //     println(s"$this.subst($from, $to) == $res")
+
+      //   res
+      // }
+    }
 
     /** Substitute symbols `to` for occurrences of symbols `from` in this type.
      *
@@ -2084,6 +2096,27 @@ trait Types extends api.Types { self: SymbolTable =>
     /** No unapplied type params size it has (should have) equally as many args. */
     override def isHigherKinded = false
     override def typeParams = Nil
+
+    override def subst(from: List[Symbol], to: List[Type]): Type = {
+      if (from.isEmpty) this
+      else {
+        println(s"subst($from, $to)")
+        this foreach (x => println("    " + x))
+
+        val substmap = new SubstTypeMap(from, to)
+        val res = this map substmap
+
+        // val substmap = new SubstTypeMap(from, to)
+        // val args1    = args map substmap
+        // val tcon     = substmap(typeConstructor)
+        // val res      = appliedType(tcon, args1)
+        // val res = new SubstTypeMap(from, to) apply this
+        if (this ne res)
+          println(s"$this.subst($from, $to) == $res")
+
+        res
+      }
+    }
 
     override def transform(tp: Type): Type = {
       // This situation arises when a typevar is encountered for which
@@ -4610,14 +4643,18 @@ trait Types extends api.Types { self: SymbolTable =>
         // we must replace the a in Iterable[a] by (a,b)
         // (must not recurse --> loops)
         // 3) replacing m by List in m[Int] should yield List[Int], not just List
-        case TypeRef(NoPrefix, sym, args) =>
-          val tcon = substFor(sym)
-          if ((tp eq tcon) || args.isEmpty) tcon
-          else appliedType(tcon.typeConstructor, args)
-        case SingleType(NoPrefix, sym) =>
+        case TypeRef(_, sym, args) =>
+          val args1 = args mapConserve this
+          val tcon  = substFor(sym)
+          if (args.isEmpty) tcon
+          else {
+            val tp1 = appliedType(sym.typeConstructor, args1)
+            if (tp ne tp1) apply(tp1) else tp
+          }
+        case SingleType(_, sym) =>
           substFor(sym)
         case _ =>
-          tp
+          mapOver(tp)
       }
     }
   }

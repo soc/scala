@@ -167,7 +167,7 @@ trait Infer extends Checkable {
    */
   object instantiate extends TypeMap {
     private var excludedVars = immutable.Set[TypeVar]()
-    def apply(tp: Type): Type = tp match {
+    def apply(tp: Type): Type = /*printResult(s"instantiate($tp)")*/(tp match {
       case WildcardType | BoundedWildcardType(_) | NoType =>
         throw new NoInstance("undetermined type")
       case tv @ TypeVar(origin, constr) if !tv.untouchable =>
@@ -183,7 +183,7 @@ trait Infer extends Checkable {
         }
       case _ =>
         mapOver(tp)
-    }
+    })
   }
 
   /** Is type fully defined, i.e. no embedded anytypes or wildcards in it?
@@ -639,6 +639,11 @@ trait Infer extends Checkable {
       // side effecter.
       isConservativelyCompatible(restpeInst, pt)
 
+      println("\nrestpe")
+      restpe foreach println
+      println("\nrestpeInst")
+      restpeInst foreach println
+
       // Return value unused with the following explanation:
       //
       // Just wait and instantiate from the arguments.  That way,
@@ -650,8 +655,13 @@ trait Infer extends Checkable {
       // throw new DeferredNoInstance(() =>
       //   "result type " + normalize(restpe) + " is incompatible with expected type " + pt)
 
-      for (tvar <- tvars)
-        if (!isFullyDefined(tvar)) tvar.constr.inst = NoType
+      for (tvar <- tvars) {
+        if (!isFullyDefined(tvar)) {
+          println("Reset " + tvar + " / " + tvar.constr.inst)
+          tvar foreach (tp => println("  " + tp))
+          tvar.constr.inst = NoType
+        }
+      }
 
       // Then define remaining type variables from argument types.
       map2(argtpes, formals) { (argtpe, formal) =>
