@@ -2949,7 +2949,7 @@ trait Types extends api.Types { self: SymbolTable =>
 
     /** This is the only place TypeVars should be instantiated.
      */
-    private def createTypeVar(origin: Type, constr: TypeConstraint, args: List[Type], params: List[Symbol], untouchable: Boolean): TypeVar = {
+    private def createTypeVar(origin: Type, constr: TypeConstraint, args: List[Type], params: List[Symbol], untouchable: Boolean): TypeVar = util.Origins("createTypeVar", 10)(printResult(s"createTypeVar($origin, $constr, $args, $params, $untouchable") {
       val tv = (
         if (args.isEmpty && params.isEmpty) {
           if (untouchable) new TypeVar(origin, constr) with UntouchableTypeVar
@@ -2967,7 +2967,7 @@ trait Types extends api.Types { self: SymbolTable =>
       )
 
       trace("create", "In " + tv.originLocation)(tv)
-    }
+    })
     private def createTypeVar(tparam: Symbol, untouchable: Boolean): TypeVar =
       createTypeVar(tparam.tpeHK, deriveConstraint(tparam), Nil, tparam.typeParams, untouchable)
   }
@@ -4569,21 +4569,28 @@ trait Types extends api.Types { self: SymbolTable =>
     assert(sameLength(from, to), "Unsound substitution from "+ from +" to "+ to)
 
     /** Are `sym` and `sym1` the same? Can be tuned by subclasses. */
-    protected def matches(sym: Symbol, sym1: Symbol): Boolean = sym eq sym1
+    protected def matches(sym: Symbol, sym1: Symbol): Boolean = (
+         (sym eq sym1)
+      || (sym.isTypeParameter && sym1.isTypeParameter && (sym.owner == sym1.owner) && (sym.name == sym1.name) && { println("Got one: " + ((sym, sym1))) ; true })
+    )
 
     /** Map target to type, can be tuned by subclasses */
     protected def toType(fromtp: Type, tp: T): Type
 
-    protected def renameBoundSyms(tp: Type): Type = tp match {
+    protected def renameBoundSyms(tp: Type): Type = printResult(s"renameBoundSyms($tp)")(tp match {
       case MethodType(ps, restp) =>
         createFromClonedSymbols(ps, restp)((ps1, tp1) => copyMethodType(tp, ps1, renameBoundSyms(tp1)))
       case PolyType(bs, restp) =>
         createFromClonedSymbols(bs, restp)((ps1, tp1) => PolyType(ps1, renameBoundSyms(tp1)))
       case ExistentialType(bs, restp) =>
         createFromClonedSymbols(bs, restp)(newExistentialType)
-      case _ =>
-        tp
-    }
+      case _ => tp
+        // if (isDummyAppliedType(tp)) {
+        //   println(s"dummies in $tp")
+        //   tp
+        // }
+        // else tp
+    })
 
     @tailrec private def subst(tp: Type, sym: Symbol, from: List[Symbol], to: List[T]): Type = (
       if (from.isEmpty) tp
@@ -4594,9 +4601,10 @@ trait Types extends api.Types { self: SymbolTable =>
 
     def apply(tp0: Type): Type = if (from.isEmpty) tp0 else {
       val boundSyms             = tp0.boundSyms
+      // val tp1 = renameBoundSyms(tp0)
       val tp1                   = if (boundSyms.nonEmpty && (boundSyms exists from.contains)) renameBoundSyms(tp0) else tp0
       val tp                    = mapOver(tp1)
-      def substFor(sym: Symbol) = subst(tp, sym, from, to)
+      def substFor(sym: Symbol) = printResult(s"substFor($sym)")(subst(tp, sym, from, to))
 
       tp match {
         // @M
@@ -4613,7 +4621,8 @@ trait Types extends api.Types { self: SymbolTable =>
         case TypeRef(NoPrefix, sym, args) =>
           val tcon = substFor(sym)
           if ((tp eq tcon) || args.isEmpty) tcon
-          else appliedType(tcon.typeConstructor, args)
+          else appliedType(tcon.typeConstructor, args mapConserve this)
+          // else printResult(s"SubstMap($from, $to).apply($tp0)/")(appliedType(tcon.typeConstructor, args mapConserve this))
         case SingleType(NoPrefix, sym) =>
           substFor(sym)
         case _ =>
