@@ -189,6 +189,7 @@ trait Variances {
       case PolyType(tparams, restpe)                    => inSyms(tparams).flip        & inType(restpe)
       case ExistentialType(tparams, restpe)             => inSyms(tparams)             & inType(restpe)
       case AnnotatedType(annots, tp, _)                 => inTypes(annots map (_.atp)) & inType(tp)
+      case TypeVar(origin, _)                           => inType(origin)
     }
 
     inType(tp)

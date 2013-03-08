@@ -4577,7 +4577,7 @@ trait Types extends api.Types { self: SymbolTable =>
     )
 
     /** Are `sym` and `sym1` the same? Can be tuned by subclasses. */
-    protected def matches(sym: Symbol, sym1: Symbol): Boolean = (sym eq sym1) || sameTypeParameter(sym, sym1)
+    protected def matches(sym: Symbol, sym1: Symbol): Boolean = (sym eq sym1)// || sameTypeParameter(sym, sym1)
 
     /** Map target to type, can be tuned by subclasses */
     protected def toType(fromtp: Type, tp: T): Type
@@ -4621,7 +4621,7 @@ trait Types extends api.Types { self: SymbolTable =>
         case TypeRef(NoPrefix, sym, args) =>
           val tcon = substFor(sym)
           if ((tp eq tcon) || args.isEmpty) tcon
-          else appliedType(tcon.typeConstructor, args mapConserve this)
+          else appliedType(tcon.typeConstructor, args)
         case SingleType(NoPrefix, sym) =>
           substFor(sym)
         case _ =>

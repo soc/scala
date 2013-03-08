@@ -627,32 +627,10 @@ trait Infer extends Checkable {
     */
     def methTypeArgs(tparams: List[Symbol], formals: List[Type], restpe: Type,
                      argtpes: List[Type], pt: Type): AdjustedTypeArgs.Result = {
-      val tvars = tparams map freshVar
       if (!sameLength(formals, argtpes))
         throw new NoInstance("parameter lists differ in length")
 
-      val restpeInst = restpe.instantiateTypeParams(tparams, tvars)
-
-      // first check if typevars can be fully defined from the expected type.
-      // The return value isn't used so I'm making it obvious that this side
-      // effects, because a function called "isXXX" is not the most obvious
-      // side effecter.
-      isConservativelyCompatible(restpeInst, pt)
-
-      // Return value unused with the following explanation:
-      //
-      // Just wait and instantiate from the arguments.  That way,
-      // we can try to apply an implicit conversion afterwards.
-      // This case could happen if restpe is not fully defined, so the
-      // search for an implicit from restpe => pt fails due to ambiguity.
-      // See #347.  Therefore, the following two lines are commented out.
-      //
-      // throw new DeferredNoInstance(() =>
-      //   "result type " + normalize(restpe) + " is incompatible with expected type " + pt)
-
-      for (tvar <- tvars)
-        if (!isFullyDefined(tvar)) tvar.constr.inst = NoType
-
+      val tvars = tparams map freshVar
       // Then define remaining type variables from argument types.
       map2(argtpes, formals) { (argtpe, formal) =>
         val tp1 = argtpe.deconst.instantiateTypeParams(tparams, tvars)
