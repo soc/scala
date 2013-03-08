@@ -4568,8 +4568,16 @@ trait Types extends api.Types { self: SymbolTable =>
   abstract class SubstMap[T](from: List[Symbol], to: List[T]) extends TypeMap {
     assert(sameLength(from, to), "Unsound substitution from "+ from +" to "+ to)
 
+    private def sameTypeParameter(sym: Symbol, sym1: Symbol): Boolean = (
+         sym.isTypeParameter
+      && sym1.isTypeParameter
+      && (sym.owner == sym1.owner)
+      && (sym.name == sym1.name)
+      && printResult(s"Same type parameter $sym $sym1")(true)
+    )
+
     /** Are `sym` and `sym1` the same? Can be tuned by subclasses. */
-    protected def matches(sym: Symbol, sym1: Symbol): Boolean = sym eq sym1
+    protected def matches(sym: Symbol, sym1: Symbol): Boolean = (sym eq sym1) || sameTypeParameter(sym, sym1)
 
     /** Map target to type, can be tuned by subclasses */
     protected def toType(fromtp: Type, tp: T): Type
@@ -4613,7 +4621,7 @@ trait Types extends api.Types { self: SymbolTable =>
         case TypeRef(NoPrefix, sym, args) =>
           val tcon = substFor(sym)
           if ((tp eq tcon) || args.isEmpty) tcon
-          else appliedType(tcon.typeConstructor, args)
+          else appliedType(tcon.typeConstructor, args mapConserve this)
         case SingleType(NoPrefix, sym) =>
           substFor(sym)
         case _ =>
