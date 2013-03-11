@@ -225,7 +225,7 @@ trait ProcessImplicits {
     * from string to a process. Importantly, tags are completely ignored, so
     * they cannot be used to separate parameters.
     */
-  implicit def xmlToProcess(command: scala.xml.Elem): ProcessBuilder      = apply(command)
+  // implicit def xmlToProcess(command: scala.xml.Elem): ProcessBuilder      = apply(command)
 
   /** Implicitly convert a `String` into a [[scala.sys.process.ProcessBuilder]]. */
   implicit def stringToProcess(command: String): ProcessBuilder           = apply(command)

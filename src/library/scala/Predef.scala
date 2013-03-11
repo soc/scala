@@ -135,7 +135,7 @@ object Predef extends LowPriorityImplicits with DeprecatedPredef {
   @inline def locally[T](x: T): T  = x    // to communicate intent and avoid unmoored statements
 
   // Apparently needed for the xml library
-  val $scope = scala.xml.TopScope
+  val $scope: String = null // scala.xml.TopScope
 
   // errors and asserts -------------------------------------------------
 
