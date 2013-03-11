@@ -133,7 +133,7 @@ trait ProcessCreation {
     * apply(<x> {dxPath.absolutePath} --dex --output={classesDexPath.absolutePath} {classesMinJarPath.absolutePath}</x>)
     * }}}
     */
-  def apply(command: scala.xml.Elem): ProcessBuilder  = apply(command.text.trim)
+  // def apply(command: scala.xml.Elem): ProcessBuilder  = apply(command.text.trim)
 
   /** Creates a [[scala.sys.process.ProcessBuilder]] from a `Boolean`. This can be
     * to force an exit value.

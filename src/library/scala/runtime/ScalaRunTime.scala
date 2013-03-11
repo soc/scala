@@ -15,9 +15,7 @@ import scala.collection.immutable.{ StringLike, NumericRange, List, Stream, Nil,
 import scala.collection.generic.{ Sorted }
 import scala.reflect.{ ClassTag, classTag }
 import scala.util.control.ControlThrowable
-import scala.xml.{ Node, MetaData }
 import java.lang.{ Class => jClass }
-
 import java.lang.Double.doubleToLongBits
 import java.lang.reflect.{ Modifier, Method => JMethod }
 
@@ -278,7 +276,7 @@ object ScalaRunTime {
     // When doing our own iteration is dangerous
     def useOwnToString(x: Any) = x match {
       // Node extends NodeSeq extends Seq[Node] and MetaData extends Iterable[MetaData]
-      case _: Node | _: MetaData => true
+      case xs: Iterable[_] if xs.getClass.getName.startsWith("scala.xml.") => true
       // Range/NumericRange have a custom toString to avoid walking a gazillion elements
       case _: Range | _: NumericRange[_] => true
       // Sorted collections to the wrong thing (for us) on iteration - ticket #3493

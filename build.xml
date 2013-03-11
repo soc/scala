@@ -996,7 +996,30 @@ QUICK BUILD (QUICK)
     <stopwatch name="quick.lib.timer" action="total"/>
   </target>
 
-  <target name="quick.pre-reflect" depends="quick.lib">
+  <target name="quick.pre-xml" depends="quick.lib">
+    <uptodate property="quick.xml.available" targetfile="${build-quick.dir}/xml.complete">
+      <srcfiles dir="${src.dir}/xml"/>
+    </uptodate>
+  </target>
+
+  <target name="quick.xml" depends="quick.pre-xml" unless="quick.xml.available">
+    <mkdir dir="${build-quick.dir}/classes/xml"/>
+    <scalacfork
+      destdir="${build-quick.dir}/classes/xml"
+      compilerpathref="locker.classpath"
+      params="${scalac.args.quick}"
+      srcdir="${src.dir}/xml"
+      jvmargs="${scalacfork.jvmargs}">
+      <include name="**/*.scala"/>
+      <compilationpath>
+        <pathelement location="${build-quick.dir}/classes/library"/>
+        <pathelement location="${build-quick.dir}/classes/xml"/>
+      </compilationpath>
+    </scalacfork>
+    <touch file="${build-quick.dir}/xml.complete" verbose="no"/>
+  </target>
+
+  <target name="quick.pre-reflect" depends="quick.xml">
     <uptodate property="quick.reflect.available" targetfile="${build-quick.dir}/reflect.complete">
       <srcfiles dir="${src.dir}">
         <include name="reflect/**"/>
