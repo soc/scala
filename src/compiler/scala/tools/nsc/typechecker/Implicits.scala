@@ -18,6 +18,7 @@ import scala.util.matching.Regex
 import symtab.Flags._
 import scala.reflect.internal.util.Statistics
 import scala.language.implicitConversions
+import scala.reflect.internal.util.Origins
 
 /** This trait provides methods to find various kinds of implicits.
  *
@@ -268,9 +269,60 @@ trait Implicits {
    */
   object Function1 {
     val Sym = FunctionClass(1)
-    def unapply(tp: Type) = tp baseType Sym match {
+    val users = mutable.Map[Type, Int]() withDefaultValue 0
+    val nanos = mutable.Map[String, Long]() withDefaultValue 0L
+    scala.sys addShutdownHook {
+      for ((who, ns) <- nanos.toList.sortBy(_._1))
+        println(f"$who%10s ${ns / 1e6}%.3f ms")
+
+      println(s"\n${users.values.sum} calls to Function1.unapply\n")
+
+      users.toList.sortBy(-_._2).take(50) foreach { case (k, v) =>
+        println(f"$k%70s  $v%-5d calls")
+      }
+    }
+    def op[T](who: String)(op: => T): T = {
+      val start = System.nanoTime
+      try op finally nanos(who) += (System.nanoTime - start)
+    }
+
+    def unapply1(tp: Type) = tp baseType Sym match {
       case TypeRef(_, Sym, arg1 :: arg2 :: _) => Some((arg1, arg2))
       case _                                  => None
+    }
+    def unapply2(tp: Type) = tp match {
+      case TypeRef(_, Sym, arg1 :: arg2 :: _) => Some((arg1, arg2))
+      case _                                  => None
+    }
+    def unapply3(tp: Type) = {
+      tp match {
+        case TypeRef(_, Sym, x1 :: x2 :: Nil) => Some((x1, x2))
+        case _                                =>
+          tp baseType Sym match {
+            case TypeRef(_, Sym, arg1 :: arg2 :: _) => Some((arg1, arg2))
+            case _                                  => None
+          }
+      }
+    }
+
+    final def unapplyN(tp: Type, n: Int) = n match {
+      case 1 => op("unapply1")(unapply1(tp))
+      case 2 => op("unapply2")(unapply2(tp))
+      case 3 => op("unapply3")(unapply3(tp))
+    }
+
+    def unapply(tp: Type) = Origins("Function1#unapply", 3) {
+      users(tp) += 1
+      val order = scala.util.Random.shuffle(List(1, 2, 3))
+      val results = order map (unapplyN(tp, _))
+      if (results.distinct.size > 1) {
+        val loser = order zip results collectFirst { case (n, None) => n } getOrElse -1
+        val winner = order zip results collectFirst { case (_, Some(x)) => x } getOrElse "???"
+        Origins("Overlook", 5) {
+          println(s"  loser $loser overlooks winner $winner")
+        }
+      }
+      results.head
     }
   }
 
