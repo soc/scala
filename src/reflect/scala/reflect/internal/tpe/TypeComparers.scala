@@ -465,7 +465,6 @@ trait TypeComparers {
     def thirdTryRef(tp1: Type, tp2: TypeRef): Boolean = {
       val sym2 = tp2.sym
       sym2 match {
-        case NotNullClass => tp1.isNotNull
         case SingletonClass => tp1.isStable || fourthTry
         case _: ClassSymbol =>
           if (isRawType(tp2))
@@ -490,7 +489,7 @@ trait TypeComparers {
 
     /** Third try, on the right:
       *   - decompose refined types.
-      *   - handle typerefs, existentials, and notnull types.
+      *   - handle typerefs and existentials.
       *   - handle left+right method types, polytypes, typebounds
       */
     def thirdTry = tp2 match {
@@ -501,8 +500,6 @@ trait TypeComparers {
           (rt2.decls forall (specializesSym(tp1, _, depth)))
       case et2: ExistentialType =>
         et2.withTypeVars(isSubType(tp1, _, depth), depth) || fourthTry
-      case nn2: NotNullType =>
-        tp1.isNotNull && isSubType(tp1, nn2.underlying, depth)
       case mt2: MethodType =>
         tp1 match {
           case mt1 @ MethodType(params1, res1) =>
@@ -536,7 +533,7 @@ trait TypeComparers {
     }
 
     /** Fourth try, on the left:
-      *   - handle typerefs, refined types, notnull and singleton types.
+      *   - handle typerefs, refined types, and singleton types.
       */
     def fourthTry = tp1 match {
       case tr1 @ TypeRef(pre1, sym1, _) =>
@@ -572,7 +569,7 @@ trait TypeComparers {
         }
       case RefinedType(parents1, _) =>
         parents1 exists (isSubType(_, tp2, depth))
-      case _: SingletonType | _: NotNullType =>
+      case _: SingletonType =>
         isSubType(tp1.underlying, tp2, depth)
       case _ =>
         false

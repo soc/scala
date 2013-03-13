@@ -1317,16 +1317,15 @@ trait Typers extends Adaptations with Tags {
      */
     def adaptToMemberWithArgs(tree: Tree, qual: Tree, name: Name, mode: Mode, reportAmbiguous: Boolean, saveErrors: Boolean): Tree = {
       def onError(reportError: => Tree): Tree = context.tree match {
-          case Apply(tree1, args) if (tree1 eq tree) && args.nonEmpty =>
+        case Apply(tree1, args) if (tree1 eq tree) && args.nonEmpty =>
           ( silent   (_.typedArgs(args, mode))
                  map (_.asInstanceOf[List[Tree]])
               filter (xs => !(xs exists (_.isErrorTyped)))
                  map (xs => adaptToArguments(qual, name, xs, WildcardType, reportAmbiguous, saveErrors))
               orElse ( _ => reportError)
           )
-              case _            =>
-                reportError
-            }
+        case _ => reportError
+      }
 
       silent(_.adaptToMember(qual, HasMember(name), reportAmbiguous = false)) orElse (err =>
         onError {
@@ -1334,7 +1333,7 @@ trait Typers extends Adaptations with Tags {
           setError(tree)
         }
       )
-      }
+    }
 
     /** Try to apply an implicit conversion to `qual` to that it contains a
      *  member `name` of arbitrary type.
@@ -3035,8 +3034,8 @@ trait Typers extends Adaptations with Tags {
 
     def doTypedApply(tree: Tree, fun0: Tree, args: List[Tree], mode: Mode, pt: Type): Tree = {
       // TODO_NMT: check the assumption that args nonEmpty
-      def duplErrTree = setError(treeCopy.Apply(tree, fun0, args))
-      def duplErrorTree(err: AbsTypeError) = { issue(err); duplErrTree }
+      def dupTree                         = dupTreeAndSetError(tree, fun0, args)
+      def dupErrorTree(err: AbsTypeError) = issueAndSetError(err, dupTree)
 
       def preSelectOverloaded(fun: Tree): Tree = {
         if (fun.hasSymbolField && fun.symbol.isOverloaded) {
@@ -3152,24 +3151,24 @@ trait Typers extends Adaptations with Tags {
 
             def checkNotMacro() = {
               if (treeInfo.isMacroApplication(fun))
-                tryTupleApply getOrElse duplErrorTree(NamedAndDefaultArgumentsNotSupportedForMacros(tree, fun))
+                tryTupleApply getOrElse dupErrorTree(NamedAndDefaultArgumentsNotSupportedForMacros(tree, fun))
             }
 
-            if (mt.isErroneous) duplErrTree
+            if (mt.isErroneous) dupTree
             else if (mode.inPatternMode) {
               // #2064
-              duplErrorTree(WrongNumberOfArgsError(tree, fun))
+              dupErrorTree(WrongNumberOfArgsError(tree, fun))
             } else if (lencmp > 0) {
-              tryTupleApply getOrElse duplErrorTree(TooManyArgsNamesDefaultsError(tree, fun))
+              tryTupleApply getOrElse dupErrorTree(TooManyArgsNamesDefaultsError(tree, fun))
             } else if (lencmp == 0) {
               // we don't need defaults. names were used, so this application is transformed
               // into a block (@see transformNamedApplication in NamesDefaults)
               val (namelessArgs, argPos) = removeNames(Typer.this)(args, params)
               if (namelessArgs exists (_.isErroneous)) {
-                duplErrTree
+                dupTree
               } else if (!allArgsArePositional(argPos) && !sameLength(formals, params))
                 // !allArgsArePositional indicates that named arguments are used to re-order arguments
-                duplErrorTree(MultipleVarargError(tree))
+                dupErrorTree(MultipleVarargError(tree))
               else if (allArgsArePositional(argPos) && !isNamedApplyBlock(fun)) {
                 // if there's no re-ordering, and fun is not transformed, no need to transform
                 // more than an optimization, e.g. important in "synchronized { x = update-x }"
@@ -3186,7 +3185,7 @@ trait Typers extends Adaptations with Tags {
               //  foo[Int](a)()  ==>  foo[Int](a)(b = foo$qual.foo$default$2[Int](a))
               checkNotMacro()
               val fun1 = transformNamedApplication(Typer.this, mode, pt)(fun, x => x)
-              if (fun1.isErroneous) duplErrTree
+              if (fun1.isErroneous) dupTree
               else {
                 assert(isNamedApplyBlock(fun1), fun1)
                 val NamedApplyInfo(qual, targs, previousArgss, _) = context.namedApplyBlockInfo.get._2
@@ -3203,17 +3202,17 @@ trait Typers extends Adaptations with Tags {
                 val lencmp2 = compareLengths(allArgs, formals)
 
                 if (!sameLength(allArgs, args) && callToCompanionConstr(context, funSym)) {
-                  duplErrorTree(ModuleUsingCompanionClassDefaultArgsErrror(tree))
+                  dupErrorTree(ModuleUsingCompanionClassDefaultArgsErrror(tree))
                 } else if (lencmp2 > 0) {
                   removeNames(Typer.this)(allArgs, params) // #3818
-                  duplErrTree
+                  dupTree
                 } else if (lencmp2 == 0) {
                   // useful when a default doesn't match parameter type, e.g. def f[T](x:T="a"); f[Int]()
                   val note = "Error occurred in an application involving default arguments."
                   if (!(context.diagnostic contains note)) context.diagnostic = note :: context.diagnostic
                   doTypedApply(tree, if (blockIsEmpty) fun else fun1, allArgs, mode, pt)
                 } else {
-                  tryTupleApply getOrElse duplErrorTree(NotEnoughArgsError(tree, fun, missing))
+                  tryTupleApply getOrElse dupErrorTree(NotEnoughArgsError(tree, fun, missing))
                 }
               }
             }
@@ -3297,7 +3296,7 @@ trait Typers extends Adaptations with Tags {
                   } else arg1
                 }
                 val args1 = map2(args, formals)(typedArgToPoly)
-                if (args1 exists { _.isErrorTyped }) duplErrTree
+                if (args1 exists { _.isErrorTyped }) dupTree
                 else {
                   debuglog("infer method inst " + fun + ", tparams = " + tparams + ", args = " + args1.map(_.tpe) + ", pt = " + pt + ", lobounds = " + tparams.map(_.tpe.bounds.lo) + ", parambounds = " + tparams.map(_.info)) //debug
                   // define the undetparams which have been fixed by this param list, replace the corresponding symbols in "fun"
@@ -3312,7 +3311,7 @@ trait Typers extends Adaptations with Tags {
           }
 
         case SingleType(_, _) =>
-          doTypedApply(tree, fun setType fun.tpe.widen, args, mode, pt)
+          doTypedApply(tree, fun modifyType (_.widen), args, mode, pt)
 
         case ErrorType =>
           if (!tree.isErrorTyped) setError(tree) else tree
@@ -3322,19 +3321,31 @@ trait Typers extends Adaptations with Tags {
           doTypedUnapply(tree, fun0, fun, args, mode, pt)
 
         case _ =>
-          if (treeInfo.isMacroApplication(tree)) duplErrorTree(MacroTooManyArgumentListsError(tree, fun.symbol))
-          else duplErrorTree(ApplyWithoutArgsError(tree, fun))
+          dupErrorTree(
+            if (treeInfo.isMacroApplication(tree))
+              MacroTooManyArgumentListsError(tree, fun.symbol)
+            else
+              ApplyWithoutArgsError(tree, fun)
+          )
       }
     }
 
+    def dupTreeAndSetError(tree: Tree, fun: Tree, args: List[Tree]): Tree =
+      setError(treeCopy.Apply(tree, fun, args))
+
+    def issueAndSetError(err: AbsTypeError, errTree: => Tree): Tree = {
+      issue(err)
+      errTree
+    }
+
     def doTypedUnapply(tree: Tree, fun0: Tree, fun: Tree, args: List[Tree], mode: Mode, pt: Type): Tree = {
-      def duplErrTree = setError(treeCopy.Apply(tree, fun0, args))
-      def duplErrorTree(err: AbsTypeError) = { issue(err); duplErrTree }
+      def dupTree                         = dupTreeAndSetError(tree, fun0, args)
+      def dupErrorTree(err: AbsTypeError) = issueAndSetError(err, dupTree)
 
       val otpe = fun.tpe
 
       if (args.length > MaxTupleArity)
-        return duplErrorTree(TooManyArgsPatternError(fun))
+        return dupErrorTree(TooManyArgsPatternError(fun))
 
       //
       def freshArgType(tp: Type): (List[Symbol], Type) = tp match {
@@ -3379,26 +3390,29 @@ trait Typers extends Adaptations with Tags {
       // clearing the type is necessary so that ref will be stabilized; see bug 881
       val fun1 = typedPos(fun.pos)(Apply(Select(fun.clearType(), unapp), List(arg)))
 
-      if (fun1.tpe.isErroneous) duplErrTree
+      if (fun1.tpe.isErroneous) dupTree
       else {
-        val resTp     = fun1.tpe.finalResultType.dealiasWiden
-        val nbSubPats = args.length
+        val resTp = fun1.tpe.finalResultType.dealiasWiden
 
-        val (formals, formalsExpanded) = extractorFormalTypes(fun0.pos, resTp, nbSubPats, fun1.symbol)
-        if (formals == null) duplErrorTree(WrongNumberOfArgsError(tree, fun))
-        else {
-          val args1 = typedArgs(args, mode, formals, formalsExpanded)
-          val pt1 = if (isFullyDefined(pt)) pt else makeFullyDefined(pt) // SI-1048
+        extractorFormalTypes(fun0.pos, resTp, args.length, fun1.symbol) match {
+          case (null, _)                  =>
+            dupErrorTree(WrongNumberOfArgsError(tree, fun))
+          case (formals, formalsExpanded) =>
+            val args1 = typedArgs(args, mode, formals, formalsExpanded)
+            val pt1   = if (isFullyDefined(pt)) pt else makeFullyDefined(pt) // SI-1048
+            val itype = glb(List(pt1, arg.tpe))
 
-          val itype = glb(List(pt1, arg.tpe))
-          arg setType pt1    // restore type (arg is a dummy tree, just needs to pass typechecking)
-          val unapply = UnApply(fun1, args1) setPos tree.pos setType itype
-
-          // if the type that the unapply method expects for its argument is uncheckable, wrap in classtag extractor
-          // skip if the unapply's type is not a method type with (at least, but really it should be exactly) one argument
-          // also skip if we already wrapped a classtag extractor (so we don't keep doing that forever)
-          if (uncheckedTypeExtractor.isEmpty || fun1.symbol.owner.isNonBottomSubClass(ClassTagClass)) unapply
-          else wrapClassTagUnapply(unapply, uncheckedTypeExtractor.get, unappType.paramTypes.head)
+            arg setType pt1 // restore type (arg is a dummy tree, just needs to pass typechecking)
+            val unapply = UnApply(fun1, args1) setPos tree.pos setType itype
+            // if the type that the unapply method expects for its argument is uncheckable, wrap in classtag extractor
+            // skip if the unapply's type is not a method type with (at least, but really it should be exactly) one argument
+            // also skip if we already wrapped a classtag extractor (so we don't keep doing that forever)
+            uncheckedTypeExtractor match {
+              case Some(extractor) if !(fun1.symbol.owner isNonBottomSubClass ClassTagClass) =>
+                wrapClassTagUnapply(unapply, extractor, unappType.paramTypes.head)
+              case _ =>
+                unapply
+            }
         }
       }
     }
@@ -4184,11 +4198,11 @@ trait Typers extends Adaptations with Tags {
 
       def typedArrayValue(tree: ArrayValue) = {
         val elemtpt1 = typedType(tree.elemtpt, mode)
-        val elems1 = tree.elems mapConserve (elem => typed(elem, mode, elemtpt1.tpe))
-        treeCopy.ArrayValue(tree, elemtpt1, elems1)
-          .setType(
-            (if (isFullyDefined(pt) && !phase.erasedTypes) pt
-             else arrayType(elemtpt1.tpe)).notNull)
+        val elems1   = tree.elems mapConserve (elem => typed(elem, mode, elemtpt1.tpe))
+        // see run/t6126 for an example where `pt` does not suffice (tagged types)
+        val tpe1     = if (isFullyDefined(pt) && !phase.erasedTypes) pt else arrayType(elemtpt1.tpe)
+
+        treeCopy.ArrayValue(tree, elemtpt1, elems1) setType tpe1
       }
 
       def typedAssign(lhs: Tree, rhs: Tree): Tree = {
@@ -4406,63 +4420,46 @@ trait Typers extends Adaptations with Tags {
         }
       }
 
-      /** Try to apply function to arguments; if it does not work, try to convert Java raw to existentials, or try to
-       *  insert an implicit conversion.
+      /** (1) Try to apply function `fun` to arguments `args`.
+       *  (2) If that fails, try to convert a java raw type to an existential.
+       *  (3) If that fails, try inserting an implicit conversion.
+       *  (4) Otherwise, issue type error.
        */
       def tryTypedApply(fun: Tree, args: List[Tree]): Tree = {
+        // See SI-4712 for a motivating raw->existential example.
+        def fallbackOnExistential(): Tree = (
+          if ((fun.symbol eq null) || !fun.symbol.isJavaDefined) EmptyTree
+          else rawToExistential(fun.tpe) match {
+            case tpe if tpe ne fun.tpe => tryTypedApply(fun setType tpe, args)
+            case _                     => EmptyTree
+          }
+        )
+        def fallbackOnImplicit(err: AbsTypeError): Tree = {
+          val errPos   = err.errPos
+          val tryAgain = (errPos ne null) && !pt.isError && tree.exists(_.pos == errPos)
+          def typing1  = fun :: args map ptTree mkString ("second try: fun = ", ", ", "")
+          def typing2  = if (tryAgain) typing1 else s"no $typing1 because $errPos not contained in ${tree.pos}"
+
+          def secondTry(args1: List[Tree]): Tree = {
+            val Select(qual, name) = fun
+            val qual1 = adaptToArguments(qual, name, args1, pt, reportAmbiguous = true, saveErrors = true)
+            if (qual eq qual1) EmptyTree
+            else typed1(Apply(Select(qual1, name) setPos fun.pos, args1) setPos tree.pos, mode | SNDTRYmode, pt)
+          }
+
+          printTyping(typing2)
+
+          if (!tryAgain) EmptyTree
+          else tryTypedArgs(args, forArgMode(fun, mode)).fold(EmptyTree: Tree)(secondTry)
+        }
         val start = if (Statistics.canEnable) Statistics.startTimer(failedApplyNanos) else null
-
-        def onError(typeError: AbsTypeError): Tree = {
-            if (Statistics.canEnable) Statistics.stopTimer(failedApplyNanos, start)
-
-            // If the problem is with raw types, copnvert to existentials and try again.
-            // See #4712 for a case where this situation arises,
-            if ((fun.symbol ne null) && fun.symbol.isJavaDefined) {
-              val newtpe = rawToExistential(fun.tpe)
-              if (fun.tpe ne newtpe) {
-                // println("late cooking: "+fun+":"+fun.tpe) // DEBUG
-                return tryTypedApply(fun setType newtpe, args)
-              }
-            }
-
-            def treesInResult(tree: Tree): List[Tree] = tree :: (tree match {
-              case Block(_, r)                        => treesInResult(r)
-              case Match(_, cases)                    => cases
-              case CaseDef(_, _, r)                   => treesInResult(r)
-              case Annotated(_, r)                    => treesInResult(r)
-              case If(_, t, e)                        => treesInResult(t) ++ treesInResult(e)
-              case Try(b, catches, _)                 => treesInResult(b) ++ catches
-              case Typed(r, Function(Nil, EmptyTree)) => treesInResult(r)
-              case _                                  => Nil
-            })
-            def errorInResult(tree: Tree) = treesInResult(tree) exists (_.pos == typeError.errPos)
-
-            val retry = (typeError.errPos != null) && (fun :: tree :: args exists errorInResult)
-            printTyping {
-              val funStr = ptTree(fun) + " and " + (args map ptTree mkString ", ")
-              if (retry) "second try: " + funStr
-              else "no second try: " + funStr + " because error not in result: " + typeError.errPos+"!="+tree.pos
-            }
-            if (retry) {
-              val Select(qual, name) = fun
-              tryTypedArgs(args, forArgMode(fun, mode)) match {
-                case Some(args1) =>
-                  val qual1 =
-                    if (!pt.isError) adaptToArguments(qual, name, args1, pt, reportAmbiguous = true, saveErrors = true)
-                    else qual
-                  if (qual1 ne qual) {
-                    val tree1 = Apply(Select(qual1, name) setPos fun.pos, args1) setPos tree.pos
-                    return typed1(tree1, mode | SNDTRYmode, pt)
-                  }
-                case _ => ()
-              }
-            }
-            issue(typeError)
-            setError(treeCopy.Apply(tree, fun, args))
-        }
-
-        silent(_.doTypedApply(tree, fun, args, mode, pt)) orElse onError
-        }
+        try silent(_.doTypedApply(tree, fun, args, mode, pt)) orElse (err =>
+          fallbackOnExistential()
+            orElse fallbackOnImplicit(err)
+            orElse issueAndSetError(err, treeCopy.Apply(tree, fun, args))
+        )
+        finally if (Statistics.canEnable) Statistics.stopTimer(failedApplyNanos, start)
+      }
 
       def normalTypedApply(tree: Tree, fun: Tree, args: List[Tree]) = {
         val stableApplication = (fun.symbol ne null) && fun.symbol.isMethod && fun.symbol.isStable
@@ -4491,35 +4488,31 @@ trait Typers extends Adaptations with Tags {
                   reportError
               }
           }
-          silent(_.typed(fun, mode.forFunMode, funpt),
-                 if (mode.inExprMode) false else context.ambiguousErrors,
-                 if (mode.inExprMode) tree else context.tree) match {
+          val silentResult = silent(
+            op                    = _.typed(fun, mode.forFunMode, funpt),
+            reportAmbiguousErrors = !mode.inExprMode && context.ambiguousErrors,
+            newtree               = if (mode.inExprMode) tree else context.tree
+          )
+          silentResult match {
             case SilentResultValue(fun1) =>
               val fun2 = if (stableApplication) stabilizeFun(fun1, mode, pt) else fun1
               if (Statistics.canEnable) Statistics.incCounter(typedApplyCount)
-              def isImplicitMethod(tpe: Type) = tpe match {
-                case mt: MethodType => mt.isImplicit
-                case _ => false
-              }
-              val useTry = (
-                   !isPastTyper
-                && fun2.isInstanceOf[Select]
-                && !isImplicitMethod(fun2.tpe)
-                && ((fun2.symbol eq null) || !fun2.symbol.isConstructor)
-                && (mode & (EXPRmode | SNDTRYmode)) == EXPRmode
+              val noSecondTry = (
+                   isPastTyper
+                || (fun2.symbol ne null) && fun2.symbol.isConstructor
+                || (fun2.tpe match { case mt: MethodType => mt.isImplicit case _ => false })
               )
-              val res =
-                if (useTry) tryTypedApply(fun2, args)
-                else doTypedApply(tree, fun2, args, mode, pt)
+              val isFirstTry = !noSecondTry && (
+                fun2 match {
+                  case Select(_, _) => mode inExprModeButNot SNDTRYmode
+                  case _            => false
+                }
+              )
+              if (isFirstTry)
+                tryTypedApply(fun2, args)
+              else
+                doTypedApply(tree, fun2, args, mode, pt)
 
-              if (fun2.symbol == Array_apply && !res.isErrorTyped) {
-                val checked = gen.mkCheckInit(res)
-                // this check is needed to avoid infinite recursion in Duplicators
-                // (calling typed1 more than once for the same tree)
-                if (checked ne res) typed { atPos(tree.pos)(checked) }
-                else res
-              } else
-                res
             case SilentTypeError(err) =>
               onError({issue(err); setError(tree)})
           }
@@ -4735,16 +4728,6 @@ trait Typers extends Adaptations with Tags {
               (stabilize(treeAndPre._1, treeAndPre._2, mode, pt), None)
           }
 
-          def isPotentialNullDeference() = {
-            !isPastTyper &&
-            !sym.isConstructor &&
-            !(qual.tpe <:< NotNullClass.tpe) && !qual.tpe.isNotNull &&
-            !(List(Any_isInstanceOf, Any_asInstanceOf) contains result.symbol)  // null.is/as is not a dereference
-          }
-          // unit is null here sometimes; how are we to know when unit might be null? (See bug #2467.)
-          if (settings.warnSelectNullable.value && isPotentialNullDeference && unit != null)
-            unit.warning(tree.pos, "potential null pointer dereference: "+tree)
-
           result match {
             // could checkAccessible (called by makeAccessible) potentially have skipped checking a type application in qual?
             case SelectFromTypeTree(qual@TypeTree(), name) if qual.tpe.typeArgs.nonEmpty => // TODO: somehow the new qual is not checked in refchecks
@@ -4837,13 +4820,13 @@ trait Typers extends Adaptations with Tags {
         // setting to enable unqualified idents in empty package (used by the repl)
         def inEmptyPackage = if (settings.exposeEmptyPackage.value) lookupInEmpty(name) else NoSymbol
 
-        def issue(err: AbsTypeError) = {
+        def issue(err: AbsTypeError, errorTree: Tree = null): Tree = {
           // Avoiding some spurious error messages: see SI-2388.
           val suppress = reporter.hasErrors && (name startsWith tpnme.ANON_CLASS_NAME)
           if (!suppress)
             ErrorUtils.issueTypeError(err)
 
-          setError(tree)
+          setError( if (errorTree eq null) tree else errorTree )
         }
           // ignore current variable scope in patterns to enforce linearity
         val startContext = if (mode.inNone(PATTERNmode | TYPEPATmode)) context else context.outer

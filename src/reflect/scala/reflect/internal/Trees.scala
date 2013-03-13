@@ -43,6 +43,16 @@ trait Trees extends api.Trees { self: SymbolTable =>
     final def tpe = rawtpe
     @deprecated("Use setType", "2.11.0") def tpe_=(t: Type): Unit = setType(t)
 
+    /** The type of the tree, unless null or NoType;
+     *  in that case, the type of the symbol, unless null;
+     *  otherwise, NoType.
+     */
+    def typeOrSymbolType = (
+      if (isTyped) tpe
+      else if (symbol ne null) symbol.tpe_*
+      else NoType
+    )
+
     def clearType(): this.type = this setType null
     def setType(tp: Type): this.type = { rawtpe = tp; this }
     def defineType(tp: Type): this.type = setType(tp)
