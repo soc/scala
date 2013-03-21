@@ -61,7 +61,7 @@ abstract class SymbolPairs {
     def isSubType(sym1: Symbol, sym2: Symbol): Boolean     = sym1 <:< sym2
     def isSuperType(sym1: Symbol, sym2: Symbol): Boolean   = sym2 <:< sym1
     def isSameErasure(sym1: Symbol, sym2: Symbol): Boolean = erasureOf(sym1) =:= erasureOf(sym2)
-    def matches(sym1: Symbol, sym2: Symbol): Boolean       = (sym1: Type) matches (sym2: Type)
+    def matches(sym1: Symbol, sym2: Symbol): Boolean       = logResult(s"${signature(sym1)} matches ${signature(sym2)}")((sym1: Type) matches (sym2: Type))
 
     override def toString = s"RelativeTo($prefix)"
   }
