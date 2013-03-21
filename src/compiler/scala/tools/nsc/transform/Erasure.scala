@@ -945,11 +945,11 @@ abstract class Erasure extends AddInterfaces
           || super.exclude(sym)
           || !sym.hasTypeAt(currentRun.refchecksPhase.id)
         )
-        override def matches(sym1: Symbol, sym2: Symbol) = true
+        override def matches(sym1: Symbol, sym2: Symbol) = exitingPostErasure(sym1.tpe_* =:= sym2.tpe_*)
       }
       for (pair <- opc.iterator) {
         log(pair)
-        if (pair.sameTypeAfterPostErasure && !pair.memberTypesMatch)
+        if (!exitingRefchecks(pair.memberTypesMatch))
           doubleDefError(pair)
       }
     }

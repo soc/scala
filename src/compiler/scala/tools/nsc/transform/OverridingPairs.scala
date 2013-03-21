@@ -17,11 +17,11 @@ abstract class OverridingPairs extends SymbolPairs {
   class Cursor(base: Symbol) extends super.Cursor(base) {
     lazy val relatively = new RelativeTo(base.thisType)
 
-    /** Symbols to exclude: Here these are constructors and private/artifact symbols,
+    /** Symbols to exclude: Here these are constructors and private symbols,
      *  including bridges. But it may be refined in subclasses.
      */
     override protected def exclude(sym: Symbol) = (
-         (sym hasFlag PRIVATE | ARTIFACT)
+         (sym hasFlag PRIVATE| ARTIFACT)
       || sym.isConstructor
     )
 
@@ -71,26 +71,28 @@ abstract class SymbolPairs {
   )
 
   case class SymbolPair(base: Symbol, low: Symbol, high: Symbol) {
+    log(s"new SymbolPair($base, $low, $high)")
+
     def pos           = if (low.owner == base) low.pos else if (high.owner == base) high.pos else base.pos
     def self          = base.thisType
     def rootType      = base.thisType
     def lowType       = self memberType low
     // def lowInfo       = self memberInfo low
-    def lowErased     = erasure.specialErasure(base)(low.tpe)
-    def lowClassBound = classBoundAsSeen(low.tpe.typeSymbol)
+    def lowErased     = erasure.specialErasure(base)(low.tpe_*)
+    def lowClassBound = classBoundAsSeen(low.tpe_*.typeSymbol)
 
     def highType       = self memberType high
     def highInfo       = self memberInfo high
-    def highErased     = erasure.specialErasure(base)(high.tpe)
-    def highClassBound = classBoundAsSeen(high.tpe.typeSymbol)
-    def isErroneous    = low.tpe.isErroneous || high.tpe.isErroneous
+    def highErased     = erasure.specialErasure(base)(high.tpe_*)
+    def highClassBound = classBoundAsSeen(high.tpe_*.typeSymbol)
+    def isErroneous    = low.tpe_*.isErroneous || high.tpe_*.isErroneous
     def sameKind       = sameLength(low.typeParams, high.typeParams)
 
     private def classBoundAsSeen(tsym: Symbol) =
       tsym.classBound.asSeenFrom(rootType, tsym.owner)
 
-    def sameTypeAfterPostErasure = exitingPostErasure(low.tpe =:= high.tpe)
-    def memberTypesMatch         = exitingRefchecks(lowType matches highType)
+    def sameTypeAfterPostErasure = logResult(s"sameTypeAfterPostErasure($this)")(exitingPostErasure(low.tpe_* =:= high.tpe_*))
+    def memberTypesMatch         = logResult(s"memberTypesMatch($this)")(exitingRefchecks(lowType matches highType))
 
     // def lowAccessBoundary  = low accessBoundary base
     // def highAccessBoundary = high accessBoundary base
@@ -113,7 +115,7 @@ abstract class SymbolPairs {
 
     // def comparisonString = s"$lowString and $highString"
     override def toString = s"""
-      |Cursor(in $base) {
+      |Cursor(base=$base) {
       |   high  $highString
       | erased  $highErased
       |  infos  ${high.infosString}
@@ -266,7 +268,10 @@ abstract class SymbolPairs {
         nextEntry = decls lookupNextEntry nextEntry
         if (nextEntry ne null) {
           val high    = nextEntry.sym
-          val isMatch = matches(lowSymbol, high) && { visited addEntry nextEntry ; true } // side-effect visited on all matches
+          // side-effect visited on all matches
+          val isMatch = logResult(s"Considering whether $lowSymbol matches $high in $base") {
+            matches(lowSymbol, high) && { visited addEntry nextEntry ; true }
+          }
 
           // skip nextEntry if a class in `parents` is a subclass of the
           // owners of both low and high.
@@ -296,7 +301,7 @@ abstract class SymbolPairs {
     def high     = highSymbol
 
     def hasNext     = curEntry ne null
-    def currentPair = new SymbolPair(base, low, high)
+    def currentPair = logResult("currentPair")(new SymbolPair(base, low, high))
     def iterator    = new Iterator[SymbolPair] {
       def hasNext = cursor.hasNext
       def next()  = { cursor.next() ; cursor.currentPair }
