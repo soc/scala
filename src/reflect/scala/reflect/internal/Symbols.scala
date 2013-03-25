@@ -30,8 +30,6 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
 
   /** Used to keep track of the recursion depth on locked symbols */
   private var recursionTable = immutable.Map.empty[Symbol, Int]
-  private var createdMethodSymbols: Int = 0
-  scala.sys addShutdownHook println(s"Created $createdMethodSymbols method symbols.")
 
   private var nextexid = 0
   protected def freshExistentialName(suffix: String) = {
@@ -2676,7 +2674,6 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
   /** A class for method symbols */
   class MethodSymbol protected[Symbols] (initOwner: Symbol, initPos: Position, initName: TermName)
   extends TermSymbol(initOwner, initPos, initName) with MethodSymbolApi {
-    createdMethodSymbols += 1
     private[this] var mtpePeriod       = NoPeriod
     private[this] var mtpePre: Type    = _
     private[this] var mtpeResult: Type = _
