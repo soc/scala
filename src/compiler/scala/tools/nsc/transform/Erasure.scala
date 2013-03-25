@@ -527,8 +527,10 @@ abstract class Erasure extends AddInterfaces
 
     private def isPrimitiveValueType(tpe: Type) = isPrimitiveValueClass(tpe.typeSymbol)
 
-    private def isDifferentErasedValueType(tpe: Type, other: Type) =
-      isErasedValueType(tpe) && (tpe ne other)
+    private def isDifferentErasedValueType(tpe: Type, other: Type) = (tpe, other) match {
+      case (ErasedValueType(under1), ErasedValueType(under2)) => !(under1 =:= under2)
+      case _                                                  => false
+    }
 
     private def isPrimitiveValueMember(sym: Symbol) =
       sym != NoSymbol && isPrimitiveValueClass(sym.owner)
