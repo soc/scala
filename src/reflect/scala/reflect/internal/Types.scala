@@ -2431,7 +2431,7 @@ trait Types
   private final class ClassNoArgsTypeRef(pre: Type, sym: Symbol) extends NoArgsTypeRef(pre, sym) with ClassTypeRef
 
   object TypeRef extends TypeRefExtractor {
-    def apply(pre: Type, sym: Symbol, args: List[Type]): Type = unique({
+    private def applyInternal(pre: Type, sym: Symbol, args: List[Type]): Type = unique({
       if (args.nonEmpty) {
         if (sym.isAliasType)              new AliasArgsTypeRef(pre, sym, args)
         else if (sym.isAbstractType)      new AbstractArgsTypeRef(pre, sym, args)
@@ -2446,6 +2446,26 @@ trait Types
         else                              new ClassNoArgsTypeRef(pre, sym)
       }
     })
+
+    def apply(pre: Type, sym: Symbol, args: List[Type]): Type = {
+      def default = applyInternal(pre, sym, args)
+      if (args.isEmpty && isDefinitionsInitialized) sym match {
+        case x: PackageClassSymbol =>
+          if (uniquePackages contains x) uniquePackages(x) else {
+            val res = unique(new PackageTypeRef(pre, sym))
+            uniquePackages(x) = res
+            res
+          }
+        case x: ClassSymbol if neverHasTypeParameters(x) && !x.isRefinementClass && !x.isModuleClass =>
+          if (uniqueMonoClasses contains x) uniqueMonoClasses(x) else {
+            val res = unique(new ClassNoArgsTypeRef(pre, sym))
+            uniqueMonoClasses(x) = res
+            res
+          }
+        case _ => default
+      }
+      else default
+    }
   }
 
   protected def defineParentsOfTypeRef(tpe: TypeRef) = {
@@ -3649,7 +3669,19 @@ trait Types
 
   private val initialUniquesCapacity = 4096
   private var uniques: util.HashSet[Type] = _
+  private val uniquePackages = mutable.Map[PackageClassSymbol, PackageTypeRef]()
+  private val uniqueMonoClasses = mutable.Map[ClassSymbol, ClassNoArgsTypeRef]()
   private var uniqueRunId = NoRunId
+
+  private var shutdownps: List[() => String] = Nil
+  private def printAtShutdown(msg: => String) {
+    shutdownps ::= (() => msg)
+  }
+  scala.sys addShutdownHook {
+    shutdownps.reverse foreach (f =>
+      Console.err.println(f())
+    )
+  }
 
   protected def unique[T <: Type](tp: T): T = {
     if (Statistics.canEnable) Statistics.incCounter(rawTypeCount)
@@ -3658,7 +3690,15 @@ trait Types
       perRunCaches.recordCache(uniques)
       uniqueRunId = currentRunId
     }
-    (uniques findEntryOrUpdate tp).asInstanceOf[T]
+    val res = (uniques findEntryOrUpdate tp).asInstanceOf[T]
+    if (res ne tp) {
+      def str(t: Type) = s"$t   ${t.typeSymbol.fullName}   ${util.shortClassOfInstance(t)}"
+      printAtShutdown(
+        sm"""|yes: ${str(res)}
+             | no: ${str(tp)}"""
+      )
+    }
+    res
   }
 
 // Helper Classes ---------------------------------------------------------
