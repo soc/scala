@@ -1182,8 +1182,8 @@ trait Types
    *  A type that can be passed to unique(..) and be stored in the uniques map.
    */
   abstract class UniqueType extends Type with Product {
-    // final override val hashCode = computeHashCode
-    // protected def computeHashCode = scala.runtime.ScalaRunTime._hashCode(this)
+    final override val hashCode = computeHashCode
+    protected def computeHashCode = scala.runtime.ScalaRunTime._hashCode(this)
   }
 
  /** A base class for types that defer some operations
@@ -2249,17 +2249,17 @@ trait Types
     private var normalized: Type                       = _
 
     //OPT specialize hashCode
-    // override final def computeHashCode = {
-    //   import scala.util.hashing.MurmurHash3._
-    //   val hasArgs = args.nonEmpty
-    //   var h = productSeed
-    //   h = mix(h, pre.hashCode)
-    //   h = mix(h, sym.hashCode)
-    //   if (hasArgs)
-    //     finalizeHash(mix(h, args.hashCode()), 3)
-    //   else
-    //     finalizeHash(h, 2)
-    // }
+    override final def computeHashCode = {
+      import scala.util.hashing.MurmurHash3._
+      val hasArgs = args.nonEmpty
+      var h = productSeed
+      h = mix(h, pre.hashCode)
+      h = mix(h, sym.hashCode)
+      if (hasArgs)
+        finalizeHash(mix(h, args.hashCode()), 3)
+      else
+        finalizeHash(h, 2)
+    }
 
     // @M: propagate actual type params (args) to `tp`, by replacing
     // formal type parameters with actual ones. If tp is higher kinded,
@@ -3651,14 +3651,14 @@ trait Types
   private var uniques: util.HashSet[Type] = _
   private var uniqueRunId = NoRunId
 
-  protected def unique[T <: Type](tp: T): T = { tp
-    // if (Statistics.canEnable) Statistics.incCounter(rawTypeCount)
-    // if (uniqueRunId != currentRunId) {
-    //   uniques = util.HashSet[Type]("uniques", initialUniquesCapacity)
-    //   perRunCaches.recordCache(uniques)
-    //   uniqueRunId = currentRunId
-    // }
-    // (uniques findEntryOrUpdate tp).asInstanceOf[T]
+  protected def unique[T <: Type](tp: T): T = {
+    if (Statistics.canEnable) Statistics.incCounter(rawTypeCount)
+    if (uniqueRunId != currentRunId) {
+      uniques = util.HashSet[Type]("uniques", initialUniquesCapacity)
+      perRunCaches.recordCache(uniques)
+      uniqueRunId = currentRunId
+    }
+    (uniques findEntryOrUpdate tp).asInstanceOf[T]
   }
 
 // Helper Classes ---------------------------------------------------------
