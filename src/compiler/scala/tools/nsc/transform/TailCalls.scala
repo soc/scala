@@ -243,7 +243,7 @@ abstract class TailCalls extends Transform {
           def isRecursiveCall(t: Tree) = {
             val sym = t.symbol
             (sym != null) && {
-              sym.isMethod && (dd.symbol.name == sym.name) && (dd.symbol.enclClass isSubClass sym.enclClass)
+              sym.isMethod && (dd.symbol name_== sym) && (dd.symbol.enclClass isSubClass sym.enclClass)
             }
           }
           if (newCtx.isMandatory) {

@@ -110,7 +110,7 @@ abstract class ICodeCheckers {
     /** Only called when m1 < m2, so already known that (m1 ne m2).
      */
     private def isConfict(m1: IMember, m2: IMember, canOverload: Boolean) = (
-      (m1.symbol.name == m2.symbol.name) &&
+      (m1.symbol name_== m2.symbol) &&
       (!canOverload || (m1.symbol.tpe =:= m2.symbol.tpe))
     )
 

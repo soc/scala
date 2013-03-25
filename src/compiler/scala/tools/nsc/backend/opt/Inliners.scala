@@ -635,6 +635,7 @@ abstract class Inliners extends SubComponent {
       def addLocals(ls: List[Local])  = m.locals ++= ls
       def addLocal(l: Local)          = addLocals(List(l))
       def addHandlers(exhs: List[ExceptionHandler]) = m.exh = exhs ::: m.exh
+      def owner_==(other: IMethodInfo) = sym owner_== other
 
       /**
        * This method inspects the callee's instructions, finding out the most restrictive accessibility implied by them.
@@ -1023,7 +1024,7 @@ abstract class Inliners extends SubComponent {
       }
 
       def canAccess(level: NonPublicRefs.Value) = level match {
-        case Private    => caller.owner == inc.owner
+        case Private    => caller owner_== inc
         case Protected  => caller.owner.tpe <:< inc.owner.tpe
         case Public     => true
       }

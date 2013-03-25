@@ -484,10 +484,10 @@ trait DocComments { self: Global =>
         }
         val partnames = (parts.init map newTermName) :+ newTypeName(parts.last)
         val (start, rest) = parts match {
-          case "this" :: _      => (site.thisType, partnames.tail)
-          case _ :: "this" :: _ =>
-            site.ownerChain.find(_.name == partnames.head) match {
-              case Some(clazz)  => (clazz.thisType, partnames drop 2)
+          case "this" :: _            => (site.thisType, partnames.tail)
+          case head :: "this" :: rest =>
+            site.ownerChain.find(_ name_== head) match {
+              case Some(clazz)  => (clazz.thisType, rest)
               case _            => (NoType, Nil)
             }
           case _ =>

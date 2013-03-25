@@ -2300,7 +2300,11 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
 // ------ toString -------------------------------------------------------------------
 
     /** The simple name of this Symbol */
-    final def simpleName: Name = name
+    final def simpleName: Name = name.dropLocal
+
+    def name_==(other: Name): Boolean    = name == other.name
+    def name_==(other: Symbol): Boolean  = sameName(other.name)
+    def owner_==(other: Symbol): Boolean = (this ne NoSymbol) && (other ne NoSymbol) && (this.owner == other.owner)
 
     /** The String used to order otherwise identical sealed symbols.
      *  This uses data which is stable across runs and variable classpaths

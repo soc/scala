@@ -73,7 +73,7 @@ trait Members {
         )
         startBlock = b.successors.head
       }
-      
+
       blocks -= b
       assert(!blocks.contains(b))
       method.exh filter (_ covers b) foreach (_.covered -= b)
@@ -196,7 +196,7 @@ trait Members {
 
     def addLocals(ls: List[Local]) = ls foreach addLocal
 
-    def lookupLocal(n: Name): Option[Local]     = locals find (_.sym.name == n)
+    def lookupLocal(n: Name): Option[Local]     = locals find (_.sym name_== n)
     def lookupLocal(sym: Symbol): Option[Local] = locals find (_.sym == sym)
 
     def addHandler(e: ExceptionHandler) = exh ::= e
