@@ -1,16 +1,43 @@
-tailrec.scala:45: error: could not optimize @tailrec annotated method facfail: it contains a recursive call not in tail position
+tailrec.scala:36: error: could not optimize @tailrec annotated method succ3: it contains a recursive call outside of tail position
+    case Nil      => Nil
+                     ^
+tailrec.scala:36: error: could not optimize @tailrec annotated method succ3: it contains a recursive call outside of tail position
+    case Nil      => Nil
+         ^
+tailrec.scala:37: error: could not optimize @tailrec annotated method succ3: it contains a recursive call outside of tail position
+    case x :: xs  => succ3(xs, x :: acc)
+                          ^
+tailrec.scala:37: error: could not optimize @tailrec annotated method succ3: it contains a recursive call outside of tail position
+    case x :: xs  => succ3(xs, x :: acc)
+           ^
+tailrec.scala:35: error: could not optimize @tailrec annotated method succ3: it contains a recursive call outside of tail position
+  @tailrec final def succ3[T](in: List[T], acc: List[T]): List[T] = in match {
+                                                                    ^
+tailrec.scala:45: error: could not optimize @tailrec annotated method facfail: it contains a recursive call outside of tail position
     else n * facfail(n - 1)
            ^
 tailrec.scala:50: error: could not optimize @tailrec annotated method fail1: it is neither private nor final so can be overridden
   @tailrec def fail1(x: Int): Int = fail1(x)
                ^
-tailrec.scala:53: error: could not optimize @tailrec annotated method fail2: it contains a recursive call not in tail position
+tailrec.scala:54: error: could not optimize @tailrec annotated method fail2: it contains a recursive call outside of tail position
+    case Nil      => Nil
+                     ^
+tailrec.scala:54: error: could not optimize @tailrec annotated method fail2: it contains a recursive call outside of tail position
+    case Nil      => Nil
+         ^
+tailrec.scala:55: error: could not optimize @tailrec annotated method fail2: it contains a recursive call outside of tail position
+    case x :: xs  => x :: fail2[T](xs)
+                       ^
+tailrec.scala:55: error: could not optimize @tailrec annotated method fail2: it contains a recursive call outside of tail position
+    case x :: xs  => x :: fail2[T](xs)
+           ^
+tailrec.scala:53: error: could not optimize @tailrec annotated method fail2: it contains a recursive call outside of tail position
   @tailrec final def fail2[T](xs: List[T]): List[T] = xs match {
                                                       ^
-tailrec.scala:59: error: could not optimize @tailrec annotated method fail3: it is called recursively with different type arguments
+tailrec.scala:59: error: could not optimize @tailrec annotated method fail3: it contains a recursive call with different type arguments
   @tailrec final def fail3[T](x: Int): Int = fail3(x - 1)
-                                             ^
+                                                  ^
 tailrec.scala:63: error: could not optimize @tailrec annotated method fail4: it changes type of 'this' on a polymorphic recursive call
     @tailrec final def fail4[U](other: Tom[U], x: Int): Int = other.fail4[U](other, x - 1)
-                                                                    ^
-5 errors found
+                                                                            ^
+14 errors found
