@@ -42,7 +42,8 @@ abstract class Origins {
   def newRep(xs: StackSlice): Rep
   def repString(rep: Rep): String
 
-  private val origins      = new mutable.HashMap[Rep, Int] withDefaultValue 0
+  private val elapsed      = mutable.HashMap[Rep, Long]() withDefaultValue 0L
+  private val origins      = mutable.HashMap[Rep, Int]() withDefaultValue 0
   private def add(xs: Rep) = origins(xs) += 1
   private def total        = origins.values.foldLeft(0L)(_ + _)
 
@@ -52,14 +53,20 @@ abstract class Origins {
   )
 
   def apply[T](body: => T): T = {
-    add(newRep(readStack()))
-    body
+    val rep = newRep(readStack())
+    add(rep)
+    val start = System.nanoTime
+    try body
+    finally elapsed(rep) += (System.nanoTime - start)
   }
+
   def clear() = origins.clear()
   def show()  = {
-    println("\n>> Origins tag '%s' logged %s calls from %s distinguished sources.\n".format(tag, total, origins.keys.size))
-    origins.toList sortBy (-_._2) foreach {
-      case (k, v) => println("%7s %s".format(v, repString(k)))
+    val total_elapsed = elapsed.values.sum / 1e6
+    println(f"\n>> Origins tag '$tag' logged $total calls consuming $total_elapsed%.3f ms from ${origins.size} distinguished sources.\n")
+    for ((k, v) <- origins.toList sortBy (-_._2)) {
+      val time = elapsed(k) / 1e6
+      println(f"$time%10.3f $v%7s ${repString(k)}")
     }
   }
   def purge() = {

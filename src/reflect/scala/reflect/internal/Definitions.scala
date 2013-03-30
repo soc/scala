@@ -10,6 +10,7 @@ import scala.annotation.{ switch, meta }
 import scala.collection.{ mutable, immutable }
 import Flags._
 import scala.reflect.api.{Universe => ApiUniverse}
+import util.Origins
 
 trait Definitions extends api.StandardDefinitions {
   self: SymbolTable =>
@@ -148,6 +149,7 @@ trait Definitions extends api.StandardDefinitions {
       FloatClass,
       DoubleClass
     )
+    lazy val ScalaValueClassIds = printResult("ScalaValueClassIds")(ScalaValueClasses map (_.id))
     def ScalaPrimitiveValueClasses: List[ClassSymbol] = ScalaValueClasses
   }
 
@@ -403,10 +405,10 @@ trait Definitions extends api.StandardDefinitions {
     lazy val JavaRepeatedParamClass = specialPolyClass(tpnme.JAVA_REPEATED_PARAM_CLASS_NAME, COVARIANT)(tparam => arrayType(tparam.tpe))
     lazy val RepeatedParamClass     = specialPolyClass(tpnme.REPEATED_PARAM_CLASS_NAME, COVARIANT)(tparam => seqType(tparam.tpe))
 
-    def isByNameParamType(tp: Type)        = tp.typeSymbol == ByNameParamClass
+    def isByNameParamType(tp: Type)        = Origins("isByNameParamType")(tp.typeSymbol == ByNameParamClass)
     def isScalaRepeatedParamType(tp: Type) = tp.typeSymbol == RepeatedParamClass
     def isJavaRepeatedParamType(tp: Type)  = tp.typeSymbol == JavaRepeatedParamClass
-    def isRepeatedParamType(tp: Type)      = isScalaRepeatedParamType(tp) || isJavaRepeatedParamType(tp)
+    def isRepeatedParamType(tp: Type)      = Origins("isRepeatedParamType")(isScalaRepeatedParamType(tp) || isJavaRepeatedParamType(tp))
     def isRepeated(param: Symbol)          = isRepeatedParamType(param.tpe_*)
     def isByName(param: Symbol)            = isByNameParamType(param.tpe_*)
     def isCastSymbol(sym: Symbol)          = sym == Any_asInstanceOf || sym == Object_asInstanceOf
@@ -1056,11 +1058,15 @@ trait Definitions extends api.StandardDefinitions {
       newPolyMethod(1, owner, name, flags)(tparams => (Some(Nil), createFn(tparams.head)))
     }
 
-    lazy val isUnbox = unboxMethod.values.toSet[Symbol]
-    lazy val isBox = boxMethod.values.toSet[Symbol]
+    lazy val _isUnbox = unboxMethod.values.toSet[Symbol]
+    lazy val _isBox = boxMethod.values.toSet[Symbol]
+
+    def isBox(s: Symbol) = Origins("isBox")(_isBox(s))
+    def isUnbox(s: Symbol) = Origins("isUnbox")(_isUnbox(s))
+    def isPhantomClass(s: Symbol) = Origins("isPhantomClass")(_isPhantomClass(s))
 
     /** Is symbol a phantom class for which no runtime representation exists? */
-    lazy val isPhantomClass = Set[Symbol](AnyClass, AnyValClass, NullClass, NothingClass)
+    lazy val _isPhantomClass = Set[Symbol](AnyClass, AnyValClass, NullClass, NothingClass)
     /** Lists core classes that don't have underlying bytecode, but are synthesized on-the-fly in every reflection universe */
     lazy val syntheticCoreClasses = List(
       AnnotationDefaultAttr, // #2264
@@ -1113,11 +1119,12 @@ trait Definitions extends api.StandardDefinitions {
     private lazy val boxedValueClassesSet = boxedClass.values.toSet[Symbol] + BoxedUnitClass
 
     /** Is symbol a value class? */
-    def isPrimitiveValueClass(sym: Symbol) = ScalaValueClasses contains sym
-    def isPrimitiveValueType(tp: Type)     = isPrimitiveValueClass(tp.typeSymbol)
+    def isPrimitiveValueClass(sym: Symbol) = Origins("isPrimitiveValueClass")(ScalaValueClassIds contains sym.id)
+    //(ScalaValueClasses contains sym)
+    def isPrimitiveValueType(tp: Type)     = Origins("isPrimitiveValueType")(isPrimitiveValueClass(tp.dealias.typeSymbolDirect))
 
     /** Is symbol a boxed value class, e.g. java.lang.Integer? */
-    def isBoxedValueClass(sym: Symbol) = boxedValueClassesSet(sym)
+    def isBoxedValueClass(sym: Symbol) = Origins("isBoxedValueClass")(boxedValueClassesSet(sym))
 
     /** If symbol is a value class (boxed or not), return the unboxed
      *  value class.  Otherwise, NoSymbol.
