@@ -6,6 +6,8 @@
 package scala.tools.nsc
 package typechecker
 
+import scala.collection.{ mutable, immutable }
+
 /** A generic means of breaking down types into their subcomponents.
  *  Types are decomposed top down, and recognizable substructure is
  *  dispatched via self-apparently named methods.  Those methods can
@@ -35,7 +37,8 @@ trait DestructureTypes {
     def wrapSequence(nodes: List[Node]): Node
     def wrapAtom[U](value: U): Node
 
-    private val openSymbols = scala.collection.mutable.Set[Symbol]()
+    private val openSymbols = mutable.Set[Symbol]()
+    private val openTypes   = mutable.Set[Type]()
 
     private def nodeList[T](elems: List[T], mkNode: T => Node): Node =
       if (elems.isEmpty) wrapEmpty else list(elems map mkNode)
@@ -64,13 +67,17 @@ trait DestructureTypes {
       },
       tree.productPrefix
     )
-    def wrapSymbolInfo(sym: Symbol): Node = {
+    def wrapSymbolInfo(sym: Symbol): Node = try {
       if ((sym eq NoSymbol) || openSymbols(sym)) wrapEmpty
       else {
         openSymbols += sym
         try product(symbolType(sym), wrapAtom(sym.defString))
         finally openSymbols -= sym
       }
+    }
+    catch { case ex: Throwable =>
+      println(s"Caught $ex open symbols $openSymbols")
+      wrapEmpty
     }
 
     def list(nodes: List[Node]): Node = wrapSequence(nodes)
@@ -170,24 +177,30 @@ trait DestructureTypes {
     def node(label: String, node: Node): Node = withLabel(node, label)
     def apply(label: String, tp: Type): Node  = withLabel(this(tp), label)
 
-    def apply(tp: Type): Node = tp match {
-      case AntiPolyType(pre, targs)                  => product(tp, prefix(pre), typeArgs(targs))
-      case ClassInfoType(parents, decls, clazz)      => product(tp, parentList(parents), scope(decls), wrapAtom(clazz))
-      case ConstantType(const)                       => product(tp, constant("value", const))
-      case OverloadedType(pre, alts)                 => product(tp, prefix(pre), node("alts", typeList(alts map pre.memberType)))
-      case RefinedType(parents, decls)               => product(tp, parentList(parents), scope(decls))
-      case SingleType(pre, sym)                      => product(tp, prefix(pre), wrapAtom(sym))
-      case SuperType(thistp, supertp)                => product(tp, this("this", thistp), this("super", supertp))
-      case ThisType(clazz)                           => product(tp, wrapAtom(clazz))
-      case TypeVar(inst, constr)                     => product(tp, this("inst", inst), typeConstraint(constr))
-      case AnnotatedType(annotations, underlying, _) => annotatedType(annotations, underlying)
-      case ExistentialType(tparams, underlying)      => polyFunction(tparams, underlying)
-      case PolyType(tparams, restpe)                 => polyFunction(tparams, restpe)
-      case MethodType(params, restpe)                => monoFunction(params, restpe)
-      case NullaryMethodType(restpe)                 => nullaryFunction(restpe)
-      case TypeBounds(lo, hi)                        => typeBounds(lo, hi)
-      case tr @ TypeRef(pre, sym, args)              => typeRef(tr)
-      case _                                         => wrapAtom(tp) // XXX see what this is
+    case class CyclicNode(val tp: Type)
+
+    def apply(tp: Type): Node = if (openTypes contains tp) wrapAtom(tp.toString) else {
+      openTypes += tp
+      try tp match {
+        case AntiPolyType(pre, targs)                  => product(tp, prefix(pre), typeArgs(targs))
+        case ClassInfoType(parents, decls, clazz)      => product(tp, parentList(parents), scope(decls), wrapAtom(clazz))
+        case ConstantType(const)                       => product(tp, constant("value", const))
+        case OverloadedType(pre, alts)                 => product(tp, prefix(pre), node("alts", typeList(alts map pre.memberType)))
+        case RefinedType(parents, decls)               => product(tp, parentList(parents), scope(decls))
+        case SingleType(pre, sym)                      => product(tp, prefix(pre), wrapAtom(sym))
+        case SuperType(thistp, supertp)                => product(tp, this("this", thistp), this("super", supertp))
+        case ThisType(clazz)                           => product(tp, wrapAtom(clazz))
+        case TypeVar(inst, constr)                     => product(tp, this("inst", inst), typeConstraint(constr))
+        case AnnotatedType(annotations, underlying, _) => annotatedType(annotations, underlying)
+        case ExistentialType(tparams, underlying)      => polyFunction(tparams, underlying)
+        case PolyType(tparams, restpe)                 => polyFunction(tparams, restpe)
+        case MethodType(params, restpe)                => monoFunction(params, restpe)
+        case NullaryMethodType(restpe)                 => nullaryFunction(restpe)
+        case TypeBounds(lo, hi)                        => typeBounds(lo, hi)
+        case tr @ TypeRef(pre, sym, args)              => typeRef(tr)
+        case _                                         => wrapAtom(tp) // XXX see what this is
+      }
+      finally openTypes -= tp
     }
   }
 }

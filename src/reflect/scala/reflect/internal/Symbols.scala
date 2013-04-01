@@ -744,6 +744,10 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
      *  assumption: if a type starts out as monomorphic, it will not acquire
      *  type parameters in later phases.
      */
+    // final def isMonomorphicType = isType && (
+    //      (arity == 0)
+    //   || (arity < 0) && (infos ne null) && infos.isOriginallyMonomorphic
+    // )
     final def isMonomorphicType =
       isType && {
         val info = originalInfo
@@ -1209,14 +1213,9 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
 // ------ info and type -------------------------------------------------------------------
 
     private[Symbols] var infos: TypeHistory = null
-    def originalInfo = {
-      if (infos eq null) null
-      else {
-        var is = infos
-        while (is.prev ne null) { is = is.prev }
-        is.info
-      }
-    }
+
+    @deprecated("This method will be removed")
+    def originalInfo = if (infos eq null) null else infos.toList.last.info
 
     /** The "type" of this symbol.  The type of a term symbol is its usual
      *  type.  A TypeSymbol is more complicated; see that class for elaboration.
@@ -1531,7 +1530,10 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
      *  type parameters later.
      */
     def unsafeTypeParams: List[Symbol] =
-      if (isMonomorphicType) Nil
+      if (isMonomorphicType) {
+        if (arity > 0) println(s"PANIC! $this")
+        Nil
+      }
       else enteringPhase(unsafeTypeParamPhase)(rawInfo.typeParams)
 
     /** The type parameters of this symbol.
@@ -2894,7 +2896,7 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
 
       tpeCache = NoType // cycle marker
       tpeCache = newTypeRef(
-        if (phase.erasedTypes && this != ArrayClass || unsafeTypeParams.isEmpty) Nil
+        if (phase.erasedTypes && this != ArrayClass || isMonomorphicType) Nil
         else unsafeTypeParams map (_.typeConstructor)
       )
     }
@@ -3258,6 +3260,7 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
     override def companionSymbol = fail(NoSymbol)
   }
   class StubClassSymbol(owner0: Symbol, name0: TypeName, protected val missingMessage: String) extends ClassSymbol(owner0, owner0.pos, name0) with StubSymbol
+
   class StubTermSymbol(owner0: Symbol, name0: TermName, protected val missingMessage: String) extends TermSymbol(owner0, owner0.pos, name0) with StubSymbol
 
   trait FreeSymbol extends Symbol {

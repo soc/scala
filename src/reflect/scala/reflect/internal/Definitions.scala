@@ -724,7 +724,34 @@ trait Definitions extends api.StandardDefinitions {
       existentialAbstraction(clazz.typeParams, clazz.tpe_*)
 
     def unsafeClassExistentialType(clazz: Symbol): Type =
-      existentialAbstraction(clazz.unsafeTypeParams, clazz.tpe_*)
+      unsafeClassExistentialType(clazz.unsafeTypeParams, clazz)
+
+    def unsafeClassExistentialType(tparams: List[Symbol], clazz: Symbol): Type = printResult(s"unsafeClassExistentialType($tparams, $clazz)")(
+      existentialAbstraction(tparams, clazz.tpe_*)
+    )
+
+    // def unsafeClassExistentialType(clazz: Symbol): Type = {
+    //   val tparams0 = clazz.unsafeTypeParams
+
+    //   def typeParamsToExistentials(clazz: Symbol, tparams: List[Symbol]): List[Symbol] = {
+    //     val eparams = mapWithIndex(tparams)((tparam, i) =>
+    //       clazz.newExistential(newTypeName("?"+i), clazz.pos) setInfo tparam.info.bounds)
+
+    //     eparams map (_ substInfo (tparams, eparams))
+    //   }
+
+    //   def
+    //   val newtparam = sym.newExistential(newTypeName("?"+i), sym.pos) setInfo
+    //   existentials += newtparam
+    //   xs += newtparam.tpeHK
+    //   i += 1
+
+    //   if (clazz.arity > 0 && tparams0.size != clazz.arity) {
+    //     existentialAbstraction(1 to clazz.arity map (_ =>
+
+
+    //   existentialAbstraction(clazz.unsafeTypeParams, clazz.tpe_*)
+    // }
 
     // members of class scala.Any
     lazy val Any_==       = enterNewMethod(AnyClass, nme.EQ, anyparam, booltype, FINAL)

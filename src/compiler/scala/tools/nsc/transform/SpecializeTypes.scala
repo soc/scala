@@ -411,7 +411,7 @@ abstract class SpecializeTypes extends InfoTransform with TypingTransformers {
     loop(immutable.Set.empty, tpes)
   }
   def specializedTypeVars(sym: Symbol): immutable.Set[Symbol] = (
-    if (definitions.neverHasTypeParameters(sym)) immutable.Set.empty
+    if (sym.isMonomorphicType) immutable.Set.empty
     else enteringTyper(specializedTypeVars(sym.info))
   )
 

@@ -2050,7 +2050,9 @@ trait Types
           copyTypeRef(this, pre, sym, actuals)
         // partial application (needed in infer when bunching type arguments from classes and methods together)
         else
-          copyTypeRef(this, pre, sym, dummyArgs).instantiateTypeParams(formals, actuals)
+          appliedType(this, actuals)
+          // TypeRef(pre, sym, dummyArgs).instantiateTypeParams(formals, actuals)
+          // copyTypeRef(this, pre, sym, dummyArgs).instantiateTypeParams(formals, actuals)
       }
       else
         super.instantiateTypeParams(formals, actuals)
@@ -2433,21 +2435,70 @@ trait Types
   private final class ClassNoArgsTypeRef(pre: Type, sym: Symbol) extends NoArgsTypeRef(pre, sym) with ClassTypeRef
 
   object TypeRef extends TypeRefExtractor {
-    def apply(pre: Type, sym: Symbol, args: List[Type]): Type = unique({
-      if (args.nonEmpty) {
-        if (sym.isAliasType)              new AliasArgsTypeRef(pre, sym, args)
-        else if (sym.isAbstractType)      new AbstractArgsTypeRef(pre, sym, args)
-        else                              new ClassArgsTypeRef(pre, sym, args)
-      }
-      else {
-        if (sym.isAliasType)              new AliasNoArgsTypeRef(pre, sym)
-        else if (sym.isAbstractType)      new AbstractNoArgsTypeRef(pre, sym)
-        else if (sym.isRefinementClass)   new RefinementTypeRef(pre, sym)
-        else if (sym.isPackageClass)      new PackageTypeRef(pre, sym)
-        else if (sym.isModuleClass)       new ModuleTypeRef(pre, sym)
-        else                              new ClassNoArgsTypeRef(pre, sym)
-      }
-    })
+    // private def isEligible(sym: Symbol): Boolean = (
+    //      isDefinitionsInitialized
+    //   && !sym.isBottomClass
+    //   // && (sym ne AnyClass)
+    // )
+    private def isFullyDefinedBySymbol(sym: Symbol): Boolean = !sym.isBottomClass && (
+         sym.isStaticOwner
+      || sym.isClass && !sym.isRefinementClass && sym.owner.isStaticOwner && sym.isMonomorphicType
+    )
+    /*  Because of the unpredictable nature of symbols during bootstrapping
+     *  (when there are few lies you will not hear) it is easy for a core
+     *  symbol to wind up in uniques, only for it later to become apparent
+     *  that it belongs in symbolicTypeRefs. Whenever we create a symbolic
+     *  type ref, we ensure there is not a matching one in uniques already.
+     *  If there is, remove it from uniques and place it into symbolicTypeRefs.
+     */
+    private def newSymbolicTypeRef(sym: Symbol): Type = {
+      /* TODO - package/modules don't need an incoming "pre" argument. */
+      val pre = sym.owner.thisType
+      val created = (
+        if (sym.isPackageClass) new PackageTypeRef(pre, sym)
+        else if (sym.isModuleClass) new ModuleTypeRef(pre, sym)
+        else new ClassNoArgsTypeRef(pre, sym)
+      )
+      val existing = if (uniques eq null) created else uniques findEntry created
+      val result = (
+        if ((existing eq null) || (existing eq created)) created
+        else {
+          log(s"Duplicating from uniques to symbolic: $existing")
+          // uniques removeEntry existing
+          existing
+        }
+      )
+      symbolicTypeRefs(sym.id) = result
+      result
+    }
+    def apply(pre: Type, sym: Symbol, args: List[Type]): Type = (
+      if (symbolicTypeRefs contains sym.id)
+        symbolicTypeRefs(sym.id)
+      else if (isFullyDefinedBySymbol(sym))
+        newSymbolicTypeRef(sym)
+      else unique(
+        if (args.nonEmpty) (
+          if (sym.isAliasType)              new AliasArgsTypeRef(pre, sym, args)
+          else if (sym.isAbstractType)      new AbstractArgsTypeRef(pre, sym, args)
+          else                              new ClassArgsTypeRef(pre, sym, args)
+        )
+        else (
+          if (sym.isAliasType)              new AliasNoArgsTypeRef(pre, sym)
+          else if (sym.isAbstractType)      new AbstractNoArgsTypeRef(pre, sym)
+          else if (sym.isRefinementClass)   new RefinementTypeRef(pre, sym)
+          else if (sym.isPackageClass)      new PackageTypeRef(pre, sym)
+          else if (sym.isModuleClass)       new ModuleTypeRef(pre, sym)
+          else                              new ClassNoArgsTypeRef(pre, sym)
+        )
+      )
+    )
+
+    def apply(sym: Symbol): Type = (
+      if (symbolicTypeRefs contains sym.id)
+        symbolicTypeRefs(sym.id)
+      else
+        newSymbolicTypeRef(sym)
+    )
   }
 
   protected def defineParentsOfTypeRef(tpe: TypeRef) = {
@@ -3652,6 +3703,11 @@ trait Types
 
 // Hash consing --------------------------------------------------------------
 
+  /** Split off from the main uniques cache, these are symbols for which
+   *  there can be only one TypeRef, such as package classes, and
+   *  package-owned monormorphic classes. The map is indexed by Symbol id.
+   */
+  private val symbolicTypeRefs = perRunCaches.newMap[Int, Type]()
   private val initialUniquesCapacity = 4096
   private var uniques: util.HashSet[Type] = _
   private var uniqueRunId = NoRunId
@@ -4378,6 +4434,7 @@ trait Types
     case ExistentialType(tparams, quantified) :: rest =>
       mergePrefixAndArgs(quantified :: rest, variance, depth) map (existentialAbstraction(tparams, _))
     case _ =>
+      val tps_s = tps map (t => s"$t: ${util.shortClassOfInstance(t)}")
       abort(s"mergePrefixAndArgs($tps, $variance, $depth): unsupported tps")
   }
 
