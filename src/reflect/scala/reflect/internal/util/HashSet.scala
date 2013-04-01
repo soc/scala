@@ -22,6 +22,30 @@ class HashSet[T >: Null <: AnyRef](val label: String, initialCapacity: Int) exte
     table = new Array[AnyRef](initialCapacity)
   }
 
+  def removeEntry(x: T): Unit = {
+    var h = index(x.##)
+    var entry = table(h)
+    while ((entry ne null) && x != entry) {
+      h = index(h + 1)
+      entry = table(h)
+    }
+    if (x == entry) {
+      // Inserting a null might break an open addressing chain,
+      // severing the link between an entry and the point from which
+      // a search will begin. So we also null out everything to the
+      // the right of this entry, until we reach a null, and then
+      // re-add the nearly-orphaned entries.
+      var rehash: List[T] = Nil
+      var h1 = index(h + 1)
+      while (table(h1) ne null) {
+        rehash ::= table(h1).asInstanceOf[T]
+        table(h1) = null
+        h1 = index(h1 + 1)
+      }
+      rehash.reverse foreach addEntry
+    }
+  }
+
   def findEntryOrUpdate(x: T): T = {
     var h = index(x.##)
     var entry = table(h)
