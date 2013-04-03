@@ -1,0 +1,2 @@
+ import scala.collection.JavaConversions._
+ println("bindings: "+ bindings.toList)

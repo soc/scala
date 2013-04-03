@@ -1,0 +1,49 @@
+<project name="maven" xmlns:artifact="urn:maven-artifact-ant">
+  <!-- This task has an issue where if the user directory does not exist. -->
+  <mkdir dir="${user.home}/.m2/repository"/>
+
+  <path id="maven-ant-tasks.classpath" path="${basedir}/lib/ant/maven-ant-tasks-2.1.1.jar" />
+  <typedef resource="org/apache/maven/artifact/ant/antlib.xml" uri="urn:maven-artifact-ant" classpathref="maven-ant-tasks.classpath" />
+
+  <!-- Pax runner -->
+  <property name="pax.exam.version" value="2.5.0"/>
+  <artifact:dependencies pathId="pax.exam.classpath" filesetId="pax.exam.fileset">
+    <dependency groupId="org.ops4j.pax.exam" artifactId="pax-exam-container-native" version="${pax.exam.version}"/>
+    <dependency groupId="org.ops4j.pax.exam" artifactId="pax-exam-junit4" version="${pax.exam.version}"/>
+    <dependency groupId="org.ops4j.pax.exam" artifactId="pax-exam-link-assembly" version="${pax.exam.version}"/>
+    <dependency groupId="org.ops4j.pax.url" artifactId="pax-url-aether" version="1.4.0"/>
+    <dependency groupId="org.ops4j.pax.swissbox" artifactId="pax-swissbox-framework" version="1.5.1"/>
+    <dependency groupId="ch.qos.logback" artifactId="logback-core" version="0.9.20"/>
+    <dependency groupId="ch.qos.logback" artifactId="logback-classic" version="0.9.20"/>
+    <dependency groupId="junit" artifactId="junit" version="4.10"/>
+    <dependency groupId="org.apache.felix" artifactId="org.apache.felix.framework" version="3.2.2"/>
+  </artifact:dependencies>
+
+  <macrodef name="depends">
+    <attribute name="id"/>
+    <attribute name="g"/>
+    <attribute name="a"/>
+    <attribute name="v"/>
+    <sequential>
+      <artifact:dependencies pathId="@{id}">
+        <dependency groupId="@{g}" artifactId="@{a}" version="@{v}"/>
+      </artifact:dependencies>
+    </sequential>
+  </macrodef>
+
+  <!-- BND support -->
+  <depends id="bnd.classpath" g="biz.aQute" a="bnd" v="1.50.0"/>
+  <typedef resource="aQute/bnd/ant/taskdef.properties" classpathref="bnd.classpath" />
+
+  <!-- java diff library for partest -->
+  <depends id="partest.extras.classpath" g="com.googlecode.java-diff-utils" a="diffutils" v="1.3.0"/>
+
+  <!-- scala in ant -->
+  <depends id="scala.m2.classpath" g="org.scala-lang" a="scala-compiler" v="2.11.0-M2"/>
+
+  <!-- <echo message="and the winner is ${toString:scala-compiler}"/> -->
+<!--   <artifact:dependencies pathId="scala.v211m2.classpath">
+    <dependency groupId="org.scala-lang" artifactId="scala-compiler" version="2.11.0-M2"/>
+  </artifact:dependencies>
+ -->
+</project>
