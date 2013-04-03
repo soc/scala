@@ -944,6 +944,57 @@ trait Typers extends Adaptations with Tags {
         // due to wrapClassTagUnapply, but when we support parameterized extractors, it will become
         // more common place)
         val extractor = overloadedExtractorOfObject orElse unapplyMember(tree.tpe)
+        def convertToCaseConstructor(clazz: Symbol): TypeTree = {
+          // convert synthetic unapply of case class to case class constructor
+          val prefix = tree.tpe.prefix
+          val tree1 = TypeTree(clazz.primaryConstructor.tpe.asSeenFrom(prefix, clazz.owner))
+            .setOriginal(tree)
+
+          val skolems = new mutable.ListBuffer[TypeSymbol]
+          object variantToSkolem extends TypeMap(trackVariance = true) {
+            def apply(tp: Type) = mapOver(tp) match {
+              // !!! FIXME - skipping this when variance.isInvariant allows unsoundness, see SI-5189
+              case TypeRef(NoPrefix, tpSym, Nil) if !variance.isInvariant && tpSym.isTypeParameterOrSkolem && tpSym.owner.isTerm =>
+                // must initialize or tpSym.tpe might see random type params!!
+                // without this, we'll get very weird types inferred in test/scaladoc/run/SI-5933.scala
+                // TODO: why is that??
+                tpSym.initialize
+                val bounds = if (variance.isPositive) TypeBounds.upper(tpSym.tpe) else TypeBounds.lower(tpSym.tpe)
+                // origin must be the type param so we can deskolemize
+                val skolem = context.owner.newGADTSkolem(unit.freshTypeName("?"+tpSym.name), tpSym, bounds)
+                // println("mapping "+ tpSym +" to "+ skolem + " : "+ bounds +" -- pt= "+ pt +" in "+ context.owner +" at "+ context.tree )
+                skolems += skolem
+                skolem.tpe
+              case tp1 => tp1
+            }
+          }
+
+          // have to open up the existential and put the skolems in scope
+          // can't simply package up pt in an ExistentialType, because that takes us back to square one (List[_ <: T] == List[T] due to covariance)
+          val ptSafe   = variantToSkolem(pt) // TODO: pt.skolemizeExistential(context.owner, tree) ?
+          val freeVars = skolems.toList
+
+          // use "tree" for the context, not context.tree: don't make another CaseDef context,
+          // as instantiateTypeVar's bounds would end up there
+          val ctorContext = context.makeNewScope(tree, context.owner)
+          freeVars foreach ctorContext.scope.enter
+          newTyper(ctorContext).infer.inferConstructorInstance(tree1, clazz.typeParams, ptSafe)
+
+          // simplify types without losing safety,
+          // so that we get rid of unnecessary type slack, and so that error messages don't unnecessarily refer to skolems
+          val extrapolate = new ExistentialExtrapolation(freeVars) extrapolate (_: Type)
+          val extrapolated = tree1.tpe match {
+            case MethodType(ctorArgs, res) => // ctorArgs are actually in a covariant position, since this is the type of the subpatterns of the pattern represented by this Apply node
+              ctorArgs foreach (p => p.info = extrapolate(p.info)) // no need to clone, this is OUR method type
+              copyMethodType(tree1.tpe, ctorArgs, extrapolate(res))
+            case tp => tp
+          }
+
+          // once the containing CaseDef has been type checked (see typedCase),
+          // tree1's remaining type-slack skolems will be deskolemized (to the method type parameter skolems)
+          tree1 setType extrapolated
+        }
+
         if (extractor != NoSymbol) {
           // if we did some ad-hoc overloading resolution, update the tree's symbol
           // do not update the symbol if the tree's symbol's type does not define an unapply member
@@ -959,59 +1010,16 @@ trait Typers extends Adaptations with Tags {
           val clazz = unapplyParameterType(unapply)
 
           if (unapply.isCase && clazz.isCase) {
-            // convert synthetic unapply of case class to case class constructor
-            val prefix = tree.tpe.prefix
-            val tree1 = TypeTree(clazz.primaryConstructor.tpe.asSeenFrom(prefix, clazz.owner))
-              .setOriginal(tree)
-
-            val skolems = new mutable.ListBuffer[TypeSymbol]
-            object variantToSkolem extends TypeMap(trackVariance = true) {
-              def apply(tp: Type) = mapOver(tp) match {
-                // !!! FIXME - skipping this when variance.isInvariant allows unsoundness, see SI-5189
-                case TypeRef(NoPrefix, tpSym, Nil) if !variance.isInvariant && tpSym.isTypeParameterOrSkolem && tpSym.owner.isTerm =>
-                  // must initialize or tpSym.tpe might see random type params!!
-                  // without this, we'll get very weird types inferred in test/scaladoc/run/SI-5933.scala
-                  // TODO: why is that??
-                  tpSym.initialize
-                  val bounds = if (variance.isPositive) TypeBounds.upper(tpSym.tpe) else TypeBounds.lower(tpSym.tpe)
-                  // origin must be the type param so we can deskolemize
-                  val skolem = context.owner.newGADTSkolem(unit.freshTypeName("?"+tpSym.name), tpSym, bounds)
-                  // println("mapping "+ tpSym +" to "+ skolem + " : "+ bounds +" -- pt= "+ pt +" in "+ context.owner +" at "+ context.tree )
-                  skolems += skolem
-                  skolem.tpe
-                case tp1 => tp1
-              }
-            }
-
-            // have to open up the existential and put the skolems in scope
-            // can't simply package up pt in an ExistentialType, because that takes us back to square one (List[_ <: T] == List[T] due to covariance)
-            val ptSafe   = variantToSkolem(pt) // TODO: pt.skolemizeExistential(context.owner, tree) ?
-            val freeVars = skolems.toList
-
-            // use "tree" for the context, not context.tree: don't make another CaseDef context,
-            // as instantiateTypeVar's bounds would end up there
-            val ctorContext = context.makeNewScope(tree, context.owner)
-            freeVars foreach ctorContext.scope.enter
-            newTyper(ctorContext).infer.inferConstructorInstance(tree1, clazz.typeParams, ptSafe)
-
-            // simplify types without losing safety,
-            // so that we get rid of unnecessary type slack, and so that error messages don't unnecessarily refer to skolems
-            val extrapolate = new ExistentialExtrapolation(freeVars) extrapolate (_: Type)
-            val extrapolated = tree1.tpe match {
-              case MethodType(ctorArgs, res) => // ctorArgs are actually in a covariant position, since this is the type of the subpatterns of the pattern represented by this Apply node
-                ctorArgs foreach (p => p.info = extrapolate(p.info)) // no need to clone, this is OUR method type
-                copyMethodType(tree1.tpe, ctorArgs, extrapolate(res))
-              case tp => tp
-            }
-
-            // once the containing CaseDef has been type checked (see typedCase),
-            // tree1's remaining type-slack skolems will be deskolemized (to the method type parameter skolems)
-            tree1 setType extrapolated
+            convertToCaseConstructor(clazz)
           } else {
             tree
           }
         } else {
-          CaseClassConstructorError(tree)
+          val clazz = tree.tpe.typeSymbol.linkedClassOfClass
+          if (clazz.isCase)
+            convertToCaseConstructor(clazz)
+          else
+            CaseClassConstructorError(tree)
         }
       }
 
@@ -1324,8 +1332,7 @@ trait Typers extends Adaptations with Tags {
     def adaptToMemberWithArgs(tree: Tree, qual: Tree, name: Name, mode: Mode, reportAmbiguous: Boolean, saveErrors: Boolean): Tree = {
       def onError(reportError: => Tree): Tree = context.tree match {
           case Apply(tree1, args) if (tree1 eq tree) && args.nonEmpty =>
-          ( silent   (_.typedArgs(args, mode))
-                 map (_.asInstanceOf[List[Tree]])
+          ( silent   (_.typedArgs(args.map(_.duplicate), mode))
               filter (xs => !(xs exists (_.isErrorTyped)))
                  map (xs => adaptToArguments(qual, name, xs, WildcardType, reportAmbiguous, saveErrors))
               orElse ( _ => reportError)
@@ -3558,7 +3565,7 @@ trait Typers extends Adaptations with Tags {
         // If there are dummy type arguments in typeFun part, it suggests we
         // must type the actual constructor call, not only the select. The value
         // arguments are how the type arguments will be inferred.
-        if (targs.isEmpty && typedFun0.exists(t => isDummyAppliedType(t.tpe)))
+        if (targs.isEmpty && typedFun0.exists(t => t.tpe != null && isDummyAppliedType(t.tpe)))
           logResult(s"Retyped $typedFun0 to find type args")(typed(argss.foldLeft(fun0)(Apply(_, _))))
         else
           typedFun0
@@ -4211,7 +4218,7 @@ trait Typers extends Adaptations with Tags {
         if (treeInfo.mayBeVarGetter(varsym)) {
           lhs1 match {
             case treeInfo.Applied(Select(qual, name), _, _) =>
-              val sel = Select(qual, nme.getterToSetter(name.toTermName)) setPos lhs.pos
+              val sel = Select(qual, name.setterName) setPos lhs.pos
               val app = Apply(sel, List(rhs)) setPos tree.pos
               return typed(app, mode, pt)
 
@@ -4372,6 +4379,12 @@ trait Typers extends Adaptations with Tags {
           treeCopy.New(tree, tpt1).setType(tp)
       }
 
+      def functionTypeWildcard(tree: Tree, arity: Int): Type = {
+        val tp = functionType(List.fill(arity)(WildcardType), WildcardType)
+        if (tp == NoType) MaxFunctionArityError(tree)
+        tp
+      }
+
       def typedEta(expr1: Tree): Tree = expr1.tpe match {
         case TypeRef(_, ByNameParamClass, _) =>
           val expr2 = Function(List(), expr1) setPos expr1.pos
@@ -4383,10 +4396,10 @@ trait Typers extends Adaptations with Tags {
           typed1(expr2, mode, pt)
         case PolyType(_, MethodType(formals, _)) =>
           if (isFunctionType(pt)) expr1
-          else adapt(expr1, mode, functionType(formals map (t => WildcardType), WildcardType))
+          else adapt(expr1, mode, functionTypeWildcard(expr1, formals.length))
         case MethodType(formals, _) =>
           if (isFunctionType(pt)) expr1
-          else adapt(expr1, mode, functionType(formals map (t => WildcardType), WildcardType))
+          else adapt(expr1, mode, functionTypeWildcard(expr1, formals.length))
         case ErrorType =>
           expr1
         case _ =>
@@ -4692,11 +4705,13 @@ trait Typers extends Adaptations with Tags {
           def handleMissing: Tree = {
             def errorTree = missingSelectErrorTree(tree, qual, name)
             def asTypeSelection = (
-              if (context.owner.enclosingTopLevelClass.isJavaDefined && name.isTypeName) {
+              if (context.unit.isJava && name.isTypeName) {
+                // SI-3120 Java uses the same syntax, A.B, to express selection from the
+                // value A and from the type A. We have to try both.
                 atPos(tree.pos)(gen.convertToSelectFromType(qual, name)) match {
                   case EmptyTree => None
                   case tree1     => Some(typed1(tree1, mode, pt))
-            }
+                }
               }
               else None
             )

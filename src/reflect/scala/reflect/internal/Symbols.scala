@@ -763,16 +763,10 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
     def compileTimeOnlyMessage  = getAnnotation(CompileTimeOnlyAttr) flatMap (_ stringArg 0)
 
     /** Is this symbol an accessor method for outer? */
-    final def isOuterAccessor = {
-      hasFlag(STABLE | ARTIFACT) &&
-      originalName == nme.OUTER
-    }
+    final def isOuterAccessor = hasFlag(STABLE | ARTIFACT) && (unexpandedName == nme.OUTER)
 
     /** Is this symbol an accessor method for outer? */
-    final def isOuterField = {
-      hasFlag(ARTIFACT) &&
-      originalName == nme.OUTER_LOCAL
-    }
+    final def isOuterField = isArtifact && (unexpandedName == nme.OUTER_LOCAL)
 
     /** Does this symbol denote a stable value? */
     def isStable = false
@@ -997,10 +991,12 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
 
 // ------ name attribute --------------------------------------------------------------
 
-    /** If this symbol has an expanded name, its original name, otherwise its name itself.
-     *  @see expandName
+    @deprecated("Use unexpandedName", "2.11.0") def originalName: Name = unexpandedName
+
+    /** If this symbol has an expanded name, its original (unexpanded) name,
+     *  otherwise the name itself.
      */
-    def originalName: Name = nme.originalName(nme.dropLocalSuffix(name))
+    def unexpandedName: Name = nme.unexpandedName(name)
 
     /** The name of the symbol before decoding, e.g. `\$eq\$eq` instead of `==`.
      */
@@ -1008,7 +1004,7 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
 
     /** The decoded name of the symbol, e.g. `==` instead of `\$eq\$eq`.
      */
-    def decodedName: String = nme.dropLocalSuffix(name).decode
+    def decodedName: String = name.decode
 
     private def addModuleSuffix(n: Name): Name =
       if (needsModuleSuffix) n append nme.MODULE_SUFFIX_STRING else n
@@ -1027,7 +1023,7 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
     )
     /** These should be moved somewhere like JavaPlatform.
      */
-    def javaSimpleName: Name = addModuleSuffix(nme.dropLocalSuffix(simpleName))
+    def javaSimpleName: Name = addModuleSuffix(simpleName.dropLocal)
     def javaBinaryName: Name = addModuleSuffix(fullNameInternal('/'))
     def javaClassName: String  = addModuleSuffix(fullNameInternal('.')).toString
 
@@ -1048,7 +1044,7 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
       else ((effectiveOwner.enclClass.fullNameAsName(separator) append separator): Name) append name
     )
 
-    def fullNameAsName(separator: Char): Name = nme.dropLocalSuffix(fullNameInternal(separator))
+    def fullNameAsName(separator: Char): Name = fullNameInternal(separator).dropLocal
 
     /** The encoded full path name of this symbol, where outer names and inner names
      *  are separated by periods.
@@ -1825,7 +1821,7 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
       //
       // The slightly more principled approach of using the paramss of the
       // primary constructor leads to cycles in, for example, pos/t5084.scala.
-      val primaryNames = constrParamAccessors.map(acc => nme.dropLocalSuffix(acc.name))
+      val primaryNames = constrParamAccessors map (_.name.dropLocal)
       caseFieldAccessorsUnsorted.sortBy { acc =>
         primaryNames indexWhere { orig =>
           (acc.name == orig) || (acc.name startsWith (orig append "$"))
@@ -1844,7 +1840,7 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
     /** The symbol accessed by this accessor function, but with given owner type. */
     final def accessed(ownerTp: Type): Symbol = {
       assert(hasAccessorFlag, this)
-      ownerTp decl nme.getterToLocal(getterName.toTermName)
+      ownerTp decl localName
     }
 
     /** The module corresponding to this module class (note that this
@@ -2201,22 +2197,23 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
     /** The getter of this value or setter definition in class `base`, or NoSymbol if
      *  none exists.
      */
-    final def getter(base: Symbol): Symbol = base.info.decl(getterName) filter (_.hasAccessorFlag)
+    final def getter(base: Symbol): Symbol =
+      base.info decl getterName filter (_.hasAccessorFlag)
 
-    def getterName: TermName = (
-      if (isSetter) nme.setterToGetter(name.toTermName)
-      else if (nme.isLocalName(name)) nme.localToGetter(name.toTermName)
-      else name.toTermName
-    )
+    def getterName: TermName = name.getterName
+    def setterName: TermName = name.setterName
+    def localName: TermName  = name.localName
 
     /** The setter of this value or getter definition, or NoSymbol if none exists */
-    final def setter(base: Symbol): Symbol = setter(base, hasExpandedName = false)
+    final def setter(base: Symbol, hasExpandedName: Boolean = needsExpandedSetterName): Symbol =
+      base.info decl setterNameInBase(base, hasExpandedName) filter (_.hasAccessorFlag)
 
-    final def setter(base: Symbol, hasExpandedName: Boolean): Symbol = {
-      var sname = nme.getterToSetter(nme.getterName(name.toTermName))
-      if (hasExpandedName) sname = nme.expandedSetterName(sname, base)
-      base.info.decl(sname) filter (_.hasAccessorFlag)
-    }
+    def needsExpandedSetterName = (
+      if (isMethod) hasStableFlag && !isLazy
+      else hasNoFlags(LAZY | MUTABLE)
+    )
+    def setterNameInBase(base: Symbol, expanded: Boolean): TermName =
+      if (expanded) nme.expandedSetterName(setterName, base) else setterName
 
     /** If this is a derived value class, return its unbox method
      *  or NoSymbol if it does not exist.
@@ -2393,12 +2390,13 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
      *  If settings.uniqid, adds id.
      *  If settings.Yshowsymkinds, adds abbreviated symbol kind.
      */
-    def nameString: String = (
-      if (!settings.uniqid.value && !settings.Yshowsymkinds.value) "" + originalName.decode
-      else if (settings.uniqid.value && !settings.Yshowsymkinds.value) originalName.decode + "#" + id
-      else if (!settings.uniqid.value && settings.Yshowsymkinds.value) originalName.decode + "#" + abbreviatedKindString
-      else originalName.decode + "#" + id + "#" + abbreviatedKindString
-    )
+    def nameString: String = {
+      val name_s = if (settings.debug.value) "" + unexpandedName else unexpandedName.dropLocal.decode
+      val id_s   = if (settings.uniqid.value) "#" + id else ""
+      val kind_s = if (settings.Yshowsymkinds.value) "#" + abbreviatedKindString else ""
+
+      name_s + id_s + kind_s
+    }
 
     def fullNameString: String = {
       def recur(sym: Symbol): String = {
@@ -2625,20 +2623,32 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
     }
 
     /** change name by appending $$<fully-qualified-name-of-class `base`>
-     *  Do the same for any accessed symbols or setters/getters
+     *  Do the same for any accessed symbols or setters/getters.
+     *  If the accessor to be renamed is overriding a base symbol, enter
+     *  a cloned symbol with the original name but without ACCESSOR flag.
      */
     override def expandName(base: Symbol) {
-      if (!hasFlag(EXPANDEDNAME)) {
-        setFlag(EXPANDEDNAME)
-        if (hasAccessorFlag && !isDeferred) {
-          accessed.expandName(base)
-        }
-        else if (hasGetter) {
-          getter(owner).expandName(base)
-          setter(owner).expandName(base)
-        }
-        name = nme.expandedName(name.toTermName, base)
+      def expand(sym: Symbol) {
+        if ((sym eq NoSymbol) || (sym hasFlag EXPANDEDNAME)) () // skip
+        else sym setFlag EXPANDEDNAME setName nme.expandedName(sym.name.toTermName, base)
       }
+      def cloneAndExpand(accessor: Symbol) {
+        val clone = accessor.cloneSymbol(accessor.owner, (accessor.flags | ARTIFACT) & ~ACCESSOR)
+        expand(accessor)
+        log(s"Expanded overriding accessor to $accessor, but cloned $clone to preserve override")
+        accessor.owner.info.decls enter clone
+      }
+      def expandAccessor(accessor: Symbol) {
+        if (accessor.isOverridingSymbol) cloneAndExpand(accessor) else expand(accessor)
+      }
+      if (hasAccessorFlag && !isDeferred) {
+        expand(accessed)
+      }
+      else if (hasGetter) {
+        expandAccessor(getter(owner))
+        expandAccessor(setter(owner))
+      }
+      expand(this)
     }
   }
   implicit val TermSymbolTag = ClassTag[TermSymbol](classOf[TermSymbol])
@@ -3068,7 +3078,7 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
       if (Statistics.canEnable) Statistics.incCounter(nameCount)
       if (needsFlatClasses) {
         if (flatname eq null)
-          flatname = nme.flattenedName(rawowner.name, rawname).toTypeName
+          flatname = tpnme.flattenedName(rawowner.name, rawname)
 
         flatname
       }
