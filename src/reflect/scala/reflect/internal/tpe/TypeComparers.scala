@@ -405,7 +405,7 @@ trait TypeComparers {
 
   /** Does type `tp1` conform to `tp2`? */
   private def isSubType3(tp1: Type, tp2: Type, depth: Int): Boolean = {
-    def isSub(lhs: Type, rhs: Type) = isSubType(lhs, rhs, depth)
+    def isSub(lhs: Type, rhs: Type) = ((lhs ne tp1) || (rhs ne tp2)) && isSubType(lhs, rhs, depth)
     def replaceLeft(lhs: Type)      = (lhs ne tp1) && isSub(lhs, tp2)
     def replaceRight(rhs: Type)     = (rhs ne tp2) && isSub(tp1, rhs)
     def narrowModuleClass(tp: Type): Type = tp match {
@@ -529,10 +529,9 @@ trait TypeComparers {
         false
     }
 
-
-
     (    fromRight
       || fromLeft
+      || moduleClassSubType
     )
   }
 
