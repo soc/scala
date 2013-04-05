@@ -408,6 +408,10 @@ trait TypeComparers {
 
   /** Does type `tp1` conform to `tp2`? */
   private def isSubType3(tp1: Type, tp2: Type, depth: Int): Boolean = {
+    def isSub(lhs: Type, rhs: Type) = isSubType(lhs, rhs, depth)
+    def replaceLeft(lhs: Type)      = (lhs ne tp1) && isSub(lhs, tp2)
+    def replaceRight(rhs: Type)     = (rhs ne tp2) && isSub(tp1, rhs)
+
     // if ((tp1 eq tp2) || isErrorOrWildcard(tp1) || isErrorOrWildcard(tp2)) return true
     // if ((tp1 eq NoType) || (tp2 eq NoType)) return false
     // if (tp1 eq NoPrefix) return (tp2 eq NoPrefix) || tp2.typeSymbol.isPackageClass // !! I do not see how the "isPackageClass" would be warranted by the spec
@@ -415,110 +419,81 @@ trait TypeComparers {
     // if (isSingleType(tp1) && isSingleType(tp2) || isConstantType(tp1) && isConstantType(tp2)) return tp1 =:= tp2
     // if (tp1.isHigherKinded || tp2.isHigherKinded) return isHKSubType(tp1, tp2, depth)
 
+    def typeRefOnRight(tp1: Type, tp2: TypeRef): Boolean = {
+      val sym2 = tp2.sym
+      def lo = tp2.bounds.
+      sym2 match {
+        case SingletonClass                       => tp1.isStable
+        case _: ClassSymbol                       => false
+        case _: TypeSymbol if sym2.isAbstractType => isDifferentTypeConstructor(tp2, lo) && replaceRight(lo)
+        case _: TypeSymbol                        => isSub(tp1.normalize, tp2.normalize)
+        case _                                    => false
+      }
+    }
+    def typeRefOnLeft(tp1: TypeRef, tp2: Type): Boolean = {
+      val TypeRef(pre1, sym1, args1) = tp1
+      def isNullable = tp2 match {
+        case TypeRef(_, sym2, _) => sym1 isBottomSubClass sym2
+        case _                   => isSingleType(tp2) && replaceRight(tp2.widen)
+      }
+      sym1 match {
+        case NothingClass                     => true
+        case NullClass                        => isNullable
+        case _: ClassSymbol                   => false
+        case _: TypeSymbol if sym1.isDeferred => isDifferentTypeConstructor(tp1, tp2.bounds.hi) && replaceLeft(tp1.bounds.hi)
+        case _: TypeSymbol                    => isSub(tp1.normalize, tp2.normalize)
+        case _                                => false
+      }
+    }
+
     /* First try, on the right:
      *   - unwrap Annotated types, BoundedWildcardTypes,
      *   - bind TypeVars  on the right, if lhs is not Annotated nor BoundedWildcard
      *   - handle common cases for first-kind TypeRefs on both sides as a fast path.
      */
-    def firstTry = tp2 match {
-      // fast path: two typerefs, none of them HK
-      case tr2: TypeRef =>
+    def twoTypeRefs(tr1: TypeRef, tr2: TypeRef) = {
+      val sym1 = tr1.sym
+      val sym2 = tr2.sym
+      val pre1 = tr1.pre
+      val pre2 = tr2.pre
+
+      (
+        ((if (sym1 == sym2) phase.erasedTypes || sym1.owner.hasPackageFlag || isSubType(pre1, pre2, depth)
+      else (sym1.name == sym2.name && !sym1.isModuleClass && !sym2.isModuleClass &&
+        (isUnifiable(pre1, pre2) ||
+          isSameSpecializedSkolem(sym1, sym2, pre1, pre2) ||
+          sym2.isAbstractType && isSubPre(pre1, pre2, sym2)))) &&
+        isSubArgs(tr1.args, tr2.args, sym1.typeParams, depth))
+        ||
+        sym2.isClass && {
+          val base = tr1 baseType sym2
+          (base ne tr1) && isSubType(base, tr2, depth)
+        }
+        ||
+        typeRefOnRight(tr1, tr2)
+        || typeRefOnLeft(tr1, tr2)
+      )
+    }
+
+    def fromLeft = tp1 match {
+      case tp1: TypeRef            => typeRefOnLeft(tp1, tp2)
+      case tp1: ExistentialType    => atHigherSkolemization(isSubType(tp1.skolemizeExistential, tp2, depth))
+      case RefinedType(parents, _) => parents exists replaceLeft
+      case _: SingletonType        => replaceLeft(tp1.underlying)
+      case _                       => false
+    }
+
+    def fromRight = tp2 match {
+      case tp2: TypeRef =>
         tp1 match {
-          case tr1: TypeRef =>
-            // TODO - dedicate a method to TypeRef/TypeRef subtyping.
-            // These typerefs are pattern matched up and down far more
-            // than is necessary.
-            val sym1 = tr1.sym
-            val sym2 = tr2.sym
-            val pre1 = tr1.pre
-            val pre2 = tr2.pre
-            (((if (sym1 == sym2) phase.erasedTypes || sym1.owner.hasPackageFlag || isSubType(pre1, pre2, depth)
-            else (sym1.name == sym2.name && !sym1.isModuleClass && !sym2.isModuleClass &&
-              (isUnifiable(pre1, pre2) ||
-                isSameSpecializedSkolem(sym1, sym2, pre1, pre2) ||
-                sym2.isAbstractType && isSubPre(pre1, pre2, sym2)))) &&
-              isSubArgs(tr1.args, tr2.args, sym1.typeParams, depth))
-              ||
-              sym2.isClass && {
-                val base = tr1 baseType sym2
-                (base ne tr1) && isSubType(base, tr2, depth)
-              }
-              ||
-              thirdTryRef(tr1, tr2))
-          case _ =>
-            secondTry
+          case tp1: TypeRef => twoTypeRefs(tp1, tp2)
+          case _            => typeRefOnRight(tp1, tp2)
         }
-      // case AnnotatedType(_, _, _) =>
-      //   isSubType(tp1.withoutAnnotations, tp2.withoutAnnotations, depth) &&
-      //     annotationsConform(tp1, tp2)
-      // case BoundedWildcardType(bounds) =>
-      //   isSubType(tp1, bounds.hi, depth)
-      // case tv2 @ TypeVar(_, constr2) =>
-      //   tp1 match {
-      //     case AnnotatedType(_, _, _) | BoundedWildcardType(_) =>
-      //       secondTry
-      //     case _ =>
-      //       tv2.registerBound(tp1, isLowerBound = true)
-      //   }
-      case _ =>
-        secondTry
-    }
-
-    /* Second try, on the left:
-     *   - unwrap AnnotatedTypes, BoundedWildcardTypes,
-     *   - bind typevars,
-     *   - handle existential types by skolemization.
-     */
-    def secondTry = tp1 match {
-      // case AnnotatedType(_, _, _) =>
-      //   isSubType(tp1.withoutAnnotations, tp2.withoutAnnotations, depth) &&
-      //     annotationsConform(tp1, tp2)
-      // case BoundedWildcardType(bounds) =>
-      //   isSubType(tp1.bounds.lo, tp2, depth)
-      // case tv @ TypeVar(_,_) =>
-      //   tv.registerBound(tp2, isLowerBound = false)
-      case ExistentialType(_, _) =>
-        try {
-          skolemizationLevel += 1
-          isSubType(tp1.skolemizeExistential, tp2, depth)
-        } finally {
-          skolemizationLevel -= 1
-        }
-      case _ =>
-        thirdTry
-    }
-
-    def thirdTryRef(tp1: Type, tp2: TypeRef): Boolean = {
-      val sym2 = tp2.sym
-      def retry(lhs: Type, rhs: Type)   = isSubType(lhs, rhs, depth)
-      def abstractTypeOnRight(lo: Type) = isDifferentTypeConstructor(tp2, lo) && retry(tp1, lo)
-      // def classOnRight                  = (
-      //   if (isRawType(tp2)) retry(tp1, rawToExistential(tp2))
-      //   // else if (sym2.isRefinementClass) retry(tp1, sym2.info)
-      //   else fourthTry
-      // )
-      sym2 match {
-        case SingletonClass                   => tp1.isStable || fourthTry
-        case _: ClassSymbol                   => fourthTry
-        case _: TypeSymbol if sym2.isDeferred => abstractTypeOnRight(tp2.bounds.lo) || fourthTry
-        case _: TypeSymbol                    => retry(tp1.normalize, tp2.normalize)
-        case _                                => fourthTry
-      }
-    }
-
-    /* Third try, on the right:
-     *   - decompose refined types.
-     *   - handle typerefs and existentials.
-     *   - handle left+right method types, polytypes, typebounds
-     */
-    def thirdTry = tp2 match {
-      case tr2: TypeRef =>
-        thirdTryRef(tp1, tr2)
       case rt2: RefinedType =>
         (rt2.parents forall (isSubType(tp1, _, depth))) &&
           (rt2.decls forall (specializesSym(tp1, _, depth)))
       case et2: ExistentialType =>
-        et2.withTypeVars(isSubType(tp1, _, depth), depth) || fourthTry
+        et2.withTypeVars(isSubType(tp1, _, depth), depth)
       case mt2: MethodType =>
         tp1 match {
           case mt1 @ MethodType(params1, res1) =>
@@ -548,47 +523,15 @@ trait TypeComparers {
             false
         }
       case _ =>
-        fourthTry
+        false
     }
 
-    /* Fourth try, on the left:
-     *   - handle typerefs, refined types, and singleton types.
-     */
-    def fourthTry = {
-      def retry(lhs: Type, rhs: Type)  = isSubType(lhs, rhs, depth)
-      def abstractTypeOnLeft(hi: Type) = isDifferentTypeConstructor(tp1, hi) && retry(hi, tp2)
 
-      tp1 match {
-        case tr1 @ TypeRef(pre1, sym1, _) =>
-          def nullOnLeft = tp2 match {
-            case TypeRef(_, sym2, _) => sym1 isBottomSubClass sym2
-            case _                   => isSingleType(tp2) && retry(tp1, tp2.widen)
-          }
-          // def moduleOnLeft = tp2 match {
-          //   case SingleType(pre2, sym2) => equalSymsAndPrefixes(sym1.sourceModule, pre1, sym2, pre2)
-          //   case _                      => false
-          // }
-          // def classOnLeft = (
-          //   if (isRawType(tp1)) retry(rawToExistential(tp1), tp2)
-          //   else if (sym1.isModuleClass) moduleOnLeft
-          //   else false
-          //   // else sym1.isRefinementClass && retry(sym1.info, tp2)
-          // )
-          sym1 match {
-            case NothingClass                     => true
-            case NullClass                        => nullOnLeft
-            case _: ClassSymbol                   => false // classOnLeft
-            case _: TypeSymbol if sym1.isDeferred => abstractTypeOnLeft(tp1.bounds.hi)
-            case _: TypeSymbol                    => retry(tp1.normalize, tp2.normalize)
-            case _                                => false
-          }
-        case RefinedType(parents, _) => parents exists (retry(_, tp2))
-        case _: SingletonType        => retry(tp1.underlying, tp2)
-        case _                       => false
-      }
-    }
 
-    firstTry
+    (    fromRight
+      || fromLeft
+      || skolemizeOnLeft
+    )
   }
 
 
