@@ -420,9 +420,8 @@ trait TypeComparers {
     // if (tp1.isHigherKinded || tp2.isHigherKinded) return isHKSubType(tp1, tp2, depth)
 
     def typeRefOnRight(tp1: Type, tp2: TypeRef): Boolean = {
-      val sym2 = tp2.sym
-      def lo = tp2.bounds.
-      sym2 match {
+      def lo = tp2.bounds.lo
+      tp2.sym match {
         case SingletonClass                       => tp1.isStable
         case _: ClassSymbol                       => false
         case _: TypeSymbol if sym2.isAbstractType => isDifferentTypeConstructor(tp2, lo) && replaceRight(lo)
@@ -431,16 +430,16 @@ trait TypeComparers {
       }
     }
     def typeRefOnLeft(tp1: TypeRef, tp2: Type): Boolean = {
-      val TypeRef(pre1, sym1, args1) = tp1
+      def hi = tp1.bounds.hi
       def isNullable = tp2 match {
-        case TypeRef(_, sym2, _) => sym1 isBottomSubClass sym2
+        case TypeRef(_, sym2, _) => NullClass isBottomSubClass sym2
         case _                   => isSingleType(tp2) && replaceRight(tp2.widen)
       }
-      sym1 match {
+      tp1.sym match {
         case NothingClass                     => true
         case NullClass                        => isNullable
         case _: ClassSymbol                   => false
-        case _: TypeSymbol if sym1.isDeferred => isDifferentTypeConstructor(tp1, tp2.bounds.hi) && replaceLeft(tp1.bounds.hi)
+        case _: TypeSymbol if sym1.isDeferred => isDifferentTypeConstructor(tp1, hi) && replaceLeft(hi)
         case _: TypeSymbol                    => isSub(tp1.normalize, tp2.normalize)
         case _                                => false
       }
@@ -471,13 +470,12 @@ trait TypeComparers {
         }
         ||
         typeRefOnRight(tr1, tr2)
-        || typeRefOnLeft(tr1, tr2)
       )
     }
 
     def fromLeft = tp1 match {
-      case tp1: TypeRef            => typeRefOnLeft(tp1, tp2)
       case tp1: ExistentialType    => atHigherSkolemization(isSubType(tp1.skolemizeExistential, tp2, depth))
+      case tp1: TypeRef            => typeRefOnLeft(tp1, tp2)
       case RefinedType(parents, _) => parents exists replaceLeft
       case _: SingletonType        => replaceLeft(tp1.underlying)
       case _                       => false
