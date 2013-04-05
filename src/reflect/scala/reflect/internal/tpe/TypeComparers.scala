@@ -422,11 +422,11 @@ trait TypeComparers {
     def typeRefOnRight(tp1: Type, tp2: TypeRef): Boolean = {
       def lo = tp2.bounds.lo
       tp2.sym match {
-        case SingletonClass                       => tp1.isStable
-        case _: ClassSymbol                       => false
-        case _: TypeSymbol if sym2.isAbstractType => isDifferentTypeConstructor(tp2, lo) && replaceRight(lo)
-        case _: TypeSymbol                        => isSub(tp1.normalize, tp2.normalize)
-        case _                                    => false
+        case SingletonClass                    => tp1.isStable
+        case _: ClassSymbol                    => false
+        case s: TypeSymbol if s.isAbstractType => isDifferentTypeConstructor(tp2, lo) && replaceRight(lo)
+        case _: TypeSymbol                     => isSub(tp1.normalize, tp2.normalize)
+        case _                                 => false
       }
     }
     def typeRefOnLeft(tp1: TypeRef, tp2: Type): Boolean = {
@@ -436,12 +436,12 @@ trait TypeComparers {
         case _                   => isSingleType(tp2) && replaceRight(tp2.widen)
       }
       tp1.sym match {
-        case NothingClass                     => true
-        case NullClass                        => isNullable
-        case _: ClassSymbol                   => false
-        case _: TypeSymbol if sym1.isDeferred => isDifferentTypeConstructor(tp1, hi) && replaceLeft(hi)
-        case _: TypeSymbol                    => isSub(tp1.normalize, tp2.normalize)
-        case _                                => false
+        case NothingClass                  => true
+        case NullClass                     => isNullable
+        case _: ClassSymbol                => false
+        case s: TypeSymbol if s.isDeferred => isDifferentTypeConstructor(tp1, hi) && replaceLeft(hi)
+        case _: TypeSymbol                 => isSub(tp1.normalize, tp2.normalize)
+        case _                             => false
       }
     }
 
@@ -528,7 +528,6 @@ trait TypeComparers {
 
     (    fromRight
       || fromLeft
-      || skolemizeOnLeft
     )
   }
 
