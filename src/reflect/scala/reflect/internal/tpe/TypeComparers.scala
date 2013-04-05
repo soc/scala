@@ -16,6 +16,19 @@ trait TypeComparers {
 
   private val pendingSubTypes = new mutable.HashSet[SubTypePair]
 
+  private def nextEquivalentInternal(tp: Type, canWiden: Boolean): Type = tp match {
+    case TypeRef(pre, sym, Nil) if sym.isRefinementClass          => pre memberInfo sym               // refinement classes
+    case TypeRef(_, sym, Nil) if isRawIfWithoutArgs(sym)          => rawToExistential(tp)             // raw types
+    case TypeRef(pre, sym, Nil) if sym.isAliasType                => tp.dealias                       // type aliases
+    case TypeRef(pre, sym, Nil) if sym.isAbstractType && canWiden => (pre memberInfo sym).bounds.hi   // abstract types
+    case tp if tp ne tp.normalize                                 => tp.normalize                     // polytypes
+    case tp: SingletonType if canWiden || (tp.underlying =:= tp)  => tp.underlying                    // singleton types
+    case _                                                        => null
+  }
+
+  def nextEquivalentOrWider(tp: Type): Type = nextEquivalentInternal(tp, canWiden = true)
+  def nextEquivalent(tp: Type): Type = nextEquivalent(tp, canWiden = false)
+
   class SubTypePair(val tp1: Type, val tp2: Type) {
     override def hashCode = tp1.hashCode * 41 + tp2.hashCode
     override def equals(other: Any) = (this eq other.asInstanceOf[AnyRef]) || (other match {
