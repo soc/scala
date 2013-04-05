@@ -332,12 +332,71 @@ trait TypeComparers {
 
   /** Does type `tp1` conform to `tp2`? */
   private def isSubType2(tp1: Type, tp2: Type, depth: Int): Boolean = {
-    if ((tp1 eq tp2) || isErrorOrWildcard(tp1) || isErrorOrWildcard(tp2)) return true
-    if ((tp1 eq NoType) || (tp2 eq NoType)) return false
-    if (tp1 eq NoPrefix) return (tp2 eq NoPrefix) || tp2.typeSymbol.isPackageClass // !! I do not see how the "isPackageClass" would be warranted by the spec
-    if (tp2 eq NoPrefix) return tp1.typeSymbol.isPackageClass
-    if (isSingleType(tp1) && isSingleType(tp2) || isConstantType(tp1) && isConstantType(tp2)) return tp1 =:= tp2
-    if (tp1.isHigherKinded || tp2.isHigherKinded) return isHKSubType(tp1, tp2, depth)
+    def requiresEquivalence(tp: Type) = (
+         isConstantType(tp)
+      || isSingleType(tp)
+      // || (tp eq NoPrefix)
+    )
+    def conformsToNoPrefix(tp: Type) = (tp eq NoPrefix) || tp.typeSymbol.isPackageClass
+    def subTypeVars() = tp2 match {
+      case tv @ TypeVar(_,_) if tv.registerBound(tp1, isLowerBound = true) => true
+      case _                                                               =>
+        tp1 match {
+          case tv @ TypeVar(_,_) => tv.registerBound(tp2, isLowerBound = false)
+          case _                 => false
+        }
+    }
+    def prepare(tp: Type, isLhs: Boolean): Type = {
+      def choose(tb: TypeBounds) = if (isLhs) tb.hi else tb.lo
+      tp match {
+        case TypeRef(_, sym, _) if sym.isRefinementClass     => prepare(sym.info, isLhs)
+        case TypeRef(_, sym, Nil) if isRawIfWithoutArgs(sym) => prepare(rawToExistential(tp), isLhs)
+        case st @ SingleType(_, sym) if sym.isModule         => prepare(st.underlying, isLhs)
+        case _                                               => tp
+      }
+    }
+
+    // !! I do not see how the "isPackageClass" would be warranted by the spec
+    if ((tp1 eq tp2) || isErrorOrWildcard(tp1) || isErrorOrWildcard(tp2))
+      true
+    else if ((tp1 eq NoType) || (tp2 eq NoType))
+      false
+    else if (tp1 eq NoPrefix)
+      conformsToNoPrefix(tp2)
+    else if (tp2 eq NoPrefix)
+      conformsToNoPrefix(tp1)
+    else if (requiresEquivalence(tp1) || requiresEquivalence(tp2))
+      tp1 =:= tp2
+    else if (tp1.isHigherKinded || tp2.isHigherKinded)
+      isHKSubType(tp1, tp2, depth)
+    else if (tp1.annotations.nonEmpty || tp2.annotations.nonEmpty)
+      annotationsConform(tp1, tp2) && (tp1.withoutAnnotations <:< tp2.withoutAnnotations)
+    else {
+      val lhs = prepare(tp1, isLhs = true)
+      val rhs = prepare(tp2, isLhs = false)
+
+      lhs match {
+        case BoundedWildcardType(bounds) => return isSubType(bounds.hi, tp2, depth)
+        case _                           =>
+          rhs match {
+            case BoundedWildcardType(bounds) => return isSubType(tp1, bounds.lo, depth)
+            case _                           =>
+          }
+      }
+
+      subTypeVars() || isSubType3(lhs, rhs, depth)
+    }
+  }
+
+
+  /** Does type `tp1` conform to `tp2`? */
+  private def isSubType3(tp1: Type, tp2: Type, depth: Int): Boolean = {
+    // if ((tp1 eq tp2) || isErrorOrWildcard(tp1) || isErrorOrWildcard(tp2)) return true
+    // if ((tp1 eq NoType) || (tp2 eq NoType)) return false
+    // if (tp1 eq NoPrefix) return (tp2 eq NoPrefix) || tp2.typeSymbol.isPackageClass // !! I do not see how the "isPackageClass" would be warranted by the spec
+    // if (tp2 eq NoPrefix) return tp1.typeSymbol.isPackageClass
+    // if (isSingleType(tp1) && isSingleType(tp2) || isConstantType(tp1) && isConstantType(tp2)) return tp1 =:= tp2
+    // if (tp1.isHigherKinded || tp2.isHigherKinded) return isHKSubType(tp1, tp2, depth)
 
     /* First try, on the right:
      *   - unwrap Annotated types, BoundedWildcardTypes,
