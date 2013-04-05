@@ -399,10 +399,7 @@ trait TypeComparers {
 
       val lhs = prepare(tp1)
       val rhs = prepare(tp2)
-      // subTypeVars() ||
-      // isSubType3(lhs, rhs, depth)
       isSubType3(tp1, tp2, depth)
-    // }
   }
 
 
