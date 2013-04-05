@@ -345,14 +345,11 @@ trait TypeComparers {
           case _                 => false
         }
     }
-    def prepare(tp: Type, isLhs: Boolean): Type = {
-      def choose(tb: TypeBounds) = if (isLhs) tb.hi else tb.lo
-      tp match {
-        case TypeRef(_, sym, _) if sym.isRefinementClass     => prepare(sym.info, isLhs)
-        case TypeRef(_, sym, Nil) if isRawIfWithoutArgs(sym) => prepare(rawToExistential(tp), isLhs)
-        case st @ SingleType(_, sym) if sym.isModule         => prepare(st.underlying, isLhs)
-        case _                                               => tp
-      }
+    def prepare(tp: Type): Type = tp match {
+      case TypeRef(_, sym, _) if sym.isRefinementClass     => prepare(sym.info)
+      case TypeRef(_, sym, Nil) if isRawIfWithoutArgs(sym) => prepare(rawToExistential(tp))
+      case st @ SingleType(_, sym) if sym.isModule         => prepare(st.underlying)
+      case _                                               => tp
     }
     if ((tp1 eq tp2) || isErrorOrWildcard(tp1) || isErrorOrWildcard(tp2)) return true
     if ((tp1 eq NoType) || (tp2 eq NoType)) return false
@@ -394,8 +391,8 @@ trait TypeComparers {
         case _                           =>
       }
 
-      // val lhs = prepare(tp1, isLhs = true)
-      // val rhs = prepare(tp2, isLhs = false)
+      val lhs = prepare(tp1)
+      val rhs = prepare(tp2)
       // subTypeVars() ||
       // isSubType3(lhs, rhs, depth)
       isSubType3(tp1, tp2, depth)
