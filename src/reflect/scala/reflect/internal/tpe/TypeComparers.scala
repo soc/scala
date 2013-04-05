@@ -372,8 +372,10 @@ trait TypeComparers {
     else if (tp1.annotations.nonEmpty || tp2.annotations.nonEmpty)
       annotationsConform(tp1, tp2) && (tp1.withoutAnnotations <:< tp2.withoutAnnotations)
     else {
-      val lhs = prepare(tp1, isLhs = true)
-      val rhs = prepare(tp2, isLhs = false)
+      val lhs = tp1
+      val rhs = tp2
+      // val lhs = prepare(tp1, isLhs = true)
+      // val rhs = prepare(tp2, isLhs = false)
 
       lhs match {
         case BoundedWildcardType(bounds) => return isSubType(bounds.hi, tp2, depth)
