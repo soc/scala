@@ -448,24 +448,44 @@ trait TypeComparers {
      *   - bind TypeVars  on the right, if lhs is not Annotated nor BoundedWildcard
      *   - handle common cases for first-kind TypeRefs on both sides as a fast path.
      */
-    def twoTypeRefs(tr1: TypeRef, tr2: TypeRef) = {
-      val sym1 = tr1.sym
-      val sym2 = tr2.sym
-      val pre1 = tr1.pre
-      val pre2 = tr2.pre
+    def twoTypeRefs(tp1: TypeRef, tp2: TypeRef) = {
+      val TypeRef(pre1, sym1, args1) = tp1
+      val TypeRef(pre2, sym2, args2) = tp2
 
-      (
-        ((if (sym1 == sym2) phase.erasedTypes || sym1.owner.hasPackageFlag || isSub(pre1, pre2)
-      else (sym1.name == sym2.name && !sym1.isModuleClass && !sym2.isModuleClass &&
-        (isUnifiable(pre1, pre2) ||
-          isSameSpecializedSkolem(sym1, sym2, pre1, pre2) ||
-          sym2.isAbstractType && isSubPre(pre1, pre2, sym2)))) &&
-        isSubArgs(tr1.args, tr2.args, sym1.typeParams, depth))
-        ||
-        sym2.isClass && replaceLeft(tr1 baseType sym2)
-        ||
-        typeRefOnRight(tr1, tr2)
+      def compatiblePrefixes = (
+           isUnifiable(pre1, pre2)
+        || isSameSpecializedSkolem(sym1, sym2, pre1, pre2)
+        || sym2.isAbstractType && isSubPre(pre1, pre2, sym2)
       )
+      def compatibleSymbols = (
+        if (sym1 == sym2)
+          phase.erasedTypes || sym1.owner.hasPackageFlag || isSub(pre1, pre2)
+        else
+          (sym1.name == sym2.name) && compatiblePrefixes
+      )
+      def compatibleTypeArgs = isSubArgs(tr1.args, tr2.args, sym1.typeParams, depth)
+
+      (    compatibleSymbols && compatibleTypeArgs
+        || sym2.isClass && replaceLeft(tr1 baseType sym2)
+      )
+    }
+
+
+    def isSubMethodType(tp1: MethodType, tp2: MethodType) = {
+      val MethodType(params1, res1) = tp1
+      val MethodType(params2, res2) = tp2
+
+      (    sameLength(params1, params2)
+        && mt1.isImplicit == mt2.isImplicit
+        && matchingParams(params1, params2, mt1.isJava, mt2.isJava)
+        && isSub(res1.substSym(params1, params2), res2)
+      )
+    }
+    def subTypeRequiresSameCaseClass = tp1 match {
+      case tp1: MethodType         => tp2 match { case tp2: MethodType         => isSubMethodType(tp1, tp2)          ; case _ => false }
+      case TypeBounds(lo1, hi1)    => tp2 match { case TypeBounds(lo2, hi2)    => isSub(lo2, lo1) && isSub(hi1, hi2) ; case _ => false }
+      case NullaryMethodType(res1) => tp2 match { case NullaryMethodType(res2) => isSub(res1, res2)                  ; case _ => false }
+      case _                       => false
     }
 
     def fromLeft = tp1 match {
@@ -475,45 +495,23 @@ trait TypeComparers {
       case _: SingletonType        => replaceLeft(tp1.underlying)
       case _                       => false
     }
-
     def fromRight = tp2 match {
       case tp2: TypeRef =>
         tp1 match {
           case tp1: TypeRef => twoTypeRefs(tp1, tp2) || typeRefOnRight(tp1, tp2)
           case _            => typeRefOnRight(tp1, tp2)
         }
-      case rt2: RefinedType =>
-        (rt2.parents forall (isSubType(tp1, _, depth))) &&
-          (rt2.decls forall (specializesSym(tp1, _, depth)))
-      case et2: ExistentialType => et2.withTypeVars(replaceRight, depth)
-      case mt2: MethodType =>
-        tp1 match {
-          case mt1 @ MethodType(params1, res1) =>
-            val params2 = mt2.params
-            val res2 = mt2.resultType
-            (sameLength(params1, params2) &&
-              mt1.isImplicit == mt2.isImplicit &&
-              matchingParams(params1, params2, mt1.isJava, mt2.isJava) &&
-              isSub(res1.substSym(params1, params2), res2))
-          // TODO: if mt1.params.isEmpty, consider NullaryMethodType?
-          case _ =>
-            false
-        }
-      case pt2 @ NullaryMethodType(_) =>
-        tp1 match {
-          case pt1 @ NullaryMethodType(_) => isSub(pt1.resultType, pt2.resultType)
-          case _                          => false
-        }
-      case TypeBounds(lo2, hi2) =>
-        tp1 match {
-          case TypeBounds(lo1, hi1) => isSub(lo2, lo1) && isSub(hi1, hi2)
-          case _                    => false
-        }
+      case RefinedType(parents, decls) =>
+           (parents forall replaceRight)
+        && (decls forall (d => specializesSym(tp1, d, depth)))
+      case et2: ExistentialType =>
+        et2.withTypeVars(replaceRight, depth)
       case _ =>
         false
     }
 
-    (    fromRight
+    (    subTypeRequiresSameCaseClass
+      || fromRight
       || fromLeft
       || aberrantConformance
     )
