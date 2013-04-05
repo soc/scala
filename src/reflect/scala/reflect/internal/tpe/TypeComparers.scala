@@ -337,7 +337,6 @@ trait TypeComparers {
       || isSingleType(tp)
       // || (tp eq NoPrefix)
     )
-    def conformsToNoPrefix(tp: Type) = (tp eq NoPrefix) || tp.typeSymbol.isPackageClass
     def subTypeVars() = tp2 match {
       case tv @ TypeVar(_,_) if tv.registerBound(tp1, isLowerBound = true) => true
       case _                                                               =>
@@ -380,19 +379,26 @@ trait TypeComparers {
     // else {
       // val lhs = tp1
       // val rhs = tp2
+      tp2 match {
+        case BoundedWildcardType(bounds) => return isSubType(tp1, bounds.lo, depth)
+        case tv2 @ TypeVar(_, _) =>
+          tp1 match {
+            case AnnotatedType(_, _, _) | BoundedWildcardType(_) =>
+            case _                                               => return tv2.registerBound(tp1, isLowerBound = true)
+          }
+        case _  =>
+      }
       tp1 match {
         case BoundedWildcardType(bounds) => return isSubType(bounds.hi, tp2, depth)
+        case tv @ TypeVar(_,_)           => return tv.registerBound(tp2, isLowerBound = false)
         case _                           =>
-          tp2 match {
-            case BoundedWildcardType(bounds) => return isSubType(tp1, bounds.lo, depth)
-            case _                           =>
-          }
       }
 
-      val lhs = prepare(tp1, isLhs = true)
-      val rhs = prepare(tp2, isLhs = false)
+      // val lhs = prepare(tp1, isLhs = true)
+      // val rhs = prepare(tp2, isLhs = false)
       // subTypeVars() ||
-      isSubType3(lhs, rhs, depth)
+      // isSubType3(lhs, rhs, depth)
+      isSubType3(tp1, tp2, depth)
     // }
   }
 
@@ -444,13 +450,13 @@ trait TypeComparers {
           annotationsConform(tp1, tp2)
       // case BoundedWildcardType(bounds) =>
       //   isSubType(tp1, bounds.hi, depth)
-      case tv2 @ TypeVar(_, constr2) =>
-        tp1 match {
-          case AnnotatedType(_, _, _) | BoundedWildcardType(_) =>
-            secondTry
-          case _ =>
-            tv2.registerBound(tp1, isLowerBound = true)
-        }
+      // case tv2 @ TypeVar(_, constr2) =>
+      //   tp1 match {
+      //     case AnnotatedType(_, _, _) | BoundedWildcardType(_) =>
+      //       secondTry
+      //     case _ =>
+      //       tv2.registerBound(tp1, isLowerBound = true)
+      //   }
       case _ =>
         secondTry
     }
@@ -466,8 +472,8 @@ trait TypeComparers {
           annotationsConform(tp1, tp2)
       // case BoundedWildcardType(bounds) =>
       //   isSubType(tp1.bounds.lo, tp2, depth)
-      case tv @ TypeVar(_,_) =>
-        tv.registerBound(tp2, isLowerBound = false)
+      // case tv @ TypeVar(_,_) =>
+      //   tv.registerBound(tp2, isLowerBound = false)
       case ExistentialType(_, _) =>
         try {
           skolemizationLevel += 1
