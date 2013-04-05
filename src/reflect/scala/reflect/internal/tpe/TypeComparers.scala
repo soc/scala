@@ -355,23 +355,29 @@ trait TypeComparers {
         case _                                               => tp
       }
     }
+    if ((tp1 eq tp2) || isErrorOrWildcard(tp1) || isErrorOrWildcard(tp2)) return true
+    if ((tp1 eq NoType) || (tp2 eq NoType)) return false
+    if (tp1 eq NoPrefix) return (tp2 eq NoPrefix) || tp2.typeSymbol.isPackageClass // !! I do not see how the "isPackageClass" would be warranted by the spec
+    if (tp2 eq NoPrefix) return tp1.typeSymbol.isPackageClass
+    if (isSingleType(tp1) && isSingleType(tp2) || isConstantType(tp1) && isConstantType(tp2)) return tp1 =:= tp2
+    if (tp1.isHigherKinded || tp2.isHigherKinded) return isHKSubType(tp1, tp2, depth)
 
     // !! I do not see how the "isPackageClass" would be warranted by the spec
-    if ((tp1 eq tp2) || isErrorOrWildcard(tp1) || isErrorOrWildcard(tp2))
-      true
-    else if ((tp1 eq NoType) || (tp2 eq NoType))
-      false
-    else if (tp1 eq NoPrefix)
-      conformsToNoPrefix(tp2)
-    else if (tp2 eq NoPrefix)
-      conformsToNoPrefix(tp1)
-    else if (requiresEquivalence(tp1) || requiresEquivalence(tp2))
-      tp1 =:= tp2
-    else if (tp1.isHigherKinded || tp2.isHigherKinded)
-      isHKSubType(tp1, tp2, depth)
-    else if (tp1.annotations.nonEmpty || tp2.annotations.nonEmpty)
-      annotationsConform(tp1, tp2) && (tp1.withoutAnnotations <:< tp2.withoutAnnotations)
-    else {
+    // if ((tp1 eq tp2) || isErrorOrWildcard(tp1) || isErrorOrWildcard(tp2))
+    //   true
+    // else if ((tp1 eq NoType) || (tp2 eq NoType))
+    //   false
+    // else if (tp1 eq NoPrefix)
+    //   conformsToNoPrefix(tp2)
+    // else if (tp2 eq NoPrefix)
+    //   conformsToNoPrefix(tp1)
+    // else if (requiresEquivalence(tp1) || requiresEquivalence(tp2))
+    //   tp1 =:= tp2
+    // else if (tp1.isHigherKinded || tp2.isHigherKinded)
+    //   isHKSubType(tp1, tp2, depth)
+    // else if (tp1.annotations.nonEmpty || tp2.annotations.nonEmpty)
+    //   annotationsConform(tp1, tp2) && (tp1.withoutAnnotations <:< tp2.withoutAnnotations)
+    // else {
       val lhs = tp1
       val rhs = tp2
       // val lhs = prepare(tp1, isLhs = true)
@@ -388,7 +394,7 @@ trait TypeComparers {
 
       // subTypeVars() ||
       isSubType3(lhs, rhs, depth)
-    }
+    // }
   }
 
 
