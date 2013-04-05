@@ -410,13 +410,31 @@ trait TypeComparers {
     def replaceLeft(lhs: Type)      = (lhs ne tp1) && isSub(lhs, tp2)
     def replaceRight(rhs: Type)     = (rhs ne tp2) && isSub(tp1, rhs)
 
-    def correctAberrantType(tp: Type) = tp match {
-      case TypeRef(pre, sym, Nil) if sym.isModuleClass     => tp.narrow              // module classes
-      case TypeRef(pre, sym, Nil) if sym.isRefinementClass => pre memberInfo sym     // refinement classes
-      case TypeRef(_, sym, Nil) if isRawIfWithoutArgs(sym) => rawToExistential(tp)   // raw types
-      case _                                               => tp.normalize
+    def aberrantTypes(tp: Type, canWiden: Boolean): List[Type] = {
+      val next = tp match {
+        // case TypeRef(pre, sym, Nil) if sym.isModuleClass            => tp.narrow                       // module classes
+        case TypeRef(pre, sym, Nil) if sym.isRefinementClass           => pre memberInfo sym              // refinement classes
+        case TypeRef(_, sym, Nil) if isRawIfWithoutArgs(sym)           => rawToExistential(tp)            // raw types
+        case TypeRef(pre, sym, args) if sym.isAbstractType && canWiden => (pre memberInfo sym).bounds.hi  // abstract type bounds
+        case _ if tp ne tp.dealias                                     => tp.dealias                      // type aliases
+        case _: SingletonType if canWiden                              => tp.underlying                   // singleton types
+        case _ if tp ne tp.normalize                                   => tp.normalize
+        case _                                                         => null
+      }
+      if (next eq null) Nil else next :: aberrantTypes(next, canWiden)
     }
-    def aberrantConformance = isSub(correctAberrantType(tp1), correctAberrantType(tp2))
+    def aberrantConformance = {
+      val lhsTypes = tp1 :: aberrantTypes(tp1, canWiden = true)
+      val rhsTypes = tp2 :: aberrantTypes(tp2, canWiden = false)
+
+      printResult(s"${lhsTypes.size}/${rhsTypes.size} aberrantConformance(tp1=$tp1, tp2=$tp2)")(
+        lhsTypes exists (lhs =>
+          rhsTypes exists (rhs =>
+            printResult(s"  isSub($lhs, $rhs)")(isSub(lhs, rhs))
+          )
+        )
+      )
+    }
     def typeRefOnRight(tp1: Type, tp2: TypeRef): Boolean = {
       def lo = tp2.bounds.lo
       tp2.sym match {
@@ -469,7 +487,6 @@ trait TypeComparers {
         || sym2.isClass && replaceLeft(tp1 baseType sym2)
       )
     }
-
 
     def isSubMethodType(tp1: MethodType, tp2: MethodType) = {
       val MethodType(params1, res1) = tp1
