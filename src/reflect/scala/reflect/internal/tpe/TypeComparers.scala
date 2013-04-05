@@ -380,7 +380,7 @@ trait TypeComparers {
       // val lhs = tp1
       // val rhs = tp2
       tp2 match {
-        case BoundedWildcardType(bounds) => return isSubType(tp1, bounds.lo, depth)
+        case BoundedWildcardType(bounds) => return isSubType(tp1, bounds.hi, depth)
         case tv2 @ TypeVar(_, _) =>
           tp1 match {
             case AnnotatedType(_, _, _) | BoundedWildcardType(_) =>
