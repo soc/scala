@@ -331,30 +331,11 @@ trait TypeComparers {
   }
 
   /** Does type `tp1` conform to `tp2`? */
-  private def isSubType2(tp1: Type, tp2: Type, depth: Int): Boolean = {
-    def requiresEquivalence(tp: Type) = (
-         isConstantType(tp)
-      || isSingleType(tp)
-      // || (tp eq NoPrefix)
-    )
+  private def isSubType2(tp1: Type, tp2: Type, depth: Int): Boolean = printResult(s"isSubType2($tp1, $tp2, $depth") {
     def annotatedConforms = (
          annotationsConform(tp1, tp2)
       && isSubType(tp1.withoutAnnotations, tp2.withoutAnnotations, depth)
     )
-    def subTypeVars() = tp2 match {
-      case tv @ TypeVar(_,_) if tv.registerBound(tp1, isLowerBound = true) => true
-      case _                                                               =>
-        tp1 match {
-          case tv @ TypeVar(_,_) => tv.registerBound(tp2, isLowerBound = false)
-          case _                 => false
-        }
-    }
-    // def prepare(tp: Type): Type = tp match {
-    //   case TypeRef(pre, sym, _) if sym.isRefinementClass   => prepare(pre memberInfo sym)
-    //   case TypeRef(_, sym, Nil) if isRawIfWithoutArgs(sym) => prepare(rawToExistential(tp))
-    //   case st @ SingleType(_, sym) if sym.isModule         => prepare(st.underlying)
-    //   case _                                               => tp
-    // }
     if ((tp1 eq tp2) || isErrorOrWildcard(tp1) || isErrorOrWildcard(tp2)) return true
     if ((tp1 eq NoType) || (tp2 eq NoType)) return false
     if (tp1 eq NoPrefix) return (tp2 eq NoPrefix) || tp2.typeSymbol.isPackageClass // !! I do not see how the "isPackageClass" would be warranted by the spec
@@ -377,30 +358,22 @@ trait TypeComparers {
     //   tp1 =:= tp2
     // else if (tp1.isHigherKinded || tp2.isHigherKinded)
     //   isHKSubType(tp1, tp2, depth)
-    // else if (tp1.annotations.nonEmpty || tp2.annotations.nonEmpty)
-    //   annotationsConform(tp1, tp2) && (tp1.withoutAnnotations <:< tp2.withoutAnnotations)
-    // else {
-      // val lhs = tp1
-      // val rhs = tp2
-      tp2 match {
-        case BoundedWildcardType(bounds) => return isSubType(tp1, bounds.hi, depth)
-        case tv2 @ TypeVar(_, _) =>
-          tp1 match {
-            case AnnotatedType(_, _, _) | BoundedWildcardType(_) =>
-            case _                                               => return tv2.registerBound(tp1, isLowerBound = true)
-          }
-        case _  =>
-      }
-      tp1 match {
-        case BoundedWildcardType(bounds) => return isSubType(bounds.lo, tp2, depth)
-        case tv @ TypeVar(_,_)           => return tv.registerBound(tp2, isLowerBound = false)
-        case _                           =>
-      }
+    tp2 match {
+      case BoundedWildcardType(bounds) => return isSubType(tp1, bounds.hi, depth)
+      case tv2 @ TypeVar(_, _) =>
+        tp1 match {
+          case AnnotatedType(_, _, _) | BoundedWildcardType(_) =>
+          case _                                               => return tv2.registerBound(tp1, isLowerBound = true)
+        }
+      case _  =>
+    }
+    tp1 match {
+      case BoundedWildcardType(bounds) => return isSubType(bounds.lo, tp2, depth)
+      case tv @ TypeVar(_,_)           => return tv.registerBound(tp2, isLowerBound = false)
+      case _                           =>
+    }
 
-      isSubType3(tp1, tp2, depth)
-      // val lhs = prepare(tp1)
-      // val rhs = prepare(tp2)
-      // isSubType3(tp1, tp2, depth)
+    isSubType3(tp1, tp2, depth)
   }
 
 
@@ -411,26 +384,31 @@ trait TypeComparers {
     def replaceRight(rhs: Type)     = (rhs ne tp2) && isSub(tp1, rhs)
 
     def aberrantTypes(tp: Type, canWiden: Boolean): List[Type] = {
-      val next = tp match {
+      val next = if (typeContainsTypeVar(tp)) null else tp match {
         // case TypeRef(pre, sym, Nil) if sym.isModuleClass            => tp.narrow                       // module classes
         case TypeRef(pre, sym, Nil) if sym.isRefinementClass           => pre memberInfo sym              // refinement classes
         case TypeRef(_, sym, Nil) if isRawIfWithoutArgs(sym)           => rawToExistential(tp)            // raw types
-        case TypeRef(pre, sym, args) if sym.isAbstractType && canWiden => (pre memberInfo sym).bounds.hi  // abstract type bounds
+        case TypeRef(pre, sym, args) if sym.isAbstractType && canWiden => sym.info.bounds.hi              // abstract type bounds
+        // case TypeRef(pre, sym, args) if sym.isAbstractType && canWiden => (pre memberInfo sym).bounds.hi  // abstract type bounds
         case _ if tp ne tp.dealias                                     => tp.dealias                      // type aliases
         case _: SingletonType if canWiden                              => tp.underlying                   // singleton types
         case _ if tp ne tp.normalize                                   => tp.normalize
         case _                                                         => null
       }
-      if (next eq null) Nil else next :: aberrantTypes(next, canWiden)
+      if (next eq null) Nil else printResult("aberrant/isLhs=" + canWiden)(next) :: aberrantTypes(next, canWiden)
     }
     def aberrantConformance = {
       val lhsTypes = tp1 :: aberrantTypes(tp1, canWiden = true)
       val rhsTypes = tp2 :: aberrantTypes(tp2, canWiden = false)
 
-      printResult(s"${lhsTypes.size}/${rhsTypes.size} aberrantConformance(tp1=$tp1, tp2=$tp2)")(
+      /*printResult(s"${lhsTypes.size}/${rhsTypes.size} aberrantConformance(tp1=$tp1, tp2=$tp2)")*/(
         lhsTypes exists (lhs =>
           rhsTypes exists (rhs =>
-            printResult(s"  isSub($lhs, $rhs)")(isSub(lhs, rhs))
+            { val s1 = s"$lhs/${util.shortClassOfInstance(lhs)}"
+              val s2 = s"$rhs/${util.shortClassOfInstance(rhs)}"
+              val s3 = f"  $s1%50s    $s2%-50s"
+              printResult(s3)(isSub(lhs, rhs))
+            }
           )
         )
       )
@@ -449,13 +427,13 @@ trait TypeComparers {
       def hi = tp1.bounds.hi
       def isNullable = tp2 match {
         case TypeRef(_, sym2, _) => NullClass isBottomSubClass sym2
-        case _                   => isSingleType(tp2) && replaceRight(tp2.widen)
+        case _                   => isSingleType(tp2) && replaceRight(tp2.underlying)
       }
       tp1.sym match {
         case NothingClass                  => true
         case NullClass                     => isNullable
         case _: ClassSymbol                => false
-        case s: TypeSymbol if s.isDeferred => isDifferentTypeConstructor(tp1, hi) && replaceLeft(hi)
+        case s: TypeSymbol if s.isDeferred => hi.dealiasWidenChain drop 1 exists replaceLeft
         // case _: TypeSymbol                 => isSub(tp1.normalize, tp2.normalize)
         case _                             => false
       }
