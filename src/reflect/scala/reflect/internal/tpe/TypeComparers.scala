@@ -409,26 +409,14 @@ trait TypeComparers {
     def isSub(lhs: Type, rhs: Type) = ((lhs ne tp1) || (rhs ne tp2)) && isSubType(lhs, rhs, depth)
     def replaceLeft(lhs: Type)      = (lhs ne tp1) && isSub(lhs, tp2)
     def replaceRight(rhs: Type)     = (rhs ne tp2) && isSub(tp1, rhs)
-    // def narrowModuleClass(tp: Type): Type = tp match {
-    //   case TypeRef(pre, sym, Nil) if sym.isModuleClass => tp.narrow
-    //   // case st @ SingleType(_, sym) if sym.isModule => st.underlying
-    //   case _                                       => tp
-    // }
+
     def correctAberrantType(tp: Type) = tp match {
-      case TypeRef(pre, sym, Nil) if sym.isModuleClass     => tp.narrow
-      case TypeRef(pre, sym, Nil) if sym.isRefinementClass => pre memberInfo sym
-      case TypeRef(_, sym, Nil) if isRawIfWithoutArgs(sym) => rawToExistential(tp)
+      case TypeRef(pre, sym, Nil) if sym.isModuleClass     => tp.narrow              // module classes
+      case TypeRef(pre, sym, Nil) if sym.isRefinementClass => pre memberInfo sym     // refinement classes
+      case TypeRef(_, sym, Nil) if isRawIfWithoutArgs(sym) => rawToExistential(tp)   // raw types
       case _                                               => tp
     }
-    def moduleClassSubType = isSub(correctAberrantType(tp1), correctAberrantType(tp2))
-
-    // if ((tp1 eq tp2) || isErrorOrWildcard(tp1) || isErrorOrWildcard(tp2)) return true
-    // if ((tp1 eq NoType) || (tp2 eq NoType)) return false
-    // if (tp1 eq NoPrefix) return (tp2 eq NoPrefix) || tp2.typeSymbol.isPackageClass // !! I do not see how the "isPackageClass" would be warranted by the spec
-    // if (tp2 eq NoPrefix) return tp1.typeSymbol.isPackageClass
-    // if (isSingleType(tp1) && isSingleType(tp2) || isConstantType(tp1) && isConstantType(tp2)) return tp1 =:= tp2
-    // if (tp1.isHigherKinded || tp2.isHigherKinded) return isHKSubType(tp1, tp2, depth)
-
+    def aberrantConformance = isSub(correctAberrantType(tp1), correctAberrantType(tp2))
     def typeRefOnRight(tp1: Type, tp2: TypeRef): Boolean = {
       def lo = tp2.bounds.lo
       tp2.sym match {
@@ -536,7 +524,7 @@ trait TypeComparers {
 
     (    fromRight
       || fromLeft
-      || moduleClassSubType
+      || aberrantConformance
     )
   }
 
