@@ -414,7 +414,7 @@ trait TypeComparers {
       case TypeRef(pre, sym, Nil) if sym.isModuleClass     => tp.narrow              // module classes
       case TypeRef(pre, sym, Nil) if sym.isRefinementClass => pre memberInfo sym     // refinement classes
       case TypeRef(_, sym, Nil) if isRawIfWithoutArgs(sym) => rawToExistential(tp)   // raw types
-      case _                                               => tp
+      case _                                               => tp.normalize
     }
     def aberrantConformance = isSub(correctAberrantType(tp1), correctAberrantType(tp2))
     def typeRefOnRight(tp1: Type, tp2: TypeRef): Boolean = {
@@ -423,7 +423,7 @@ trait TypeComparers {
         case SingletonClass                    => tp1.isStable
         case _: ClassSymbol                    => false
         case s: TypeSymbol if s.isAbstractType => isDifferentTypeConstructor(tp2, lo) && replaceRight(lo)
-        case _: TypeSymbol                     => isSub(tp1.normalize, tp2.normalize)
+        // case _: TypeSymbol                     => isSub(tp1.normalize, tp2.normalize)
         case _                                 => false
       }
     }
@@ -438,7 +438,7 @@ trait TypeComparers {
         case NullClass                     => isNullable
         case _: ClassSymbol                => false
         case s: TypeSymbol if s.isDeferred => isDifferentTypeConstructor(tp1, hi) && replaceLeft(hi)
-        case _: TypeSymbol                 => isSub(tp1.normalize, tp2.normalize)
+        // case _: TypeSymbol                 => isSub(tp1.normalize, tp2.normalize)
         case _                             => false
       }
     }
@@ -455,24 +455,21 @@ trait TypeComparers {
       val pre2 = tr2.pre
 
       (
-        ((if (sym1 == sym2) phase.erasedTypes || sym1.owner.hasPackageFlag || isSubType(pre1, pre2, depth)
+        ((if (sym1 == sym2) phase.erasedTypes || sym1.owner.hasPackageFlag || isSub(pre1, pre2)
       else (sym1.name == sym2.name && !sym1.isModuleClass && !sym2.isModuleClass &&
         (isUnifiable(pre1, pre2) ||
           isSameSpecializedSkolem(sym1, sym2, pre1, pre2) ||
           sym2.isAbstractType && isSubPre(pre1, pre2, sym2)))) &&
         isSubArgs(tr1.args, tr2.args, sym1.typeParams, depth))
         ||
-        sym2.isClass && {
-          val base = tr1 baseType sym2
-          (base ne tr1) && isSubType(base, tr2, depth)
-        }
+        sym2.isClass && replaceLeft(tr1 baseType sym2)
         ||
         typeRefOnRight(tr1, tr2)
       )
     }
 
     def fromLeft = tp1 match {
-      case tp1: ExistentialType    => atHigherSkolemization(isSubType(tp1.skolemizeExistential, tp2, depth))
+      case tp1: ExistentialType    => atHigherSkolemization(replaceLeft(tp1.skolemizeExistential))
       case tp1: TypeRef            => typeRefOnLeft(tp1, tp2)
       case RefinedType(parents, _) => parents exists replaceLeft
       case _: SingletonType        => replaceLeft(tp1.underlying)
@@ -482,14 +479,13 @@ trait TypeComparers {
     def fromRight = tp2 match {
       case tp2: TypeRef =>
         tp1 match {
-          case tp1: TypeRef => twoTypeRefs(tp1, tp2)
+          case tp1: TypeRef => twoTypeRefs(tp1, tp2) || typeRefOnRight(tp1, tp2)
           case _            => typeRefOnRight(tp1, tp2)
         }
       case rt2: RefinedType =>
         (rt2.parents forall (isSubType(tp1, _, depth))) &&
           (rt2.decls forall (specializesSym(tp1, _, depth)))
-      case et2: ExistentialType =>
-        et2.withTypeVars(isSubType(tp1, _, depth), depth)
+      case et2: ExistentialType => et2.withTypeVars(replaceRight, depth)
       case mt2: MethodType =>
         tp1 match {
           case mt1 @ MethodType(params1, res1) =>
@@ -498,25 +494,20 @@ trait TypeComparers {
             (sameLength(params1, params2) &&
               mt1.isImplicit == mt2.isImplicit &&
               matchingParams(params1, params2, mt1.isJava, mt2.isJava) &&
-              isSubType(res1.substSym(params1, params2), res2, depth))
+              isSub(res1.substSym(params1, params2), res2))
           // TODO: if mt1.params.isEmpty, consider NullaryMethodType?
           case _ =>
             false
         }
       case pt2 @ NullaryMethodType(_) =>
         tp1 match {
-          // TODO: consider MethodType mt for which mt.params.isEmpty??
-          case pt1 @ NullaryMethodType(_) =>
-            isSubType(pt1.resultType, pt2.resultType, depth)
-          case _ =>
-            false
+          case pt1 @ NullaryMethodType(_) => isSub(pt1.resultType, pt2.resultType)
+          case _                          => false
         }
       case TypeBounds(lo2, hi2) =>
         tp1 match {
-          case TypeBounds(lo1, hi1) =>
-            isSubType(lo2, lo1, depth) && isSubType(hi1, hi2, depth)
-          case _ =>
-            false
+          case TypeBounds(lo1, hi1) => isSub(lo2, lo1) && isSub(hi1, hi2)
+          case _                    => false
         }
       case _ =>
         false
