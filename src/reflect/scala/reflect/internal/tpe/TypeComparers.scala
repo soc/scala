@@ -389,7 +389,7 @@ trait TypeComparers {
         case _  =>
       }
       tp1 match {
-        case BoundedWildcardType(bounds) => return isSubType(bounds.hi, tp2, depth)
+        case BoundedWildcardType(bounds) => return isSubType(bounds.lo, tp2, depth)
         case tv @ TypeVar(_,_)           => return tv.registerBound(tp2, isLowerBound = false)
         case _                           =>
       }
