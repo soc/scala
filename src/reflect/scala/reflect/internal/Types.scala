@@ -110,6 +110,11 @@ trait Types
    *  in isSameType, isSubType that do constraint solving under a prefix.
    */
   var skolemizationLevel = 0
+  @inline final def atHigherSkolemization[T](op: => T): T = {
+    skolemizationLevel += 1
+    try op
+    finally skolemizationLevel -= 1
+  }
 
   /** A map from lists to compound types that have the given list as parents.
    *  This is used to avoid duplication in the computation of base type sequences and baseClasses.
