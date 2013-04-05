@@ -337,6 +337,10 @@ trait TypeComparers {
       || isSingleType(tp)
       // || (tp eq NoPrefix)
     )
+    def annotatedConforms = (
+         annotationsConform(tp1, tp2)
+      && isSubType(tp1.withoutAnnotations, tp2.withoutAnnotations, depth)
+    )
     def subTypeVars() = tp2 match {
       case tv @ TypeVar(_,_) if tv.registerBound(tp1, isLowerBound = true) => true
       case _                                                               =>
@@ -357,6 +361,8 @@ trait TypeComparers {
     if (tp2 eq NoPrefix) return tp1.typeSymbol.isPackageClass
     if (isSingleType(tp1) && isSingleType(tp2) || isConstantType(tp1) && isConstantType(tp2)) return tp1 =:= tp2
     if (tp1.isHigherKinded || tp2.isHigherKinded) return isHKSubType(tp1, tp2, depth)
+    if (tp1.isInstanceOf[AnnotatedType] || tp2.isInstanceOf[AnnotatedType])
+      return annotatedConforms
 
     // !! I do not see how the "isPackageClass" would be warranted by the spec
     // if ((tp1 eq tp2) || isErrorOrWildcard(tp1) || isErrorOrWildcard(tp2))
@@ -442,9 +448,9 @@ trait TypeComparers {
           case _ =>
             secondTry
         }
-      case AnnotatedType(_, _, _) =>
-        isSubType(tp1.withoutAnnotations, tp2.withoutAnnotations, depth) &&
-          annotationsConform(tp1, tp2)
+      // case AnnotatedType(_, _, _) =>
+      //   isSubType(tp1.withoutAnnotations, tp2.withoutAnnotations, depth) &&
+      //     annotationsConform(tp1, tp2)
       // case BoundedWildcardType(bounds) =>
       //   isSubType(tp1, bounds.hi, depth)
       // case tv2 @ TypeVar(_, constr2) =>
@@ -464,9 +470,9 @@ trait TypeComparers {
      *   - handle existential types by skolemization.
      */
     def secondTry = tp1 match {
-      case AnnotatedType(_, _, _) =>
-        isSubType(tp1.withoutAnnotations, tp2.withoutAnnotations, depth) &&
-          annotationsConform(tp1, tp2)
+      // case AnnotatedType(_, _, _) =>
+      //   isSubType(tp1.withoutAnnotations, tp2.withoutAnnotations, depth) &&
+      //     annotationsConform(tp1, tp2)
       // case BoundedWildcardType(bounds) =>
       //   isSubType(tp1.bounds.lo, tp2, depth)
       // case tv @ TypeVar(_,_) =>
@@ -486,14 +492,14 @@ trait TypeComparers {
       val sym2 = tp2.sym
       def retry(lhs: Type, rhs: Type)   = isSubType(lhs, rhs, depth)
       def abstractTypeOnRight(lo: Type) = isDifferentTypeConstructor(tp2, lo) && retry(tp1, lo)
-      def classOnRight                  = (
-        if (isRawType(tp2)) retry(tp1, rawToExistential(tp2))
-        // else if (sym2.isRefinementClass) retry(tp1, sym2.info)
-        else fourthTry
-      )
+      // def classOnRight                  = (
+      //   if (isRawType(tp2)) retry(tp1, rawToExistential(tp2))
+      //   // else if (sym2.isRefinementClass) retry(tp1, sym2.info)
+      //   else fourthTry
+      // )
       sym2 match {
         case SingletonClass                   => tp1.isStable || fourthTry
-        case _: ClassSymbol                   => classOnRight
+        case _: ClassSymbol                   => fourthTry
         case _: TypeSymbol if sym2.isDeferred => abstractTypeOnRight(tp2.bounds.lo) || fourthTry
         case _: TypeSymbol                    => retry(tp1.normalize, tp2.normalize)
         case _                                => fourthTry
@@ -558,20 +564,20 @@ trait TypeComparers {
             case TypeRef(_, sym2, _) => sym1 isBottomSubClass sym2
             case _                   => isSingleType(tp2) && retry(tp1, tp2.widen)
           }
-          def moduleOnLeft = tp2 match {
-            case SingleType(pre2, sym2) => equalSymsAndPrefixes(sym1.sourceModule, pre1, sym2, pre2)
-            case _                      => false
-          }
-          def classOnLeft = (
-            if (isRawType(tp1)) retry(rawToExistential(tp1), tp2)
-            else if (sym1.isModuleClass) moduleOnLeft
-            else false
-            // else sym1.isRefinementClass && retry(sym1.info, tp2)
-          )
+          // def moduleOnLeft = tp2 match {
+          //   case SingleType(pre2, sym2) => equalSymsAndPrefixes(sym1.sourceModule, pre1, sym2, pre2)
+          //   case _                      => false
+          // }
+          // def classOnLeft = (
+          //   if (isRawType(tp1)) retry(rawToExistential(tp1), tp2)
+          //   else if (sym1.isModuleClass) moduleOnLeft
+          //   else false
+          //   // else sym1.isRefinementClass && retry(sym1.info, tp2)
+          // )
           sym1 match {
             case NothingClass                     => true
             case NullClass                        => nullOnLeft
-            case _: ClassSymbol                   => classOnLeft
+            case _: ClassSymbol                   => false // classOnLeft
             case _: TypeSymbol if sym1.isDeferred => abstractTypeOnLeft(tp1.bounds.hi)
             case _: TypeSymbol                    => retry(tp1.normalize, tp2.normalize)
             case _                                => false
