@@ -380,18 +380,17 @@ trait TypeComparers {
     // else {
       // val lhs = tp1
       // val rhs = tp2
-      val lhs = prepare(tp1, isLhs = true)
-      val rhs = prepare(tp2, isLhs = false)
-
-      lhs match {
+      tp1 match {
         case BoundedWildcardType(bounds) => return isSubType(bounds.hi, tp2, depth)
         case _                           =>
-          rhs match {
+          tp2 match {
             case BoundedWildcardType(bounds) => return isSubType(tp1, bounds.lo, depth)
             case _                           =>
           }
       }
 
+      val lhs = prepare(tp1, isLhs = true)
+      val rhs = prepare(tp2, isLhs = false)
       // subTypeVars() ||
       isSubType3(lhs, rhs, depth)
     // }
@@ -443,8 +442,8 @@ trait TypeComparers {
       case AnnotatedType(_, _, _) =>
         isSubType(tp1.withoutAnnotations, tp2.withoutAnnotations, depth) &&
           annotationsConform(tp1, tp2)
-      case BoundedWildcardType(bounds) =>
-        isSubType(tp1, bounds.hi, depth)
+      // case BoundedWildcardType(bounds) =>
+      //   isSubType(tp1, bounds.hi, depth)
       case tv2 @ TypeVar(_, constr2) =>
         tp1 match {
           case AnnotatedType(_, _, _) | BoundedWildcardType(_) =>
@@ -465,8 +464,8 @@ trait TypeComparers {
       case AnnotatedType(_, _, _) =>
         isSubType(tp1.withoutAnnotations, tp2.withoutAnnotations, depth) &&
           annotationsConform(tp1, tp2)
-      case BoundedWildcardType(bounds) =>
-        isSubType(tp1.bounds.lo, tp2, depth)
+      // case BoundedWildcardType(bounds) =>
+      //   isSubType(tp1.bounds.lo, tp2, depth)
       case tv @ TypeVar(_,_) =>
         tv.registerBound(tp2, isLowerBound = false)
       case ExistentialType(_, _) =>
@@ -486,7 +485,7 @@ trait TypeComparers {
       def abstractTypeOnRight(lo: Type) = isDifferentTypeConstructor(tp2, lo) && retry(tp1, lo)
       def classOnRight                  = (
         if (isRawType(tp2)) retry(tp1, rawToExistential(tp2))
-        else if (sym2.isRefinementClass) retry(tp1, sym2.info)
+        // else if (sym2.isRefinementClass) retry(tp1, sym2.info)
         else fourthTry
       )
       sym2 match {
@@ -563,7 +562,8 @@ trait TypeComparers {
           def classOnLeft = (
             if (isRawType(tp1)) retry(rawToExistential(tp1), tp2)
             else if (sym1.isModuleClass) moduleOnLeft
-            else sym1.isRefinementClass && retry(sym1.info, tp2)
+            else false
+            // else sym1.isRefinementClass && retry(sym1.info, tp2)
           )
           sym1 match {
             case NothingClass                     => true
