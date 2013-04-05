@@ -377,16 +377,17 @@ trait TypeComparers {
       // val lhs = prepare(tp1, isLhs = true)
       // val rhs = prepare(tp2, isLhs = false)
 
-      lhs match {
-        case BoundedWildcardType(bounds) => return isSubType(bounds.hi, tp2, depth)
-        case _                           =>
-          rhs match {
-            case BoundedWildcardType(bounds) => return isSubType(tp1, bounds.lo, depth)
-            case _                           =>
-          }
-      }
+      // lhs match {
+      //   case BoundedWildcardType(bounds) => return isSubType(bounds.hi, tp2, depth)
+      //   case _                           =>
+      //     rhs match {
+      //       case BoundedWildcardType(bounds) => return isSubType(tp1, bounds.lo, depth)
+      //       case _                           =>
+      //     }
+      // }
 
-      subTypeVars() || isSubType3(lhs, rhs, depth)
+      // subTypeVars() ||
+      isSubType3(lhs, rhs, depth)
     }
   }
 
