@@ -408,6 +408,14 @@ trait TypeComparers {
     def isSub(lhs: Type, rhs: Type) = isSubType(lhs, rhs, depth)
     def replaceLeft(lhs: Type)      = (lhs ne tp1) && isSub(lhs, tp2)
     def replaceRight(rhs: Type)     = (rhs ne tp2) && isSub(tp1, rhs)
+    def narrowModuleClass(tp: Type): Type = tp match {
+      case TypeRef(pre, sym, Nil) if sym.isModuleClass => tp.narrow
+      // case st @ SingleType(_, sym) if sym.isModule => st.underlying
+      case _                                       => tp
+    }
+    def moduleClassSubType = (
+      isSub(narrowModuleClass(tp1), narrowModuleClass(tp2))
+    )
 
     // if ((tp1 eq tp2) || isErrorOrWildcard(tp1) || isErrorOrWildcard(tp2)) return true
     // if ((tp1 eq NoType) || (tp2 eq NoType)) return false
