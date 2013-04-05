@@ -463,10 +463,10 @@ trait TypeComparers {
         else
           (sym1.name == sym2.name) && compatiblePrefixes
       )
-      def compatibleTypeArgs = isSubArgs(tr1.args, tr2.args, sym1.typeParams, depth)
+      def compatibleTypeArgs = isSubArgs(args1, args2, sym1.typeParams, depth)
 
       (    compatibleSymbols && compatibleTypeArgs
-        || sym2.isClass && replaceLeft(tr1 baseType sym2)
+        || sym2.isClass && replaceLeft(tp1 baseType sym2)
       )
     }
 
@@ -476,8 +476,8 @@ trait TypeComparers {
       val MethodType(params2, res2) = tp2
 
       (    sameLength(params1, params2)
-        && mt1.isImplicit == mt2.isImplicit
-        && matchingParams(params1, params2, mt1.isJava, mt2.isJava)
+        && tp1.isImplicit == tp2.isImplicit
+        && matchingParams(params1, params2, tp1.isJava, tp2.isJava)
         && isSub(res1.substSym(params1, params2), res2)
       )
     }
@@ -502,8 +502,7 @@ trait TypeComparers {
           case _            => typeRefOnRight(tp1, tp2)
         }
       case RefinedType(parents, decls) =>
-           (parents forall replaceRight)
-        && (decls forall (d => specializesSym(tp1, d, depth)))
+        (parents forall replaceRight) && decls.forall(d => specializesSym(tp1, d, depth))
       case et2: ExistentialType =>
         et2.withTypeVars(replaceRight, depth)
       case _ =>
