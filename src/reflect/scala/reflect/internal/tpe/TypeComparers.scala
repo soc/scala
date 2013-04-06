@@ -16,18 +16,70 @@ trait TypeComparers {
 
   private val pendingSubTypes = new mutable.HashSet[SubTypePair]
 
-  private def nextEquivalentInternal(tp: Type, canWiden: Boolean): Type = tp match {
-    case TypeRef(pre, sym, Nil) if sym.isRefinementClass          => pre memberInfo sym               // refinement classes
-    case TypeRef(_, sym, Nil) if isRawIfWithoutArgs(sym)          => rawToExistential(tp)             // raw types
-    case TypeRef(pre, sym, Nil) if sym.isAliasType                => tp.dealias                       // type aliases
-    case TypeRef(pre, sym, Nil) if sym.isAbstractType && canWiden => (pre memberInfo sym).bounds.hi   // abstract types
-    case tp if tp ne tp.normalize                                 => tp.normalize                     // polytypes
-    case tp: SingletonType if canWiden || (tp.underlying =:= tp)  => tp.underlying                    // singleton types
-    case _                                                        => null
+  class NextEquivalent(canWiden: Boolean) extends TypeMap {
+    private def op(tp: Type): Type = if (canWiden) transformToEquivalentOrWider(tp) else transformToEquivalent(tp)
+    def apply(tp: Type): Type = op(tp)
+
+    def transformToEquivalentOrWider(tp: Type): Type = {
+      val tp1 = transformToEquivalent(tp)
+      if (tp eq tp1) transformToWider(tp) else tp1
+    }
   }
 
-  def nextEquivalentOrWider(tp: Type): Type = nextEquivalentInternal(tp, canWiden = true)
-  def nextEquivalent(tp: Type): Type = nextEquivalent(tp, canWiden = false)
+  def transformToEquivalent(tp: Type): Type = tp match {
+    case TypeRef(pre, sym, Nil) if sym.isRefinementClass => pre memberInfo sym               // refinement classes
+    case TypeRef(pre, sym, Nil) if sym.isAliasType       => tp.dealias                       // type aliases
+    case RefinedType(p :: Nil, decls) if decls.isEmpty   => p
+    case SingleType(pre, sym) if sym.isModule            => tp.widen
+    case _: SingletonType if tp.underlying =:= tp        => tp.underlying
+    case NullaryMethodType(restpe)                       => restpe
+    case _                                               => tp
+  }
+  def transformToWider(tp: Type): Type = tp match {
+    case ThisType(sym)                                   => sym.typeOfThis
+    case SingleType(pre, sym)                            => sym.typeOfThis
+    case TypeRef(_, sym, Nil) if isRawIfWithoutArgs(sym) => rawToExistential(tp)             // raw types
+    case TypeRef(pre, sym, Nil) if sym.isAbstractType    => (pre memberInfo sym).bounds.hi   // abstract types
+    case tp if tp ne tp.underlying                       => tp.underlying
+    case tp if tp ne tp.widen                            => tp.widen
+    case _                                               => tp
+  }
+
+  def nextEquivalentOrWider(tp: Type): Type = transformToWider(tp)
+  def nextEquivalent(tp: Type): Type        = transformToEquivalent(tp)
+
+  // object nextEquivalentOrWider extends NextEquivalent(canWiden = true)
+  // object nextEquivalent extends NextEquivalent(canWiden = false)
+
+  // private def nextEquivalentInternal(tp: Type, canWiden: Boolean): Type = tp match {
+  //   case TypeRef(pre, sym, Nil) if sym.isRefinementClass          => pre memberInfo sym               // refinement classes
+  //   case TypeRef(_, sym, Nil) if isRawIfWithoutArgs(sym)          => rawToExistential(tp)             // raw types
+  //   case TypeRef(pre, sym, Nil) if sym.isAliasType                => tp.dealias                       // type aliases
+  //   case TypeRef(pre, sym, Nil) if sym.isAbstractType && canWiden => (pre memberInfo sym).bounds.hi   // abstract types
+  //   case tp if canWiden && (tp ne tp.underlying)                  => tp.underlying
+  //   case tp if canWiden && (tp ne tp.widen)                       => tp.widen
+  //   case tp if (tp ne tp.normalize)                               => tp.normalize                     // polytypes
+  //   case RefinedType(p :: Nil, decls) if decls.isEmpty            => p
+  //   case _                                                        =>
+  //     println(s"nextEquivalentInternal($tp, $canWiden)/${util.shortClassOfInstance(tp)} is NoType")
+  //     NoType
+  // }
+
+  // scala> println(typeOf[s.A].decls.toList map { x => val (t1, t2) = (typeOf[s.A] memberInfo x, typeOf[s.A] memberType x finalResultType) ; List(x, t1, t2, equivalentOrWiderTypes(t1), equivalentOrWiderTypes(t2)).mkString("\n", "\n  ", "\n") })
+
+  //   val
+
+  // tp map (nextEquivalentInternal(_, canWiden = true))
+  // def nextEquivalent(tp: Type): Type = tp map (nextEquivalentInternal(_, canWiden = false))
+
+  def equivalentTypes(tp: Type): List[Type] = nextEquivalent(tp) match {
+    case tp1 if tp eq tp1 => Nil
+    case next             => next :: equivalentTypes(next)
+  }
+  def equivalentOrWiderTypes(tp: Type): List[Type] = nextEquivalentOrWider(tp) match {
+    case tp1 if tp eq tp1 => Nil
+    case next             => next :: equivalentOrWiderTypes(next)
+  }
 
   class SubTypePair(val tp1: Type, val tp2: Type) {
     override def hashCode = tp1.hashCode * 41 + tp2.hashCode
