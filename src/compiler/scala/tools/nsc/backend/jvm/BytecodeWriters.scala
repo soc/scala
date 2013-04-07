@@ -9,7 +9,7 @@ package backend.jvm
 import java.io.{ DataOutputStream, FileOutputStream, IOException, OutputStream, File => JFile }
 import scala.tools.nsc.io._
 import scala.tools.nsc.util.ScalaClassLoader
-import java.util.jar.Attributes.Name
+import java.util.jar.Attributes
 import scala.language.postfixOps
 
 /** Can't output a file due to the state of the file system. */
@@ -49,7 +49,7 @@ trait BytecodeWriters {
   class DirectToJarfileWriter(jfile: JFile) extends BytecodeWriter {
     val jarMainAttrs = (
       if (settings.mainClass.isDefault) Nil
-      else List(Name.MAIN_CLASS -> settings.mainClass.value)
+      else List(Attributes.Name.MAIN_CLASS -> settings.mainClass.value)
     )
     val writer = new Jar(jfile).jarWriter(jarMainAttrs: _*)
 

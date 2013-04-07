@@ -756,7 +756,7 @@ trait ContextErrors {
           if (sym.isTerm) "splice when splicing this variable into a reifee"
           else "c.WeakTypeTag annotation for this type parameter"
         )
-        macroExpansionError(expandee, template(sym.name.nameKind).format(sym.name + " " + sym.origin, forgotten))
+        macroExpansionError(expandee, template(sym.name.nameKind.kind).format(sym.name + " " + sym.origin, forgotten))
       }
 
       def MacroExpansionHasInvalidTypeError(expandee: Tree, expanded: Any) = {

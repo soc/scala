@@ -9,6 +9,7 @@ package ast
 import scala.compat.Platform.EOL
 import symtab.Flags._
 import scala.language.postfixOps
+import scala.reflect.naming
 
 /** The object `nodePrinter` converts the internal tree
  *  representation to a string.
@@ -40,7 +41,7 @@ abstract class NodePrinters {
     def showFlags(tree: MemberDef)     = flagsToString(tree.symbol.flags | tree.mods.flags)
     def showLiteral(lit: Literal)      = showPosition(lit) + lit.value.escapedStringValue
     def showTypeTree(tt: TypeTree)     = showPosition(tt) + "<tpt>" + emptyOrComment(showType(tt))
-    def showName(name: Name)           = name match {
+    def showName(name: naming.Name)    = name match {
       case nme.EMPTY | tpnme.EMPTY => "<empty>"
       case name                    => "\"" + name + "\""
     }
@@ -69,7 +70,7 @@ abstract class NodePrinters {
     private val buf = new StringBuilder
     private var level = 0
 
-    def showName(name: Name): String
+    def showName(name: naming.Name): String
     def showPosition(tree: Tree): String
     def showNameAndPos(tree: NameTree): String
     def showDefTreeName(defTree: DefTree): String
@@ -202,7 +203,7 @@ abstract class NodePrinters {
       }
     }
 
-    def printSingle(tree: Tree, name: Name) {
+    def printSingle(tree: Tree, name: naming.Name) {
       println(treePrefix(tree) + "(" + showName(name) + ")" + showAttributes(tree))
     }
 

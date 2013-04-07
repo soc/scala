@@ -9,6 +9,7 @@ package ast
 import symtab._
 import util.DocStrings._
 import scala.collection.mutable
+import scala.reflect.naming
 
 /*
  *  @author  Martin Odersky
@@ -446,14 +447,14 @@ trait DocComments { self: Global =>
 
     def expandedDefs(sym: Symbol, site: Symbol): List[Symbol] = {
 
-      def select(site: Type, name: Name, orElse: => Type): Type = {
+      def select(site: Type, name: naming.Name, orElse: => Type): Type = {
         val member = site.nonPrivateMember(name)
         if (member.isTerm) singleType(site, member)
         else if (member.isType) site.memberType(member)
         else orElse
       }
 
-      def getSite(name: Name): Type = {
+      def getSite(name: naming.Name): Type = {
         def findIn(sites: List[Symbol]): Type = sites match {
           case List() => NoType
           case site :: sites1 => select(site.thisType, name, findIn(sites1))

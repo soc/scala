@@ -1,4 +1,5 @@
-package scala.reflect.reify
+package scala.reflect
+package reify
 package codegen
 
 import scala.reflect.internal.Flags._
@@ -153,7 +154,7 @@ trait GenSymbols {
       Reification(name, Ident(sym), mirrorBuildCall(nme.newNestedSymbol, reifiedOwner, reify(sym.name), reify(sym.pos), mirrorBuildCall(nme.flagsFromBits, reify(sym.flags)), reify(sym.isClass)))
     }
 
-  case class Reification(name: Name, binding: Tree, tree: Tree)
+  case class Reification(name: naming.Name, binding: Tree, tree: Tree)
 
   private def reifyIntoSymtab(sym: Symbol)(reificode: Symbol => Reification): Tree = {
     def fromSymtab = symtab symRef sym

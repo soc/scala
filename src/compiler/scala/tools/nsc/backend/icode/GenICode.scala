@@ -1905,7 +1905,7 @@ abstract class GenICode extends SubComponent  {
        */
       private def newExceptionHandler(cls: Symbol, pos: Position): ExceptionHandler = {
         handlerCount += 1
-        val exh = new ExceptionHandler(method, newTermNameCached("" + handlerCount), cls, pos)
+        val exh = new ExceptionHandler(method, newTermName("" + handlerCount), cls, pos)
         method.addHandler(exh)
         handlers = exh :: handlers
         debuglog("added handler: " + exh)

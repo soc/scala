@@ -9,6 +9,7 @@ package typechecker
 import symtab.Flags._
 import scala.collection.mutable
 import scala.reflect.ClassTag
+import scala.reflect.naming
 
 /**
  *  @author Lukas Rytz
@@ -370,7 +371,7 @@ trait NamesDefaults { self: Analyzer =>
     }
   }
 
-  def missingParams[T](args: List[T], params: List[Symbol], argName: T => Option[Name] = nameOfNamedArg _): (List[Symbol], Boolean) = {
+  def missingParams[T](args: List[T], params: List[Symbol], argName: T => Option[naming.Name] = nameOfNamedArg _): (List[Symbol], Boolean) = {
     val namedArgs = args.dropWhile(arg => {
       val n = argName(arg)
       n.isEmpty || params.forall(p => p.name != n.get)

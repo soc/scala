@@ -1,0 +1,126 @@
+package scala
+package reflect
+package naming
+
+class Keyword
+
+trait JavaKeyword[T] {
+  protected def createKeyword(s: String): T
+  private implicit def liftKeyword(s: String): T = createKeyword(s)
+
+  final val ABSTRACTkw: T     = "abstract"
+  final val ASSERTkw: T       = "assert"
+  final val BOOLEANkw: T      = "boolean"
+  final val BREAKkw: T        = "break"
+  final val BYTEkw: T         = "byte"
+  final val CASEkw: T         = "case"
+  final val CATCHkw: T        = "catch"
+  final val CHARkw: T         = "char"
+  final val CLASSkw: T        = "class"
+  final val CONSTkw: T        = "const"
+  final val CONTINUEkw: T     = "continue"
+  final val DEFAULTkw: T      = "default"
+  final val DOkw: T           = "do"
+  final val DOUBLEkw: T       = "double"
+  final val ELSEkw: T         = "else"
+  final val ENUMkw: T         = "enum"
+  final val EXTENDSkw: T      = "extends"
+  final val FINALkw: T        = "final"
+  final val FINALLYkw: T      = "finally"
+  final val FLOATkw: T        = "float"
+  final val FORkw: T          = "for"
+  final val IFkw: T           = "if"
+  final val GOTOkw: T         = "goto"
+  final val IMPLEMENTSkw: T   = "implements"
+  final val IMPORTkw: T       = "import"
+  final val INSTANCEOFkw: T   = "instanceof"
+  final val INTkw: T          = "int"
+  final val INTERFACEkw: T    = "interface"
+  final val LONGkw: T         = "long"
+  final val NATIVEkw: T       = "native"
+  final val NEWkw: T          = "new"
+  final val PACKAGEkw: T      = "package"
+  final val PRIVATEkw: T      = "private"
+  final val PROTECTEDkw: T    = "protected"
+  final val PUBLICkw: T       = "public"
+  final val RETURNkw: T       = "return"
+  final val SHORTkw: T        = "short"
+  final val STATICkw: T       = "static"
+  final val STRICTFPkw: T     = "strictfp"
+  final val SUPERkw: T        = "super"
+  final val SWITCHkw: T       = "switch"
+  final val SYNCHRONIZEDkw: T = "synchronized"
+  final val THISkw: T         = "this"
+  final val THROWkw: T        = "throw"
+  final val THROWSkw: T       = "throws"
+  final val TRANSIENTkw: T    = "transient"
+  final val TRYkw: T          = "try"
+  final val VOIDkw: T         = "void"
+  final val VOLATILEkw: T     = "volatile"
+  final val WHILEkw: T        = "while"
+}
+object JavaKeyword extends JavaKeyword[String] {
+  protected def createKeyword(s: String): String = s
+}
+
+trait ScalaKeyword[T] {
+  protected def createKeyword(s: String): T
+  private implicit def liftKeyword(s: String): T = createKeyword(s)
+
+  final val ABSTRACTkw: T  = "abstract"
+  final val CASEkw: T      = "case"
+  final val CLASSkw: T     = "class"
+  final val CATCHkw: T     = "catch"
+  final val DEFkw: T       = "def"
+  final val DOkw: T        = "do"
+  final val ELSEkw: T      = "else"
+  final val EXTENDSkw: T   = "extends"
+  final val FALSEkw: T     = "false"
+  final val FINALkw: T     = "final"
+  final val FINALLYkw: T   = "finally"
+  final val FORkw: T       = "for"
+  final val FORSOMEkw: T   = "forSome"
+  final val IFkw: T        = "if"
+  final val IMPLICITkw: T  = "implicit"
+  final val IMPORTkw: T    = "import"
+  final val LAZYkw: T      = "lazy"
+  final val MACROkw: T     = "macro"
+  final val MATCHkw: T     = "match"
+  final val NEWkw: T       = "new"
+  final val NULLkw: T      = "null"
+  final val OBJECTkw: T    = "object"
+  final val OVERRIDEkw: T  = "override"
+  final val PACKAGEkw: T   = "package"
+  final val PRIVATEkw: T   = "private"
+  final val PROTECTEDkw: T = "protected"
+  final val RETURNkw: T    = "return"
+  final val SEALEDkw: T    = "sealed"
+  final val SUPERkw: T     = "super"
+  final val THENkw: T      = "then"
+  final val THISkw: T      = "this"
+  final val THROWkw: T     = "throw"
+  final val TRAITkw: T     = "trait"
+  final val TRUEkw: T      = "true"
+  final val TRYkw: T       = "try"
+  final val TYPEkw: T      = "type"
+  final val VALkw: T       = "val"
+  final val VARkw: T       = "var"
+  final val WITHkw: T      = "with"
+  final val WHILEkw: T     = "while"
+  final val YIELDkw: T     = "yield"
+  final val ARROWkw: T     = "=>"
+  final val ATkw: T        = "@"
+  final val COLONkw: T     = ":"
+  final val DOTkw: T       = "."
+  final val EQUALSkw: T    = "="
+  final val HASHkw: T      = "#"
+  final val LARROWkw: T    = "<-"
+  final val SUBTYPEkw: T   = "<:"
+  final val SUPERTYPEkw: T = ">:"
+  final val USCOREkw: T    = "_"
+  final val VIEWBOUNDkw: T = "<%"
+}
+
+object ScalaKeyword extends ScalaKeyword[String] {
+  protected def createKeyword(s: String): String = s
+}

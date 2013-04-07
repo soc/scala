@@ -8,15 +8,18 @@ package internal
 
 import Flags._
 import scala.collection.mutable.{ListBuffer, LinkedHashSet}
+import scala.collection.immutable.StringOps
 import util.Statistics
 
 trait Trees extends api.Trees { self: SymbolTable =>
 
   private[scala] var nodeCount = 0
 
-  protected def treeLine(t: Tree): String =
-    if (t.pos.isDefined && t.pos.isRange) t.pos.lineContent.drop(t.pos.column - 1).take(t.pos.end - t.pos.start + 1)
+  protected def treeLine(t: Tree): String = (
+    if (t.pos.isDefined && t.pos.isRange)
+      t.pos.lineContent drop (t.pos.column - 1) take (t.pos.end - t.pos.start + 1)
     else t.summaryString
+  )
 
   protected def treeStatus(t: Tree, enclosingTree: Tree = null) = {
     val parent = if (enclosingTree eq null) "        " else " P#%5s".format(enclosingTree.id)
@@ -827,15 +830,13 @@ trait Trees extends api.Trees { self: SymbolTable =>
       if qual0 == qual => t
       case _ => treeCopy.This(tree, qual)
     }
-    def Select(tree: Tree, qualifier: Tree, selector: Name) = tree match {
-      case t @ Select(qualifier0, selector0)
-      if (qualifier0 == qualifier) && (selector0 == selector) => t
-      case _ => treeCopy.Select(tree, qualifier, selector)
+    def Select(tree: Tree, qualifier: Tree, selector: Name): Select = tree match {
+      case t @ Select(`qualifier`, `selector`) => t
+      case _                                   => treeCopy.Select(tree, qualifier, selector)
     }
-    def Ident(tree: Tree, name: Name) = tree match {
-      case t @ Ident(name0)
-      if name0 == name => t
-      case _ => treeCopy.Ident(tree, name)
+    def Ident(tree: Tree, name: Name): Ident = tree match {
+      case t @ Ident(`name`) => t
+      case _                 => treeCopy.Ident(tree, name)
     }
     def ReferenceToBoxed(tree: Tree, idt: Ident) = tree match {
       case t @ ReferenceToBoxed(idt0)
@@ -843,9 +844,8 @@ trait Trees extends api.Trees { self: SymbolTable =>
       case _ => this.treeCopy.ReferenceToBoxed(tree, idt)
     }
     def Literal(tree: Tree, value: Constant) = tree match {
-      case t @ Literal(value0)
-      if value0 == value => t
-      case _ => treeCopy.Literal(tree, value)
+      case t @ Literal(`value`) => t
+      case _                    => treeCopy.Literal(tree, value)
     }
     def TypeTree(tree: Tree) = tree match {
       case t @ TypeTree() => t
@@ -861,15 +861,13 @@ trait Trees extends api.Trees { self: SymbolTable =>
       if ref0 == ref => t
       case _ => treeCopy.SingletonTypeTree(tree, ref)
     }
-    def SelectFromTypeTree(tree: Tree, qualifier: Tree, selector: Name) = tree match {
-      case t @ SelectFromTypeTree(qualifier0, selector0)
-      if (qualifier0 == qualifier) && (selector0 == selector) => t
-      case _ => treeCopy.SelectFromTypeTree(tree, qualifier, selector)
+    def SelectFromTypeTree(tree: Tree, qualifier: Tree, selector: Name): SelectFromTypeTree = tree match {
+      case t @ SelectFromTypeTree(`qualifier`, `selector`) => t
+      case _                                               => treeCopy.SelectFromTypeTree(tree, qualifier, selector)
     }
     def CompoundTypeTree(tree: Tree, templ: Template) = tree match {
-      case t @ CompoundTypeTree(templ0)
-      if templ0 == templ => t
-      case _ => treeCopy.CompoundTypeTree(tree, templ)
+      case t @ CompoundTypeTree(`templ`) => t
+      case _                             => treeCopy.CompoundTypeTree(tree, templ)
     }
     def AppliedTypeTree(tree: Tree, tpt: Tree, args: List[Tree]) = tree match {
       case t @ AppliedTypeTree(tpt0, args0)
@@ -1108,13 +1106,13 @@ trait Trees extends api.Trees { self: SymbolTable =>
     This(sym.name.toTypeName) setSymbol sym
 
   def Select(qualifier: Tree, name: String): Select =
-    Select(qualifier, newTermName(name))
+    Select(qualifier, TermName(name))
 
   def Select(qualifier: Tree, sym: Symbol): Select =
     Select(qualifier, sym.name) setSymbol sym
 
   def Ident(name: String): Ident =
-    Ident(newTermName(name))
+    Ident(TermName(name))
 
   def Ident(sym: Symbol): Ident =
     Ident(sym.name) setSymbol sym

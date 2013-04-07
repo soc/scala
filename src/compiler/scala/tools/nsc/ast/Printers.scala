@@ -188,7 +188,7 @@ trait Printers extends scala.reflect.internal.Printers { this: Global =>
     private def params(trees: List[Tree]): String = trees map safe mkString ", "
 
     private def safe(name: Name): String = name.decode
-    private def safe(tree: Tree): String = tree match {
+    private def safe(tree: Tree): String        = tree match {
       case Apply(fn, args)        => "%s(%s)".format(safe(fn), params(args))
       case Select(qual, name)     => safe(qual) + "." + safe(name)
       case This(qual)             => safe(qual) + ".this"

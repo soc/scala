@@ -133,7 +133,7 @@ abstract class SymbolTable extends macros.Universe
    *  This is overridden by the reflection compiler to make up a package
    *  when it makes sense (i.e. <owner> is a package and <name> is a term name).
    */
-  def missingHook(owner: Symbol, name: Name): Symbol = NoSymbol
+  def missingHook(owner: Symbol, name: naming.Name): Symbol = NoSymbol
 
   /** Returns the mirror that loaded given symbol */
   def mirrorThatLoaded(sym: Symbol): Mirror
@@ -316,13 +316,17 @@ abstract class SymbolTable extends macros.Universe
     }
 
     def clearAll() = {
-      debuglog("Clearing " + caches.size + " caches.")
-      caches foreach { ref =>
-        val cache = ref.get()
-        if (cache == null)
-          caches -= ref
-        else
-          cache.clear()
+      if (sys.props contains "scala.debug.noclear")
+        warning("Not clearing perRunCaches due to setting.")
+      else {
+        debuglog(s"Clearing ${caches.size} caches.")
+        caches foreach { ref =>
+          val cache = ref.get()
+          if (cache == null)
+            caches -= ref
+          else
+            cache.clear()
+        }
       }
     }
 

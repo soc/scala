@@ -42,13 +42,13 @@ trait Synthetics {
    *  (term name for modules, type name for classes). $TOPLEVEL_TREE.
    *  If such a tree does not exist, returns `EmptyTree`.
    */
-  def topLevelDef(name: Name): Tree
+  def topLevelDef(name: naming.Name): Tree
 
   /** Returns a reference to a top-level definition tree with a given fully-qualified name
    *  (term name for modules, type name for classes). $TOPLEVEL_TREE.
    *  If such a tree does not exist, returns `EmptyTree`.
    */
-  def topLevelRef(name: Name): Tree
+  def topLevelRef(name: naming.Name): Tree
 
   /** Adds a top-level definition to the compiler's symbol table. $INTRODUCE_TOP_LEVEL.
    *

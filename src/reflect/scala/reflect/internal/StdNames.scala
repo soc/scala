@@ -11,32 +11,14 @@ import Chars.isOperatorPart
 import scala.annotation.switch
 import scala.language.implicitConversions
 import scala.collection.immutable
+import scala.collection.immutable.StringOps
 import scala.io.Codec
+import scala.collection.{ mutable, immutable, generic }
 
 trait StdNames {
   self: SymbolTable =>
 
-  def encode(str: String): TermName = newTermNameCached(NameTransformer.encode(str))
-
-  /** Tensions: would like the keywords to be the very first names entered into the names
-   *  storage so their ids count from 0, which simplifies the parser. Switched to abstract
-   *  classes to avoid all the indirection which is generated with implementation-containing
-   *  traits. Since all these classes use eager vals, that means the constructor with the
-   *  keywords must run first. If it's the top in the superclass chain, then CommonNames
-   *  must inherit from it, which means TypeNames would inherit keywords as well.
-   *
-   *  Solution: Keywords extends CommonNames and uses early defs to beat the
-   *  CommonNames constructor out of the starting gate.  This is its builder.
-   */
-  private class KeywordSetBuilder {
-    private var kws: Set[TermName] = Set()
-    def apply(s: String): TermName = {
-      val result = newTermNameCached(s)
-      kws = kws + result
-      result
-    }
-    def result: Set[TermName] = try kws finally kws = null
-  }
+  def encode(str: String): TermName = newTermName(NameTransformer.encode(str))
 
   private final object compactify extends (String => String) {
     val md5 = MessageDigest.getInstance("MD5")
@@ -60,8 +42,8 @@ trait StdNames {
       2 * (settings.maxClassfileName.value - 6 - 2*marker.length - 32)
     )
     def toMD5(s: String, edge: Int): String = {
-      val prefix = s take edge
-      val suffix = s takeRight edge
+      val prefix: String = s take edge
+      val suffix: String = s takeRight edge
 
       val cs = s.toArray
       val bytes = Codec toUTF8 cs
@@ -136,72 +118,11 @@ trait StdNames {
   }
 
   /** This should be the first trait in the linearization. */
-  // abstract class Keywords extends CommonNames {
-  abstract class Keywords extends {
-    private val kw = new KeywordSetBuilder
 
-    final val ABSTRACTkw: TermName  = kw("abstract")
-    final val CASEkw: TermName      = kw("case")
-    final val CLASSkw: TermName     = kw("class")
-    final val CATCHkw: TermName     = kw("catch")
-    final val DEFkw: TermName       = kw("def")
-    final val DOkw: TermName        = kw("do")
-    final val ELSEkw: TermName      = kw("else")
-    final val EXTENDSkw: TermName   = kw("extends")
-    final val FALSEkw: TermName     = kw("false")
-    final val FINALkw: TermName     = kw("final")
-    final val FINALLYkw: TermName   = kw("finally")
-    final val FORkw: TermName       = kw("for")
-    final val FORSOMEkw: TermName   = kw("forSome")
-    final val IFkw: TermName        = kw("if")
-    final val IMPLICITkw: TermName  = kw("implicit")
-    final val IMPORTkw: TermName    = kw("import")
-    final val LAZYkw: TermName      = kw("lazy")
-    final val MACROkw: TermName     = kw("macro")
-    final val MATCHkw: TermName     = kw("match")
-    final val NEWkw: TermName       = kw("new")
-    final val NULLkw: TermName      = kw("null")
-    final val OBJECTkw: TermName    = kw("object")
-    final val OVERRIDEkw: TermName  = kw("override")
-    final val PACKAGEkw: TermName   = kw("package")
-    final val PRIVATEkw: TermName   = kw("private")
-    final val PROTECTEDkw: TermName = kw("protected")
-    final val RETURNkw: TermName    = kw("return")
-    final val SEALEDkw: TermName    = kw("sealed")
-    final val SUPERkw: TermName     = kw("super")
-    final val THENkw: TermName      = kw("then")
-    final val THISkw: TermName      = kw("this")
-    final val THROWkw: TermName     = kw("throw")
-    final val TRAITkw: TermName     = kw("trait")
-    final val TRUEkw: TermName      = kw("true")
-    final val TRYkw: TermName       = kw("try")
-    final val TYPEkw: TermName      = kw("type")
-    final val VALkw: TermName       = kw("val")
-    final val VARkw: TermName       = kw("var")
-    final val WITHkw: TermName      = kw("with")
-    final val WHILEkw: TermName     = kw("while")
-    final val YIELDkw: TermName     = kw("yield")
-    final val DOTkw: TermName       = kw(".")
-    final val USCOREkw: TermName    = kw("_")
-    final val COLONkw: TermName     = kw(":")
-    final val EQUALSkw: TermName    = kw("=")
-    final val ARROWkw: TermName     = kw("=>")
-    final val LARROWkw: TermName    = kw("<-")
-    final val SUBTYPEkw: TermName   = kw("<:")
-    final val VIEWBOUNDkw: TermName = kw("<%")
-    final val SUPERTYPEkw: TermName = kw(">:")
-    final val HASHkw: TermName      = kw("#")
-    final val ATkw: TermName        = kw("@")
-
-    final val keywords = kw.result
-  } with CommonNames {
-    final val javaKeywords = new JavaKeywords()
-  }
-
-  abstract class TypeNames extends Keywords with TypeNamesApi {
+  abstract class TypeNames extends CommonNames with TypeNamesApi {
     override type NameType = TypeName
 
-    protected implicit def createNameType(name: String): TypeName = newTypeNameCached(name)
+    protected implicit def createNameType(name: String): TypeName = newTypeName(name)
 
     final val BYNAME_PARAM_CLASS_NAME: NameType        = "<byname>"
     final val JAVA_REPEATED_PARAM_CLASS_NAME: NameType = "<repeated...>"
@@ -260,10 +181,17 @@ trait StdNames {
     def interfaceName(implname: Name): TypeName = (implname dropRight IMPL_CLASS_SUFFIX.length).toTypeName
   }
 
-  abstract class TermNames extends Keywords with TermNamesApi {
+  abstract class TermNames extends {
+    private val created = mutable.Set[TermName]()
+  } with CommonNames with TermNamesApi with naming.ScalaKeyword[TermName] {
+    lazy val keywords = try created.toSet finally created.clear()
+    protected def createKeyword(s: String): TermName = {
+      val k = newTermName(s)
+      created += k
+      k
+    }
     override type NameType = TermName
-
-    protected implicit def createNameType(name: String): TermName = newTermNameCached(name)
+    protected implicit def createNameType(name: String): TermName = newTermName(name)
 
     /** Base strings from which synthetic names are derived. */
     val BITMAP_PREFIX                 = "bitmap$"
@@ -342,7 +270,7 @@ trait StdNames {
     }
 
     private def expandedNameInternal(name: TermName, base: Symbol, separator: String): TermName =
-      newTermNameCached(base.fullName('$') + separator + name)
+      newTermName(base.fullName('$') + separator + name)
 
     /** The expanded name of `name` relative to this class `base`
      */
@@ -377,8 +305,8 @@ trait StdNames {
 
     @deprecated("Use unexpandedName", "2.11.0") def originalName(name: Name): Name            = unexpandedName(name)
     @deprecated("Use Name#dropModule", "2.11.0") def stripModuleSuffix(name: Name): Name      = name.dropModule
-    @deprecated("Use Name#dropLocal", "2.11.0") def localToGetter(name: TermName): TermName   = name.dropLocal
-    @deprecated("Use Name#dropLocal", "2.11.0") def dropLocalSuffix(name: Name): TermName     = name.dropLocal
+    @deprecated("Use Name#dropLocal", "2.11.0") def localToGetter(name: TermName): TermName   = name.dropLocal.toTermName
+    @deprecated("Use Name#dropLocal", "2.11.0") def dropLocalSuffix(name: Name): TermName     = name.dropLocal.toTermName
     @deprecated("Use Name#localName", "2.11.0") def getterToLocal(name: TermName): TermName   = name.localName
     @deprecated("Use Name#setterName", "2.11.0") def getterToSetter(name: TermName): TermName = name.setterName
     @deprecated("Use Name#getterName", "2.11.0") def getterName(name: TermName): TermName     = name.getterName
@@ -728,7 +656,7 @@ trait StdNames {
     val toCharacter: NameType = "toCharacter"
     val toInteger: NameType   = "toInteger"
 
-    def newLazyValSlowComputeName(lzyValName: Name) = lzyValName append LAZY_SLOW_SUFFIX
+    def newLazyValSlowComputeName(lzyValName: naming.Name) = lzyValName append LAZY_SLOW_SUFFIX toTermName
 
     // ASCII names for operators
     val ADD      = encode("+")
@@ -867,20 +795,31 @@ trait StdNames {
      *  For the purposes of referencing that object, the syntax is allowed.
      */
     def segments(name: String, assumeTerm: Boolean): List[Name] = {
-      def mkName(str: String, term: Boolean): Name =
-        if (term) newTermName(str) else newTypeName(str)
+      val divIndex = {
+        val dot   = name indexOf '.'
+        val sharp = name indexOf '#'
+        if (dot < 0) sharp
+        else if (sharp < 0) dot
+        else math.min(sharp, dot)
+      }
+      if (name == "")
+        scala.Nil
+      // last segment: the parameter tells us whether type or term
+      else if (divIndex < 0)
+        Name(name, isTerm = assumeTerm) :: scala.Nil
+      // otherwise, we can tell based on whether '#' or '.' is the following char.
+      else {
+        val simple = name.substring(0, divIndex)
+        val div    = name charAt divIndex
+        val rest   = name.substring(divIndex + 1)
 
-      name.indexWhere(ch => ch == '.' || ch == '#') match {
-        // it's the last segment: the parameter tells us whether type or term
-        case -1     => if (name == "") scala.Nil else scala.List(mkName(name, assumeTerm))
-        // otherwise, we can tell based on whether '#' or '.' is the following char.
-        case idx    =>
-          val (simple, div, rest) = (name take idx, name charAt idx, name drop idx + 1)
-          mkName(simple, div == '.') :: segments(rest, assumeTerm)
+        Name(simple, isTerm = div == '.') :: segments(rest, assumeTerm)
       }
     }
+    def segments(name: naming.Name): List[Name] = segments(name.stringValue, assumeTerm = name.isTermName)
+    // def segments[T <: Name](name: T): List[T] = segments(name.stringValue, assumeTerm = name.isTermName) map (name newName _)
 
-    def newBitmapName(bitmapPrefix: Name, n: Int) = bitmapPrefix append ("" + n)
+    def newBitmapName(bitmapPrefix: Name, n: Int) = bitmapPrefix append ("" + n) toTermName
 
     val BITMAP_NORMAL: NameType              = BITMAP_PREFIX + ""           // initialization bitmap for public/protected lazy vals
     val BITMAP_TRANSIENT: NameType           = BITMAP_PREFIX + "trans$"     // initialization bitmap for transient lazy vals
@@ -906,11 +845,13 @@ trait StdNames {
     val RuntimeNull    = toBinary(fulltpnme.RuntimeNull).toTypeName
   }
 
-  val javanme = nme.javaKeywords
+  object javanme extends naming.JavaKeyword[TermName] {
+    protected def createKeyword(s: String): TermName = newTermName(s)
+  }
 
   object nme extends TermNames {
     def moduleVarName(name: TermName): TermName =
-      newTermNameCached("" + name + MODULE_VAR_SUFFIX)
+      newTermName("" + name + MODULE_VAR_SUFFIX)
 
     def getCause         = sn.GetCause
     def getClass_        = sn.GetClass
@@ -932,67 +873,10 @@ trait StdNames {
     @deprecated("Use a method in tpnme", "2.10.0") def interfaceName(implname: Name): TypeName = tpnme.interfaceName(implname)
   }
 
-  class JavaKeywords {
-    private val kw = new KeywordSetBuilder
-
-    final val ABSTRACTkw: TermName     = kw("abstract")
-    final val ASSERTkw: TermName       = kw("assert")
-    final val BOOLEANkw: TermName      = kw("boolean")
-    final val BREAKkw: TermName        = kw("break")
-    final val BYTEkw: TermName         = kw("byte")
-    final val CASEkw: TermName         = kw("case")
-    final val CATCHkw: TermName        = kw("catch")
-    final val CHARkw: TermName         = kw("char")
-    final val CLASSkw: TermName        = kw("class")
-    final val CONSTkw: TermName        = kw("const")
-    final val CONTINUEkw: TermName     = kw("continue")
-    final val DEFAULTkw: TermName      = kw("default")
-    final val DOkw: TermName           = kw("do")
-    final val DOUBLEkw: TermName       = kw("double")
-    final val ELSEkw: TermName         = kw("else")
-    final val ENUMkw: TermName         = kw("enum")
-    final val EXTENDSkw: TermName      = kw("extends")
-    final val FINALkw: TermName        = kw("final")
-    final val FINALLYkw: TermName      = kw("finally")
-    final val FLOATkw: TermName        = kw("float")
-    final val FORkw: TermName          = kw("for")
-    final val IFkw: TermName           = kw("if")
-    final val GOTOkw: TermName         = kw("goto")
-    final val IMPLEMENTSkw: TermName   = kw("implements")
-    final val IMPORTkw: TermName       = kw("import")
-    final val INSTANCEOFkw: TermName   = kw("instanceof")
-    final val INTkw: TermName          = kw("int")
-    final val INTERFACEkw: TermName    = kw("interface")
-    final val LONGkw: TermName         = kw("long")
-    final val NATIVEkw: TermName       = kw("native")
-    final val NEWkw: TermName          = kw("new")
-    final val PACKAGEkw: TermName      = kw("package")
-    final val PRIVATEkw: TermName      = kw("private")
-    final val PROTECTEDkw: TermName    = kw("protected")
-    final val PUBLICkw: TermName       = kw("public")
-    final val RETURNkw: TermName       = kw("return")
-    final val SHORTkw: TermName        = kw("short")
-    final val STATICkw: TermName       = kw("static")
-    final val STRICTFPkw: TermName     = kw("strictfp")
-    final val SUPERkw: TermName        = kw("super")
-    final val SWITCHkw: TermName       = kw("switch")
-    final val SYNCHRONIZEDkw: TermName = kw("synchronized")
-    final val THISkw: TermName         = kw("this")
-    final val THROWkw: TermName        = kw("throw")
-    final val THROWSkw: TermName       = kw("throws")
-    final val TRANSIENTkw: TermName    = kw("transient")
-    final val TRYkw: TermName          = kw("try")
-    final val VOIDkw: TermName         = kw("void")
-    final val VOLATILEkw: TermName     = kw("volatile")
-    final val WHILEkw: TermName        = kw("while")
-
-    final val keywords = kw.result
-  }
-
   sealed abstract class SymbolNames {
     protected val stringToTermName = null
     protected val stringToTypeName = null
-    protected implicit def createNameType(s: String): TypeName = newTypeNameCached(s)
+    protected implicit def createNameType(s: String): TypeName = newTypeName(s)
 
     final val BoxedBoolean: TypeName       = "java.lang.Boolean"
     final val BoxedByte: TypeName          = "java.lang.Byte"

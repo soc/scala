@@ -10,6 +10,7 @@ import scala.collection.immutable
 import scala.collection.mutable.ListBuffer
 import scala.util.control.ControlThrowable
 import symtab.Flags._
+import scala.reflect.naming
 
 /** This trait ...
  *
@@ -1542,7 +1543,7 @@ trait Infer extends Checkable {
     }
 
     // Checks against the name of the parameter and also any @deprecatedName.
-    private def paramMatchesName(param: Symbol, name: Name) =
+    private def paramMatchesName(param: Symbol, name: naming.Name) =
       param.name == name || param.deprecatedParamName.exists(_ == name)
 
     private def containsNamedType(argtpes: List[Type]): Boolean = argtpes match {

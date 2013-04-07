@@ -95,8 +95,8 @@ trait TreeDSL {
       def APPLY(params: List[Tree]) = Apply(target, params)
       def MATCH(cases: CaseDef*)    = Match(target, cases.toList)
 
-      def DOT(member: Name)         = SelectStart(Select(target, member))
-      def DOT(sym: Symbol)          = SelectStart(Select(target, sym))
+      def DOT(member: Name) = SelectStart(Select(target, member))
+      def DOT(sym: Symbol)  = SelectStart(Select(target, sym))
 
       /** Assignment */
       // !!! This method is responsible for some tree sharing, but a diligent

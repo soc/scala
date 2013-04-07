@@ -13,6 +13,7 @@ import scala.annotation.{ switch, tailrec }
 import scala.collection.{ mutable, immutable }
 import mutable.{ ListBuffer, ArrayBuffer }
 import scala.xml.Utility.{ isNameStart }
+import scala.reflect.naming.ScalaTokenCodes
 
 /** See Parsers.scala / ParsersCommon for some explanation of ScannersCommon.
  */
@@ -22,7 +23,8 @@ trait ScannersCommon {
 
   trait CommonTokenData {
     def token: Int
-    def name: TermName
+    def word: String
+    def name: TermName = TermName(word)
   }
 
   trait ScannerCommon extends CommonTokenData {
@@ -62,7 +64,7 @@ trait Scanners extends ScannersCommon {
     var lastOffset: Offset = 0
 
     /** the name of an identifier */
-    var name: TermName = null
+    var word: String = null
 
     /** the string value of a literal */
     var strVal: String = null
@@ -71,12 +73,12 @@ trait Scanners extends ScannersCommon {
     var base: Int = 0
 
     def copyFrom(td: TokenData) = {
-      this.token = td.token
-      this.offset = td.offset
+      this.token      = td.token
+      this.offset     = td.offset
       this.lastOffset = td.lastOffset
-      this.name = td.name
-      this.strVal = td.strVal
-      this.base = td.base
+      this.word       = td.word
+      this.strVal     = td.strVal
+      this.base       = td.base
     }
   }
 
@@ -159,13 +161,11 @@ trait Scanners extends ScannersCommon {
     /** A character buffer for literals
      */
     val cbuf = new StringBuilder
+    private def drainCbuf() = try cbuf.toString finally cbuf.clear()
 
     /** append Unicode character to "cbuf" buffer
      */
-    protected def putChar(c: Char) {
-//      assert(cbuf.size < 10000, cbuf)
-      cbuf.append(c)
-    }
+    protected def putChar(c: Char): Unit = cbuf append c
 
     /** Determines whether this scanner should emit identifier deprecation warnings,
      *  e.g. when seeing `macro` or `then`, which are planned to become keywords in future versions of Scala.
@@ -174,23 +174,24 @@ trait Scanners extends ScannersCommon {
 
     /** Clear buffer and set name and token */
     private def finishNamed(idtoken: Int = IDENTIFIER) {
-      name = newTermName(cbuf.toString)
-      cbuf.clear()
-      token = idtoken
-      if (idtoken == IDENTIFIER) {
-        val idx = name.start - kwOffset
-        if (idx >= 0 && idx < kwArray.length) {
-          token = kwArray(idx)
-          if (token == IDENTIFIER && allowIdent != name && emitIdentifierDeprecationWarnings)
-            deprecationWarning(name+" is now a reserved word; usage as an identifier is deprecated")
-        }
-      }
+      word  = drainCbuf()
+      token = if (idtoken == IDENTIFIER) ScalaTokenCodes scalaLookup word else idtoken
+
+      def shouldWarn = (
+           idtoken == IDENTIFIER
+        && ScalaTokenCodes.isDeprecatedIdent(word)
+        && allowedIdent != word
+        && emitIdentifierDeprecationWarnings
+      )
+      if (shouldWarn)
+        deprecationWarning(s"$word is now a reserved word; usage as an identifier is deprecated")
     }
 
     /** Clear buffer and set string */
-    private def setStrVal() {
-      strVal = cbuf.toString
-      cbuf.clear()
+    private def setStrVal(): Unit = strVal = drainCbuf()
+    private def setStrLit() {
+      setStrVal()
+      token = STRINGLIT
     }
 
     private class TokenData0 extends TokenData
@@ -235,17 +236,13 @@ trait Scanners extends ScannersCommon {
     }
 
     /** Allow an otherwise deprecated ident here */
-    private var allowIdent: Name = nme.EMPTY
+    private var allowedIdent: String = ""
 
     /** Get next token, and allow the otherwise deprecated ident `name`  */
-    def nextTokenAllow(name: Name) = {
-      val prev = allowIdent
-      allowIdent = name
-      try {
-        nextToken()
-      } finally {
-        allowIdent = prev
-      }
+    def nextTokenAllow(ident: String) = {
+      val saved = allowedIdent
+      allowedIdent = ident
+      try nextToken() finally allowedIdent = saved
     }
 
     /** Produce next token, filling TokenData fields of Scanner.
@@ -594,7 +591,7 @@ trait Scanners extends ScannersCommon {
       if (ch == '`') {
         nextChar()
         finishNamed(BACKQUOTED_IDENT)
-        if (name.length == 0)
+        if (word.length == 0)
           syntaxError("empty quoted identifier")
         else if (name == nme.WILDCARD)
           syntaxError("wildcard invalid as backquoted identifier")
@@ -678,21 +675,20 @@ trait Scanners extends ScannersCommon {
       } else syntaxError("unclosed string literal")
     }
 
-    private def getRawStringLit(): Unit = {
-      if (ch == '\"') {
-        nextRawChar()
-        if (isTripleQuote()) {
-          setStrVal()
-          token = STRINGLIT
-        } else
-          getRawStringLit()
-      } else if (ch == SU) {
-        incompleteInputError("unclosed multi-line string literal")
-      } else {
+    private def handlePossibleTripleQuote() = (
+      isTripleQuote() && {
+        setStrLit()
+        true
+      }
+    )
+
+    private def getRawStringLit(): Unit = ch match {
+      case '\"' => nextRawChar() ; if (!handlePossibleTripleQuote()) getRawStringLit()
+      case SU   => incompleteInputError("unclosed multi-line string literal")
+      case _    =>
         putChar(ch)
         nextRawChar()
         getRawStringLit()
-      }
     }
 
     @annotation.tailrec private def getStringPart(multiLine: Boolean): Unit = {
@@ -705,15 +701,12 @@ trait Scanners extends ScannersCommon {
       if (ch == '"') {
         if (multiLine) {
           nextRawChar()
-          if (isTripleQuote()) {
-            setStrVal()
-            token = STRINGLIT
-          } else
+          if (!handlePossibleTripleQuote())
             getStringPart(multiLine)
-        } else {
+        }
+        else {
           nextChar()
-          setStrVal()
-          token = STRINGLIT
+          setStrLit()
         }
       } else if (ch == '$') {
         nextRawChar()
@@ -731,14 +724,12 @@ trait Scanners extends ScannersCommon {
             putChar(ch)
             nextRawChar()
           } while (ch != SU && Character.isUnicodeIdentifierPart(ch))
+
           next.token = IDENTIFIER
-          next.name = newTermName(cbuf.toString)
-          cbuf.clear()
-          val idx = next.name.start - kwOffset
-          if (idx >= 0 && idx < kwArray.length) {
-            next.token = kwArray(idx)
-          }
-        } else {
+          next.word  = drainCbuf()
+          next.token = ScalaTokenCodes scalaLookup next.word
+        }
+        else {
           syntaxError("invalid string interpolation: `$$', `$'ident or `$'BlockExpr expected")
         }
       } else {
@@ -1033,7 +1024,7 @@ trait Scanners extends ScannersCommon {
       } else {
         op()
         token = SYMBOLLIT
-        strVal = name.toString
+        strVal = word
       }
     }
 
@@ -1060,7 +1051,7 @@ trait Scanners extends ScannersCommon {
 
     override def toString() = token match {
       case IDENTIFIER | BACKQUOTED_IDENT =>
-        "id(" + name + ")"
+        "id(" + word + ")"
       case CHARLIT =>
         "char(" + intVal + ")"
       case INTLIT =>
@@ -1076,7 +1067,7 @@ trait Scanners extends ScannersCommon {
       case STRINGPART =>
         "stringpart(" + strVal + ")"
       case INTERPOLATIONID =>
-        "interpolationid(" + name + ")"
+        "interpolationid(" + word + ")"
       case SEMI =>
         ";"
       case NEWLINE =>
@@ -1111,103 +1102,34 @@ trait Scanners extends ScannersCommon {
     }
   } // end Scanner
 
-  // ------------- keyword configuration -----------------------------------
-
-  private val allKeywords = List[(Name, Int)](
-    nme.ABSTRACTkw  -> ABSTRACT,
-    nme.CASEkw      -> CASE,
-    nme.CATCHkw     -> CATCH,
-    nme.CLASSkw     -> CLASS,
-    nme.DEFkw       -> DEF,
-    nme.DOkw        -> DO,
-    nme.ELSEkw      -> ELSE,
-    nme.EXTENDSkw   -> EXTENDS,
-    nme.FALSEkw     -> FALSE,
-    nme.FINALkw     -> FINAL,
-    nme.FINALLYkw   -> FINALLY,
-    nme.FORkw       -> FOR,
-    nme.FORSOMEkw   -> FORSOME,
-    nme.IFkw        -> IF,
-    nme.IMPLICITkw  -> IMPLICIT,
-    nme.IMPORTkw    -> IMPORT,
-    nme.LAZYkw      -> LAZY,
-    nme.MATCHkw     -> MATCH,
-    nme.NEWkw       -> NEW,
-    nme.NULLkw      -> NULL,
-    nme.OBJECTkw    -> OBJECT,
-    nme.OVERRIDEkw  -> OVERRIDE,
-    nme.PACKAGEkw   -> PACKAGE,
-    nme.PRIVATEkw   -> PRIVATE,
-    nme.PROTECTEDkw -> PROTECTED,
-    nme.RETURNkw    -> RETURN,
-    nme.SEALEDkw    -> SEALED,
-    nme.SUPERkw     -> SUPER,
-    nme.THISkw      -> THIS,
-    nme.THROWkw     -> THROW,
-    nme.TRAITkw     -> TRAIT,
-    nme.TRUEkw      -> TRUE,
-    nme.TRYkw       -> TRY,
-    nme.TYPEkw      -> TYPE,
-    nme.VALkw       -> VAL,
-    nme.VARkw       -> VAR,
-    nme.WHILEkw     -> WHILE,
-    nme.WITHkw      -> WITH,
-    nme.YIELDkw     -> YIELD,
-    nme.DOTkw       -> DOT,
-    nme.USCOREkw    -> USCORE,
-    nme.COLONkw     -> COLON,
-    nme.EQUALSkw    -> EQUALS,
-    nme.ARROWkw     -> ARROW,
-    nme.LARROWkw    -> LARROW,
-    nme.SUBTYPEkw   -> SUBTYPE,
-    nme.VIEWBOUNDkw -> VIEWBOUND,
-    nme.SUPERTYPEkw -> SUPERTYPE,
-    nme.HASHkw      -> HASH,
-    nme.ATkw        -> AT,
-    nme.MACROkw     -> IDENTIFIER,
-    nme.THENkw      -> IDENTIFIER)
-
-  private var kwOffset: Int = -1
-  private val kwArray: Array[Int] = {
-    val (offset, arr) = createKeywordArray(allKeywords, IDENTIFIER)
-    kwOffset = offset
-    arr
-  }
-
-  final val token2name = (allKeywords map (_.swap)).toMap
-
 // Token representation ----------------------------------------------------
 
   /** Returns the string representation of given token. */
   def token2string(token: Int): String = (token: @switch) match {
-    case IDENTIFIER | BACKQUOTED_IDENT => "identifier"
-    case CHARLIT => "character literal"
-    case INTLIT => "integer literal"
-    case LONGLIT => "long literal"
-    case FLOATLIT => "float literal"
-    case DOUBLELIT => "double literal"
+    case IDENTIFIER | BACKQUOTED_IDENT            => "identifier"
+    case CHARLIT                                  => "character literal"
+    case INTLIT                                   => "integer literal"
+    case LONGLIT                                  => "long literal"
+    case FLOATLIT                                 => "float literal"
+    case DOUBLELIT                                => "double literal"
     case STRINGLIT | STRINGPART | INTERPOLATIONID => "string literal"
-    case SYMBOLLIT => "symbol literal"
-    case LPAREN => "'('"
-    case RPAREN => "')'"
-    case LBRACE => "'{'"
-    case RBRACE => "'}'"
-    case LBRACKET => "'['"
-    case RBRACKET => "']'"
-    case EOF => "eof"
-    case ERROR => "something"
-    case SEMI => "';'"
-    case NEWLINE => "';'"
-    case NEWLINES => "';'"
-    case COMMA => "','"
-    case CASECLASS => "case class"
-    case CASEOBJECT => "case object"
-    case XMLSTART => "$XMLSTART$<"
-    case _ =>
-      (token2name get token) match {
-        case Some(name) => "'" + name + "'"
-        case _          => "'<" + token + ">'"
-      }
+    case SYMBOLLIT                                => "symbol literal"
+    case LPAREN                                   => "'('"
+    case RPAREN                                   => "')'"
+    case LBRACE                                   => "'{'"
+    case RBRACE                                   => "'}'"
+    case LBRACKET                                 => "'['"
+    case RBRACKET                                 => "']'"
+    case EOF                                      => "eof"
+    case ERROR                                    => "something"
+    case SEMI                                     => "';'"
+    case NEWLINE                                  => "';'"
+    case NEWLINES                                 => "';'"
+    case COMMA                                    => "','"
+    case CASECLASS                                => "case class"
+    case CASEOBJECT                               => "case object"
+    case XMLSTART                                 => "$XMLSTART$<"
+    case _                                        => "'%s'" format ScalaTokenCodes.tokenToString(token)
   }
 
   class MalformedInput(val offset: Int, val msg: String) extends Exception

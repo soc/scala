@@ -9,6 +9,7 @@ package ast
 import scala.collection.mutable.ListBuffer
 import symtab.Flags._
 import scala.language.postfixOps
+import scala.reflect.naming
 
 /** XXX to resolve: TreeGen only assumes global is a SymbolTable, but
  *  TreeDSL at the moment expects a Global.  Can we get by with SymbolTable?
@@ -174,7 +175,7 @@ abstract class TreeGen extends scala.reflect.internal.TreeGen with TreeDSL {
 
   /** Try to convert Select(qual, name) to a SelectFromTypeTree.
    */
-  def convertToSelectFromType(qual: Tree, origName: Name) = convertToTypeName(qual) match {
+  def convertToSelectFromType(qual: Tree, origName: naming.Name) = convertToTypeName(qual) match {
     case Some(qual1)  => SelectFromTypeTree(qual1 setPos qual.pos, origName.toTypeName)
     case _            => EmptyTree
   }

@@ -771,8 +771,11 @@ private[reflect] trait JavaMirrors extends internal.SymbolTable with api.JavaUni
    implicit class RichClass(jclazz: jClass[_]) {
       // `jclazz.isLocalClass` doesn't work because of problems with `getSimpleName`
       // hence we have to approximate by removing the `isAnonymousClass` check
-//      def isLocalClass0: Boolean = jclazz.isLocalClass
-      def isLocalClass0: Boolean = jclazz.getEnclosingMethod != null || jclazz.getEnclosingConstructor != null
+      def isLocalClass0 = enclosingMethod != null // jclazz.isLocalClass
+      def enclosingMethod: JMethodOrConstructor = jclazz.getEnclosingMethod match {
+        case null => jclazz.getEnclosingConstructor match { case null => null ; case c => JMethodOrConstructor(c) }
+        case m    => JMethodOrConstructor(m)
+      }
     }
 
     /**
@@ -782,29 +785,27 @@ private[reflect] trait JavaMirrors extends internal.SymbolTable with api.JavaUni
       if (jclazz.isMemberClass) {
         val jEnclosingClass = jclazz.getEnclosingClass
         val sEnclosingClass = classToScala(jEnclosingClass)
+        // println(s"sOwner(${jclazz.javaFlags} ${jclazz.getName}, jEncl=${jEnclosingClass.getName} sEncl=${sEnclosingClass.fullName}")
         followStatic(sEnclosingClass, jclazz.javaFlags)
-      } else if (jclazz.isLocalClass0) {
-        val jEnclosingMethod = jclazz.getEnclosingMethod
-        if (jEnclosingMethod != null) {
-          methodToScala(jEnclosingMethod)
-        } else {
-          val jEnclosingConstructor = jclazz.getEnclosingConstructor
-          constructorToScala(jEnclosingConstructor)
-        }
-      } else if (jclazz.isPrimitive || jclazz.isArray) {
-        ScalaPackageClass
-      } else if (jclazz.getPackage != null) {
-        val jPackage = jclazz.getPackage
-        packageToScala(jPackage).moduleClass
-      } else {
-        // @eb: a weird classloader might return a null package for something with a non-empty package name
-        // for example, http://groups.google.com/group/scala-internals/browse_thread/thread/7be09ff8f67a1e5c
-        // in that case we could invoke packageNameToScala(jPackageName) and, probably, be okay
-        // however, I think, it's better to blow up, since weirdness of the class loader might bite us elsewhere
-        // [martin] I think it's better to be forgiving here. Restoring packageNameToScala.
-        val jPackageName = jclazz.getName take jclazz.getName.lastIndexOf('.')
-        packageNameToScala(jPackageName).moduleClass
       }
+      else if (jclazz.isLocalClass0) {
+        jclazz.getEnclosingMethod match {
+          case null            => constructorToScala(jclazz.getEnclosingConstructor)
+          case enclosingMethod => methodToScala(enclosingMethod)
+        }
+      }
+      else if (jclazz.isPrimitive || jclazz.isArray)
+        ScalaPackageClass
+      else if (jclazz.getPackage != null)
+        packageToScala(jclazz.getPackage).moduleClass
+      else
+        fullNameToPackageNameToScala(jclazz.getName).moduleClass
+        // printResult(s"sOwner($jclazz)")()
+      // @eb: a weird classloader might return a null package for something with a non-empty package name
+      // for example, http://groups.google.com/group/scala-internals/browse_thread/thread/7be09ff8f67a1e5c
+      // in that case we could invoke packageNameToScala(jPackageName) and, probably, be okay
+      // however, I think, it's better to blow up, since weirdness of the class loader might bite us elsewhere
+      // [martin] I think it's better to be forgiving here. Restoring packageNameToScala.
 
     /**
      * The Scala owner of the Scala symbol corresponding to the Java member `jmember`
@@ -887,11 +888,30 @@ private[reflect] trait JavaMirrors extends internal.SymbolTable with api.JavaUni
         if (jpkg != null) packageToScala(jpkg) else makeScalaPackage(fullname)
       }
     }
+    private def fullNameToPackageNameToScala(fullname: String): ModuleSymbol = /*printResult(s"fullNameToPackageNameToScala($fullname)")*/ {
+      packageNameToScala(fullname take fullname.lastIndexOf('.'))
+      // packageNameToScala(fullname split '.' dropRight 1 mkString ".")
+    }
 
     /**
      * The Scala package with given fully qualified name. Unlike `packageNameToScala`,
      *  this one bypasses the cache.
      */
+    // private[JavaMirrors] def makeScalaPackage(fullname: String): ModuleSymbol = {
+    //   val owner = if (fullname contains '.') fullNameToPackageNameToScala(fullname).moduleClass else RootClass
+    //   val name = TermName(fullname split '.' last)
+    //   val opkg = owner.info decl name
+    //   if (opkg.isPackage)
+    //     opkg.asModule
+    //   else if (opkg == NoSymbol) {
+    //     val pkg = owner.newPackage(name)
+    //     pkg.moduleClass setInfo new LazyPackageType
+    //     pkg setInfoAndEnter pkg.moduleClass.tpe
+    //     info("made Scala "+pkg)
+    //     pkg
+    //   } else
+    //     throw new ReflectError(opkg+" is not a package")
+    // }
     private[JavaMirrors] def makeScalaPackage(fullname: String): ModuleSymbol = {
       val split = fullname lastIndexOf '.'
       val ownerModule: ModuleSymbol =
@@ -911,6 +931,7 @@ private[reflect] trait JavaMirrors extends internal.SymbolTable with api.JavaUni
         throw new ReflectError(opkg+" is not a package")
     }
 
+
     private def scalaSimpleName(jclazz: jClass[_]): TypeName = {
       val owner = sOwner(jclazz)
       val enclosingClass = jclazz.getEnclosingClass
@@ -923,6 +944,16 @@ private[reflect] trait JavaMirrors extends internal.SymbolTable with api.JavaUni
       newTypeName(name)
     }
 
+    // private def scalaSimpleName(jclazz: jClass[_]): TypeName = {
+    //   val owner = sOwner(jclazz)
+    //   val enclosingClass = jclazz.getEnclosingClass
+    //   var prefix = if (enclosingClass != null) enclosingClass.getName else ""
+    //   val isObject = owner.isModuleClass && !owner.isPackageClass
+    //   if (isObject && !prefix.endsWith(nme.MODULE_SUFFIX_STRING)) prefix += nme.MODULE_SUFFIX_STRING
+    //   assert(jclazz.getName startsWith prefix, jclazz)
+    //   TypeName(jclazz.getName) stripPrefix prefix simpleName
+    // }
+
     /**
      * The Scala class that corresponds to a given Java class.
      *  @param jclazz  The Java class
@@ -934,20 +965,22 @@ private[reflect] trait JavaMirrors extends internal.SymbolTable with api.JavaUni
       toScala(classCache, jclazz)(_ classToScala1 _)
 
     private def classToScala1(jclazz: jClass[_]): ClassSymbol = {
-      val jname = newTypeName(jclazz.getName)
-      if (jname == fulltpnme.RuntimeNothing) NothingClass
-      else if (jname == fulltpnme.RuntimeNull) NullClass
+      val jname0 = jclazz.getName
+      if (jname0 == "scala.runtime.Nothing$") NothingClass
+      else if (jname0 == "scala.runtime.Null$") NullClass
       else {
-        val owner = sOwner(jclazz)
+        val jname      = TypeName(jname0)
+        val owner      = sOwner(jclazz)
         val simpleName = scalaSimpleName(jclazz)
 
         def lookupClass = {
-          def coreLookup(name: Name): Symbol =
+          def coreLookup(name: Name): Symbol = (
             owner.info.decl(name) orElse {
-              if (name.startsWith(nme.NAME_JOIN_STRING)) coreLookup(name drop 1) else NoSymbol
+              if (name startsWith nme.NAME_JOIN_STRING) coreLookup(name drop 1) else NoSymbol
             }
-          if (nme.isModuleName(simpleName))
-            coreLookup(nme.stripModuleSuffix(simpleName).toTermName) map (_.moduleClass)
+          )
+          if (simpleName.isModule)
+            coreLookup(simpleName.dropModule.toTermName) map (_.moduleClass)
           else
             coreLookup(simpleName)
         }
@@ -1259,7 +1292,7 @@ private[reflect] trait JavaMirrors extends internal.SymbolTable with api.JavaUni
     case _ => abort(s"${sym}.enclosingRootClass = ${sym.enclosingRootClass}, which is not a RootSymbol")
   }
 
-  private lazy val syntheticCoreClasses: Map[(String, Name), Symbol] = {
+  private lazy val syntheticCoreClasses: Map[(String, naming.Name), Symbol] = {
     def mapEntry(sym: Symbol): ((String, Name), Symbol) = (sym.owner.fullName, sym.name) -> sym
     Map() ++ (definitions.syntheticCoreClasses map mapEntry)
   }
@@ -1270,7 +1303,7 @@ private[reflect] trait JavaMirrors extends internal.SymbolTable with api.JavaUni
    *  2. If `owner` is the scala package and `name` designates a phantom class, return
    *     the corresponding class symbol and enter it into this mirror's ScalaPackage.
    */
-  override def missingHook(owner: Symbol, name: Name): Symbol = {
+  override def missingHook(owner: Symbol, name: naming.Name): Symbol = {
     if (owner.hasPackageFlag) {
       val mirror = mirrorThatLoaded(owner)
       // todo. this makes toolbox tests pass, but it's a mere workaround for SI-5865
@@ -1280,7 +1313,8 @@ private[reflect] trait JavaMirrors extends internal.SymbolTable with api.JavaUni
       if (name.isTermName && !owner.isEmptyPackageClass)
         return mirror.makeScalaPackage(
           if (owner.isRootSymbol) name.toString else owner.fullName+"."+name)
-      syntheticCoreClasses get (owner.fullName, name) match {
+
+      syntheticCoreClasses get ((owner.fullName, name)) match {
         case Some(tsym) =>
           // synthetic core classes are only present in root mirrors
           // because Definitions.scala, which initializes and enters them, only affects rootMirror

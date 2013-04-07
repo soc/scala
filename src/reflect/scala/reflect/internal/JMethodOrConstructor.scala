@@ -40,6 +40,8 @@ class JMethodOrConstructor(val member: jMember with jAnnotatedElement) {
 }
 
 object JMethodOrConstructor {
-  implicit def liftMethodToJmoc(m: jMethod): JMethodOrConstructor              = new JMethodOrConstructor(m)
-  implicit def liftConstructorToJmoc(m: jConstructor[_]): JMethodOrConstructor = new JMethodOrConstructor(m)
+  implicit def liftMethodToJmoc(m: jMethod): JMethodOrConstructor              = apply(m)
+  implicit def liftConstructorToJmoc(m: jConstructor[_]): JMethodOrConstructor = apply(m)
+  def apply(m: jMethod): JMethodOrConstructor         = new JMethodOrConstructor(m)
+  def apply(m: jConstructor[_]): JMethodOrConstructor = new JMethodOrConstructor(m)
 }

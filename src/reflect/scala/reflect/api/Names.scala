@@ -30,75 +30,28 @@ trait Names {
    *  Enables an alternative notation `"map": TermName` as opposed to `newTermName("map")`.
    *  @group Names
    */
-  implicit def stringToTermName(s: String): TermName = newTermName(s)
+  implicit def stringToTermName(s: String): TermName = TermName(s)
 
   /** An implicit conversion from String to TypeName.
    *  Enables an alternative notation `"List": TypeName` as opposed to `newTypeName("List")`.
    *  @group Names
    */
-  implicit def stringToTypeName(s: String): TypeName = newTypeName(s)
+  implicit def stringToTypeName(s: String): TypeName = TypeName(s)
 
   /** The abstract type of names.
    *  @group Names
    */
-  type Name >: Null <: NameApi
+  type Name >: Null <: naming.Name
 
   /** The abstract type of names representing terms.
    *  @group Names
    */
-  type TypeName >: Null <: Name
+  type TypeName >: Null <: Name with naming.TypeName
 
   /** The abstract type of names representing types.
    *  @group Names
    */
-  type TermName >: Null <: Name
-
-  /** The API of Name instances.
-   *  @group API
-   */
-  abstract class NameApi {
-    /** Checks wether the name is a term name */
-    def isTermName: Boolean
-
-    /** Checks wether the name is a type name */
-    def isTypeName: Boolean
-
-    /** Returns a term name that wraps the same string as `this` */
-    def toTermName: TermName
-
-    /** Returns a type name that wraps the same string as `this` */
-    def toTypeName: TypeName
-
-    /** Replaces all occurrences of \$op_names in this name by corresponding operator symbols.
-     *  Example: `foo_\$plus\$eq` becomes `foo_+=`
-     */
-    def decoded: String
-
-    /** Replaces all occurrences of operator symbols in this name by corresponding \$op_names.
-     *  Example: `foo_+=` becomes `foo_\$plus\$eq`.
-     */
-    def encoded: String
-
-    /** The decoded name, still represented as a name.
-     */
-    def decodedName: Name
-
-    /** The encoded name, still represented as a name.
-     */
-    def encodedName: Name
-  }
-
-  /** Create a new term name.
-   *  @group Names
-   */
-  @deprecated("Use TermName instead", "2.11.0")
-  def newTermName(s: String): TermName
-
-  /** Creates a new type name.
-   *  @group Names
-   */
-  @deprecated("Use TypeName instead", "2.11.0")
-  def newTypeName(s: String): TypeName
+  type TermName >: Null <: Name with naming.TermName
 
   /** The constructor/extractor for `TermName` instances.
    *  @group Extractors
@@ -125,4 +78,9 @@ trait Names {
     def apply(s: String): TypeName
     def unapply(name: TypeName): Option[String]
   }
+
+  @deprecated("Use TermName instead", "2.11.0")
+  def newTermName(s: String): TermName
+  @deprecated("Use TypeName instead", "2.11.0")
+  def newTypeName(s: String): TypeName
 }

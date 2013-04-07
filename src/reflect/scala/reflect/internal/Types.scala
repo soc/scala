@@ -209,7 +209,7 @@ trait Types
   }
 
   abstract class TypeApiImpl extends TypeApi { this: Type =>
-    def declaration(name: Name): Symbol = decl(name)
+    def declaration(name: naming.Name): Symbol = decl(name)
     def declarations = decls
     def typeArguments = typeArgs
     def erasure = this match {
@@ -558,7 +558,7 @@ trait Types
      *  an OverloadedSymbol if several exist, NoSymbol if none exist.
      *  Alternatives of overloaded symbol appear in the order they are declared.
      */
-    def decl(name: Name): Symbol = findDecl(name, 0)
+    def decl(name: naming.Name): Symbol = findDecl(name, 0)
 
     /** A list of all non-private members defined or declared in this type. */
     def nonPrivateDecls: List[Symbol] = decls.filterNot(_.isPrivate).toList
@@ -567,7 +567,7 @@ trait Types
      *  an OverloadedSymbol if several exist, NoSymbol if none exist.
      *  Alternatives of overloaded symbol appear in the order they are declared.
      */
-    def nonPrivateDecl(name: Name): Symbol = findDecl(name, PRIVATE)
+    def nonPrivateDecl(name: naming.Name): Symbol = findDecl(name, PRIVATE)
 
     /** A list of all members of this type (defined or inherited)
      *  Members appear in linearization order of their owners.
@@ -591,14 +591,14 @@ trait Types
 
     /** The member with given name,
      *  an OverloadedSymbol if several exist, NoSymbol if none exist */
-    def member(name: Name): Symbol =
+    def member(name: naming.Name): Symbol =
       memberBasedOnName(name, BridgeFlags)
 
     /** The non-private member with given name,
      *  an OverloadedSymbol if several exist, NoSymbol if none exist.
      *  Bridges are excluded from the result
      */
-    def nonPrivateMember(name: Name): Symbol =
+    def nonPrivateMember(name: naming.Name): Symbol =
       memberBasedOnName(name, BridgeAndPrivateFlags)
 
     /** The non-private member with given name, admitting members with given flags `admit`.
@@ -608,12 +608,12 @@ trait Types
      *
      *  An OverloadedSymbol if several exist, NoSymbol if none exists.
      */
-    def nonPrivateMemberAdmitting(name: Name, admit: Long): Symbol =
+    def nonPrivateMemberAdmitting(name: naming.Name, admit: Long): Symbol =
       memberBasedOnName(name, BridgeAndPrivateFlags & ~admit)
 
     /** The non-local member with given name,
      *  an OverloadedSymbol if several exist, NoSymbol if none exist */
-    def nonLocalMember(name: Name): Symbol =
+    def nonLocalMember(name: naming.Name): Symbol =
       memberBasedOnName(name, BridgeFlags | LOCAL)
 
     /** Members excluding and requiring the given flags.
@@ -622,7 +622,7 @@ trait Types
     def membersBasedOnFlags(excludedFlags: Long, requiredFlags: Long): Scope =
       findMembers(excludedFlags, requiredFlags)
 
-    def memberBasedOnName(name: Name, excludedFlags: Long): Symbol =
+    def memberBasedOnName(name: naming.Name, excludedFlags: Long): Symbol =
       findMember(name, excludedFlags, 0, stableOnly = false)
 
     /** The least type instance of given class which is a supertype
@@ -953,7 +953,7 @@ trait Types
     /** If this is a symbol loader type, load and assign a new type to `sym`. */
     def load(sym: Symbol) {}
 
-    private def findDecl(name: Name, excludedFlags: Int): Symbol = {
+    private def findDecl(name: naming.Name, excludedFlags: Int): Symbol = {
       var alts: List[Symbol] = List()
       var sym: Symbol = NoSymbol
       var e: ScopeEntry = decls.lookupEntry(name)
@@ -1044,7 +1044,7 @@ trait Types
      *  @param stableOnly     If set, return only members that are types or stable values
      */
     //TODO: use narrow only for modules? (correct? efficiency gain?)
-    def findMember(name: Name, excludedFlags: Long, requiredFlags: Long, stableOnly: Boolean): Symbol = {
+    def findMember(name: naming.Name, excludedFlags: Long, requiredFlags: Long, stableOnly: Boolean): Symbol = {
       def findMemberInternal: Symbol = {
         var member: Symbol        = NoSymbol
         var members: List[Symbol] = null
@@ -1235,7 +1235,7 @@ trait Types
     // todo see whether we can do without
     override def isError: Boolean = true
     override def decls: Scope = new ErrorScope(NoSymbol)
-    override def findMember(name: Name, excludedFlags: Long, requiredFlags: Long, stableOnly: Boolean): Symbol = {
+    override def findMember(name: naming.Name, excludedFlags: Long, requiredFlags: Long, stableOnly: Boolean): Symbol = {
       var sym = decls lookup name
       if (sym == NoSymbol) {
         sym = NoSymbol.newErrorSymbol(name)
@@ -3337,14 +3337,14 @@ trait Types
    *  are represented as NamedType.
    */
   case class NamedType(name: Name, tp: Type) extends Type {
-    override def safeToString: String = name.toString +": "+ tp
+    override def safeToString = s"$name: $tp"
   }
   /** As with NamedType, used only when calling isApplicable.
    *  Records that the application has a wildcard star (aka _*)
    *  at the end of it.
    */
   case class RepeatedType(tp: Type) extends Type {
-    override def safeToString: String = tp + ": _*"
+    override def safeToString = s"$tp: _*"
   }
 
   /** A temporary type representing the erasure of a user-defined value type.
@@ -4425,14 +4425,15 @@ trait Types
   }
 
   /** The current indentation string for traces */
-  protected[internal] var indent: String = ""
+  protected[internal] var indentDepth: Int = 0
+  protected[internal] def indent: String = "  " * indentDepth
 
   /** Perform operation `p` on arguments `tp1`, `arg2` and print trace of computation. */
   protected def explain[T](op: String, p: (Type, T) => Boolean, tp1: Type, arg2: T): Boolean = {
     Console.println(indent + tp1 + " " + op + " " + arg2 + "?" /* + "("+tp1.getClass+","+arg2.getClass+")"*/)
-    indent = indent + "  "
+    indentDepth += 1
     val result = p(tp1, arg2)
-    indent = indent stripSuffix "  "
+    indentDepth -= 1
     Console.println(indent + result)
     result
   }

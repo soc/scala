@@ -6,6 +6,7 @@
 package scala.reflect
 package internal
 
+import scala.reflect.naming._
 import scala.collection.{ mutable, immutable }
 import scala.collection.mutable.ListBuffer
 import util.{ Statistics, shortClassOfInstance }
@@ -148,7 +149,7 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
         if (isSpecialized) debuglog(msg) else log(msg)
       }
     }
-    def asNameType(n: Name): NameType
+    def asNameType(n: naming.Name): NameType
 
     private[this] var _rawowner = initOwner // Syncnote: need not be protected, as only assignment happens in owner_=, which is not exposed to api
     private[this] var _rawflags: Long = _
@@ -425,7 +426,7 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
     final def newRefinementClass(pos: Position): RefinementClassSymbol =
       createRefinementClassSymbol(pos, 0L)
 
-    final def newErrorSymbol(name: Name): Symbol = name match {
+    final def newErrorSymbol(name: naming.Name): Symbol = name match {
       case x: TypeName  => newErrorClass(x)
       case x: TermName  => newErrorValue(x)
     }
@@ -435,7 +436,7 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
      *  failure to the point when that name is used for something, which is
      *  often to the point of never.
      */
-    def newStubSymbol(name: Name, missingMessage: String): Symbol = name match {
+    def newStubSymbol(name: naming.Name, missingMessage: String): Symbol = name match {
       case n: TypeName  => new StubClassSymbol(this, n, missingMessage)
       case _            => new StubTermSymbol(this, name.toTermName, missingMessage)
     }
@@ -1004,13 +1005,8 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
      */
     def decodedName: String = name.decode
 
-    private def addModuleSuffix(n: Name): Name =
-      if (needsModuleSuffix) n append nme.MODULE_SUFFIX_STRING else n
+    private def maybeModuleSuffix(n: Name): Name = if (needsModuleSuffix) n.dropLocal.moduleName else n.dropLocal
 
-    def moduleSuffix: String = (
-      if (needsModuleSuffix) nme.MODULE_SUFFIX_STRING
-      else ""
-    )
     /** Whether this symbol needs nme.MODULE_SUFFIX_STRING (aka $) appended on the java platform.
      */
     def needsModuleSuffix = (
@@ -1021,9 +1017,9 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
     )
     /** These should be moved somewhere like JavaPlatform.
      */
-    def javaSimpleName: Name = addModuleSuffix(simpleName.dropLocal)
-    def javaBinaryName: Name = addModuleSuffix(fullNameInternal('/'))
-    def javaClassName: String  = addModuleSuffix(fullNameInternal('.')).toString
+    def javaSimpleName: String   = maybeModuleSuffix(simpleName).stringValue
+    def javaClassName: String    = maybeModuleSuffix(fullNameAsName('.')).stringValue
+    def javaInternalName: String = maybeModuleSuffix(fullNameAsName('/')).stringValue
 
     /** The encoded full path name of this symbol, where outer names and inner names
      *  are separated by `separator` characters.
@@ -1031,18 +1027,14 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
      *  Never adds id.
      *  Drops package objects.
      */
-    final def fullName(separator: Char): String = fullNameAsName(separator).toString
+    def fullName(separator: Char): String     = "" + fullNameAsName(separator)
+    def fullNameAsName(separator: Char): Name = fullNameSegments mkName separator dropLocal
 
-    /** Doesn't drop package objects, for those situations (e.g. classloading)
-     *  where the true path is needed.
-     */
-    private def fullNameInternal(separator: Char): Name = (
-      if (isRoot || isRootPackage || this == NoSymbol) name
-      else if (owner.isEffectiveRoot) name
-      else ((effectiveOwner.enclClass.fullNameAsName(separator) append separator): Name) append name
+    def fullNameSegments: List[Name] = (
+      if (isRootSymbol || this == NoSymbol) Nil
+      else if (effectiveOwner.isEffectiveRoot) name :: Nil
+      else effectiveOwner.enclClass.fullNameSegments :+ name
     )
-
-    def fullNameAsName(separator: Char): Name = fullNameInternal(separator).dropLocal
 
     /** The encoded full path name of this symbol, where outer names and inner names
      *  are separated by periods.
@@ -1721,7 +1713,7 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
 
     def suchThat(cond: Symbol => Boolean): Symbol = {
       val result = filter(cond)
-      assert(!result.isOverloaded, result.alternatives)
+      assert(!result.isOverloaded, result.alternatives map (_.fullNameString))
       result
     }
 
@@ -2307,7 +2299,7 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
      *  (the initial Name) before falling back on id, which varies depending
      *  on exactly when a symbol is loaded.
      */
-    final def sealedSortName: String = initName + "#" + id
+    final def sealedSortName: String = s"$initName#$id"
 
     /** String representation of symbol's definition key word */
     final def keyString: String =
@@ -2510,7 +2502,7 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
         _rawname = name.toTermName
       }
     }
-    final def asNameType(n: Name) = n.toTermName
+    final def asNameType(n: naming.Name) = n.toTermName
 
     /** Term symbols with the exception of static parts of Java classes and packages.
      */
@@ -2781,7 +2773,7 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
       if (Statistics.hotEnabled) Statistics.incCounter(nameCount)
       _rawname
     }
-    final def asNameType(n: Name) = n.toTypeName
+    final def asNameType(n: naming.Name) = n.toTypeName
 
     override def isNonClassType = true
 
@@ -3253,7 +3245,7 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
     final type NameType = TermName
     type TypeOfClonedSymbol = NoSymbol
 
-    def asNameType(n: Name) = n.toTermName
+    def asNameType(n: naming.Name) = n.toTermName
     def rawname = nme.NO_NAME
     def name = nme.NO_NAME
     override def name_=(n: Name) = abort("Cannot set NoSymbol's name to " + n)

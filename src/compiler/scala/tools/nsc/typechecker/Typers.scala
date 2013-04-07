@@ -3998,7 +3998,7 @@ trait Typers extends Adaptations with Tags {
         else lookupInOwner(qual.tpe.typeSymbol, name) orElse {
           NotAMemberError(tree, qual, name)
           NoSymbol
-      }
+        }
       )
 
       def typedAnnotated(atd: Annotated): Tree = {

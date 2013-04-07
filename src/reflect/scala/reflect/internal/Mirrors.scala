@@ -29,29 +29,38 @@ trait Mirrors extends api.Mirrors {
     val EmptyPackageClass: ClassSymbol
     val EmptyPackage: ModuleSymbol
 
-    def findMemberFromRoot(fullName: Name): Symbol = {
-      val segs = nme.segments(fullName.toString, fullName.isTermName)
-      if (segs.isEmpty) NoSymbol
-      else definitions.findNamedMember(segs.tail, RootClass.info member segs.head)
+    def findMemberFromRoot(fullName: naming.Name): Symbol = nme.segments(fullName) match {
+      case Nil      => NoSymbol
+      case hd :: tl => definitions.findNamedMember(tl, RootClass.info member hd)
     }
 
     /** Todo: organize similar to mkStatic in reflect.Base */
-    private def getModuleOrClass(path: Name, len: Int): Symbol = {
-      val point = path lastPos('.', len - 1)
-      val owner =
-        if (point > 0) getModuleOrClass(path.toTermName, point)
-        else RootClass
-      val name = path subName (point + 1, len)
-      val sym = owner.info member name
-      val result = if (path.isTermName) sym.suchThat(_ hasFlag MODULE) else sym
-      if (result != NoSymbol) result
-      else {
-        if (settings.debug) { log(sym.info); log(sym.info.members) }//debug
-        thisMirror.missingHook(owner, name) orElse {
-          MissingRequirementError.notFound((if (path.isTermName) "object " else "class ")+path+" in "+thisMirror)
-        }
-      }
+    private def getModuleOrClass(path: naming.Name, len: Int): Symbol = {
+      def what = if (path.isTermName) "object " else "class "
+      nme.segments(path take len).foldLeft(RootClass: Symbol)((owner, name) =>
+        owner.info member name
+          orElse thisMirror.missingHook(owner, name)
+          orElse MissingRequirementError.notFound(s"$what $path in $thisMirror")
+      )
     }
+
+    // private def getModuleOrClass(path: Name, len: Int): Symbol = {
+    //   val point = path.lastIndexOf('.', len - 1)
+    //   val owner =
+    //     if (point > 0) getModuleOrClass(path.toTermName, point)
+    //     else RootClass
+    //   val name = path subName (point + 1, len)
+    //   val sym = owner.info member name
+    //   val result = if (path.isTermName) sym.suchThat(_ hasFlag MODULE) else sym
+    //   if (result != NoSymbol) result
+    //   else {
+    //     if (settings.debug) { log(sym.info); log(sym.info.members) }//debug
+    //     thisMirror.missingHook(owner, name) orElse {
+    //       MissingRequirementError.notFound((if (path.isTermName) "object " else "class ")+path+" in "+thisMirror)
+    //     }
+    //   }
+    // }
+
 
     /** If you're looking for a class, pass a type name.
      *  If a module, a term name.
@@ -59,7 +68,7 @@ trait Mirrors extends api.Mirrors {
      *  Unlike `getModuleOrClass`, this function
      *  loads unqualified names from the root package.
      */
-    private def getModuleOrClass(path: Name): Symbol =
+    private def getModuleOrClass(path: naming.Name): Symbol =
       getModuleOrClass(path, path.length)
 
     /** If you're looking for a class, pass a type name.
@@ -68,17 +77,17 @@ trait Mirrors extends api.Mirrors {
      *  Unlike `getModuleOrClass`, this function
      *  loads unqualified names from the empty package.
      */
-    private def staticModuleOrClass(path: Name): Symbol = {
-      val isPackageless = path.pos('.') == path.length
-      if (isPackageless) EmptyPackageClass.info decl path
+    private def staticModuleOrClass(path: naming.Name): Symbol = {
+      val unqualified = !(path containsChar '.')
+      if (unqualified) EmptyPackageClass.info decl path
       else getModuleOrClass(path)
     }
 
-    protected def mirrorMissingHook(owner: Symbol, name: Name): Symbol = NoSymbol
+    protected def mirrorMissingHook(owner: Symbol, name: naming.Name): Symbol = NoSymbol
 
-    protected def universeMissingHook(owner: Symbol, name: Name): Symbol = thisUniverse.missingHook(owner, name)
+    protected def universeMissingHook(owner: Symbol, name: naming.Name): Symbol = thisUniverse.missingHook(owner, name)
 
-    private[scala] def missingHook(owner: Symbol, name: Name): Symbol = logResult(s"missingHook($owner, $name)")(
+    private[scala] def missingHook(owner: Symbol, name: naming.Name): Symbol = logResult(s"missingHook($owner, $name)")(
       mirrorMissingHook(owner, name) orElse universeMissingHook(owner, name)
     )
 
@@ -96,22 +105,24 @@ trait Mirrors extends api.Mirrors {
     }
 
     @deprecated("Use getClassByName", "2.10.0")
-    def getClass(fullname: Name): ClassSymbol =
+    def getClass(fullname: naming.Name): ClassSymbol =
       getClassByName(fullname)
 
-    def getClassByName(fullname: Name): ClassSymbol =
+    def getClassByName(fullname: naming.Name): ClassSymbol = {
+      // println(s"getClassByName(${fullname.longString})")
       ensureClassSymbol(fullname.toString, getModuleOrClass(fullname.toTypeName))
+    }
 
     def getRequiredClass(fullname: String): ClassSymbol =
-      getClassByName(newTypeNameCached(fullname))
+      getClassByName(newTypeName(fullname))
 
     def requiredClass[T: ClassTag] : ClassSymbol =
       getRequiredClass(erasureName[T])
 
     def getClassIfDefined(fullname: String): Symbol =
-      getClassIfDefined(newTypeNameCached(fullname))
+      getClassIfDefined(newTypeName(fullname))
 
-    def getClassIfDefined(fullname: Name): Symbol =
+    def getClassIfDefined(fullname: naming.Name): Symbol =
       wrapMissing(getClassByName(fullname.toTypeName))
 
     /** @inheritdoc
@@ -120,7 +131,7 @@ trait Mirrors extends api.Mirrors {
      *  Compiler might ignore them, but they should be loadable with macros.
      */
     override def staticClass(fullname: String): ClassSymbol =
-      ensureClassSymbol(fullname, staticModuleOrClass(newTypeNameCached(fullname)))
+      ensureClassSymbol(fullname, staticModuleOrClass(newTypeName(fullname)))
 
     /************************ loaders of module symbols ************************/
 
@@ -131,14 +142,14 @@ trait Mirrors extends api.Mirrors {
       }
 
     @deprecated("Use getModuleByName", "2.10.0")
-    def getModule(fullname: Name): ModuleSymbol =
+    def getModule(fullname: naming.Name): ModuleSymbol =
       getModuleByName(fullname)
 
-    def getModuleByName(fullname: Name): ModuleSymbol =
+    def getModuleByName(fullname: naming.Name): ModuleSymbol =
       ensureModuleSymbol(fullname.toString, getModuleOrClass(fullname.toTermName), allowPackages = true)
 
     def getRequiredModule(fullname: String): ModuleSymbol =
-      getModule(newTermNameCached(fullname))
+      getModule(newTermName(fullname))
 
     // TODO: What syntax do we think should work here? Say you have an object
     // like scala.Predef.  You can't say requiredModule[scala.Predef] since there's
@@ -148,12 +159,12 @@ trait Mirrors extends api.Mirrors {
     // a method which returns a usable name, one which doesn't expose this
     // detail of the backend.
     def requiredModule[T: ClassTag] : ModuleSymbol =
-      getRequiredModule(erasureName[T] stripSuffix "$")
+      getModuleByName(TermName(erasureName[T] stripSuffix "$"))
 
     def getModuleIfDefined(fullname: String): Symbol =
-      getModuleIfDefined(newTermNameCached(fullname))
+      getModuleIfDefined(newTermName(fullname))
 
-    def getModuleIfDefined(fullname: Name): Symbol =
+    def getModuleIfDefined(fullname: naming.Name): Symbol =
       wrapMissing(getModule(fullname.toTermName))
 
     /** @inheritdoc
@@ -162,7 +173,7 @@ trait Mirrors extends api.Mirrors {
      *  Compiler might ignore them, but they should be loadable with macros.
      */
     override def staticModule(fullname: String): ModuleSymbol =
-      ensureModuleSymbol(fullname, staticModuleOrClass(newTermNameCached(fullname)), allowPackages = false)
+      ensureModuleSymbol(fullname, staticModuleOrClass(newTermName(fullname)), allowPackages = false)
 
     /************************ loaders of package symbols ************************/
 
@@ -176,23 +187,26 @@ trait Mirrors extends api.Mirrors {
       ensurePackageSymbol(fullname.toString, getModuleOrClass(fullname), allowModules = true)
 
     @deprecated("Use getPackage", "2.11.0") def getRequiredPackage(fullname: String): ModuleSymbol =
-      getPackage(newTermNameCached(fullname))
+      getPackage(newTermName(fullname))
 
     def getPackageObject(fullname: String): ModuleSymbol = getPackageObject(newTermName(fullname))
-    def getPackageObject(fullname: TermName): ModuleSymbol =
+    def getPackageObject(fullname: TermName): ModuleSymbol = (
       (getPackage(fullname).info member nme.PACKAGE) match {
         case x: ModuleSymbol => x
         case _               => MissingRequirementError.notFound("package object " + fullname)
       }
+    )
 
-    def getPackageObjectIfDefined(fullname: String): Symbol =
-      getPackageObjectIfDefined(newTermNameCached(fullname))
+    def getPackageObjectIfDefined(fullname: String): Symbol = {
+      getPackageObjectIfDefined(newTermName(fullname))
+    }
 
-    def getPackageObjectIfDefined(fullname: TermName): Symbol =
+    def getPackageObjectIfDefined(fullname: TermName): Symbol = {
       wrapMissing(getPackageObject(fullname))
+    }
 
     override def staticPackage(fullname: String): ModuleSymbol =
-      ensurePackageSymbol(fullname.toString, getModuleOrClass(newTermNameCached(fullname)), allowModules = false)
+      ensurePackageSymbol(fullname.toString, getModuleOrClass(newTermName(fullname)), allowModules = false)
 
     /************************ helpers ************************/
 

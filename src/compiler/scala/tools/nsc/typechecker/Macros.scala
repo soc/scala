@@ -136,7 +136,7 @@ trait Macros extends scala.tools.reflect.FastTrack with Traces {
             sym.fullName + suffix
           case sym =>
             val separator = if (sym.owner.isModuleClass) "" else "$"
-            loop(sym.owner) + separator + sym.javaSimpleName.toString
+            loop(sym.owner) + separator + sym.javaSimpleName
         }
 
         loop(owner)

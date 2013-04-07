@@ -17,6 +17,7 @@ object NameTransformer {
   // the compiler before recompiling the compiler.
   val MODULE_SUFFIX_STRING          = sys.props.getOrElse("SCALA_MODULE_SUFFIX_STRING", "$")
   val NAME_JOIN_STRING              = sys.props.getOrElse("SCALA_NAME_JOIN_STRING", "$")
+  val IMPLCLASS_SUFFIX_STRING       = "$class"
   val MODULE_INSTANCE_NAME          = "MODULE$"
   val LOCAL_SUFFIX_STRING           = " "
   val SETTER_SUFFIX_STRING          = "_$eq"
@@ -156,6 +157,8 @@ object NameTransformer {
       }
     }
     //System.out.println("= " + (if (buf == null) name else buf.toString()));//DEBUG
-    if (buf eq null) name else buf.toString()
+    val res = if (buf eq null) name else buf.toString
+    // Making sure to return the original string if unaltered
+    if (res == name) name else res
   }
 }

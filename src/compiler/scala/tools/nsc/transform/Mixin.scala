@@ -710,7 +710,7 @@ abstract class Mixin extends InfoTransform with ast.TreeDSL {
        */
       def bitmapFor(clazz0: Symbol, offset: Int, field: Symbol): Symbol = {
         val category   = bitmapCategory(field)
-        val bitmapName = nme.newBitmapName(category, offset / flagsPerBitmap(field)).toTermName
+        val bitmapName = nme.newBitmapName(category, offset / flagsPerBitmap(field))
         val sym        = clazz0.info.decl(bitmapName)
 
         assert(!sym.isOverloaded, sym)
@@ -774,7 +774,7 @@ abstract class Mixin extends InfoTransform with ast.TreeDSL {
 
       def mkSlowPathDef(clazz: Symbol, lzyVal: Symbol, cond: Tree, syncBody: List[Tree],
                         stats: List[Tree], retVal: Tree, attrThis: Tree, args: List[Tree]): Symbol = {
-        val defSym = clazz.newMethod(nme.newLazyValSlowComputeName(lzyVal.name.toTermName), lzyVal.pos, PRIVATE)
+        val defSym = clazz.newMethod(nme.newLazyValSlowComputeName(lzyVal.name), lzyVal.pos, PRIVATE)
         val params = defSym newSyntheticValueParams args.map(_.symbol.tpe)
         defSym setInfoAndEnter MethodType(params, lzyVal.tpe.resultType)
         val rhs: Tree = (gen.mkSynchronizedCheck(attrThis, cond, syncBody, stats)).changeOwner(currentOwner -> defSym)

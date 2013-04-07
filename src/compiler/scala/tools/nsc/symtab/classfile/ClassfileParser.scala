@@ -180,7 +180,7 @@ abstract class ClassfileParser {
         case name: Name => name
         case _          =>
           val start = firstExpecting(index, CONSTANT_UTF8)
-          recordAtIndex(newTermName(in.buf, start + 2, in.getChar(start)), index)
+          recordAtIndex(TermName(new String(in.buf, start + 2, in.getChar(start))), index)
       }
     )
 
@@ -201,8 +201,8 @@ abstract class ClassfileParser {
         case sym: Symbol => sym
         case _           =>
           val result = getClassName(index) match {
-            case name if nme.isModuleName(name) => rootMirror getModuleByName name.dropModule
-            case name                           => classNameToSymbol(name)
+            case name if name.isModule => rootMirror getModuleByName name.dropModule
+            case name                  => classNameToSymbol(name)
           }
           recordAtIndex(result, index)
       }
@@ -247,9 +247,10 @@ abstract class ClassfileParser {
           val index = in.getChar(start + 1)
           val name = getExternalName(in.getChar(starts(index) + 1))
           //assert(name.endsWith("$"), "Not a module class: " + name)
+          // f = forceMangledName(name.dropModule, module = true)
           f = forceMangledName(name dropRight 1, module = true)
           if (f == NoSymbol)
-            f = rootMirror.getModuleByName(name dropRight 1)
+            f = rootMirror.getModuleByName(name.dropModule)
         } else {
           val origName = nme.unexpandedName(name)
           val owner = if (static) ownerTpe.typeSymbol.linkedClassOfClass else ownerTpe.typeSymbol
@@ -290,8 +291,8 @@ abstract class ClassfileParser {
     private def getNameAndType(index: Int, ownerTpe: Type): (Name, Type) = {
       if (index <= 0 || len <= index) errorBadIndex(index)
       (values(index): @unchecked) match {
-        case p: ((Name, Type)) => p
-        case _                 =>
+        case p: Tuple2[_,_] => p.asInstanceOf[(Name, Type)]
+        case _              =>
           val start = firstExpecting(index, CONSTANT_NAMEANDTYPE)
           val name = getName(in.getChar(start).toInt)
           // create a dummy symbol for method types
@@ -406,10 +407,10 @@ abstract class ClassfileParser {
       for (part0 <- parts; if !(part0 == ""); part = newTermName(part0)) {
         val sym1 = enteringIcode {
           sym.linkedClassOfClass.info
-          sym.info.decl(part.encode)
+          sym.info decl part.encodedName.toTermName
         }//.suchThat(module == _.isModule)
 
-        sym = sym1 orElse sym.info.decl(part.encode.toTypeName)
+        sym = sym1 orElse (sym.info decl part.encodedName.toTypeName)
       }
     }
     sym
@@ -1047,8 +1048,7 @@ abstract class ClassfileParser {
    *  and implicitly current class' superclasses.
    */
   private def enterOwnInnerClasses() {
-    def className(name: Name): Name =
-      name.subName(name.lastPos('.') + 1, name.length)
+    def className(name: Name): Name = name.simpleName
 
     def enterClassAndModule(entry: InnerClassEntry, file: AbstractFile) {
       def jflags      = entry.jflags

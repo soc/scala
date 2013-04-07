@@ -192,7 +192,7 @@ abstract class LazyVals extends Transform with TypingTransformers with ast.TreeD
 
     def mkSlowPathDef(clazz: Symbol, lzyVal: Symbol, cond: Tree, syncBody: List[Tree],
                       stats: List[Tree], retVal: Tree): Tree = {
-      val defSym = clazz.newMethod(nme.newLazyValSlowComputeName(lzyVal.name.toTermName), lzyVal.pos, STABLE | PRIVATE)
+      val defSym = clazz.newMethod(nme.newLazyValSlowComputeName(lzyVal.name), lzyVal.pos, STABLE | PRIVATE)
       defSym setInfo MethodType(List(), lzyVal.tpe.resultType)
       defSym.owner = lzyVal.owner
       debuglog(s"crete slow compute path $defSym with owner ${defSym.owner} for lazy val $lzyVal")

@@ -176,6 +176,7 @@ package object partest {
    * test code in a string.
    */
   def trace[A](a: A) = macro traceImpl[A]
+  // def trace[A](a: A) = a
 
   import scala.reflect.macros.Context
   def traceImpl[A: c.WeakTypeTag](c: Context)(a: c.Expr[A]): c.Expr[A] = {

@@ -30,15 +30,15 @@ abstract class TreeGen extends macros.TreeBuilder {
    *  @param    args        value arguments
    *  @return               the newly created trees.
    */
-  def mkMethodCall(receiver: Symbol, methodName: Name, targs: List[Type], args: List[Tree]): Tree =
-    mkMethodCall(Select(mkAttributedRef(receiver), methodName), targs, args)
+  def mkMethodCall(receiver: Symbol, methodName: naming.Name, targs: List[Type], args: List[Tree]): Tree =
+    mkMethodCall(Select(mkAttributedRef(receiver), methodName.toTermName), targs, args)
   def mkMethodCall(method: Symbol, targs: List[Type], args: List[Tree]): Tree =
     mkMethodCall(mkAttributedRef(method), targs, args)
   def mkMethodCall(method: Symbol, args: List[Tree]): Tree =
     mkMethodCall(method, Nil, args)
   def mkMethodCall(target: Tree, args: List[Tree]): Tree =
     mkMethodCall(target, Nil, args)
-  def mkMethodCall(receiver: Symbol, methodName: Name, args: List[Tree]): Tree =
+  def mkMethodCall(receiver: Symbol, methodName: naming.Name, args: List[Tree]): Tree =
     mkMethodCall(receiver, methodName, Nil, args)
   def mkMethodCall(receiver: Tree, method: Symbol, targs: List[Type], args: List[Tree]): Tree =
     mkMethodCall(Select(receiver, method), targs, args)
@@ -129,7 +129,7 @@ abstract class TreeGen extends macros.TreeBuilder {
 
   def mkUnattributedRef(sym: Symbol): RefTree = mkUnattributedRef(sym.fullNameAsName('.'))
 
-  def mkUnattributedRef(fullName: Name): RefTree = {
+  def mkUnattributedRef(fullName: naming.Name): RefTree = {
     val hd :: tl = nme.segments(fullName.toString, assumeTerm = fullName.isTermName)
     tl.foldLeft(Ident(hd): RefTree)(Select(_,_))
   }
@@ -272,7 +272,7 @@ abstract class TreeGen extends macros.TreeBuilder {
   }
 
   /** Wrap an expression in a named argument. */
-  def mkNamedArg(name: Name, tree: Tree): Tree = mkNamedArg(Ident(name), tree)
+  def mkNamedArg(name: naming.Name, tree: Tree): Tree = mkNamedArg(Ident(name.stringValue), tree)
   def mkNamedArg(lhs: Tree, rhs: Tree): Tree = atPos(rhs.pos)(AssignOrNamedArg(lhs, rhs))
 
   /** Builds a tuple */
@@ -296,6 +296,6 @@ abstract class TreeGen extends macros.TreeBuilder {
   }
 
   def mkPackageDef(packageName: String, stats: List[Tree]): PackageDef = {
-    PackageDef(mkUnattributedRef(newTermName(packageName)), stats)
+    PackageDef(mkUnattributedRef(TermName(packageName)), stats)
   }
 }

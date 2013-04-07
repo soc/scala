@@ -153,6 +153,9 @@ abstract class ICodeReader extends ClassfileParser {
   }
 
   override def classNameToSymbol(name: Name) = {
+    if (name.toString contains "Nothing")
+      println(s"classNameToSymbol($name)")
+
     val sym = if (name == fulltpnme.RuntimeNothing)
       definitions.NothingClass
     else if (name == fulltpnme.RuntimeNull)
@@ -163,13 +166,13 @@ abstract class ICodeReader extends ClassfileParser {
       iface.owner.info // force the mixin type-transformer
       rootMirror.getClassByName(name)
     }
-    else if (nme.isModuleName(name)) {
+    else if (name.isModule) {
       val strippedName = name.dropModule
-      forceMangledName(newTermName(strippedName.decode), module = true) orElse rootMirror.getModuleByName(strippedName)
+      forceMangledName(strippedName.decodedName, module = true) orElse (rootMirror getModuleByName strippedName)
     }
     else {
       forceMangledName(name, module = false)
-      exitingFlatten(rootMirror.getClassByName(name.toTypeName))
+      exitingFlatten(rootMirror getClassByName name.toTypeName)
     }
     if (sym.isModule)
       sym.moduleClass

@@ -9,6 +9,7 @@ import java.util.UUID._
 import scala.reflect.internal.Flags._
 import scala.reflect.internal.util.BatchSourceFile
 import scala.reflect.io.VirtualFile
+import scala.reflect.naming
 
 trait Synthetics {
   self: Context =>
@@ -24,12 +25,12 @@ trait Synthetics {
   // to the contrast, staticModule and staticClass are designed
   // to be a part of the reflection API and, therefore, they
   // correctly resolve all names
-  private def topLevelSymbol(name: Name): Symbol = wrapMissing {
+  private def topLevelSymbol(name: naming.Name): Symbol = wrapMissing {
     if (name.isTermName) mirror.staticModule(name.toString)
     else mirror.staticClass(name.toString)
   }
 
-  def topLevelDef(name: Name): Tree =
+  def topLevelDef(name: naming.Name): Tree =
     enclosingRun.units.toList.map(_.body).flatMap {
       // it's okay to check `stat.symbol` here, because currently macros expand strictly after namer
       // which means that by the earliest time one can call this method all top-level definitions will have already been entered
@@ -37,7 +38,7 @@ trait Synthetics {
       case _ => Nil // should never happen, but better be safe than sorry
     }.headOption getOrElse EmptyTree
 
-  def topLevelRef(name: Name): Tree = {
+  def topLevelRef(name: naming.Name): Tree = {
     if (topLevelDef(name).nonEmpty) gen.mkUnattributedRef(name)
     else EmptyTree
   }

@@ -14,6 +14,7 @@ import reporters.{ Reporter, ConsoleReporter }
 import util.{ ClassPath, MergedClassPath, StatisticsInfo, returning, stackTraceString, stackTraceHeadString }
 import scala.reflect.internal.util.{ OffsetPosition, SourceFile, NoSourceFile, BatchSourceFile, ScriptSourceFile }
 import scala.reflect.internal.pickling.{ PickleBuffer, PickleFormat }
+import scala.reflect.naming
 import symtab.{ Flags, SymbolTable, SymbolLoaders, SymbolTrackers }
 import symtab.classfile.Pickler
 import plugins.Plugins
@@ -59,7 +60,7 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
   def EmptyPackageClass: ClassSymbol = rootMirror.EmptyPackageClass
 
   import definitions.findNamedMember
-  def findMemberFromRoot(fullName: Name): Symbol = rootMirror.findMemberFromRoot(fullName)
+  def findMemberFromRoot(fullName: naming.Name): Symbol = rootMirror.findMemberFromRoot(fullName)
 
   // alternate constructors ------------------------------------------
 
@@ -1639,7 +1640,7 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
 
   /** We resolve the class/object ambiguity by passing a type/term name.
    */
-  def showDef(fullName: Name, declsOnly: Boolean, ph: Phase) = {
+  def showDef(fullName: naming.Name, declsOnly: Boolean, ph: Phase) = {
     val boringOwners = Set[Symbol](definitions.AnyClass, definitions.AnyRefClass, definitions.ObjectClass)
     def phased[T](body: => T): T = exitingPhase(ph)(body)
     def boringMember(sym: Symbol) = boringOwners(sym.owner)

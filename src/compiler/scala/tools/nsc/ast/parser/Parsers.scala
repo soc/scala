@@ -131,7 +131,9 @@ self =>
   val global: Global
   import global._
 
-  case class OpInfo(operand: Tree, operator: Name, offset: Offset)
+  case class OpInfo(operand: Tree, operator: Name, offset: Offset) {
+    def encoded = operator.encodedName
+  }
 
   class SourceFileParser(val source: SourceFile) extends Parser {
 
@@ -530,8 +532,7 @@ self =>
         syntaxError(in.offset, msg, skipIt)
     }
 
-    def expectedMsg(token: Int): String =
-      token2string(token) + " expected but " +token2string(in.token) + " found."
+    def expectedMsg(token: Int) = s"%s expected but %s found.".format(token2string(token), token2string(in.token))
 
     /** Consume one token of the specified type, or signal an error if it is not there. */
     def accept(token: Int): Int = {
@@ -724,7 +725,7 @@ self =>
     var opstack: List[OpInfo] = Nil
 
     def precedence(operator: Name): Int =
-      if (operator eq nme.ERROR) -1
+      if (operator == nme.ERROR) -1
       else {
         val firstCh = operator.startChar
         if (isScalaLetter(firstCh)) 1
@@ -948,7 +949,7 @@ self =>
 
     /** Assumed (provisionally) to be TermNames. */
     def ident(skipIt: Boolean): Name =
-      if (isIdent) rawIdent().encode
+      if (isIdent) rawIdent().encodedName
       else {
         syntaxErrorOrIncomplete(expectedMsg(IDENTIFIER), skipIt)
         nme.ERROR
@@ -1442,7 +1443,7 @@ self =>
           opstack = opstack.tail
           val od = stripParens(reduceStack(isExpr = true, base, topinfo.operand, 0, leftAssoc = true))
           return atPos(od.pos.startOrPoint, topinfo.offset) {
-            new PostfixSelect(od, topinfo.operator.encode)
+            new PostfixSelect(od, topinfo.encoded)
           }
         }
       }
@@ -2499,9 +2500,10 @@ self =>
           } else if (restype.isEmpty && in.token == LBRACE) {
             restype = scalaUnitConstr
             blockExpr()
-          } else {
+          }
+          else {
             if (in.token == EQUALS) {
-              in.nextTokenAllow(nme.MACROkw)
+              in.nextTokenAllow(nme.MACROkw.stringValue)
               if (in.token == IDENTIFIER && in.name == nme.MACROkw) {
                 in.nextToken()
                 newmods |= Flags.MACRO

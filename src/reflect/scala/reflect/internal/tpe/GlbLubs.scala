@@ -387,13 +387,12 @@ private[internal] trait GlbLubs {
     }
     if (printLubs) {
       println(indent + "lub of " + ts + " at depth "+depth)//debug
-      indent = indent + "  "
-      assert(indent.length <= 100)
+      indentDepth += 1
     }
     if (Statistics.canEnable) Statistics.incCounter(nestedLubCount)
     val res = lub0(ts)
     if (printLubs) {
-      indent = indent stripSuffix "  "
+      indentDepth -= 1
       println(indent + "lub of " + ts + " is " + res)//debug
     }
     res

@@ -36,7 +36,7 @@ abstract class TreeBuilder {
   def mkUnattributedRef(sym: Symbol): RefTree
 
   /** Builds an untyped reference to symbol with given name. Requires the symbol to be static. */
-  def mkUnattributedRef(fullName: Name): RefTree
+  def mkUnattributedRef(fullName: naming.Name): RefTree
 
   /** Builds a typed This reference to given symbol. */
   def mkAttributedThis(sym: Symbol): This
@@ -56,7 +56,7 @@ abstract class TreeBuilder {
    *  @param    args        value arguments
    *  @return               the newly created trees.
    */
-  def mkMethodCall(receiver: Symbol, methodName: Name, targs: List[Type], args: List[Tree]): Tree
+  def mkMethodCall(receiver: Symbol, methodName: naming.Name, targs: List[Type], args: List[Tree]): Tree
 
   def mkMethodCall(method: Symbol, targs: List[Type], args: List[Tree]): Tree
 
@@ -64,7 +64,7 @@ abstract class TreeBuilder {
 
   def mkMethodCall(target: Tree, args: List[Tree]): Tree
 
-  def mkMethodCall(receiver: Symbol, methodName: Name, args: List[Tree]): Tree
+  def mkMethodCall(receiver: Symbol, methodName: naming.Name, args: List[Tree]): Tree
 
   def mkMethodCall(receiver: Tree, method: Symbol, targs: List[Type], args: List[Tree]): Tree
 

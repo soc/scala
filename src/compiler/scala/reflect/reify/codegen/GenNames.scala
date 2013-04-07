@@ -1,4 +1,5 @@
-package scala.reflect.reify
+package scala.reflect
+package reify
 package codegen
 
 trait GenNames {
@@ -6,7 +7,7 @@ trait GenNames {
 
   import global._
 
-  def reifyName(name: Name) = {
+  def reifyName(name: naming.Name) = {
     val factory = if (name.isTypeName) nme.TypeName else nme.TermName
     mirrorCall(factory, Literal(Constant(name.toString)))
   }

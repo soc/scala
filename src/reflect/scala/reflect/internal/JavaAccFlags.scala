@@ -6,7 +6,7 @@ package scala.reflect
 package internal
 
 import java.lang.{ Class => jClass }
-import java.lang.reflect.{ Member => jMember, Constructor => jConstructor, Field => jField, Method => jMethod }
+import java.lang.reflect.{ Member => jMember, Constructor => jConstructor, Field => jField, Method => jMethod, Modifier => jModifier }
 import JavaAccFlags._
 import ClassfileConstants._
 
@@ -55,6 +55,22 @@ final class JavaAccFlags private (val coded: Int) extends AnyVal {
     case Class                => FlagTranslation classFlags flags
     case _                    => FlagTranslation fieldFlags flags
   }
+  def flagString = flagCarrierId match {
+    case Class       => jModifier toString (flags & jModifier.classModifiers)
+    case Field       => jModifier toString (flags & jModifier.fieldModifiers)
+    case Method      => jModifier toString (flags & jModifier.methodModifiers)
+    case Constructor => jModifier toString (flags & jModifier.constructorModifiers)
+    case _           => jModifier toString flags
+  }
+  def carrier = flagCarrierId match {
+    case Class       => "class"
+    case Field       => "field"
+    case Method      => "method"
+    case Constructor => "constructor"
+    case _           => "unknown"
+  }
+
+  override def toString = s"$flagString $carrier"
 }
 
 object JavaAccFlags {

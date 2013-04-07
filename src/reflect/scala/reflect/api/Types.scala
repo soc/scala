@@ -91,7 +91,7 @@ trait Types {
      *  an OverloadedSymbol if several exist, NoSymbol if none exist.
      *  Alternatives of overloaded symbol appear in the order they are declared.
      */
-    def declaration(name: Name): Symbol
+    def declaration(name: naming.Name): Symbol
 
     /** A `Scope` containing directly declared members of this type.
      *  Unlike `members` this method doesn't returns inherited members.
@@ -104,7 +104,7 @@ trait Types {
     /** The member with given name, either directly declared or inherited,
      *  an OverloadedSymbol if several exist, NoSymbol if none exist.
      */
-    def member(name: Name): Symbol
+    def member(name: naming.Name): Symbol
 
     /** A `Scope` containing all members of this type (directly declared or inherited).
      *  Unlike `declarations` this method also returns inherited members.

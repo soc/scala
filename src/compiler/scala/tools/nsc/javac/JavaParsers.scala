@@ -13,6 +13,7 @@ import scala.collection.mutable.ListBuffer
 import symtab.Flags
 import JavaTokens._
 import scala.language.implicitConversions
+import scala.reflect.naming.JavaTokenCodes
 
 trait JavaParsers extends ast.parser.ParsersCommon with JavaScanners {
   val global : Global
@@ -174,10 +175,10 @@ trait JavaParsers extends ast.parser.ParsersCommon with JavaScanners {
       val pos = in.currentPos
       if (in.token != token) {
         val posToReport = in.currentPos
-        val msg =
-          JavaScannerConfiguration.token2string(token) + " expected but " +
-            JavaScannerConfiguration.token2string(in.token) + " found."
-
+        val msg = "%s expected but %s found".format(
+          JavaTokenCodes tokenToString token,
+          JavaTokenCodes tokenToString in.token
+        )
         syntaxError(posToReport, msg, skipIt = true)
       }
       if (in.token == token) in.nextToken()

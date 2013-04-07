@@ -25,8 +25,8 @@ private[reflect] trait SymbolLoaders { self: SymbolTable =>
 //    }
 
     override def complete(sym: Symbol) = {
-      debugInfo("completing "+sym+"/"+clazz.fullName)
-      assert(sym == clazz || sym == module || sym == module.moduleClass)
+      debugInfo(s"completing $sym/${clazz.fullName}")
+      assert(sym == clazz || sym == module || sym == module.moduleClass, sym)
 //      try {
       enteringPhaseNotLaterThan(picklerPhase) {
         val loadingMirror = mirrorThatLoaded(sym)
@@ -92,17 +92,14 @@ private[reflect] trait SymbolLoaders { self: SymbolTable =>
   /** Is the given name valid for a top-level class? We exclude names with embedded $-signs, because
    *  these are nested classes or anonymous classes,
    */
-  def isInvalidClassName(name: Name) = {
-    val dp = name pos '$'
-    0 < dp && dp < (name.length - 1)
-  }
+  def isInvalidClassName(name: naming.Name) = name.decodedName containsChar '$'
 
   class PackageScope(pkgClass: Symbol) extends Scope(initFingerPrints = -1L) // disable fingerprinting as we do not know entries beforehand
       with SynchronizedScope {
     assert(pkgClass.isType)
     // disable fingerprinting as we do not know entries beforehand
-    private val negatives = mutable.Set[Name]() // Syncnote: Performance only, so need not be protected.
-    override def lookupEntry(name: Name): ScopeEntry = {
+    private val negatives = mutable.Set[naming.Name]() // Syncnote: Performance only, so need not be protected.
+    override def lookupEntry(name: naming.Name): ScopeEntry = {
       val e = super.lookupEntry(name)
       if (e != null)
         e

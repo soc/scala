@@ -355,7 +355,7 @@ abstract class GenASM extends SubComponent with BytecodeWriters with GenJVMASM {
     // global.lub(List(a.tpe, b.tpe)).typeSymbol.javaBinaryName.toString()
     // icodes.lub(icodes.toTypeKind(a.tpe), icodes.toTypeKind(b.tpe)).toType
     val lcaSym  = jvmWiseLUB(a, b)
-    val lcaName = lcaSym.javaBinaryName.toString // don't call javaName because that side-effects innerClassBuffer.
+    val lcaName = lcaSym.javaInternalName // don't call javaName because that side-effects innerClassBuffer.
     val oldsym  = reverseJavaName.put(lcaName, lcaSym)
     assert(oldsym.isEmpty || (oldsym.get == lcaSym), "somehow we're not managing to compute common-super-class for ASM consumption")
     assert(lcaName != "scala/Any")
@@ -538,8 +538,8 @@ abstract class GenASM extends SubComponent with BytecodeWriters with GenJVMASM {
 
       val hasInternalName = (sym.isClass || (sym.isModule && !sym.isMethod))
       val cachedJN = javaNameCache.getOrElseUpdate(sym, {
-        if (hasInternalName) { sym.javaBinaryName }
-        else                 { sym.javaSimpleName }
+        if (hasInternalName) { TypeName(sym.javaInternalName) }
+        else                 { TypeName(sym.javaSimpleName) }
       })
 
       if(emitStackMapFrame && hasInternalName) {
@@ -627,7 +627,7 @@ abstract class GenASM extends SubComponent with BytecodeWriters with GenJVMASM {
         if (innerSym.isAnonymousClass || innerSym.isAnonymousFunction)
           null
         else
-          innerSym.rawname + innerSym.moduleSuffix
+          innerSym.rawname + ( if (innerSym.needsModuleSuffix) "$" else "" )
 
       // add inner classes which might not have been referenced yet
       exitingErasure {

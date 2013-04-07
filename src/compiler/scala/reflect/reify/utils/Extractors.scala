@@ -1,4 +1,5 @@
-package scala.reflect.reify
+package scala.reflect
+package reify
 package utils
 
 trait Extractors {
@@ -166,7 +167,7 @@ trait Extractors {
 
   sealed abstract class FreeDefExtractor(acceptTerms: Boolean, acceptTypes: Boolean) {
     def unapply(tree: Tree): Option[(Tree, TermName, Tree, Long, String)] = {
-      def acceptFreeTermFactory(name: Name) = {
+      def acceptFreeTermFactory(name: naming.Name) = {
         (acceptTerms && name == nme.newFreeTerm) ||
         (acceptTypes && name == nme.newFreeType)
       }

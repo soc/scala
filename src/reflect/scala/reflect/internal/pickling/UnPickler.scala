@@ -181,8 +181,8 @@ abstract class UnPickler {
       val tag = readByte()
       val len = readNat()
       tag match {
-        case TERMname => newTermName(bytes, readIndex, len)
-        case TYPEname => newTypeName(bytes, readIndex, len)
+        case TERMname => newTermName(new String(bytes, readIndex, len))
+        case TYPEname => newTypeName(new String(bytes, readIndex, len))
         case _ => errorBadSignature("bad name tag: " + tag)
       }
     }

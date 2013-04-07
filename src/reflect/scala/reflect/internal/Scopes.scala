@@ -28,7 +28,7 @@ trait Scopes extends api.Scopes { self: SymbolTable =>
     var next: ScopeEntry = null
 
     def depth = owner.nestingLevel
-    override def hashCode(): Int = sym.name.start
+    override def hashCode(): Int = sym.name.##
     override def toString() = s"$sym (depth=$depth)"
   }
 
@@ -119,7 +119,7 @@ trait Scopes extends api.Scopes { self: SymbolTable =>
     }
 
     private def enterInHash(e: ScopeEntry): Unit = {
-      val i = e.sym.name.start & HASHMASK
+      val i = e.sym.name.## & HASHMASK
       e.tail = hashtable(i)
       hashtable(i) = e
     }
@@ -160,9 +160,9 @@ trait Scopes extends api.Scopes { self: SymbolTable =>
       }
     }
 
-    def rehash(sym: Symbol, newname: Name) {
+    def rehash(sym: Symbol, newname: naming.Name) {
       if (hashtable ne null) {
-        val index = sym.name.start & HASHMASK
+        val index = sym.name.## & HASHMASK
         var e1 = hashtable(index)
         var e: ScopeEntry = null
         if (e1 != null) {
@@ -178,7 +178,7 @@ trait Scopes extends api.Scopes { self: SymbolTable =>
           }
         }
         if (e != null) {
-          val newindex = newname.start & HASHMASK
+          val newindex = newname.## & HASHMASK
           e.tail = hashtable(newindex)
           hashtable(newindex) = e
         }
@@ -196,7 +196,7 @@ trait Scopes extends api.Scopes { self: SymbolTable =>
         e1.next = e.next
       }
       if (hashtable ne null) {
-        val index = e.sym.name.start & HASHMASK
+        val index = e.sym.name.## & HASHMASK
         var e1 = hashtable(index)
         if (e1 == e) {
           hashtable(index) = e.tail
@@ -220,15 +220,15 @@ trait Scopes extends api.Scopes { self: SymbolTable =>
     /** Lookup a module or a class, filtering out matching names in scope
      *  which do not match that requirement.
      */
-    def lookupModule(name: Name): Symbol = lookupAll(name.toTermName) find (_.isModule) getOrElse NoSymbol
-    def lookupClass(name: Name): Symbol  = lookupAll(name.toTypeName) find (_.isClass) getOrElse NoSymbol
+    def lookupModule(name: naming.Name): Symbol = lookupAll(name.toTermName) find (_.isModule) getOrElse NoSymbol
+    def lookupClass(name: naming.Name): Symbol  = lookupAll(name.toTypeName) find (_.isClass) getOrElse NoSymbol
 
     /** True if the name exists in this scope, false otherwise. */
-    def containsName(name: Name) = lookupEntry(name) != null
+    def containsName(name: naming.Name) = lookupEntry(name) != null
 
     /** Lookup a symbol.
      */
-    def lookup(name: Name): Symbol = {
+    def lookup(name: naming.Name): Symbol = {
       val e = lookupEntry(name)
       if (e eq null) NoSymbol
       else if (lookupNextEntry(e) eq null) e.sym
@@ -263,19 +263,19 @@ trait Scopes extends api.Scopes { self: SymbolTable =>
 
     /** Returns an iterator yielding every symbol with given name in this scope.
      */
-    def lookupAll(name: Name): Iterator[Symbol] = new Iterator[Symbol] {
+    def lookupAll(name: naming.Name): Iterator[Symbol] = new Iterator[Symbol] {
       var e = lookupEntry(name)
       def hasNext: Boolean = e ne null
       def next(): Symbol = try e.sym finally e = lookupNextEntry(e)
     }
 
-    def lookupAllEntries(name: Name): Iterator[ScopeEntry] = new Iterator[ScopeEntry] {
+    def lookupAllEntries(name: naming.Name): Iterator[ScopeEntry] = new Iterator[ScopeEntry] {
       var e = lookupEntry(name)
       def hasNext: Boolean = e ne null
       def next(): ScopeEntry = try e finally e = lookupNextEntry(e)
     }
 
-    def lookupUnshadowedEntries(name: Name): Iterator[ScopeEntry] = {
+    def lookupUnshadowedEntries(name: naming.Name): Iterator[ScopeEntry] = {
       lookupEntry(name) match {
         case null => Iterator.empty
         case e    => lookupAllEntries(name) filter (e1 => (e eq e1) || (e.depth == e1.depth && e.sym != e1.sym))
@@ -287,10 +287,10 @@ trait Scopes extends api.Scopes { self: SymbolTable =>
      *  in future versions of the type system. I have reverted the previous
      *  change to use iterators as too costly.
      */
-    def lookupEntry(name: Name): ScopeEntry = {
+    def lookupEntry(name: naming.Name): ScopeEntry = {
       var e: ScopeEntry = null
       if (hashtable ne null) {
-        e = hashtable(name.start & HASHMASK)
+        e = hashtable(name.## & HASHMASK)
         while ((e ne null) && e.sym.name != name) {
           e = e.tail
         }
