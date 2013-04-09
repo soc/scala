@@ -125,9 +125,10 @@ trait Relations {
     }
     def relateScopes(decls1: Scope, decls2: Scope) = decls1 isSameScope decls2
 
+    // printResult(s"$tp1 $this.relateQuantified($tp1, $tp2)") {
     /** @pre tp1 and tp2 are both MethodTypes or both PolyTypes.
      */
-    def relateQuantified(tp1: Type, tp2: Type): Boolean = {
+    def relateQuantified(tp1: Type, tp2: Type): Boolean = printResult(f"$tp1%45s   $this%-15s/rQ   $tp2%s") {
       val isMethod = tp1.params.nonEmpty
       val syms1    = substitutionTargets(tp1)
       val syms2    = substitutionTargets(tp2)
@@ -165,6 +166,8 @@ trait Relations {
           tp2.params.nonEmpty && relateQuantified(tp1, tp2)
       )
     )
+    // -      matchesType(res1, res2.substSym(tparams2, tparams1), alwaysMatchSimple)
+
     def relateMethodTypes(tp1: NullaryMethodType, tp2: NullaryMethodType)  = begin(tp1.resultType, tp2.resultType)
     def relatePolyTypes(tp1: PolyType, tp2: PolyType)                      = relateQuantified(tp1, tp2)
     def relateExistentialTypes(tp1: ExistentialType, tp2: ExistentialType) = relateQuantified(tp1, tp2)
@@ -220,10 +223,25 @@ trait Relations {
     }
   }
   abstract class MatchesTypeCommon extends TypeRelationImpl {
-    protected def isMethodOrPoly(tp: Type) = tp match {
+    def canonicalizeNullaryRepresentations(tp: Type): Type = tp match {
+      case NullaryMethodType(restpe)                   => restpe
+      case MethodType(Nil, restpe)                     => restpe
+      case TypeRef(pre, sym, Nil) if sym.isModuleClass => tp
+      case _                                           => NoType
+    }
+    def compareDifferentTypes(tp1: Type, tp2: Type) = (
+      canonicalizeNullaryRepresentations(tp1) match {
+        case NoType => false
+        case tp1    => tp1 =:= canonicalizeNullaryRepresentations(tp2)
+      }
+    )
+    def isMethodOrPoly(tp: Type) = tp match {
       case _: PolyType | _: MethodType | _: NullaryMethodType => true
       case _                                                  => false
     }
+    protected def search(tp1: Type, tp2: Type) = (
+      compareDifferentTypes(tp1, tp2)
+    )
   }
 
   object Conformance extends SubSameTypeCommon {
@@ -260,8 +278,9 @@ trait Relations {
      *    - Both types are equivalent
      *    - phase.erasedTypes is false and neither is a MethodType or PolyType
      */
-    protected def search(tp1: Type, tp2: Type) = (
-         isSameType(tp1, tp2) // (tp1 =:= tp2)
+    override protected def search(tp1: Type, tp2: Type) = (
+         super.search(tp1, tp2)
+      || isSameType(tp1, tp2)
       || !phase.erasedTypes && !isMethodOrPoly(tp1) && !isMethodOrPoly(tp2)
     )
     override def toString = "matches"
@@ -275,7 +294,7 @@ trait Relations {
       case ExistentialType(_, res) => canonicalize(res)
       case _                       => tp
     }
-    protected def search(tp1: Type, tp2: Type) = tp1 =:= tp2
+    // protected def search(tp1: Type, tp2: Type) = isSameType(tp1, tp2)
     override def toString = "looselyMatches"
   }
 }
