@@ -106,7 +106,7 @@ trait Relations {
   }
 
   abstract class TypeRelationImpl extends TypeRelation {
-    final def apply(tp1: Type, tp2: Type) = begin(tp1, tp2) || failed(tp1, tp2)
+    final def apply(tp1: Type, tp2: Type) = /*printResult(f"$tp1%45s   $this%-15s   $tp2%s")*/(begin(tp1, tp2) || failed(tp1, tp2))
     protected def begin(tp1: Type, tp2: Type) = relateIdenticalTypes(canonicalize(tp1), canonicalize(tp2))
     protected def search(tp1: Type, tp2: Type): Boolean
     protected def failed(tp1: Type, tp2: Type) = false
@@ -210,6 +210,7 @@ trait Relations {
     //       case _            => relateOthers(tp1, tp2)
     //     }
     // }
+    override def toString = (this.getClass.getName split '.').last.replaceAllLiterally("""$""", "")
   }
 
   abstract class SubSameTypeCommon extends TypeRelationImpl {
@@ -223,28 +224,31 @@ trait Relations {
       case _: PolyType | _: MethodType | _: NullaryMethodType => true
       case _                                                  => false
     }
-    def canonicalize(tp: Type): Type = tp match {
-      case MethodType(Nil, restpe)   => restpe
-      case NullaryMethodType(restpe) => restpe
-      case _                         => tp
-    }
   }
 
   object Conformance extends SubSameTypeCommon {
     protected def search(tp1: Type, tp2: Type) = tp1 <:< tp2
+    override def toString = "<:<"
   }
   object Equivalence extends SubSameTypeCommon {
     protected def search(tp1: Type, tp2: Type) = tp1 =:= tp2
+    override def toString = "=:="
   }
   object EquivalenceModuloAny extends SubSameTypeCommon {
     protected def search(tp1: Type, tp2: Type) = (
          (tp1 =:= tp2)
       || (ObjectClass isSubClass tp1.typeSymbol) && (ObjectClass isSubClass tp2.typeSymbol)
     )
+    override def toString = "java_=:="
   }
 
 
   object MatchesType extends MatchesTypeCommon {
+    def canonicalize(tp: Type): Type = tp match {
+      case MethodType(Nil, restpe)   => restpe
+      case NullaryMethodType(restpe) => restpe
+      case _                         => tp
+    }
     /** Is this type close enough to that type so that members
      *  with the two type would override each other? This requires
      *  one of the following to be true:
@@ -257,15 +261,15 @@ trait Relations {
      *    - phase.erasedTypes is false and neither is a MethodType or PolyType
      */
     protected def search(tp1: Type, tp2: Type) = (
-      if (phase.erasedTypes) tp1 looselyMatches tp2
-      else if (isMethodOrPoly(tp1) || isMethodOrPoly(tp2)) tp1 =:= tp2
-      else true
+         (tp1 =:= tp2)
+      || !phase.erasedTypes && !isMethodOrPoly(tp1) && !isMethodOrPoly(tp2)
     )
+    override def toString = "matches"
   }
 
   /** Same as matches, except that non-method types are always assumed to match. */
   object LooselyMatchesType extends MatchesTypeCommon {
-    override def canonicalize(tp: Type): Type = tp match {
+    def canonicalize(tp: Type): Type = tp match {
       case NullaryMethodType(res)  => canonicalize(res)
       case MethodType(Nil, res)    => canonicalize(res)
       case ExistentialType(_, res) => canonicalize(res)
@@ -273,6 +277,7 @@ trait Relations {
     }
     override protected def failed(tp1: Type, tp2: Type) = tp1 =:= tp2
     protected def search(tp1: Type, tp2: Type) = false
+    override def toString = "looselyMatches"
   }
 }
 
