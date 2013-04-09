@@ -166,7 +166,7 @@ trait TypeComparers {
     (    sameLength(params1, params2)
       && tp1.isImplicit == tp2.isImplicit
       && matchingParams(params1, params2, tp1.isJava, tp2.isJava)
-      && isSub(res1.substSym(params1, params2), res2)
+      && isSubType(res1.substSym(params1, params2), res2)
     )
   }
 
