@@ -153,10 +153,16 @@ trait TypeComparers {
     )
   }
 
+  private def isSameMethodType(mt1: MethodType, mt2: MethodType) = (
+       isSameTypes(mt1.paramTypes, mt2.paramTypes)
+    && (mt1.resultType =:= mt2.resultType.substSym(mt2.params, mt1.params))
+    && (mt1.isImplicit == mt2.isImplicit)
+  )
+
   // If Ti ≡ Ti′ for i = 1, ..., n and U conforms to U′, then the method
   // type (p1: T1, ..., pn: Tn)U conforms to (p1′:T1′, ..., pn′: Tn′)U′
-  private def isSameMethodType(tp1: MethodType, tp2: MethodType) =
-    isSubOrSameMethodType(tp1, tp2, requireSame = true)
+  // private def isSameMethodType(tp1: MethodType, tp2: MethodType) =
+  //   isSubOrSameMethodType(tp1, tp2, requireSame = true)
 
   private def isSubMethodType(tp1: MethodType, tp2: MethodType) =
     isSubOrSameMethodType(tp1, tp2, requireSame = false)
