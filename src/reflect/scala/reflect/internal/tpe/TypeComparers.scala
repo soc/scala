@@ -89,35 +89,6 @@ trait TypeComparers {
     && isSameTypeConstructor(tp1.asInstanceOf[TypeRef], tp2.asInstanceOf[TypeRef])
   )
 
-  /** Do `tp1` and `tp2` denote equivalent types? */
-  def isSameType(tp1: Type, tp2: Type): Boolean = try {
-    if (Statistics.canEnable) Statistics.incCounter(sametypeCount)
-    subsametypeRecursions += 1
-    //OPT cutdown on Function0 allocation
-    //was:
-    //    undoLog undoUnless {
-    //      isSameType1(tp1, tp2)
-    //    }
-
-    undoLog.lock()
-    try {
-      val before = undoLog.log
-      var result = false
-      try {
-        result = isSameType1(tp1, tp2)
-      }
-      finally if (!result) undoLog.undoTo(before)
-      result
-    }
-    finally undoLog.unlock()
-  }
-  finally {
-    subsametypeRecursions -= 1
-    // XXX AM TODO: figure out when it is safe and needed to clear the log -- the commented approach below is too eager (it breaks #3281, #3866)
-    // it doesn't help to keep separate recursion counts for the three methods that now share it
-    // if (subsametypeRecursions == 0) undoLog.clear()
-  }
-
   private def isSameType1(tp1: Type, tp2: Type): Boolean = {
     if ((tp1 eq tp2) ||
       (tp1 eq ErrorType) || (tp1 eq WildcardType) ||
@@ -254,8 +225,6 @@ trait TypeComparers {
     )
   }
 
-  def isSubType(tp1: Type, tp2: Type): Boolean = isSubType(tp1, tp2, AnyDepth)
-
   @inline private def lockUndolog(body: => Boolean): Boolean = {
     undoLog.lock()
     var result = false
@@ -272,10 +241,6 @@ trait TypeComparers {
   // it doesn't help to keep separate recursion counts for the three methods that now share it
   // if (subsametypeRecursions == 0) undoLog.clear()
 
-  @inline private def incrementSubSame(op: => Boolean): Boolean = {
-    subsametypeRecursions += 1
-    try op finally subsametypeRecursions -= 1
-  }
   @inline private def withPendingSubtype(p: SubTypePair)(body: => Boolean): Boolean = {
     !pendingSubTypes(p) && {
       pendingSubTypes += p
@@ -283,15 +248,21 @@ trait TypeComparers {
       finally pendingSubTypes -= p
     }
   }
+  @inline private def incrementSubSame(op: => Boolean): Boolean = {
+    subsametypeRecursions += 1
+    try lockUndolog(op) finally subsametypeRecursions -= 1
+  }
+
+  def isSubType(tp1: Type, tp2: Type): Boolean = isSubType(tp1, tp2, AnyDepth)
+  /** Do `tp1` and `tp2` denote equivalent types? */
+  def isSameType(tp1: Type, tp2: Type): Boolean = incrementSubSame(isSameType1(tp1, tp2))
 
   def isSubType(tp1: Type, tp2: Type, depth: Int): Boolean = {
     incrementSubSame {
-      lockUndolog {
-        if (subsametypeRecursions < LogPendingSubTypesThreshold)
-          isSubType2(tp1, tp2, depth)
-        else
-          withPendingSubtype(new SubTypePair(tp1, tp2))(isSubType2(tp1, tp2, depth))
-      }
+      if (subsametypeRecursions < LogPendingSubTypesThreshold)
+        isSubType2(tp1, tp2, depth)
+      else
+        withPendingSubtype(new SubTypePair(tp1, tp2))(isSubType2(tp1, tp2, depth))
     }
   }
 
