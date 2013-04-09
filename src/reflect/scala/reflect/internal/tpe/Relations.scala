@@ -152,7 +152,7 @@ trait Relations {
 
     def isSameType(tp1: Type, tp2: Type) = tp1 =:= tp2
     def isSameParamType(sym1: Symbol, sym2: Symbol) = (
-         isSameType(sym1.tpe_*, sym2.tpe_*)
+         isSameType(sym1.tpeHK, sym2.tpeHK)
       || sym1.owner.isJavaDefined && matchAsAnyAndObject(sym1, sym2)
       || sym2.owner.isJavaDefined && matchAsAnyAndObject(sym2, sym1)
     )
@@ -177,10 +177,10 @@ trait Relations {
     // def relateTypeRefs(tp1: TypeRef, tp2: TypeRef)               =
     // def relateTypeRefOnLeft(tp1: TypeRef, tp2: Type)             =
     // def relateTypeRefOnRight(tp1: Type, tp2: TypeRef)            =
-    private def matchAsAnyAndObject(param1: Symbol, param2: Symbol) = (
-         param1.tpe_*.typeSymbol == AnyClass
-      && param2.tpe_*.typeSymbol == ObjectClass
-    )
+    private def matchAsAnyAndObject(param1: Symbol, param2: Symbol) = param1.typeConstructor.typeSymbol match {
+      case AnyClass | ObjectClass => true
+      case _                      => false
+    }
     private def substitutionTargets(tp: Type): List[Symbol] = tp match {
       case MethodType(params, _)       => params
       case PolyType(tparams, _)        => tparams
@@ -261,7 +261,7 @@ trait Relations {
      *    - phase.erasedTypes is false and neither is a MethodType or PolyType
      */
     protected def search(tp1: Type, tp2: Type) = (
-         (tp1 =:= tp2)
+         isSameType(tp1, tp2) // (tp1 =:= tp2)
       || !phase.erasedTypes && !isMethodOrPoly(tp1) && !isMethodOrPoly(tp2)
     )
     override def toString = "matches"
