@@ -106,8 +106,8 @@ trait Relations {
   }
 
   abstract class TypeRelationImpl extends TypeRelation {
-    final def apply(tp1: Type, tp2: Type) = /*printResult(f"$tp1%45s   $this%-15s   $tp2%s")*/(begin(tp1, tp2) || failed(tp1, tp2))
-    protected def begin(tp1: Type, tp2: Type) = relateIdenticalTypes(canonicalize(tp1), canonicalize(tp2))
+              final def apply(tp1: Type, tp2: Type) = /*printResult(f"$tp1%45s   $this%-15s   $tp2%s")*/(begin(tp1, tp2) || failed(tp1, tp2))
+    protected final def begin(tp1: Type, tp2: Type) = relateIdenticalTypes(canonicalize(tp1), canonicalize(tp2))
     protected def search(tp1: Type, tp2: Type): Boolean
     protected def failed(tp1: Type, tp2: Type) = false
 
@@ -187,7 +187,7 @@ trait Relations {
       case ExistentialType(eparams, _) => eparams
       case _                           => Nil
     }
-    private def relateIdenticalTypes(tp1: Type, tp2: Type): Boolean = tp1 match {
+    private def relateIdenticalTypes(tp1: Type, tp2: Type): Boolean = /*printResult(s"relateIdenticalTypes($tp1, $tp1)")*/(tp1 match {
       case ConstantType(const1)   => tp2 match { case ConstantType(const2)    => relateConstants(const1, const2)  ; case _ => false }
       case tp1: NullaryMethodType => tp2 match { case tp2: NullaryMethodType  => relateMethodTypes(tp1, tp2)      ; case _ => false }
       case tp1: MethodType        => tp2 match { case tp2: MethodType         => relateMethodTypes(tp1, tp2)      ; case _ => false }
@@ -196,7 +196,7 @@ trait Relations {
       case tp1: RefinedType       => tp2 match { case tp2: RefinedType        => relateRefinedTypes(tp1, tp2)     ; case _ => false }
       case tp1: TypeBounds        => tp2 match { case tp2: TypeBounds         => relateTypeBounds(tp1, tp2)       ; case _ => false }
       case _                      => search(tp1, tp2)
-    }
+    })
     // private def dispatch2(tp1: Type, tp2: Type): Boolean = relate(tp1, tp2)
     // private def dispatch2(tp1: Type, tp2: Type): Boolean = tp1 match {
     //   case tp1: TypeRef =>
@@ -245,8 +245,8 @@ trait Relations {
 
   object MatchesType extends MatchesTypeCommon {
     def canonicalize(tp: Type): Type = tp match {
-      case MethodType(Nil, restpe)   => restpe
-      case NullaryMethodType(restpe) => restpe
+      case MethodType(Nil, restpe)   => canonicalize(restpe)
+      case NullaryMethodType(restpe) => canonicalize(restpe)
       case _                         => tp
     }
     /** Is this type close enough to that type so that members
@@ -270,13 +270,12 @@ trait Relations {
   /** Same as matches, except that non-method types are always assumed to match. */
   object LooselyMatchesType extends MatchesTypeCommon {
     def canonicalize(tp: Type): Type = tp match {
-      case NullaryMethodType(res)  => canonicalize(res)
       case MethodType(Nil, res)    => canonicalize(res)
+      case NullaryMethodType(res)  => canonicalize(res)
       case ExistentialType(_, res) => canonicalize(res)
       case _                       => tp
     }
-    override protected def failed(tp1: Type, tp2: Type) = tp1 =:= tp2
-    protected def search(tp1: Type, tp2: Type) = false
+    protected def search(tp1: Type, tp2: Type) = tp1 =:= tp2
     override def toString = "looselyMatches"
   }
 }
