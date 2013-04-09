@@ -78,7 +78,7 @@ trait Relations {
 
 
   trait TypeRelation {
-    def canonicalize(tp: Type): Type
+    // def canonicalize(tp: Type): Type
     def isSameType(tp1: Type, tp2: Type): Boolean
 
     protected def begin(tp1: Type, tp2: Type): Boolean
@@ -92,9 +92,8 @@ trait Relations {
     def relateTypeBounds(tp1: TypeBounds, tp2: TypeBounds): Boolean
     def relateRefinedTypes(tp1: RefinedType, tp2: RefinedType): Boolean
     def relateConstants(const1: Constant, const2: Constant): Boolean
-    def relateQuantified(tp1: Type, tp2: Type): Boolean
-    // def relateQuantified(tparams1: List[Symbol], res1: Type, tparams2: List[Symbol], res2: Type): Boolean
 
+    def relateQuantified(tparams1: List[Symbol], res1: Type, tparams2: List[Symbol], res2: Type): Boolean
     def relatePrefixAndSymbol(pre1: Type, sym1: Symbol, pre2: Type, sym2: Symbol): Boolean
     def relateTypeArgs(args1: List[Type], args2: List[Type], tparams: List[Symbol]): Boolean
     def relateScopes(decls1: Scope, decls2: Scope): Boolean
@@ -107,9 +106,12 @@ trait Relations {
 
   abstract class TypeRelationImpl extends TypeRelation {
               final def apply(tp1: Type, tp2: Type) = /*printResult(f"$tp1%45s   $this%-15s   $tp2%s")*/(begin(tp1, tp2) || failed(tp1, tp2))
-    protected final def begin(tp1: Type, tp2: Type) = relateIdenticalTypes(canonicalize(tp1), canonicalize(tp2))
+    // protected final def begin(tp1: Type, tp2: Type) = relateIdenticalTypes(canonicalize(tp1), canonicalize(tp2))
+    protected final def begin(tp1: Type, tp2: Type) = search(tp1, tp2) //relateIdenticalTypes(tp1, tp2)
     protected def search(tp1: Type, tp2: Type): Boolean
     protected def failed(tp1: Type, tp2: Type) = false
+
+    def isSameType(tp1: Type, tp2: Type) = self.isSameType(tp1, tp2)
 
     def relatePrefixAndSymbol(pre1: Type, sym1: Symbol, pre2: Type, sym2: Symbol) = (
          (pre1 =:= pre2)
@@ -125,52 +127,91 @@ trait Relations {
     }
     def relateScopes(decls1: Scope, decls2: Scope) = decls1 isSameScope decls2
 
+    // -    def matchesQuantified(tparams1: List[Symbol], tparams2: List[Symbol], res1: Type, res2: Type): Boolean = (
+    // -      sameLength(tparams1, tparams2) &&
+    // -      matchesType(res1, res2.substSym(tparams2, tparams1), alwaysMatchSimple)
+    // -    )
+
+    def relateQuantified(syms1: List[Symbol], res1: Type, syms2: List[Symbol], res2: Type) = (
+         sameLength(syms1, syms2)
+      && begin(res1, res2.substSym(syms2, syms1))
+    )
+
+    def relateMethodTypes(tp1: MethodType, tp2: MethodType) = {
+      (tp1.isImplicit == tp2.isImplicit) && ((tp1, tp2) match {
+        case (MethodType(Nil, res1), MethodType(Nil, res2))         =>
+          begin(NullaryMethodType(res1), NullaryMethodType(res2))
+        case (MethodType(params1, res1), MethodType(params2, res2)) =>
+          sameLength(params1, params2) && relateQuantified(params1, res1, params2, res2)
+        case _ =>
+          tp1 =:= tp2
+      })
+    }
+    // )
+
+
+    //     if (tp1.params.isEmpty)
+    //       tp2.params.isEmpty && begin(tp1.resultType, tp2.resultType)
+    //     else
+    //       tp2.params.nonEmpty && relateQuantified(tp1, tp2)
+    //   )
+    // )
+
+
     // printResult(s"$tp1 $this.relateQuantified($tp1, $tp2)") {
     /** @pre tp1 and tp2 are both MethodTypes or both PolyTypes.
      */
-    def relateQuantified(tp1: Type, tp2: Type): Boolean = printResult(f"$tp1%45s   $this%-15s/rQ   $tp2%s") {
-      val isMethod = tp1.params.nonEmpty
-      val syms1    = substitutionTargets(tp1)
-      val syms2    = substitutionTargets(tp2)
-      val syms3    = if (sameLength(syms1, syms2)) cloneSymbols(syms1) else return false
+    // def relateQuantified(tp1: Type, tp2: Type): Boolean = printResult(f"$tp1%45s   $this%-15s/rQ   $tp2%s") {
 
-      def subst(info: Type) = info.substSym(syms1, syms3).substSym(syms2, syms3)
-      def oneParam(p1: Symbol, p2: Symbol): Boolean = {
-        val ptp1 = subst(p1.info)
-        val ptp2 = subst(p2.info)
-        if (isMethod) (
-             isSameType(ptp1, ptp2)
-          || p1.owner.isJavaDefined && matchAsAnyAndObject(p1, p2)
-          || p2.owner.isJavaDefined && matchAsAnyAndObject(p2, p1)
-        )
-        else begin(ptp1, ptp2)
-      }
-      def checkParams = (syms1 corresponds syms2)(oneParam)
-      def checkResult = begin(subst(tp1.resultType), subst(tp2.resultType))
+    //   val syms1 = substitutionTargets(tp1)
+    //   val syms2 = substitutionTargets(tp2)
+    //   val syms3 = cloneSymbols(syms1)
 
-      checkParams && checkResult
-    }
+    //   if (sameLength(syms1, syms2)) tp1 match {
+    //     case MethodType(params1, res1) =>
+    //       tp2 match {
+    //         case MethodType(params2, res2) =>
+    //           if (sameLength(params1, params2)) {
+    //             val paramsOk = (params1 corresponds params2)((p1, p2) => subst(p1.info) =:= subst(p2.info))
+    //             val resultOk = begin(res1, res2.substSym(params2, params1))
+    //             return paramsOk && resultOk
+    //           }
+    //         case _ =>
+    //       }
+    //     case _ =>
+    //   }
 
-    def isSameType(tp1: Type, tp2: Type) = tp1 =:= tp2
-    def isSameParamType(sym1: Symbol, sym2: Symbol) = (
-         isSameType(sym1.tpeHK, sym2.tpeHK)
-      || sym1.owner.isJavaDefined && matchAsAnyAndObject(sym1, sym2)
-      || sym2.owner.isJavaDefined && matchAsAnyAndObject(sym2, sym1)
-    )
+    //   def subst(info: Type) = info.substSym(syms1, syms3).substSym(syms2, syms3)
+    //   def oneParam(p1: Symbol, p2: Symbol): Boolean = {
+    //     val ptp1 = subst(p1.info)
+    //     val ptp2 = subst(p2.info)
+    //     search(ptp1, ptp2)
+    //     // if (isMethod) (
+    //     //      isSameType(ptp1, ptp2)
+    //     //   || p1.owner.isJavaDefined && matchAsAnyAndObject(p1, p2)
+    //     //   || p2.owner.isJavaDefined && matchAsAnyAndObject(p2, p1)
+    //     // )
+    //     // else search(ptp1, ptp2)
+    //   }
+    //   def checkParams = (syms1 corresponds syms2)(oneParam)
+    //   def checkResult = begin(subst(tp1.resultType), subst(tp2.resultType))
 
-    def relateMethodTypes(tp1: MethodType, tp2: MethodType) = (
-      tp1.isImplicit == tp2.isImplicit && (
-        if (tp1.params.isEmpty)
-          tp2.params.isEmpty && begin(tp1.resultType, tp2.resultType)
-        else
-          tp2.params.nonEmpty && relateQuantified(tp1, tp2)
-      )
-    )
+    //   checkParams && checkResult
+    // }
+
+    // def relateMethodTypes(tp1: MethodType, tp2: MethodType) = (
+    //   tp1.isImplicit == tp2.isImplicit && (
+    //     if (tp1.params.isEmpty)
+    //       tp2.params.isEmpty && begin(tp1.resultType, tp2.resultType)
+    //     else
+    //       tp2.params.nonEmpty && relateQuantified(tp1, tp2)
+    //   )
+    // )
     // -      matchesType(res1, res2.substSym(tparams2, tparams1), alwaysMatchSimple)
 
     def relateMethodTypes(tp1: NullaryMethodType, tp2: NullaryMethodType)  = begin(tp1.resultType, tp2.resultType)
-    def relatePolyTypes(tp1: PolyType, tp2: PolyType)                      = relateQuantified(tp1, tp2)
-    def relateExistentialTypes(tp1: ExistentialType, tp2: ExistentialType) = relateQuantified(tp1, tp2)
+    def relatePolyTypes(tp1: PolyType, tp2: PolyType)                      = relateQuantified(tp1.typeParams, tp1.resultType, tp2.typeParams, tp2.resultType)
+    def relateExistentialTypes(tp1: ExistentialType, tp2: ExistentialType) = relateQuantified(tp1.quantified, tp1.underlying, tp2.quantified, tp2.underlying)
     def relateTypeBounds(tp1: TypeBounds, tp2: TypeBounds)                 = begin(tp1.hi, tp2.hi) && begin(tp2.lo, tp1.lo)
     def relateConstants(const1: Constant, const2: Constant)                = const1 == const2
     def relateRefinedTypes(tp1: RefinedType, tp2: RefinedType)             = (
@@ -217,30 +258,38 @@ trait Relations {
   }
 
   abstract class SubSameTypeCommon extends TypeRelationImpl {
-    def canonicalize(tp: Type): Type = tp match {
-      case TypeRef(pre, sym, Nil) if sym.isModuleClass => tp.narrow
-      case _                                           => tp
-    }
+    // def canonicalize(tp: Type): Type = tp match {
+    //   case TypeRef(pre, sym, Nil) if sym.isModuleClass => tp.narrow
+    //   case _                                           => tp
+    // }
   }
   abstract class MatchesTypeCommon extends TypeRelationImpl {
-    def canonicalizeNullaryRepresentations(tp: Type): Type = tp match {
-      case NullaryMethodType(restpe)                   => restpe
-      case MethodType(Nil, restpe)                     => restpe
-      case TypeRef(pre, sym, Nil) if sym.isModuleClass => tp
-      case _                                           => NoType
-    }
-    def compareDifferentTypes(tp1: Type, tp2: Type) = (
-      canonicalizeNullaryRepresentations(tp1) match {
-        case NoType => false
-        case tp1    => tp1 =:= canonicalizeNullaryRepresentations(tp2)
-      }
-    )
-    def isMethodOrPoly(tp: Type) = tp match {
-      case _: PolyType | _: MethodType | _: NullaryMethodType => true
-      case _                                                  => false
-    }
+    //       case MethodType(_, _) =>
+    //         false
+    //       case PolyType(_, _) =>
+    //         false
+    //       case _ =>
+    //         alwaysMatchSimple || tp1 =:= tp2
+
+    def canonicalize(tp: Type): Type = tp
+    // def nullaryRepresentation(tp: Type): Type = tp match {
+    //   case NullaryMethodType(_)                      => tp
+    //   case MethodType(Nil, restpe)                   => NullaryMethodType(restpe)
+    //   case TypeRef(_, sym, Nil) if sym.isModuleClass => NullaryMethodType(tp.narrow)
+    //   case _                                         => NoType
+    // }
     protected def search(tp1: Type, tp2: Type) = (
-      compareDifferentTypes(tp1, tp2)
+      (tp1, tp2) match {
+        case (tp1 @ NullaryMethodType(_), tp2 @ NullaryMethodType(_))   => relateMethodTypes(tp1, tp2)
+        case (tp1 @ MethodType(Nil, res1), tp2 @ NullaryMethodType(_))  => relateMethodTypes(NullaryMethodType(res1), tp2)
+        case (tp1 @ NullaryMethodType(_), tp2 @ MethodType(Nil, res2))  => relateMethodTypes(tp1, NullaryMethodType(res2))
+        case (tp1 @ MethodType(_, _), tp2 @ MethodType(_, _))           => relateMethodTypes(tp1, tp2)
+        case (tp1 @ ExistentialType(_, _), tp2 @ ExistentialType(_, _)) => relateExistentialTypes(tp1, tp2)
+        case (tp1 @ PolyType(_, _), tp2 @ PolyType(_, _))               => relatePolyTypes(tp1, tp2)
+        case (PolyType(_, _) | MethodType(_, _), _)                     => false
+        case (_, PolyType(_, _) | MethodType(_, _))                     => false
+        case _                                                          => tp1 =:= tp2
+      }
     )
   }
 
@@ -262,11 +311,6 @@ trait Relations {
 
 
   object MatchesType extends MatchesTypeCommon {
-    def canonicalize(tp: Type): Type = tp match {
-      case MethodType(Nil, restpe)   => canonicalize(restpe)
-      case NullaryMethodType(restpe) => canonicalize(restpe)
-      case _                         => tp
-    }
     /** Is this type close enough to that type so that members
      *  with the two type would override each other? This requires
      *  one of the following to be true:
@@ -278,24 +322,48 @@ trait Relations {
      *    - Both types are equivalent
      *    - phase.erasedTypes is false and neither is a MethodType or PolyType
      */
-    override protected def search(tp1: Type, tp2: Type) = (
-         super.search(tp1, tp2)
-      || isSameType(tp1, tp2)
-      || !phase.erasedTypes && !isMethodOrPoly(tp1) && !isMethodOrPoly(tp2)
-    )
+    // override protected def search(tp1: Type, tp2: Type) = (
+    //      super.search(tp1, tp2)
+    //   || isSameType(tp1, tp2)
+    //   // || !phase.erasedTypes && !isMethodOrPoly(tp1) && !isMethodOrPoly(tp2)
+    // )
     override def toString = "matches"
+    // override protected def search(tp1: Type, tp2: Type) =
+    protected override def search(tp1: Type, tp2: Type) = printResult(f"$tp1%45s   $this%-15s/mQ   $tp2%s") {
+      super.search(tp1, tp2)
+    }
   }
 
   /** Same as matches, except that non-method types are always assumed to match. */
   object LooselyMatchesType extends MatchesTypeCommon {
-    def canonicalize(tp: Type): Type = tp match {
-      case MethodType(Nil, res)    => canonicalize(res)
-      case NullaryMethodType(res)  => canonicalize(res)
-      case ExistentialType(_, res) => canonicalize(res)
-      case _                       => tp
-    }
     // protected def search(tp1: Type, tp2: Type) = isSameType(tp1, tp2)
     override def toString = "looselyMatches"
+
+    protected override def search(tp1: Type, tp2: Type) =printResult(f"$tp1%45s   $this%-15s/lQ   $tp2%s")(
+      (tp1, tp2) match {
+        case (tp1 @ NullaryMethodType(_), tp2 @ NullaryMethodType(_))   => relateMethodTypes(tp1, tp2)
+        case (tp1 @ MethodType(Nil, res1), tp2 @ NullaryMethodType(_))  => relateMethodTypes(NullaryMethodType(res1), tp2)
+        case (tp1 @ NullaryMethodType(_), tp2 @ MethodType(Nil, res2))  => relateMethodTypes(tp1, NullaryMethodType(res2))
+        case (tp1 @ MethodType(_, _), tp2 @ MethodType(_, _))           => relateMethodTypes(tp1, tp2)
+        case (tp1 @ ExistentialType(_, _), tp2 @ ExistentialType(_, _)) => relateExistentialTypes(tp1, tp2)
+        case (tp1 @ PolyType(_, _), tp2 @ PolyType(_, _))               => relatePolyTypes(tp1, tp2)
+        case (PolyType(_, _), ExistentialType(_, res2))                 => search(tp1, res2)
+        case (ExistentialType(_, res1), PolyType(_, _))                 => search(res1, tp2)
+        case (PolyType(_, _) | MethodType(_, _), _)                     => false
+        case (_, PolyType(_, _) | MethodType(_, _))                     => false
+        case _                                                          => tp1 =:= tp2
+      }
+    )
+
+    // protected override def search(tp1: Type, tp2: Type) = printResult(f"$tp1%45s   $this%-15s/lQ   $tp2%s") {
+    //   // val s1 = nullaryRepresentation(tp1)
+    //   // val s2 = nullaryRepresentation(tp2)
+
+    //   ( super.search(tp1, tp2) || ((tp1, tp2) match {
+    //       case _                                          => isSameType(tp1, tp2)
+    //     })
+    //   )
+    // }
   }
 }
 
