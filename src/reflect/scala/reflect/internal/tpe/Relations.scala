@@ -6,6 +6,7 @@ import scala.collection.{ mutable }
 import Flags._
 import util.Statistics
 import scala.annotation.tailrec
+import scala.reflect.internal.Variance._
 
 trait Relations {
   self: SymbolTable =>
@@ -92,10 +93,10 @@ trait Relations {
     def relateRefinedTypes(tp1: RefinedType, tp2: RefinedType): Boolean
     def relateConstants(const1: Constant, const2: Constant): Boolean
     def relateQuantified(tp1: Type, tp2: Type): Boolean
+    // def relateQuantified(tparams1: List[Symbol], res1: Type, tparams2: List[Symbol], res2: Type): Boolean
 
     def relatePrefixAndSymbol(pre1: Type, sym1: Symbol, pre2: Type, sym2: Symbol): Boolean
-    // def relateQuantified(tparams1: List[Symbol], res1: Type, tparams2: List[Symbol], res2: Type): Boolean
-    def relateTypeArgs(params: List[Symbol], args1: List[Type], args2: List[Type]): Boolean
+    def relateTypeArgs(args1: List[Type], args2: List[Type], tparams: List[Symbol]): Boolean
     def relateScopes(decls1: Scope, decls2: Scope): Boolean
 
     // def relateTypeRefs(tp1: TypeRef, tp2: TypeRef): Boolean
@@ -105,11 +106,9 @@ trait Relations {
   }
 
   abstract class TypeRelationImpl extends TypeRelation {
-    protected def search(tp1: Type, tp2: Type): Boolean
-
     final def apply(tp1: Type, tp2: Type) = begin(tp1, tp2) || failed(tp1, tp2)
-
-    protected def begin(tp1: Type, tp2: Type) = dispatch(canonicalize(tp1), canonicalize(tp2))
+    protected def begin(tp1: Type, tp2: Type) = relateIdenticalTypes(canonicalize(tp1), canonicalize(tp2))
+    protected def search(tp1: Type, tp2: Type): Boolean
     protected def failed(tp1: Type, tp2: Type) = false
 
     def relatePrefixAndSymbol(pre1: Type, sym1: Symbol, pre2: Type, sym2: Symbol) = (
@@ -120,7 +119,7 @@ trait Relations {
       def relateTypeArg(arg1: Type, arg2: Type, tparam: Symbol) = tparam.variance match {
         case Covariant     => arg1 <:< arg2
         case Contravariant => arg2 <:< arg1
-        case _             => isSameType(arg1, arg)
+        case _             => isSameType(arg1, arg2)
       }
       corresponds3(args1, args2, tparams)(relateTypeArg)
     }
@@ -143,10 +142,10 @@ trait Relations {
           || p1.owner.isJavaDefined && matchAsAnyAndObject(p1, p2)
           || p2.owner.isJavaDefined && matchAsAnyAndObject(p2, p1)
         )
-        else relate(ptp1, ptp2)
+        else begin(ptp1, ptp2)
       }
       def checkParams = (syms1 corresponds syms2)(oneParam)
-      def checkResult = relate(subst(tp1.resultType), subst(tp2.resultType))
+      def checkResult = begin(subst(tp1.resultType), subst(tp2.resultType))
 
       checkParams && checkResult
     }
@@ -161,18 +160,18 @@ trait Relations {
     def relateMethodTypes(tp1: MethodType, tp2: MethodType) = (
       tp1.isImplicit == tp2.isImplicit && (
         if (tp1.params.isEmpty)
-          tp2.params.isEmpty && relate(tp1.resultType, tp2.resultType)
+          tp2.params.isEmpty && begin(tp1.resultType, tp2.resultType)
         else
           tp2.params.nonEmpty && relateQuantified(tp1, tp2)
       )
     )
-    def relateMethodTypes(tp1: NullaryMethodType, tp2: NullaryMethodType)  = relate(tp1.resultType, tp2.resultType)
+    def relateMethodTypes(tp1: NullaryMethodType, tp2: NullaryMethodType)  = begin(tp1.resultType, tp2.resultType)
     def relatePolyTypes(tp1: PolyType, tp2: PolyType)                      = relateQuantified(tp1, tp2)
     def relateExistentialTypes(tp1: ExistentialType, tp2: ExistentialType) = relateQuantified(tp1, tp2)
-    def relateTypeBounds(tp1: TypeBounds, tp2: TypeBounds)                 = relate(tp1.hi, tp2.hi) && relate(tp2.lo, tp1.lo)
+    def relateTypeBounds(tp1: TypeBounds, tp2: TypeBounds)                 = begin(tp1.hi, tp2.hi) && begin(tp2.lo, tp1.lo)
     def relateConstants(const1: Constant, const2: Constant)                = const1 == const2
     def relateRefinedTypes(tp1: RefinedType, tp2: RefinedType)             = (
-         (tp1.parents corresponds tp2.parents)(relate)
+         (tp1.parents corresponds tp2.parents)(begin)
       && relateScopes(tp1.decls, tp2.decls)
     )
     // def relateTypeRefs(tp1: TypeRef, tp2: TypeRef)               =
@@ -188,7 +187,7 @@ trait Relations {
       case ExistentialType(eparams, _) => eparams
       case _                           => Nil
     }
-    private def relateSameTypes(tp1: Type, tp2: Type): Boolean = tp1 match {
+    private def relateIdenticalTypes(tp1: Type, tp2: Type): Boolean = tp1 match {
       case ConstantType(const1)   => tp2 match { case ConstantType(const2)    => relateConstants(const1, const2)  ; case _ => false }
       case tp1: NullaryMethodType => tp2 match { case tp2: NullaryMethodType  => relateMethodTypes(tp1, tp2)      ; case _ => false }
       case tp1: MethodType        => tp2 match { case tp2: MethodType         => relateMethodTypes(tp1, tp2)      ; case _ => false }
@@ -258,7 +257,7 @@ trait Relations {
      *    - phase.erasedTypes is false and neither is a MethodType or PolyType
      */
     protected def search(tp1: Type, tp2: Type) = (
-      if (phase.erasedTypes) LooselyMatchesType.relate(tp1, tp2)
+      if (phase.erasedTypes) tp1 looselyMatches tp2
       else if (isMethodOrPoly(tp1) || isMethodOrPoly(tp2)) tp1 =:= tp2
       else true
     )
@@ -272,10 +271,8 @@ trait Relations {
       case ExistentialType(_, res) => canonicalize(res)
       case _                       => tp
     }
-    override protected def failed(tp1: Type, tp2: Type) =
-    protected def search(tp1: Type, tp2: Type) = {
-
-    }
+    override protected def failed(tp1: Type, tp2: Type) = tp1 =:= tp2
+    protected def search(tp1: Type, tp2: Type) = false
   }
 }
 
