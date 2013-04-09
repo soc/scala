@@ -4056,6 +4056,15 @@ trait Types
     case _                  => false
   }
 
+  def isSubArgs(tps1: List[Type], tps2: List[Type], tparams: List[Symbol], depth: Int): Boolean = {
+    def isSubArg(t1: Type, t2: Type, variance: Variance) = (
+         (variance.isContravariant || isSubType(t1, t2, depth))
+      && (variance.isCovariant || isSubType(t2, t1, depth))
+    )
+
+    corresponds3(tps1, tps2, tparams map (_.variance))(isSubArg)
+  }
+
   def specializesSym(tp: Type, sym: Symbol, depth: Int): Boolean = {
     def directlySpecializedBy(member: Symbol): Boolean = (
          member == sym
@@ -4090,6 +4099,141 @@ trait Types
         }
       || sym2.isAliasType && tp2.memberType(sym2).substThis(tp2.typeSymbol, tp1) =:= tp1.memberType(sym1) //@MAT ok
     )
+  }
+
+  /** A function implementing `tp1` matches `tp2`. */
+  final def matchesType(tp1: Type, tp2: Type, alwaysMatchSimple: Boolean): Boolean = {
+    def matchesQuantified(tparams1: List[Symbol], tparams2: List[Symbol], res1: Type, res2: Type): Boolean = (
+      sameLength(tparams1, tparams2) &&
+      matchesType(res1, res2.substSym(tparams2, tparams1), alwaysMatchSimple)
+    )
+    def lastTry =
+      tp2 match {
+        case ExistentialType(_, res2) if alwaysMatchSimple =>
+          matchesType(tp1, res2, alwaysMatchSimple = true)
+        case MethodType(_, _) =>
+          false
+        case PolyType(_, _) =>
+          false
+        case _ =>
+          alwaysMatchSimple || tp1 =:= tp2
+      }
+    tp1 match {
+      case mt1 @ MethodType(params1, res1) =>
+        tp2 match {
+          case mt2 @ MethodType(params2, res2) =>
+            // sameLength(params1, params2) was used directly as pre-screening optimization (now done by matchesQuantified -- is that ok, performancewise?)
+            mt1.isImplicit == mt2.isImplicit &&
+            matchingParams(params1, params2, mt1.isJava, mt2.isJava) &&
+            matchesQuantified(params1, params2, res1, res2)
+          case NullaryMethodType(res2) =>
+            if (params1.isEmpty) matchesType(res1, res2, alwaysMatchSimple)
+            else matchesType(tp1, res2, alwaysMatchSimple)
+          case ExistentialType(_, res2) =>
+            alwaysMatchSimple && matchesType(tp1, res2, alwaysMatchSimple = true)
+          case TypeRef(_, sym, Nil) =>
+            params1.isEmpty && sym.isModuleClass && matchesType(res1, tp2, alwaysMatchSimple)
+          case _ =>
+            false
+        }
+      case mt1 @ NullaryMethodType(res1) =>
+        tp2 match {
+          case mt2 @ MethodType(Nil, res2)  => // could never match if params nonEmpty, and !mt2.isImplicit is implied by empty param list
+            matchesType(res1, res2, alwaysMatchSimple)
+          case NullaryMethodType(res2) =>
+            matchesType(res1, res2, alwaysMatchSimple)
+          case ExistentialType(_, res2) =>
+            alwaysMatchSimple && matchesType(tp1, res2, alwaysMatchSimple = true)
+          case TypeRef(_, sym, Nil) if sym.isModuleClass =>
+            matchesType(res1, tp2, alwaysMatchSimple)
+          case _ =>
+            matchesType(res1, tp2, alwaysMatchSimple)
+        }
+      case PolyType(tparams1, res1) =>
+        tp2 match {
+          case PolyType(tparams2, res2) =>
+            if ((tparams1 corresponds tparams2)(_ eq _))
+              matchesType(res1, res2, alwaysMatchSimple)
+            else
+              matchesQuantified(tparams1, tparams2, res1, res2)
+          case ExistentialType(_, res2) =>
+            alwaysMatchSimple && matchesType(tp1, res2, alwaysMatchSimple = true)
+          case _ =>
+            false // remember that tparams1.nonEmpty is now an invariant of PolyType
+        }
+      case ExistentialType(tparams1, res1) =>
+        tp2 match {
+          case ExistentialType(tparams2, res2) =>
+            matchesQuantified(tparams1, tparams2, res1, res2)
+          case _ =>
+            if (alwaysMatchSimple) matchesType(res1, tp2, alwaysMatchSimple = true)
+            else lastTry
+        }
+      case TypeRef(_, sym, Nil) if sym.isModuleClass =>
+        tp2 match {
+          case MethodType(Nil, res2)   => matchesType(tp1, res2, alwaysMatchSimple)
+          case NullaryMethodType(res2) => matchesType(tp1, res2, alwaysMatchSimple)
+          case _                       => lastTry
+        }
+      case _ =>
+        lastTry
+    }
+  }
+
+/** matchesType above is an optimized version of the following implementation:
+
+  def matchesType2(tp1: Type, tp2: Type, alwaysMatchSimple: Boolean): Boolean = {
+    def matchesQuantified(tparams1: List[Symbol], tparams2: List[Symbol], res1: Type, res2: Type): Boolean =
+      tparams1.length == tparams2.length &&
+      matchesType(res1, res2.substSym(tparams2, tparams1), alwaysMatchSimple)
+    (tp1, tp2) match {
+      case (MethodType(params1, res1), MethodType(params2, res2)) =>
+        params1.length == params2.length && // useful pre-secreening optimization
+        matchingParams(params1, params2, tp1.isInstanceOf[JavaMethodType], tp2.isInstanceOf[JavaMethodType]) &&
+        matchesType(res1, res2, alwaysMatchSimple) &&
+        tp1.isImplicit == tp2.isImplicit
+      case (PolyType(tparams1, res1), PolyType(tparams2, res2)) =>
+        matchesQuantified(tparams1, tparams2, res1, res2)
+      case (NullaryMethodType(rtp1), MethodType(List(), rtp2)) =>
+        matchesType(rtp1, rtp2, alwaysMatchSimple)
+      case (MethodType(List(), rtp1), NullaryMethodType(rtp2)) =>
+        matchesType(rtp1, rtp2, alwaysMatchSimple)
+      case (ExistentialType(tparams1, res1), ExistentialType(tparams2, res2)) =>
+        matchesQuantified(tparams1, tparams2, res1, res2)
+      case (ExistentialType(_, res1), _) if alwaysMatchSimple =>
+        matchesType(res1, tp2, alwaysMatchSimple)
+      case (_, ExistentialType(_, res2)) if alwaysMatchSimple =>
+        matchesType(tp1, res2, alwaysMatchSimple)
+      case (NullaryMethodType(rtp1), _) =>
+        matchesType(rtp1, tp2, alwaysMatchSimple)
+      case (_, NullaryMethodType(rtp2)) =>
+        matchesType(tp1, rtp2, alwaysMatchSimple)
+      case (MethodType(_, _), _) => false
+      case (PolyType(_, _), _)   => false
+      case (_, MethodType(_, _)) => false
+      case (_, PolyType(_, _))   => false
+      case _ =>
+        alwaysMatchSimple || tp1 =:= tp2
+    }
+  }
+*/
+
+  /** Are `syms1` and `syms2` parameter lists with pairwise equivalent types? */
+  protected[internal] def matchingParams(syms1: List[Symbol], syms2: List[Symbol], syms1isJava: Boolean, syms2isJava: Boolean): Boolean = syms1 match {
+    case Nil =>
+      syms2.isEmpty
+    case sym1 :: rest1 =>
+      syms2 match {
+        case Nil =>
+          false
+        case sym2 :: rest2 =>
+          val tp1 = sym1.tpe
+          val tp2 = sym2.tpe
+          (tp1 =:= tp2 ||
+           syms1isJava && tp2.typeSymbol == ObjectClass && tp1.typeSymbol == AnyClass ||
+           syms2isJava && tp1.typeSymbol == ObjectClass && tp2.typeSymbol == AnyClass) &&
+          matchingParams(rest1, rest2, syms1isJava, syms2isJava)
+      }
   }
 
   /** like map2, but returns list `xs` itself - instead of a copy - if function
