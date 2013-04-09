@@ -169,11 +169,26 @@ trait TypeComparers {
     ((origin1 ne tp1) || (origin2 ne tp2)) && (origin1 =:= origin2)
   }
 
-  private def isSameMethodType(mt1: MethodType, mt2: MethodType) = (
-       isSameTypes(mt1.paramTypes, mt2.paramTypes)
-    && (mt1.resultType =:= mt2.resultType.substSym(mt2.params, mt1.params))
-    && (mt1.isImplicit == mt2.isImplicit)
-  )
+  private def isSubOrSameMethodType(tp1: MethodType, tp2: MethodType, requireSame: Boolean): Boolean = {
+    val MethodType(params1, res1) = tp1
+    val MethodType(params2, res2) = tp2
+    def res1subst                 = res1.substSym(params1, params2)
+    def resultTypesOk             = if (requireSame) res1subst =:= res2 else res1subst <:< res2
+
+    (    sameLength(params1, params2)
+      && tp1.isImplicit == tp2.isImplicit
+      && matchingParams(params1, params2, tp1.isJava, tp2.isJava)
+      && resultTypesOk
+    )
+  }
+
+  // If Ti ≡ Ti′ for i = 1, ..., n and U conforms to U′, then the method
+  // type (p1: T1, ..., pn: Tn)U conforms to (p1′:T1′, ..., pn′: Tn′)U′
+  private def isSameMethodType(tp1: MethodType, tp2: MethodType) =
+    isSubOrSameMethodType(tp1, tp2, requireSame = true)
+
+  private def isSubMethodType(tp1: MethodType, tp2: MethodType) =
+    isSubOrSameMethodType(tp1, tp2, requireSame = false)
 
   private def equalTypeParamsAndResult(tparams1: List[Symbol], res1: Type, tparams2: List[Symbol], res2: Type) = {
     def subst(info: Type) = info.substSym(tparams2, tparams1)
@@ -425,12 +440,21 @@ trait TypeComparers {
         case _                                 => false
       }
     }
+    def admitsNull(tp: Type): Boolean = {
+      def symAdmitsNull(sym: Symbol): Boolean = (
+           (NullClass isBottomSubClass sym)
+        || sym.isAbstractType && admitsNull(sym.info.bounds.hi)
+      )
+      def loop(tps: List[Type]): Boolean = tps match {
+        case TypeRef(_, sym, _) :: _ if symAdmitsNull(sym) => true
+        case _ :: tl                                       => loop(tl)
+        case Nil                                           => false
+      }
+      loop(tp.dealiasWidenChain)
+    }
     def typeRefOnLeft(tp1: TypeRef, tp2: Type): Boolean = {
       def hi = tp1.bounds.hi
-      def isNullable = tp2 match {
-        case TypeRef(_, sym2, _) => NullClass isBottomSubClass sym2
-        case _                   => isSingleType(tp2) && replaceRight(tp2.underlying)
-      }
+      def isNullable = admitsNull(tp2)
       tp1.sym match {
         case NothingClass                  => true
         case NullClass                     => isNullable
@@ -465,17 +489,6 @@ trait TypeComparers {
 
       (    compatibleSymbols && compatibleTypeArgs
         || sym2.isClass && replaceLeft(tp1 baseType sym2)
-      )
-    }
-
-    def isSubMethodType(tp1: MethodType, tp2: MethodType) = {
-      val MethodType(params1, res1) = tp1
-      val MethodType(params2, res2) = tp2
-
-      (    sameLength(params1, params2)
-        && tp1.isImplicit == tp2.isImplicit
-        && matchingParams(params1, params2, tp1.isJava, tp2.isJava)
-        && isSub(res1.substSym(params1, params2), res2)
       )
     }
     def subTypeRequiresSameCaseClass = tp1 match {
