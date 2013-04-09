@@ -74,6 +74,7 @@ import Variance._
 
 trait Types
   extends api.Types
+  with tpe.Relations
   with tpe.TypeComparers
   with tpe.TypeToStrings
   with tpe.CommonOwners
