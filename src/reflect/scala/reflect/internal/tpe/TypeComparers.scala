@@ -169,21 +169,39 @@ trait TypeComparers {
     ((origin1 ne tp1) || (origin2 ne tp2)) && (origin1 =:= origin2)
   }
 
-  private def isSameMethodType(mt1: MethodType, mt2: MethodType) = (
-       isSameTypes(mt1.paramTypes, mt2.paramTypes)
-    && (mt1.resultType =:= mt2.resultType.substSym(mt2.params, mt1.params))
-    && (mt1.isImplicit == mt2.isImplicit)
-  )
+  private def isSameMethodType(tp1: MethodType, tp2: MethodType) =
+    isSameOrSubMethodType(tp1, tp2, requireSame = true)
 
-  private def equalTypeParamsAndResult(tparams1: List[Symbol], res1: Type, tparams2: List[Symbol], res2: Type) = {
-    def subst(info: Type) = info.substSym(tparams2, tparams1)
-    // corresponds does not check length of two sequences before checking the predicate,
-    // but SubstMap assumes it has been checked (SI-2956)
-    (     sameLength(tparams1, tparams2)
-      && (tparams1 corresponds tparams2)((p1, p2) => p1.info =:= subst(p2.info))
-      && (res1 =:= subst(res2))
+  private def isSamePolyType(tparams1: List[Symbol], res1: Type, tparams2: List[Symbol], res2: Type) =
+    isSameOrSubPolyType(tparams1, res1, tparams2, res2, same = true)
+
+  private def isSameOrSubMethodType(tp1: MethodType, tp2: MethodType, requireSame: Boolean): Boolean = {
+    def res2sub = tp2.resultType.substSym(tp2.params, tp1.params)
+    def resOk   = if (requireSame) tp1.resultType =:= res2sub else tp1.resultType <:< res2sub
+
+    (    isSameTypes(tp1.paramTypes, tp2.paramTypes)
+      && tp1.isImplicit == tp2.isImplicit
+      && resOk
     )
   }
+  private def isSameOrSubPolyType(tparams1: List[Symbol], res1: Type, tparams2: List[Symbol], res2: Type, same: Boolean): Boolean = (
+    // corresponds does not check length of two sequences before checking the predicate,
+    // but SubstMap assumes it has been checked (SI-2956)
+    sameLength(tparams1, tparams2) && {
+      // fast-path: polymorphic method type -- type params cannot be captured
+      val isMethod = tparams1.head.owner.isMethod
+      //@M for an example of why we need to generate fresh symbols otherwise, see neg/tcpoly_ticket2101.scala
+      val sharedTypeParams = if (isMethod) tparams1 else cloneSymbols(tparams1)
+
+      def sub1(tp: Type)              = if (isMethod) tp else tp.substSym(tparams1, sharedTypeParams)
+      def sub2(tp: Type)              = tp.substSym(tparams2, sharedTypeParams)
+      def cmp(p1: Symbol, p2: Symbol) = sub2(p2.info) <:< sub1(p1.info)
+      def resOk                       = if (same) sub1(res1) =:= sub2(res2) else sub1(res1) <:< sub2(res2)
+
+
+      (tparams1 corresponds tparams2)(cmp) && resOk
+    }
+  )
 
   def isSameType2(tp1: Type, tp2: Type): Boolean = {
     /** Here we highlight those unfortunate type-like constructs which
@@ -223,8 +241,8 @@ trait TypeComparers {
       case tp1: MethodType            => tp2 match { case tp2: MethodType            => isSameMethodType(tp1, tp2)                           ; case _ => false }
       case RefinedType(ps1, decls1)   => tp2 match { case RefinedType(ps2, decls2)   => isSameTypes(ps1, ps2) && (decls1 isSameScope decls2) ; case _ => false }
       case SingleType(pre1, sym1)     => tp2 match { case SingleType(pre2, sym2)     => equalSymsAndPrefixes(sym1, pre1, sym2, pre2)         ; case _ => false }
-      case PolyType(ps1, res1)        => tp2 match { case PolyType(ps2, res2)        => equalTypeParamsAndResult(ps1, res1, ps2, res2)       ; case _ => false }
-      case ExistentialType(qs1, res1) => tp2 match { case ExistentialType(qs2, res2) => equalTypeParamsAndResult(qs1, res1, qs2, res2)       ; case _ => false }
+      case PolyType(ps1, res1)        => tp2 match { case PolyType(ps2, res2)        => isSamePolyType(ps1, res1, ps2, res2)                 ; case _ => false }
+      case ExistentialType(qs1, res1) => tp2 match { case ExistentialType(qs2, res2) => isSamePolyType(qs1, res1, qs2, res2)                 ; case _ => false }
       case ThisType(sym1)             => tp2 match { case ThisType(sym2)             => sym1 == sym2                                         ; case _ => false }
       case ConstantType(c1)           => tp2 match { case ConstantType(c2)           => c1 == c2                                             ; case _ => false }
       case NullaryMethodType(res1)    => tp2 match { case NullaryMethodType(res2)    => res1 =:= res2                                        ; case _ => false }
@@ -294,31 +312,14 @@ trait TypeComparers {
     // if (subsametypeRecursions == 0) undoLog.clear()
   }
 
-  private def isPolySubType(tp1: PolyType, tp2: PolyType): Boolean = {
-    val PolyType(tparams1, res1) = tp1
-    val PolyType(tparams2, res2) = tp2
-
-    sameLength(tparams1, tparams2) && {
-      // fast-path: polymorphic method type -- type params cannot be captured
-      val isMethod = tparams1.head.owner.isMethod
-      //@M for an example of why we need to generate fresh symbols otherwise, see neg/tcpoly_ticket2101.scala
-      val substitutes = if (isMethod) tparams1 else cloneSymbols(tparams1)
-      def sub1(tp: Type) = if (isMethod) tp else tp.substSym(tparams1, substitutes)
-      def sub2(tp: Type) = tp.substSym(tparams2, substitutes)
-      def cmp(p1: Symbol, p2: Symbol) = sub2(p2.info) <:< sub1(p1.info)
-
-      (tparams1 corresponds tparams2)(cmp) && (sub1(res1) <:< sub2(res2))
-    }
-  }
-
   // @assume tp1.isHigherKinded || tp2.isHigherKinded
   def isHKSubType(tp1: Type, tp2: Type, depth: Int): Boolean = {
     def isSub(ntp1: Type, ntp2: Type) = (ntp1.withoutAnnotations, ntp2.withoutAnnotations) match {
       case (TypeRef(_, AnyClass, _), _)                                     => false                    // avoid some warnings when Nothing/Any are on the other side
       case (_, TypeRef(_, NothingClass, _))                                 => false
-      case (pt1: PolyType, pt2: PolyType)                                   => isPolySubType(pt1, pt2)  // @assume both .isHigherKinded (both normalized to PolyType)
+      case (PolyType(tparams1, res1), PolyType(tparams2, res2))             => isSameOrSubPolyType(tparams1, res1, tparams2, res2, same = false)  // @assume both .isHigherKinded (both normalized to PolyType)
       case (_: PolyType, MethodType(ps, _)) if ps exists (_.tpe.isWildcard) => false                    // don't warn on HasMethodMatching on right hand side
-      case _                                                                =>                          // @assume !(both .isHigherKinded) thus cannot be subtypes
+      case _                                                                => // @assume !(both .isHigherKinded) thus cannot be subtypes
         def tp_s(tp: Type): String = f"$tp%-20s ${util.shortClassOfInstance(tp)}%s"
         devWarning(s"HK subtype check on $tp1 and $tp2, but both don't normalize to polytypes:\n  tp1=${tp_s(ntp1)}\n  tp2=${tp_s(ntp2)}")
         false
