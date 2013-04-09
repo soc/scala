@@ -4101,29 +4101,7 @@ trait Types
     )
   }
 
-  tp1 match {
-    case mt1 @ MethodType(params1, res1) =>
-      tp2 match {
-        case mt2 @ MethodType(params2, res2) =>
-          // sameLength(params1, params2) was used directly as pre-screening optimization (now done by matchesQuantified -- is that ok, performancewise?)
-          mt1.isImplicit == mt2.isImplicit &&
-          matchingParams(params1, params2, mt1.isJava, mt2.isJava) &&
-          // matchesQuantified(params1, params2, res1, res2)
-          sameLength(tparams1, tparams2) &&
-          matchesType(res1, res2.substSym(tparams2, tparams1), alwaysMatchSimple)
-
-  case mt2: MethodType =>
-    tp1 match {
-      case mt1 @ MethodType(params1, res1) =>
-        val params2 = mt2.params
-        val res2 = mt2.resultType
-        (sameLength(params1, params2) &&
-          mt1.isImplicit == mt2.isImplicit &&
-          matchingParams(params1, params2, mt1.isJava, mt2.isJava) &&
-          isSubType(res1.substSym(params1, params2), res2, depth))
-      // TODO: if mt1.params.isEmpty, consider NullaryMethodType?
-
-  object NullaryType {
+  private object NullaryType {
     def unapply(tp: Type): Option[Type] = tp match {
       case MethodType(Nil, res)                      => Some(res)
       case NullaryMethodType(res)                    => Some(res)
@@ -4133,198 +4111,29 @@ trait Types
   }
 
   private def matchesTypeLoosely(tp1: Type, tp2: Type): Boolean = {
+    def matchesQuantified(tparams1: List[Symbol], tparams2: List[Symbol], res1: Type, res2: Type): Boolean = (
+         sameLength(tparams1, tparams2)
+      && matchesTypeLoosely(res1, res2.substSym(tparams2, tparams1))
+    )
+    def matchesMethod(tp1: MethodType, tp2: MethodType) = (
+         mt1.isImplicit == mt2.isImplicit
+      && matchesQuantified(tp1.params, tp2.params, tp1.resultType, tp2.resultType)
+      && matchingParams(tp1.params, tp2.params, tp1.isJava, tp2.sJava)
+    )
     ((tp1, tp2)) match {
-      case (NullaryType(res1), NullaryType(res2))                             => matchesTypeLoosely(res1, res2)
-      case (ExistentialType(tparams1, res1), ExistentialType(tparams2, res2)) => matchesQuantified(tparams1, tparams2, res1, res2)
-      case (ExistentialType(_, res1), _)                                      => matchesTypeLoosely(res1, tp2)
-      case (_, ExistentialType(_, res2))                                      => matchesTypeLoosely(tp1, res2)
-
-      case (PolyType(_, _), ExistentialType(_, res2))                         => matchesTypeLoosely(tp1, res2)
-      case (PolyType(tparams1, res1), PolyType(tparams2, res2))               => matchesQuantified(tparams1, tparams2, res1, res2)
-      case (tp1 @ MethodType(params1, res1), tp2 @ MethodType(params2, res2)) =>
-              (    mt1.isImplicit == mt2.isImplicit
-                && sameLength(params1, params2)
-                && matchingParams(params1, params2, mt1.isJava, mt2.isJava)
-                && matchesQuantified(params1, params2, res1, res2)
-              )
-      case (
-
-
-      case mt1 @ MethodType(params1, res1) =>
-        tp2 match {
-          case mt2 @ MethodType(params2, res2) =>
-            sameLength(params1, params2)
-            mt1.isImplicit == mt2.isImplicit &&
-            matchingParams(params1, params2, mt1.isJava, mt2.isJava) &&
-            matchesQuantified(params1, params2, res1, res2)
-
-
-      case PolyType(tparams1, res1) =>
-        tp2 match {
-          case PolyType(tparams2, res2) =>
-            if ((tparams1 corresponds tparams2)(_ eq _))
-              matchesType(res1, res2, alwaysMatchSimple)
-            else
-              matchesQuantified(tparams1, tparams2, res1, res2)
-          case ExistentialType(_, res2) =>
-            alwaysMatchSimple && matchesType(tp1, res2, alwaysMatchSimple = true)
-          case _ =>
-            false // remember that tparams1.nonEmpty is now an invariant of PolyType
-        }
-
-        case ExistentialType(tparams1, res1) =>
-          tp2 match {
-            case ExistentialType(tparams2, res2) =>
-              matchesQuantified(tparams1, tparams2, res1, res2)
-
-
-      case (NullaryType(ntp1), NullaryType(ntp2)) =>
-
-
-
-      case (NullaryMethodType(res) | MethodType(Nil, res)
-
-
-
-    def canonicalizeNullary(tp: Type) = tp match {
-      case MethodType(Nil, res)                      => res
-      case NullaryMethodType(res)                    => res
-      case TypeRef(_, sym, Nil) if sym.isModuleClass => tp
-      case _                                         => null
-    }
-    val ctp1 = canonicalizeNullary(tp1)
-    val ctp2 = canonicalizeNullary(tp2)
-    if ((ctp1 ne null) && (ctp2 ne null))
-      return matchesTypeLoosely(ctp1, ctp2)
-
-    def nullaryCheck(lhs0: Type, rhs0: Type): Boolean = {
-      val rhs1 = rhs0 match {
-        case ExistentialType(_, res1) => res1
-        case _                        => rhs0
-      }
-      matchesTypeLoosely(lhs0, rhs1)
+      case (NullaryType(res1), NullaryType(res2))                 => matchesTypeLoosely(res1, res2)
+      case (NullaryType(res1), _)                                 => matchesTypeLoosely(res1, tp2)
+      case (_, NullaryType(res2))                                 => matchesTypeLoosely(tp1, res2)
+      case (ExistentialType(tps1, r1), ExistentialType(tps2, r2)) => matchesQuantified(tps1, tps2, r11, r2)
+      case (ExistentialType(_, res1), _)                          => matchesTypeLoosely(res1, tp2)
+      case (_, ExistentialType(_, res2))                          => matchesTypeLoosely(tp1, res2)
+      case (PolyType(tparams1, res1), PolyType(tparams2, res2))   => matchesQuantified(tparams1, tparams2, res1, res2)
+      case (tp1 @ MethodType(_, _), tp2 @ MethodType(_, _))       => matchesMethod(tp1, tp2)
+      case (MethodType(_, _) | PolyType(_, _), _)                 => false
+      case (_, MethodType(_, _) | PolyType(_, _))                 => false
+      case _                                                      => tp1 =:= tp22
     }
 
-    tp1 match {
-      case NullaryMethodType(res1)                   => nullaryCheck(res1, tp2)
-      case MethodType(Nil, res1)                     => nullaryCheck(res1, tp2)
-      case TypeRef(_, sym, Nil) if sym.isModuleClass => nullaryCheck(res1, tp2)
-      case _                                         =>
-        tp2 match {
-          case NullaryMethodType(res2)                   => nullaryCheck(res2, tp1)
-          case MethodType(Nil, res2)                     => nullaryCheck(res2, tp1)
-          case TypeRef(_, sym, Nil) if sym.isModuleClass => nullaryCheck(tp2, tp1)
-          case _                                         =>
-        }
-
-    }
-
-    if ((ctp1 ne null) && (ctp2 ne null))
-      matchesTypeLoosely(ctp1, ctp2)
-    else if ((ctp1 ne null) || (ctp2 ne null))
-      false
-    else
-
-
-    tp1 match {
-      case tp1: MethodType      => tp2 match { case tp2: MethodType => looseMethods(tp1, tp2) ; case _ => false }
-      case tp1: PolyType        =>
-      case tp1: ExistentialType =>
-
-
-
-        tp2 match {
-          case mt2 @ MethodType(params2, res2) =>
-            sameLength(params1, params2)
-            mt1.isImplicit == mt2.isImplicit &&
-            matchingParams(params1, params2, mt1.isJava, mt2.isJava) &&
-            matchesQuantified(params1, params2, res1, res2)
-
-
-    canonicalizeNullary(tp1) match {
-      case ctp1: Type =>
-        canonicalizeNullary(tp2) match {
-          case ctp2: Type => return matchesTypeLoosely(ctp1, ctp2)
-          case _          =>
-        }
-      case _ =>
-    }
-
-          case ExistentialType(_, res2) =>
-            alwaysMatchSimple && matchesType(tp1, res2, alwaysMatchSimple = true)
-          case TypeRef(_, sym, Nil) =>
-            params1.isEmpty && sym.isModuleClass && matchesType(res1, tp2, alwaysMatchSimple)
-
-
-
-    val nullary = tp1 match {
-      case MethodType(Nil, res1)                     => res1
-      case NullaryMethodType(res1)                   => res1
-      case TypeRef(_, sym, Nil) if sym.isModuleClass => tp1
-
-        params1.isEmpty && sym.isModuleClass && matchesType(res1, tp2, alwaysMatchSimple)
-
-
-
-    tp1 match {
-
-
-      case mt1 @ MethodType(params1, res1) =>
-        tp2 match {
-          case mt2 @ MethodType(params2, res2) =>
-            sameLength(params1, params2)
-            mt1.isImplicit == mt2.isImplicit &&
-            matchingParams(params1, params2, mt1.isJava, mt2.isJava) &&
-            matchesQuantified(params1, params2, res1, res2)
-          case NullaryMethodType(res2) =>
-            if (params1.isEmpty) matchesType(res1, res2, alwaysMatchSimple)
-            else matchesType(tp1, res2, alwaysMatchSimple)
-          case ExistentialType(_, res2) =>
-            alwaysMatchSimple && matchesType(tp1, res2, alwaysMatchSimple = true)
-          case TypeRef(_, sym, Nil) =>
-            params1.isEmpty && sym.isModuleClass && matchesType(res1, tp2, alwaysMatchSimple)
-          case _ =>
-            false
-        }
-      case mt1 @ NullaryMethodType(res1) =>
-        tp2 match {
-          case mt2 @ MethodType(Nil, res2)  => // could never match if params nonEmpty, and !mt2.isImplicit is implied by empty param list
-            matchesType(res1, res2, alwaysMatchSimple)
-          case NullaryMethodType(res2) =>
-            matchesType(res1, res2, alwaysMatchSimple)
-          case ExistentialType(_, res2) =>
-            alwaysMatchSimple && matchesType(tp1, res2, alwaysMatchSimple = true)
-          case TypeRef(_, sym, Nil) if sym.isModuleClass =>
-            matchesType(res1, tp2, alwaysMatchSimple)
-          case _ =>
-            matchesType(res1, tp2, alwaysMatchSimple)
-        }
-      case PolyType(tparams1, res1) =>
-        tp2 match {
-          case PolyType(tparams2, res2) =>
-            if ((tparams1 corresponds tparams2)(_ eq _))
-              matchesType(res1, res2, alwaysMatchSimple)
-            else
-              matchesQuantified(tparams1, tparams2, res1, res2)
-          case ExistentialType(_, res2) =>
-            alwaysMatchSimple && matchesType(tp1, res2, alwaysMatchSimple = true)
-          case _ =>
-            false // remember that tparams1.nonEmpty is now an invariant of PolyType
-        }
-      case ExistentialType(tparams1, res1) =>
-        tp2 match {
-          case ExistentialType(tparams2, res2) =>
-            matchesQuantified(tparams1, tparams2, res1, res2)
-          case _ =>
-            if (alwaysMatchSimple) matchesType(res1, tp2, alwaysMatchSimple = true)
-            else lastTry
-        }
-      case TypeRef(_, sym, Nil) if sym.isModuleClass =>
-        tp2 match {
-          case MethodType(Nil, res2)   => matchesType(tp1, res2, alwaysMatchSimple)
-          case NullaryMethodType(res2) => matchesType(tp1, res2, alwaysMatchSimple)
-          case _                       => lastTry
-        }
       case _ =>
         lastTry
     }
