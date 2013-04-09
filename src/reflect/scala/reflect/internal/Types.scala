@@ -4122,56 +4122,20 @@ trait Types
     case MethodType(_, _) | PolyType(_, _) => true
     case _                                 => false
   }
-  def matchesTypeLoosely(tp1: Type, tp2: Type): Boolean = ((tp1, tp2)) match {
-    case (NullaryType(res1), NullaryType(res2))                 => matchesTypeLoosely(res1, res2)
-    case (NullaryType(res1), _)                                 => matchesTypeLoosely(res1, tp2)
-    case (_, NullaryType(res2))                                 => matchesTypeLoosely(tp1, res2)
-    case (ExistentialType(tps1, r1), ExistentialType(tps2, r2)) => matchesQuantified(tps1, tps2, r11, r2)
-    case (ExistentialType(_, res1), _)                          => matchesTypeLoosely(res1, tp2)
-    case (_, ExistentialType(_, res2))                          => matchesTypeLoosely(tp1, res2)
-    case (PolyType(tparams1, res1), PolyType(tparams2, res2))   => matchesQuantified(tparams1, tparams2, res1, res2)
-    case (tp1 @ MethodType(_, _), tp2 @ MethodType(_, _))       => matchesMethod(tp1, tp2)
-    case _                                                      => !(isPolyOrMethod(tp1) || isPolyOrMethod(tp2))
-  }
-  def matchesType(tp1: Type, tp2: Type): Boolean = ((tp1, tp2)) match {
-    case (NullaryType(res1), NullaryType(res2))                 => matchesType(res1, res2)
-    case (NullaryType(res1), _)                                 => matchesType(res1, tp2)
-    case (_, NullaryType(res2))                                 => matchesType(tp1, res2)
-    case (ExistentialType(tps1, r1), ExistentialType(tps2, r2)) => matchesQuantified(tps1, tps2, r11, r2)
-    case (ExistentialType(_, res1), _)                          => matchesType(res1, tp2)
-    case (_, ExistentialType(_, res2))                          => matchesType(tp1, res2)
-    case (PolyType(tparams1, res1), PolyType(tparams2, res2))   => matchesQuantified(tparams1, tparams2, res1, res2)
-    case (tp1 @ MethodType(_, _), tp2 @ MethodType(_, _))       => matchesMethod(tp1, tp2)
-    case _                                                      => !(isPolyOrMethod(tp1) || isPolyOrMethod(tp2))
-  }
-
-
-    def matchesQuantified(tparams1: List[Symbol], tparams2: List[Symbol], res1: Type, res2: Type): Boolean = (
-         sameLength(tparams1, tparams2)
-      && matchesTypeLoosely(res1, res2.substSym(tparams2, tparams1))
-    )
-    def matchesMethod(tp1: MethodType, tp2: MethodType) = (
-         mt1.isImplicit == mt2.isImplicit
-      && matchesQuantified(tp1.params, tp2.params, tp1.resultType, tp2.resultType)
-      && matchingParams(tp1.params, tp2.params, tp1.isJava, tp2.sJava)
-    )
-    def isPolyOrMethod(tp: Type) = tp match {
-      case MethodType(_, _) | PolyType(_, _) => true
-      case _                                 => false
+  def matchesType(tp1: Type, tp2: Type, alwaysMatchLoosely: Boolean): Boolean = {
+    def loop(tp1: Type, tp2: Type): Boolean = ((tp1, tp2)) match {
+      case (NullaryType(res1), NullaryType(res2))                     => loop(res1, res2)
+      case (NullaryType(res1), _)                                     => loop(res1, tp2)
+      case (_, NullaryType(res2))                                     => loop(tp1, res2)
+      case (ExistentialType(tps1, res1), ExistentialType(tps2, res2)) => matchesQuantified(tps1, tps2, res1, res2)
+      case (ExistentialType(_, res1), _)                              => alwaysMatchLoosely && loop(res1, tp2)
+      case (_, ExistentialType(_, res2))                              => alwaysMatchLoosely && loop(tp1, res2)
+      case (PolyType(tparams1, res1), PolyType(tparams2, res2))       => matchesQuantified(tparams1, tparams2, res1, res2)
+      case (tp1 @ MethodType(_, _), tp2 @ MethodType(_, _))           => matchesMethod(tp1, tp2)
+      case _                                                          => !isPolyOrMethod(tp1) && !sPolyOrMethod(tp2) && (alwaysMatchLoosely || tp1 =:= tp2)
     }
-    ((tp1, tp2)) match {
-      case (NullaryType(res1), NullaryType(res2))                 => matchesTypeLoosely(res1, res2)
-      case (NullaryType(res1), _)                                 => matchesTypeLoosely(res1, tp2)
-      case (_, NullaryType(res2))                                 => matchesTypeLoosely(tp1, res2)
-      case (ExistentialType(tps1, r1), ExistentialType(tps2, r2)) => matchesQuantified(tps1, tps2, r11, r2)
-      case (ExistentialType(_, res1), _)                          => matchesTypeLoosely(res1, tp2)
-      case (_, ExistentialType(_, res2))                          => matchesTypeLoosely(tp1, res2)
-      case (PolyType(tparams1, res1), PolyType(tparams2, res2))   => matchesQuantified(tparams1, tparams2, res1, res2)
-      case (tp1 @ MethodType(_, _), tp2 @ MethodType(_, _))       => matchesMethod(tp1, tp2)
-      case _                                                      => !(isPolyOrMethod(tp1) || isPolyOrMethod(tp2))
-    }
+    loop(tp1, tp2)
   }
-
 
   /** Are `syms1` and `syms2` parameter lists with pairwise equivalent types? */
   protected[internal] def matchingParams(syms1: List[Symbol], syms2: List[Symbol], syms1isJava: Boolean, syms2isJava: Boolean): Boolean = syms1 match {
