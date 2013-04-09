@@ -116,22 +116,15 @@ trait Relations {
          (pre1 =:= pre2)
       && (sym1 == sym2)
     )
-    def relateTypeArgs(params: List[Symbol], args1: List[Type], args2: List[Type]) = {
-      def isSubArg(t1: Type, t2: Type, tparam: Symbol) = (
-           (tparam,.vari.isContravariant || isSubType(t1, t2, depth))
-        && (variance.isCovariant || isSubType(t2, t1, depth))
-      )
-      corresponds3(args1, args2, params)(isSubArg)
-    }
-
-
-      def isSubArgs(tps1: List[Type], tps2: List[Type], tparams: List[Symbol], depth: Int): Boolean = {
-
-        corresponds3(tps1, tps2, tparams map (_.variance))(isSubArg)
+    def relateTypeArgs(args1: List[Type], args2: List[Type], tparams: List[Symbol]) = {
+      def relateTypeArg(arg1: Type, arg2: Type, tparam: Symbol) = tparam.variance match {
+        case Covariant     => arg1 <:< arg2
+        case Contravariant => arg2 <:< arg1
+        case _             => isSameType(arg1, arg)
       }
-
-
-    def relateScopes(decls1: Scope, decls2: Scope): Boolean = false
+      corresponds3(args1, args2, tparams)(relateTypeArg)
+    }
+    def relateScopes(decls1: Scope, decls2: Scope) = decls1 isSameScope decls2
 
     /** @pre tp1 and tp2 are both MethodTypes or both PolyTypes.
      */
