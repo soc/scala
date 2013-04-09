@@ -330,8 +330,10 @@ trait TypeComparers {
     )
   }
 
+  // private def isShallowSubType
+
   /** Does type `tp1` conform to `tp2`? */
-  private def isSubType2(tp1: Type, tp2: Type, depth: Int): Boolean = printResult(s"isSubType2($tp1, $tp2, $depth") {
+  private def isSubType2(tp1: Type, tp2: Type, depth: Int): Boolean = /*printResult(s"isSubType2($tp1, $tp2, $depth")*/ {
     def annotatedConforms = (
          annotationsConform(tp1, tp2)
       && isSubType(tp1.withoutAnnotations, tp2.withoutAnnotations, depth)
@@ -395,7 +397,7 @@ trait TypeComparers {
         case _ if tp ne tp.normalize                                   => tp.normalize
         case _                                                         => null
       }
-      if (next eq null) Nil else printResult("aberrant/isLhs=" + canWiden)(next) :: aberrantTypes(next, canWiden)
+      if (next eq null) Nil else logResult("aberrant/isLhs=" + canWiden)(next) :: aberrantTypes(next, canWiden)
     }
     def aberrantConformance = {
       val lhsTypes = tp1 :: aberrantTypes(tp1, canWiden = true)
@@ -407,7 +409,7 @@ trait TypeComparers {
             { val s1 = s"$lhs/${util.shortClassOfInstance(lhs)}"
               val s2 = s"$rhs/${util.shortClassOfInstance(rhs)}"
               val s3 = f"  $s1%50s    $s2%-50s"
-              printResult(s3)(isSub(lhs, rhs))
+              logResult(s3)(isSub(lhs, rhs))
             }
           )
         )
