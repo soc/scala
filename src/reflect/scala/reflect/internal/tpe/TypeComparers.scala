@@ -256,57 +256,43 @@ trait TypeComparers {
 
   def isSubType(tp1: Type, tp2: Type): Boolean = isSubType(tp1, tp2, AnyDepth)
 
-  def isSubType(tp1: Type, tp2: Type, depth: Int): Boolean = try {
-    subsametypeRecursions += 1
-
-    //OPT cutdown on Function0 allocation
-    //was:
-    //    undoLog undoUnless { // if subtype test fails, it should not affect constraints on typevars
-    //      if (subsametypeRecursions >= LogPendingSubTypesThreshold) {
-    //        val p = new SubTypePair(tp1, tp2)
-    //        if (pendingSubTypes(p))
-    //          false
-    //        else
-    //          try {
-    //            pendingSubTypes += p
-    //            isSubType2(tp1, tp2, depth)
-    //          } finally {
-    //            pendingSubTypes -= p
-    //          }
-    //      } else {
-    //        isSubType2(tp1, tp2, depth)
-    //      }
-    //    }
-
+  @inline private def lockUndolog(body: => Boolean): Boolean = {
     undoLog.lock()
-    try {
-      val before = undoLog.log
-      var result = false
-
-      try result = { // if subtype test fails, it should not affect constraints on typevars
-        if (subsametypeRecursions >= LogPendingSubTypesThreshold) {
-          val p = new SubTypePair(tp1, tp2)
-          if (pendingSubTypes(p))
-            false
-          else
-            try {
-              pendingSubTypes += p
-              isSubType2(tp1, tp2, depth)
-            } finally {
-              pendingSubTypes -= p
-            }
-        } else {
-          isSubType2(tp1, tp2, depth)
-        }
-      } finally if (!result) undoLog.undoTo(before)
-
+    var result = false
+    def maybeUndo(): Boolean = {
+      val saved = undoLog.log
+      try result = body
+      finally if (!result) undoLog undoTo saved
       result
-    } finally undoLog.unlock()
-  } finally {
-    subsametypeRecursions -= 1
-    // XXX AM TODO: figure out when it is safe and needed to clear the log -- the commented approach below is too eager (it breaks #3281, #3866)
-    // it doesn't help to keep separate recursion counts for the three methods that now share it
-    // if (subsametypeRecursions == 0) undoLog.clear()
+    }
+    try maybeUndo() finally undoLog.unlock()
+  }
+  // XXX AM TODO: figure out when it is safe and needed to clear the log --
+  // the commented approach below is too eager (it breaks #3281, #3866)
+  // it doesn't help to keep separate recursion counts for the three methods that now share it
+  // if (subsametypeRecursions == 0) undoLog.clear()
+
+  @inline private def incrementSubSame(op: => Boolean): Boolean = {
+    subsametypeRecursions += 1
+    try op finally subsametypeRecursions -= 1
+  }
+  @inline private def withPendingSubtype(p: SubTypePair)(body: => Boolean): Boolean = {
+    !pendingSubTypes(p) && {
+      pendingSubTypes += p
+      try body
+      finally pendingSubTypes -= p
+    }
+  }
+
+  def isSubType(tp1: Type, tp2: Type, depth: Int): Boolean = {
+    incrementSubSame {
+      lockUndolog {
+        if (subsametypeRecursions < LogPendingSubTypesThreshold)
+          isSubType2(tp1, tp2, depth)
+        else
+          withPendingSubtype(new SubTypePair(tp1, tp2))(isSubType2(tp1, tp2, depth))
+      }
+    }
   }
 
   private def isPolySubType(tp1: PolyType, tp2: PolyType): Boolean = {
