@@ -13,107 +13,101 @@ trait Relations {
   import definitions._
   import TypesStats._
 
-  object Conformance extends TypeRelation {
-    def apply(tp1: Type, tp2: Type) = tp1 <:< tp2
-  }
-  object Equivalence extends TypeRelation {
-    def apply(tp1: Type, tp2: Type) = tp1 =:= tp2
-  }
-  object EquivalenceModuloObject extends TypeRelation {
-    def apply(tp1: Type, tp2: Type) = tp1 =:= tp2
-  }
-  object Matching extends TypeRelation {
-    def apply(tp1: Type, tp2: Type) = matchesType(tp1, tp2, alwaysMatchSimple = false)
-  }
-  object MatchingModuleExistentials extends TypeRelation {
-    def apply(tp1: Type, tp2: Type) = matchesType(tp1, tp2, alwaysMatchSimple = true)
-  }
-
   trait TypeRelation {
-    def preRelateOnLeft(tp: Type): Type
-    def preRelateOnRight(tp: Type): Type
+    def preRelate(tp: Type): Type
+    def relate(tp1: Type, tp2: Type): Boolean
     def isSameType(tp1: Type, tp2: Type): Boolean
 
-    def relateLists(tps1: List[Type], tps2: List[Type]): Boolean
     def relateMethodTypes(tp1: MethodType, tp2: MethodType): Boolean
     def relatePolyTypes(tp1: PolyType, tp2: PolyType): Boolean
     def relateExistentialTypes(tp1: ExistentialType, tp2: ExistentialType): Boolean
     def relateTypeBounds(tp1: TypeBounds, tp2: TypeBounds): Boolean
     def relateRefinedTypes(tp1: RefinedType, tp2: RefinedType): Boolean
     def relateConstants(const1: Constant, const2: Constant): Boolean
-    def relateSingletonTypes(tp1: SingletonType, tp2: SingletonType): Boolean
-    def relateScopes(scope1: Scope, scope2: Scope): Boolean
 
     def relatePrefixAndSymbol(pre1: Type, sym1: Symbol, pre2: Type, sym2: Symbol): Boolean
-    def relateValueParamsAndResult(params1: List[Symbol], res1: Type, params2: List[Symbol], res2: Type): Boolean
-    def relateTypeParamsAndResult(tparams1: List[Symbol], res1: Type, tparams2: List[Symbol], res2: Type): Boolean
+    def relateQuantified(tparams1: List[Symbol], res1: Type, tparams2: List[Symbol], res2: Type): Boolean
     def relateTypeArgs(params: List[Symbol], args1: List[Type], args2: List[Type]): Boolean
 
-    def relateTypeRefs(tp1: TypeRef, tp2: TypeRef): Boolean
-    def relateTypeRefOnLeft(tp1: TypeRef, tp2: Type): Boolean
-    def relateTypeRefOnRight(tp1: Type, tp2: TypeRef): Boolean
+    // def relateTypeRefs(tp1: TypeRef, tp2: TypeRef): Boolean
+    // def relateTypeRefOnLeft(tp1: TypeRef, tp2: Type): Boolean
+    // def relateTypeRefOnRight(tp1: Type, tp2: TypeRef): Boolean
     def relateOthers(tp1: Type, tp2: Type): Boolean
-    def relate(tp1: Type, tp2: Type): Boolean
   }
 
   abstract class AbsTypeRelation extends TypeRelation {
-    def relateSingletonTypes(tp1: SingletonType, tp2: SingletonType): Boolean
-    def relateScopes(scope1: Scope, scope2: Scope): Boolean
+    def checkRelation(tp1: Type, tp2: Type): Boolean = dispatch(preRelate(tp1), preRelate(tp2))
+    def relateOthers(tp1: Type, tp2: Type): Boolean
 
-    def preRelateOnLeft(tp: Type): Type                 = tp
-    def preRelateOnRight(tp: Type): Type                = tp
-    def isSameTypes(tps1: List[Type], tps2: List[Type]) = (tps1 corrresponds tps2)(isSameType)
-    def relateLists(tps1: List[Type], tps2: List[Type]) = (tps1 corrresponds tps2)(relate)
+    private def substitutionTargets(tp: Type): List[Symbol] = tp match {
+      case MethodType(params, _)       => params
+      case PolyType(tparams, _)        => tparams
+      case ExistentialType(eparams, _) => eparams
+      case _                           => Nil
+    }
+    /** @pre tp1 and tp2 are both MethodTypes or both PolyTypes.
+     */
+    def relateQuantified(tp1: Type, tp2: Type): Boolean = {
+      val isMethod = tp1.params.nonEmpty
+      val syms1    = substitutionTargets(tp1)
+      val syms2    = substitutionTargets(tp2)
+      val syms3    = if (sameLength(syms1, syms2)) cloneSymbols(syms1) else return false
 
-    def relateMethodTypes(tp1: MethodType, tp2: MethodType) = (
-         tp1.isImplicit == tp2.isImplicit
-      && relateValueParamsAndResult(tp1.params, tp1.resultType, tp2.params, tp2.resultType)
-    )
-    def relatePolyTypes(tp1: PolyType, tp2: PolyType) = (
-        relateTypeParamsAndResult(tp1.typeParams, tp1.resultType, tp2.typeParams, tp2.resultType)
-    )
-    def relateExistentialTypes(tp1: ExistentialType, tp2: ExistentialType) = (
-      relateTypeParamsAndResult(tp1.quantified, tp1.underlying, tp2.quantified, tp2.underlying)
-    )
-    def relateTypeBounds(tp1: TypeBounds, tp2: TypeBounds) = (
-         relate(tp1.hi, tp2.hi)
-      && relate(tp2.lo, tp1.lo)
-    )
-    def relateRefinedTypes(tp1: RefinedType, tp2: RefinedType) = (
-         relateLists(tp1.parents, tp2.parents)
-      && relateScopes(tp1.decls, tp2.decls)
-    )
-    def relateConstants(const1: Constant, const2: Constant) = const1 == const2
+      def subst(info: Type) = info.substSym(syms1, syms3).substSym(syms2, syms3)
+      def oneParam(p1: Symbol, p2: Symbol): Boolean = {
+        val ptp1 = subst(p1.info)
+        val ptp2 = subst(p2.info)
+        if (isMethodType) (
+             isSameType(ptp1, ptp2)
+          || p1.owner.isJavaDefined && matchAsAnyAndObject(p1, p2)
+          || p2.owner.isJavaDefined && matchAsAnyAndObject(p2, p1)
+        )
+        else relate(ptp1, ptp2)
+      }
+      def checkParams = (syms1 corresponds syms2)(oneParam)
+      def checkResult = relate(subst(tp1.resultType), subst(tp2.resultType))
 
-    def relateTypeRefs(tp1: TypeRef, tp2: TypeRef)                                               =
-    def relateTypeRefOnLeft(tp1: TypeRef, tp2: Type)                                             =
-    def relateTypeRefOnRight(tp1: Type, tp2: TypeRef)                                            =
-    def relateSingletons(tp1: SingletonType, tp2: SingletonType)                                 =
-    def relateOthers(tp1: Type, tp2: Type)                                                       =
-
-    def apply(tp1: Type, tp2: Type): Boolean = relate(tp1, tp2)
-    def relate(tp1: Type, tp2: Type): Boolean = tp1 match {
-      case NullaryMethodType(res1)         => tp2 match { case NullaryMethodType(res2)         => relate(res1, res2)                          ; case _ => false }
-      case MethodType(params1, res1)       => tp2 match { case MethodType(params2, res2)       => relateMethods(params1, res1, params2, res2) ; case _ => false }
-      case PolyType(tparams1, res1)        => tp2 match { case PolyType(tparams2, res2)        => relatePolys(tparams1, res1, tparams2, res2) ; case _ => false }
-      case ExistentialType(tparams1, res1) => tp2 match { case ExistentialType(tparams2, res2) => relatePolys(tparams1, res1, tparams2, res2) ; case _ => false }
-      case RefinedType(ps1, decls1)        => tp2 match { case RefinedType(ps2, decls2)        => relateRefineds(ps1, decls1, ps2, decls2)    ; case _ => false }
-      case ConstantType(const1)            => tp2 match { case ConstantType(const2)            => relateConstants(const1, const2)             ; case _ => false }
-      case TypeBounds(lo1, hi1)            => tp2 match { case TypeBounds(lo2, hi2)            => relateBounds(lo1, hi1, lo2, hi2)            ; case _ => false }
-      case _                               => typeRefDispatch(tp1, tp2)
+      checkParams && checkResult
     }
 
-    protected def typeRefDispatch(tp1: Type, tp2: Type): Boolean = tp1 match {
+    def isSameType(tp1: Type, tp2: Type) = tp1 =:= tp2
+    def isSameParamType(sym1: Symbol, sym2: Symbol) = (
+         isSameType(sym1.tpe_*, sym2.tpe_*)
+      || sym1.owner.isJavaDefined && matchAsAnyAndObject(sym1, sym2)
+      || sym2.owner.isJavaDefined && matchAsAnyAndObject(sym2, sym1)
+    )
+    private def matchAsAnyAndObject(param1: Symbol, param2: Symbol) = (
+         param1.tpe_*.typeSymbol == AnyClass
+      && param2.tpe_*.typeSymbol == ObjectClass
+    )
+
+    def relateMethodTypes(tp1: MethodType, tp2: MethodType)                = tp1.isImplicit == tp2.isImplicit && relateQuantified(tp1, tp2)
+    def relatePolyTypes(tp1: PolyType, tp2: PolyType)                      = relateQuantified(tp1, tp2)
+    def relateExistentialTypes(tp1: ExistentialType, tp2: ExistentialType) = relateQuantified(tp1, tp2)
+    def relateTypeBounds(tp1: TypeBounds, tp2: TypeBounds)                 = relate(tp1.hi, tp2.hi) && relate(tp2.lo, tp1.lo)
+    def relateConstants(const1: Constant, const2: Constant)                = const1 == const2
+    def relateRefinedTypes(tp1: RefinedType, tp2: RefinedType)             =
+      (tp1.parents corresponds tp2.parents)(relate) && relateScopes(tp1.decls, tp2.decls)
+
+    // def relateTypeRefs(tp1: TypeRef, tp2: TypeRef)               =
+    // def relateTypeRefOnLeft(tp1: TypeRef, tp2: Type)             =
+    // def relateTypeRefOnRight(tp1: Type, tp2: TypeRef)            =
+
+    private def dispatch(tp1: Type, tp2: Type): Boolean = tp1 match {
+      case NullaryMethodType(res1) => tp2 match { case NullaryMethodType(res2) => dispatch(res1, res2)             ; case _ => false }
+      case ConstantType(const1)    => tp2 match { case ConstantType(const2)    => relateConstants(const1, const2)  ; case _ => false }
+      case tp1: MethodType         => tp2 match { case tp2: MethodType         => relateMethodTypes(tp1, tp2)      ; case _ => false }
+      case tp1: PolyType           => tp2 match { case tp2: PolyType           => relatePolyTypes(tp1, tp2)        ; case _ => false }
+      case tp1: ExistentialType    => tp2 match { case tp2: ExistentialType    => relateExistentialTypes(tp1, tp2) ; case _ => false }
+      case tp1: RefinedType        => tp2 match { case tp2: RefinedType        => relateRefinedTypes(tp1, tp2)     ; case _ => false }
+      case tp1: TypeBounds         => tp2 match { case tp2: TypeBounds         => relateTypeBounds(tp1, tp2)       ; case _ => false }
+      case _                       => dispatch2(tp1, tp2)
+    }
+    private def dispatch2(tp1: Type, tp2: Type): Boolean = tp1 match {
       case tp1: TypeRef =>
         tp2 match {
           case tp2: TypeRef => relateTypeRefs(tp1, tp2)
           case _            => relateTypeRefOnLeft(tp1, tp2)
-        }
-      case tp1: SingletonType =>
-        tp2 match {
-          case tp2: SingletonType => relateSingletons(tp1, tp2)
-          case tp2: TypeRef       => relateTypeRefOnRight(tp1, tp2)
-          case _                  => relateOthers(tp1, tp2)
         }
       case _ =>
         tp2 match {
@@ -121,178 +115,42 @@ trait Relations {
           case _            => relateOthers(tp1, tp2)
         }
     }
-
-    def substitute(newSymbols: List[Symbol])(tp: Type): Type = tp match {
-      case MethodType(params, _)       => tp.substSym( params, newSymbols)
-      case PolyType(tparams, _)        => tp.substSym(tparams, newSymbols)
-      case ExistentialType(eparams, _) => tp.substSym(eparams, newSymbols)
-      case _                           => tp
-    }
-
-    def relateValueParamsAndResult(params1: List[Symbol], res1: Type, params2: List[Symbol], res2: Type) = (
-         isSameTypes(params1, params2)
-      && (mt1.resultType =:= mt2.resultType.substSym(mt2.params, mt1.params))
-      && (mt1.isImplicit == mt2.isImplicit)
-    )
-
-         isSameTypes(tp1.paramTypes, tp2.paramTypes)
-      && relate(result1, result2)
-    )
-
-    def relateMethods(tp1: MethodType, tp2: MethodType): Boolean = {
-      def result1 = tp1.resultType
-      def result2 = tp2.resultType.substSym(tp2.params, tp1.params)
-
-      (    tp1.isImplicit == tp2.isImplicit
-        && isSameTypes(tp1.paramTypes, tp2.paramTypes)
-        && relate(result1, result2)
-      )
-    }
-    def applyPolyTypes(tp1: PolyType, tp2: PolyType): Boolean = {
-      val PolyType(tparams1, res1) = tp1
-      val PolyType(tparams2, res2) = tp2
-      // corresponds does not check length of two sequences before checking the predicate,
-      // but SubstMap assumes it has been checked (SI-2956)
-      sameLength(tparams1, tparams2) && {
-        // fast-path: polymorphic method type -- type params cannot be captured
-        tparams1.head.owner.isMethod
-
-        def isSame(lhs: Type, rhs: Type) = isSameType(substitute(symbols)(lhs), substitute(symbols)(rhs))
-
-        def isSub(lhs: Symbol, rhs: Symbol) = substitute(symbols)(lhs)
-
-        val isMethod = tparams1.head.owner.isMethod
-        //@M for an example of why we need to generate fresh symbols otherwise, see neg/tcpoly_ticket2101.scala
-        val sharedTypeParams = if (isMethod) tparams1 else cloneSymbols(tparams1)
-
-        def sub1(tp: Type) = if (isMethod) tp else substitute(sharedTypeParams)(tp)
-
-        def sub2(tp: Type)              = substitute(sharedTypeParams)(tp)
-         tp.substSym(tparams2, sharedTypeParams)
-        def cmp(p1: Symbol, p2: Symbol) = sub2(p2.info) <:< sub1(p1.info)
-
-        (tparams1 corresponds tparams2)(cmp) && relate(sub1(res1), sub2(res2))
-      }
-    }
-  }
-
-
-  private def isSameMethodType(mt1: MethodType, mt2: MethodType) = (
-       isSameTypes(mt1.paramTypes, mt2.paramTypes)
-    && (mt1.resultType =:= mt2.resultType.substSym(mt2.params, mt1.params))
-    && (mt1.isImplicit == mt2.isImplicit)
   )
 
-  private def equalTypeParamsAndResult(tparams1: List[Symbol], res1: Type, tparams2: List[Symbol], res2: Type) = {
-    def subst(info: Type) = info.substSym(tparams2, tparams1)
-    (    isSameTypes(tp1.paramTypes, tp2.paramTypes)
-      && tp1.isImplicit == tp2.isImplicit
-      && resOk
-    )
+
+
+abstract class SubSameTypeCommon extends TypeRelation {
+  def preRelate(tp: Type): Type = tp match {
+    case TypRef(pre, sym, Nil) if sym.isModuleClass => tp.narrow
+    case _                                          => tp
   }
-
-  private def isSameOrSubPolyType(tparams1: List[Symbol], res1: Type, tparams2: List[Symbol], res2: Type, same: Boolean): Boolean = (
-    (    isSameTypes(tp1.paramTypes, tp2.paramTypes)
-      && tp1.isImplicit == tp2.isImplicit
-      && resOk
-    )
+}
+abstract class MatchesTypeCommon extends TypeRelation {
+  def preRelate(tp: Type): Type = tp match {
+    case MethodType(Nil, restpe)   => restpe
+    case NullaryMethodType(restpe) => restpe
+    case _                         => tp
   }
+}
 
-  private def isSameOrSubPolyType(tparams1: List[Symbol], res1: Type, tparams2: List[Symbol], res2: Type, same: Boolean): Boolean = (
-    // corresponds does not check length of two sequences before checking the predicate,
-    // but SubstMap assumes it has been checked (SI-2956)
-    (     sameLength(tparams1, tparams2)
-      && (tparams1 corresponds tparams2)((p1, p2) => p1.info =:= subst(p2.info))
-      && (res1 =:= subst(res2))
-    )
-  }
+object Conformance extends SubSameTypeCommon {
+  def relateOthers(tp1: Type, tp2: Type) = tp1 <:< tp2
+}
+object Equivalence extends SubSameTypeCommon {
+  def relateOthers(tp1: Type, tp2: Type) = tp1 =:= tp2
+}
+object EquivalenceModuloAny extends SubSameTypeCommon {
+  def relateOthers(tp1: Type, tp2: Type) = (
+       (tp1 =:= tp2)
+    || (ObjectClass isSubClass tp1.typeSymbol) && (ObjectClass isSubClass tp2.typeSymbol)
+  )
+}
+object MatchesType extends MatchesTypeCommon {
+  def relateOthers(tp1: Type, tp2: Type) = matchesType(tp1, tp2, alwaysMatchSimple = false)
 
-  /** matchesType above is an optimized version of the following implementation:
-
-    def matchesType2(tp1: Type, tp2: Type, alwaysMatchSimple: Boolean): Boolean = {
-      def matchesQuantified(tparams1: List[Symbol], tparams2: List[Symbol], res1: Type, res2: Type): Boolean =
-        tparams1.length == tparams2.length &&
-        matchesType(res1, res2.substSym(tparams2, tparams1), alwaysMatchSimple)
-      (tp1, tp2) match {
-        case (MethodType(params1, res1), MethodType(params2, res2)) =>
-          params1.length == params2.length && // useful pre-secreening optimization
-          matchingParams(params1, params2, tp1.isInstanceOf[JavaMethodType], tp2.isInstanceOf[JavaMethodType]) &&
-          matchesType(res1, res2, alwaysMatchSimple) &&
-          tp1.isImplicit == tp2.isImplicit
-        case (PolyType(tparams1, res1), PolyType(tparams2, res2)) =>
-          matchesQuantified(tparams1, tparams2, res1, res2)
-        case (NullaryMethodType(rtp1), MethodType(List(), rtp2)) =>
-          matchesType(rtp1, rtp2, alwaysMatchSimple)
-        case (MethodType(List(), rtp1), NullaryMethodType(rtp2)) =>
-          matchesType(rtp1, rtp2, alwaysMatchSimple)
-        case (ExistentialType(tparams1, res1), ExistentialType(tparams2, res2)) =>
-          matchesQuantified(tparams1, tparams2, res1, res2)
-        case (ExistentialType(_, res1), _) if alwaysMatchSimple =>
-          matchesType(res1, tp2, alwaysMatchSimple)
-        case (_, ExistentialType(_, res2)) if alwaysMatchSimple =>
-          matchesType(tp1, res2, alwaysMatchSimple)
-        case (NullaryMethodType(rtp1), _) =>
-          matchesType(rtp1, tp2, alwaysMatchSimple)
-        case (_, NullaryMethodType(rtp2)) =>
-          matchesType(tp1, rtp2, alwaysMatchSimple)
-        case (MethodType(_, _), _) => false
-        case (PolyType(_, _), _)   => false
-        case (_, MethodType(_, _)) => false
-        case (_, PolyType(_, _))   => false
-        case _ =>
-          alwaysMatchSimple || tp1 =:= tp2
-      }
-    }
-  */
-
-
-  /** Are `syms1` and `syms2` parameter lists with pairwise equivalent types? */
-  protected[internal] def matchingParams(syms1: List[Symbol], syms2: List[Symbol], syms1isJava: Boolean, syms2isJava: Boolean): Boolean = syms1 match {
-    case Nil =>
-      syms2.isEmpty
-    case sym1 :: rest1 =>
-      syms2 match {
-        case Nil =>
-          false
-        case sym2 :: rest2 =>
-          val tp1 = sym1.tpe
-          val tp2 = sym2.tpe
-          (tp1 =:= tp2 ||
-           syms1isJava && tp2.typeSymbol == ObjectClass && tp1.typeSymbol == AnyClass ||
-           syms2isJava && tp1.typeSymbol == ObjectClass && tp2.typeSymbol == AnyClass) &&
-          matchingParams(rest1, rest2, syms1isJava, syms2isJava)
-      }
-  }
-
-
-  def isSubMethodType() = {
-    val params2 = mt2.params
-    val res2 = mt2.resultType
-    (sameLength(params1, params2) &&
-      mt1.isImplicit == mt2.isImplicit &&
-      matchingParams(params1, params2, mt1.isJava, mt2.isJava) &&
-      isSubType(res1.substSym(params1, params2), res2, depth)
-    )
-  // TODO: if mt1.params.isEmpty, consider NullaryMethodType?
-  }
-
-
-  private def isPolySubType(tp1: PolyType, tp2: PolyType): Boolean = {
-    val PolyType(tparams1, res1) = tp1
-    val PolyType(tparams2, res2) = tp2
-
-    sameLength(tparams1, tparams2) && {
-      // fast-path: polymorphic method type -- type params cannot be captured
-      val isMethod = tparams1.head.owner.isMethod
-      //@M for an example of why we need to generate fresh symbols otherwise, see neg/tcpoly_ticket2101.scala
-      val substitutes = if (isMethod) tparams1 else cloneSymbols(tparams1)
-      def sub1(tp: Type) = if (isMethod) tp else tp.substSym(tparams1, substitutes)
-      def sub2(tp: Type) = tp.substSym(tparams2, substitutes)
-      def cmp(p1: Symbol, p2: Symbol) = sub2(p2.info) <:< sub1(p1.info)
-
-      (tparams1 corresponds tparams2)(cmp) && (sub1(res1) <:< sub2(res2))
-    }
-  }
+object MatchesTypeSimple extends MatchesTypeCommon {
+  def relateOthers(tp1: Type, tp2: Type) = matchesType(tp1, tp2, alwaysMatchSimple = true)
+}
 
 
   /** A function implementing `tp1` matches `tp2`. */
@@ -316,10 +174,12 @@ trait Relations {
       case mt1 @ MethodType(params1, res1) =>
         tp2 match {
           case mt2 @ MethodType(params2, res2) =>
+
+
             // sameLength(params1, params2) was used directly as pre-screening optimization (now done by matchesQuantified -- is that ok, performancewise?)
             mt1.isImplicit == mt2.isImplicit &&
             matchingParams(params1, params2, mt1.isJava, mt2.isJava) &&
-            matchesQuantified(params1, params2, res1, res2)
+            relateQuantified(params1, res1, params2, res2)
           case NullaryMethodType(res2) =>
             if (params1.isEmpty) matchesType(res1, res2, alwaysMatchSimple)
             else matchesType(tp1, res2, alwaysMatchSimple)
@@ -446,23 +306,6 @@ trait Relations {
     val origin2 = chaseDealiasedUnderlying(tp2)
     ((origin1 ne tp1) || (origin2 ne tp2)) && (origin1 =:= origin2)
   }
-
-  private def isSameMethodType(mt1: MethodType, mt2: MethodType) = (
-       isSameTypes(mt1.paramTypes, mt2.paramTypes)
-    && (mt1.resultType =:= mt2.resultType.substSym(mt2.params, mt1.params))
-    && (mt1.isImplicit == mt2.isImplicit)
-  )
-
-  private def equalTypeParamsAndResult(tparams1: List[Symbol], res1: Type, tparams2: List[Symbol], res2: Type) = {
-    def subst(info: Type) = info.substSym(tparams2, tparams1)
-    // corresponds does not check length of two sequences before checking the predicate,
-    // but SubstMap assumes it has been checked (SI-2956)
-    (     sameLength(tparams1, tparams2)
-      && (tparams1 corresponds tparams2)((p1, p2) => p1.info =:= subst(p2.info))
-      && (res1 =:= subst(res2))
-    )
-  }
-
   def matchesQuantified(tparams1: List[Symbol], res1: Type, tparams2: List[Symbol], res2: Type): Boolean = (
     (    sameLength(tparams1, tparams2)
       mt1.isImplicit == mt2.isImplicit &&
