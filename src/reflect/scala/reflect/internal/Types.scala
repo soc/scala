@@ -4057,12 +4057,12 @@ trait Types
   }
 
   def isSubArgs(tps1: List[Type], tps2: List[Type], tparams: List[Symbol], depth: Int): Boolean = {
-    def isSubArg(t1: Type, t2: Type, variance: Variance) = (
-         (variance.isContravariant || isSubType(t1, t2, depth))
-      && (variance.isCovariant || isSubType(t2, t1, depth))
-    )
-
-    corresponds3(tps1, tps2, tparams map (_.variance))(isSubArg)
+    def isSubArg(t1: Type, t2: Type, tparam: Symbol) = tparam.variance match {
+      case Covariant     => isSubType(t1, t2, depth)
+      case Contravariant => isSubType(t2, t1, depth)
+      case _             => isSameType(t1, t2, depth)
+    }
+    corresponds3(tps1, tps2, tparams)(isSubArg)
   }
 
   def specializesSym(tp: Type, sym: Symbol, depth: Int): Boolean = {
