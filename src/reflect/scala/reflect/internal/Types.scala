@@ -4123,6 +4123,7 @@ trait Types
     case _                                 => false
   }
   def matchesType(tp1: Type, tp2: Type, alwaysMatchSimple: Boolean): Boolean = {
+    println(s"matchesType($tp1, $tp2, $alwaysMatchSimple)")
     def loop(tp1: Type, tp2: Type): Boolean = ((tp1, tp2)) match {
       case (NullaryType(res1), NullaryType(res2))                     => loop(res1, res2)
       case (NullaryType(res1), _)                                     => loop(res1, tp2)
@@ -4136,6 +4137,15 @@ trait Types
     }
     loop(tp1, tp2)
   }
+
+  (xs, ys) match {
+    case (x :: Nil, y :: Nil) =>
+    case (Nil, _) =>
+    case (_, Nil) =>
+
+  case NullaryMethodType(res) | MethodType(Nil, res) | { res @ TypeRef(_, sym, Nil) if sym.isModuleClass } =>
+
+  case ExistentialType(eparams, underlying) | PolyType(tparams, restpe) | MethodType(params, restpe) =>
 
   /** Are `syms1` and `syms2` parameter lists with pairwise equivalent types? */
   protected[internal] def matchingParams(syms1: List[Symbol], syms2: List[Symbol], syms1isJava: Boolean, syms2isJava: Boolean): Boolean = syms1 match {
