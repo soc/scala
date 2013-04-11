@@ -392,7 +392,7 @@ trait Namers extends MethodSynthesis {
       val sym = tree.symbol
       if (sym eq NoSymbol) return
 
-      val ctx    = if (context.owner.isPackageObjectClass) context.outer else context
+      val ctx    = context
       val module = if (sym.isModule) sym else ctx.scope lookupModule tree.name
       val clazz  = if (sym.isClass) sym else ctx.scope lookupClass tree.name
       val fails  = (
@@ -672,12 +672,6 @@ trait Namers extends MethodSynthesis {
         m.updateAttachment(new ConstructorDefaultsAttachment(tree, null))
       }
       val owner = tree.symbol.owner
-      if (settings.lint && owner.isPackageObjectClass && !mods.isImplicit) {
-        context.unit.warning(tree.pos,
-          "it is not recommended to define classes/objects inside of package objects.\n" +
-          "If possible, define " + tree.symbol + " in " + owner.skipPackageObject + " instead."
-        )
-      }
 
       // Suggested location only.
       if (mods.isImplicit) {

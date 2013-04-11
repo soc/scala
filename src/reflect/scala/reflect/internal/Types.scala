@@ -1216,7 +1216,7 @@ trait Types
     override def safeToString: String = {
       // Avoiding printing Predef.type and scala.package.type as "type",
       // since in all other cases we omit those prefixes.
-      val pre = underlying.typeSymbol.skipPackageObject
+      val pre = underlying.typeSymbol
       if (pre.isOmittablePrefix) pre.fullName + ".type"
       else prefixString + "type"
     }
@@ -1372,8 +1372,7 @@ trait Types
     override def termSymbol = sym
     override def prefix: Type = pre
     override def prefixString = (
-      if (sym.skipPackageObject.isOmittablePrefix) ""
-      else if (sym.isPackageObjectOrClass) pre.prefixString
+      if (sym.isOmittablePrefix) ""
       else pre.prefixString + sym.nameString + "."
     )
     override def kind = "SingleType"
@@ -2412,8 +2411,8 @@ trait Types
         super.prefixString
       else if (sym.isOmittablePrefix)
         ""
-      else if (sym.isPackageClass || sym.isPackageObjectOrClass)
-        sym.skipPackageObject.fullName + "."
+      else if (sym.isPackageClass)
+        sym.fullName + "."
       else if (isStable && nme.isSingletonName(sym.name))
         tpnme.dropSingletonName(sym.name) + "."
       else

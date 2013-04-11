@@ -292,8 +292,8 @@ trait TypeDiagnostics {
     def typeQualify()  = if (sym.isTypeParameterOrSkolem) postQualify()
     def nameQualify()  = if (trueOwner.isPackageClass) preQualify() else postQualify()
 
-    def trueOwner  = tp.typeSymbol.effectiveOwner
-    def aliasOwner = tp.typeSymbolDirect.effectiveOwner
+    def trueOwner  = tp.typeSymbol.owner
+    def aliasOwner = tp.typeSymbolDirect.owner
 
     def sym_==(other: TypeDiag)     = tp.typeSymbol == other.tp.typeSymbol
     def owner_==(other: TypeDiag)   = trueOwner == other.trueOwner

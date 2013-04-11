@@ -545,41 +545,12 @@ trait Typers extends Adaptations with Tags {
      *  (illegal type applications in pre will be skipped -- that's why typedSelect wraps the resulting tree in a TreeWithDeferredChecks)
      *  @return modified tree and new prefix type
      */
-    private def makeAccessible(tree: Tree, sym: Symbol, pre: Type, site: Tree): (Tree, Type) =
-      if (context.isInPackageObject(sym, pre.typeSymbol)) {
-        if (pre.typeSymbol == ScalaPackageClass && sym.isTerm) {
-          // short cut some aliases. It seems pattern matching needs this
-          // to notice exhaustiveness and to generate good code when
-          // List extractors are mixed with :: patterns. See Test5 in lists.scala.
-          //
-          // TODO SI-6609 Eliminate this special case once the old pattern matcher is removed.
-          def dealias(sym: Symbol) =
-            (atPos(tree.pos.makeTransparent) {gen.mkAttributedRef(sym)} setPos tree.pos, sym.owner.thisType)
-          sym.name match {
-            case nme.List => return dealias(ListModule)
-            case nme.Seq  => return dealias(SeqModule)
-            case nme.Nil  => return dealias(NilModule)
-            case _ =>
-          }
-        }
-        val qual = typedQualifier { atPos(tree.pos.makeTransparent) {
-          tree match {
-            case Ident(_) => Ident(nme.PACKAGEkw)
-            case Select(qual, _) => Select(qual, nme.PACKAGEkw)
-            case SelectFromTypeTree(qual, _) => Select(qual, nme.PACKAGEkw)
-          }
-        }}
-        val tree1 = atPos(tree.pos) {
-          tree match {
-            case Ident(name) => Select(qual, name)
-            case Select(_, name) => Select(qual, name)
-            case SelectFromTypeTree(_, name) => SelectFromTypeTree(qual, name)
-          }
-        }
-        (checkAccessible(tree1, sym, qual.tpe, qual), qual.tpe)
-      } else {
-        (checkAccessible(tree, sym, pre, site), pre)
-      }
+    private def makeAccessible(tree: Tree, sym: Symbol, pre: Type, site: Tree): (Tree, Type) = {
+      if (pre.typeSymbol.hasPackageFlag && !sym.allowedAsPackageMember)
+        log(s"Noticed package object member at makeAccessible(_, $sym, $pre, _)")
+
+      (checkAccessible(tree, sym, pre, site), pre)
+    }
 
     /** Post-process an identifier or selection node, performing the following:
      *  1. Check that non-function pattern expressions are stable
@@ -1849,35 +1820,8 @@ trait Typers extends Adaptations with Tags {
       })
 
       val impl2  = finishMethodSynthesis(impl1, clazz, context)
-
       if (mdef.symbol == PredefModule)
         ensurePredefParentsAreInSameSourceFile(impl2)
-
-      // SI-5954. On second compile of a companion class contained in a package object we end up
-      // with some confusion of names which leads to having two symbols with the same name in the
-      // same owner. Until that can be straightened out we will warn on companion objects in package
-      // objects. But this code also tries to be friendly by distinguishing between case classes and
-      // user written companion pairs
-      def warnPackageObjectMembers(mdef : ModuleDef) = for (m <- mdef.symbol.info.members) {
-        // ignore synthetic objects, because the "companion" object to a case class is synthetic and
-        // we only want one error per case class
-        if (!m.isSynthetic) {
-          // can't handle case classes in package objects
-          if (m.isCaseClass) pkgObjectWarning(m, mdef, "case")
-          // can't handle companion class/object pairs in package objects
-          else if ((m.isClass && m.companionModule != NoSymbol && !m.companionModule.isSynthetic) ||
-                   (m.isModule && m.companionClass != NoSymbol && !m.companionClass.isSynthetic))
-                     pkgObjectWarning(m, mdef, "companion")
-        }
-
-        def pkgObjectWarning(m : Symbol, mdef : ModuleDef, restricted : String) = {
-          val pkgName = mdef.symbol.ownerChain find (_.isPackage) map (_.decodedName) getOrElse mdef.symbol.toString
-          context.warning(if (m.pos.isDefined) m.pos else mdef.pos, s"${m} should be placed directly in package ${pkgName} instead of package object ${pkgName}. Under some circumstances companion objects and case classes in package objects can fail to recompile. See https://issues.scala-lang.org/browse/SI-5954.")
-        }
-      }
-
-      if (mdef.symbol.isPackageObject)
-        warnPackageObjectMembers(mdef)
 
       treeCopy.ModuleDef(mdef, typedMods, mdef.name, impl2) setType NoType
     }
@@ -2916,11 +2860,7 @@ trait Typers extends Adaptations with Tags {
         var moreToAdd = true
         while (moreToAdd) {
           val initElems = scope.elems
-          // SI-5877 The decls of a package include decls of the package object. But we don't want to add
-          //         the corresponding synthetics to the package class, only to the package object class.
-          def shouldAdd(sym: Symbol) =
-            inBlock || !context.isInPackageObject(sym, context.owner)
-          for (sym <- scope if shouldAdd(sym))
+          for (sym <- scope ; if inBlock)
             for (tree <- context.unit.synthetics get sym) {
               newStats += typedStat(tree) // might add even more synthetics to the scope
               context.unit.synthetics -= sym

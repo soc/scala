@@ -170,37 +170,10 @@ abstract class TreeGen extends macros.TreeBuilder {
     // Tests involving the repl fail without the .isEmptyPackage condition.
     if (qual.symbol != null && (qual.symbol.isEffectiveRoot || qual.symbol.isEmptyPackage))
       mkAttributedIdent(sym)
-    else {
-      // Have to recognize anytime a selection is made on a package
-      // so it can be rewritten to foo.bar.`package`.name rather than
-      // foo.bar.name if name is in the package object.
-      // TODO - factor out the common logic between this and
-      // the Typers method "isInPackageObject", used in typedIdent.
-      val qualsym = (
-        if (qual.tpe ne null) qual.tpe.typeSymbol
-        else if (qual.symbol ne null) qual.symbol
-        else NoSymbol
-      )
-      val needsPackageQualifier = (
-           (sym ne null)
-        && qualsym.isPackage
-        && !sym.isDefinedInPackage
-      )
-      val pkgQualifier =
-        if (needsPackageQualifier) {
-          // The owner of a symbol which requires package qualification may be the
-          // package object iself, but it also could be any superclass of the package
-          // object.  In the latter case, we must go through the qualifier's info
-          // to obtain the right symbol.
-          val packageObject = if (sym.owner.isModuleClass) sym.owner.sourceModule else qual.tpe member nme.PACKAGE
-          Select(qual, nme.PACKAGE) setSymbol packageObject setType singleType(qual.tpe, packageObject)
-        }
-        else qual
-
-      val tree = Select(pkgQualifier, sym)
-      if (pkgQualifier.tpe == null) tree
-      else tree setType (qual.tpe memberType sym)
-    }
+    else if (qual.tpe == null)
+      Select(qual, sym)
+    else
+      Select(qual, sym) setType (qual.tpe memberType sym)
   }
 
   /** Builds a type application node if args.nonEmpty, returns fun otherwise. */

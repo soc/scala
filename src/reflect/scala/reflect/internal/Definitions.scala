@@ -14,7 +14,10 @@ import scala.reflect.api.{Universe => ApiUniverse}
 trait Definitions extends api.StandardDefinitions {
   self: SymbolTable =>
 
-  import rootMirror.{getModule, getPackage, getClassByName, getRequiredClass, getRequiredModule, getClassIfDefined, getModuleIfDefined, getPackageObject, getPackageObjectIfDefined, requiredClass, requiredModule}
+  import rootMirror.{
+    getModule, getPackage, getPackageIfDefined, getClassByName, getRequiredClass, getRequiredModule,
+    getClassIfDefined, getModuleIfDefined, requiredClass, requiredModule
+  }
 
   object definitions extends DefinitionsClass
 
@@ -336,7 +339,7 @@ trait Definitions extends api.StandardDefinitions {
     lazy val DynamicClass               = requiredClass[Dynamic]
 
     // fundamental modules
-    lazy val SysPackage = getPackageObject("scala.sys")
+    lazy val SysPackage = getPackage("scala.sys")
       def Sys_error    = getMemberMethod(SysPackage, nme.error)
 
     // Modules whose members are in the default namespace
@@ -476,8 +479,8 @@ trait Definitions extends api.StandardDefinitions {
 
     // scala.reflect
     lazy val ReflectPackage              = requiredModule[scala.reflect.`package`.type]
-    lazy val ReflectApiPackage           = getPackageObjectIfDefined("scala.reflect.api") // defined in scala-reflect.jar, so we need to be careful
-    lazy val ReflectRuntimePackage       = getPackageObjectIfDefined("scala.reflect.runtime") // defined in scala-reflect.jar, so we need to be careful
+    lazy val ReflectApiPackage           = getPackageIfDefined("scala.reflect.api") // defined in scala-reflect.jar, so we need to be careful
+    lazy val ReflectRuntimePackage       = getPackageIfDefined("scala.reflect.runtime") // defined in scala-reflect.jar, so we need to be careful
          def ReflectRuntimeUniverse      = if (ReflectRuntimePackage != NoSymbol) getMemberValue(ReflectRuntimePackage, nme.universe) else NoSymbol
          def ReflectRuntimeCurrentMirror = if (ReflectRuntimePackage != NoSymbol) getMemberMethod(ReflectRuntimePackage, nme.currentMirror) else NoSymbol
 
@@ -971,7 +974,7 @@ trait Definitions extends api.StandardDefinitions {
 
     def getMember(owner: Symbol, name: Name): Symbol = {
       getMemberIfDefined(owner, name) orElse {
-        if (phase.flatClasses && name.isTypeName && !owner.isPackageObjectOrClass) {
+        if (phase.flatClasses && name.isTypeName) {
           val pkg = owner.owner
           val flatname = tpnme.flattenedName(owner.name, name)
           getMember(pkg, flatname)

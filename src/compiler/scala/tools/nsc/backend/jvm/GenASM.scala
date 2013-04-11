@@ -849,7 +849,7 @@ abstract class GenASM extends SubComponent with BytecodeWriters with GenJVMASM {
               """|compiler bug: created invalid generic signature for %s in %s
                  |signature: %s
                  |if this is reproducible, please report bug at https://issues.scala-lang.org/
-              """.trim.stripMargin.format(sym, sym.owner.skipPackageObject.fullName, sig))
+              """.trim.stripMargin.format(sym, sym.owner.fullName, sig))
           return null
         }
       }
@@ -865,7 +865,7 @@ abstract class GenASM extends SubComponent with BytecodeWriters with GenJVMASM {
                  |normalized type: %s
                  |erasure type: %s
                  |if this is reproducible, please report bug at http://issues.scala-lang.org/
-              """.trim.stripMargin.format(sym, sym.owner.skipPackageObject.fullName, sig, memberTpe, normalizedTpe, bytecodeTpe))
+              """.trim.stripMargin.format(sym, sym.owner.fullName, sig, memberTpe, normalizedTpe, bytecodeTpe))
            return null
         }
       }

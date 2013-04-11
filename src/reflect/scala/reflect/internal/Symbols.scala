@@ -579,9 +579,6 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
 
     /** Package/package object tests */
     def isPackageClass         = false
-    def isPackageObject        = false
-    def isPackageObjectClass   = false
-    def isPackageObjectOrClass = isPackageObject || isPackageObjectClass
     def isModuleOrModuleClass  = isModule || isModuleClass
 
     /** Overridden in custom objects in Definitions */
@@ -678,7 +675,7 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
       isMethod && owner.isDerivedValueClass && !isParamAccessor && !isConstructor && !hasFlag(SUPERACCESSOR) && !isMacro
 
     final def isAnonymousFunction = isSynthetic && (name containsName tpnme.ANON_FUN_NAME)
-    final def isDefinedInPackage  = effectiveOwner.isPackageClass
+    final def isDefinedInPackage  = owner.isPackageClass
     final def needsFlatClasses    = phase.flatClasses && rawowner != NoSymbol && !rawowner.isPackageClass
 
     /** change name by appending $$<fully-qualified-name-of-class `base`>
@@ -688,15 +685,7 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
     def expandName(base: Symbol) { }
 
     // In java.lang, Predef, or scala package/package object
-    def isInDefaultNamespace = UnqualifiedOwners(effectiveOwner)
-
-    /** The owner, skipping package objects.
-     */
-    def effectiveOwner = owner.skipPackageObject
-
-    /** If this is a package object or its implementing class, its owner: otherwise this.
-     */
-    def skipPackageObject: Symbol = this
+    def isInDefaultNamespace = UnqualifiedOwners(owner)
 
     /** If this is a constructor, its owner: otherwise this.
      */
@@ -706,7 +695,7 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
      *  unpleasantries like Predef.String, $iw.$iw.Foo and <empty>.Bippy.
      */
     final def isOmittablePrefix = /*!settings.debug.value &&*/ (
-         UnqualifiedOwners(skipPackageObject)
+         UnqualifiedOwners(this)
       || isEmptyPrefix
     )
     def isEmptyPrefix = (
@@ -838,6 +827,10 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
 
     /** Is this symbol owned by a package? */
     final def isTopLevel = owner.isPackageClass
+    def allowedAsPackageMember = (
+         isClass
+      || isModule
+    )
 
     /** Is this symbol locally defined? I.e. not accessed from outside `this` instance */
     final def isLocal: Boolean = owner.isTerm
@@ -1053,7 +1046,7 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
     private def fullNameInternal(separator: Char): Name = (
       if (isRoot || isRootPackage || this == NoSymbol) name
       else if (owner.isEffectiveRoot) name
-      else ((effectiveOwner.enclClass.fullNameAsName(separator) append separator): Name) append name
+      else ((owner.enclClass.fullNameAsName(separator) append separator): Name) append name
     )
 
     def fullNameAsName(separator: Char): Name = fullNameInternal(separator).dropLocal
@@ -1087,9 +1080,6 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
 
     protected def createRefinementClassSymbol(pos: Position, newFlags: Long): RefinementClassSymbol =
       new RefinementClassSymbol(this, pos) initFlags newFlags
-
-    protected def createPackageObjectClassSymbol(pos: Position, newFlags: Long): PackageObjectClassSymbol =
-      new PackageObjectClassSymbol(this, pos) initFlags newFlags
 
     protected def createImplClassSymbol(name: TypeName, pos: Position, newFlags: Long): ClassSymbol =
       new ClassSymbol(this, pos, name) with ImplClassSymbol initFlags newFlags
@@ -1127,8 +1117,6 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
         createRefinementClassSymbol(pos, newFlags)
       else if ((newFlags & PACKAGE) != 0)
         createPackageClassSymbol(name, pos, newFlags | PackageFlags)
-      else if (name == tpnme.PACKAGE)
-        createPackageObjectClassSymbol(pos, newFlags)
       else if ((newFlags & MODULE) != 0)
         createModuleClassSymbol(name, pos, newFlags)
       else if ((newFlags & IMPLCLASS) != 0)
@@ -1990,8 +1978,8 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
     /** Is this symbol defined in the same scope and compilation unit as `that` symbol? */
     def isCoDefinedWith(that: Symbol) = (
          (this.rawInfo ne NoType)
-      && (this.effectiveOwner == that.effectiveOwner)
-      && (   !this.effectiveOwner.isPackageClass
+      && (this.owner == that.owner)
+      && (   !this.owner.isPackageClass
           || (this.associatedFile eq NoAbstractFile)
           || (that.associatedFile eq NoAbstractFile)
           || (this.associatedFile.path == that.associatedFile.path)  // Cheap possibly wrong check, then expensive normalization
@@ -2344,8 +2332,6 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
         else if (isInstanceOf[FreeTypeSymbol]) ("free type", "free type", "FTY")
         else if (isPackage) ("package", "package", "PK")
         else if (isPackageClass) ("package class", "package", "PKC")
-        else if (isPackageObject) ("package object", "package", "PKO")
-        else if (isPackageObjectClass) ("package object class", "package", "PKOC")
         else if (isAnonymousClass) ("anonymous class", "anonymous class", "AC")
         else if (isRefinementClass) ("refinement class", "", "RC")
         else if (isModule) ("module", "object", "MOD")
@@ -2414,7 +2400,7 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
       def recur(sym: Symbol): String = {
         if (sym.isRootSymbol || sym == NoSymbol) sym.nameString
         else if (sym.owner.isEffectiveRoot) sym.nameString
-        else recur(sym.effectiveOwner.enclClass) + "." + sym.nameString
+        else recur(sym.owner.enclClass) + "." + sym.nameString
       }
 
       recur(this)
@@ -2434,7 +2420,7 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
     /** String representation of location.
      */
     def ownsString: String = {
-      val owns = effectiveOwner
+      val owns = owner
       if (owns.isClass && !owns.isEmptyPrefix) "" + owns else ""
     }
 
@@ -2564,7 +2550,6 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
     override def isMixinConstructor = name == nme.MIXIN_CONSTRUCTOR
     override def isConstructor      = nme.isConstructorName(name)
 
-    override def isPackageObject  = isModule && (name == nme.PACKAGE)
     override def isStable = !isUnstable
     private def isUnstable = (
          isMutable
@@ -2994,7 +2979,6 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
     override def isNestedClass           = !isTopLevel
     override def isNumericValueClass     = definitions.isNumericValueClass(this)
     override def isNumeric               = isNumericValueClass
-    override def isPackageObjectClass    = isModuleClass && (name == tpnme.PACKAGE)
     override def isPrimitiveValueClass   = definitions.isPrimitiveValueClass(this)
     override def isPrimitive             = isPrimitiveValueClass
 
@@ -3147,29 +3131,15 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
     def implicitMembers: Scope = {
       val tp = info
       if ((implicitMembersCacheKey1 ne tp) || (implicitMembersCacheKey2 ne tp.decls.elems)) {
-        // Skip a package object class, because the members are also in
-        // the package and we wish to avoid spurious ambiguities as in pos/t3999.
-        if (!isPackageObjectClass) {
-          implicitMembersCacheKey1 = tp
-          implicitMembersCacheKey2 = tp.decls.elems
-          implicitMembersCacheValue = tp.implicitMembers
-        }
+        implicitMembersCacheKey1 = tp
+        implicitMembersCacheKey2 = tp.decls.elems
+        implicitMembersCacheValue = tp.implicitMembers
       }
       implicitMembersCacheValue
     }
     // The null check seems to be necessary for the reifier.
     override def sourceModule = if (module ne null) module else companionModule
     override def sourceModule_=(module: Symbol) { this.module = module }
-  }
-
-  class PackageObjectClassSymbol protected[Symbols] (owner0: Symbol, pos0: Position)
-  extends ModuleClassSymbol(owner0, pos0, tpnme.PACKAGE) {
-    final override def isPackageObjectClass   = true
-    final override def isPackageObjectOrClass = true
-    final override def skipPackageObject      = owner
-    final override def setName(name: Name): this.type = {
-      abort("Can't rename a package object to " + name)
-    }
   }
 
   trait ImplClassSymbol extends ClassSymbol {
