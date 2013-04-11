@@ -2673,6 +2673,21 @@ self =>
         ModuleDef(mods1, name.toTermName, template)
       }
     }
+    def packageObjectDef(start: Offset): PackageDef = {
+      val defn   = objectDef(start, NoMods)
+      val module = copyModuleDef(defn)(name = nme.PACKAGEkw)
+      val pkg    = PackageDef(Ident(defn.name), module :: Nil)
+
+      atPos(o2p(defn.pos.startOrPoint))(pkg)
+    }
+    def packageOrPackageObject(start: Offset): Tree = (
+      if (in.token == OBJECT)
+        joinComment(packageObjectDef(start) :: Nil).head
+      else {
+        in.flushDoc
+        makePackaging(start, pkgQualId(), inBracesOrNil(topStatSeq()))
+      }
+    )
 
     /** {{{
      *  ClassParents       ::= AnnotType {`(' [Exprs] `)'} {with AnnotType}
@@ -2860,18 +2875,12 @@ self =>
       while (!isStatSeqEnd) {
         stats ++= (in.token match {
           case PACKAGE  =>
-            val start = in.skipToken()
-            if (in.token == OBJECT)
-              joinComment(List(makePackageObject(start, objectDef(in.offset, NoMods))))
-            else {
-              in.flushDoc
-              List(packaging(start))
-            }
+            packageOrPackageObject(in.skipToken()) :: Nil
           case IMPORT =>
             in.flushDoc
             importClause()
           case x if x == AT || isTemplateIntro || isModifier =>
-            joinComment(List(topLevelTmplDef))
+            joinComment(topLevelTmplDef :: Nil)
           case _ =>
             if (!isStatSep)
               syntaxErrorOrIncomplete("expected class or object definition", skipIt = true)
