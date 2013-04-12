@@ -82,13 +82,13 @@ class MutableSettings(val errorFn: String => Unit)
     }
     loop(arguments, Nil)
   }
-  def processArgumentString(params: String) = processArguments(splitParams(params), true)
+  def processArgumentString(params: String) = processArguments(splitParams(params), processAll = true)
 
   /** Create a new Settings object, copying all user-set values.
    */
   def copy(): Settings = {
     val s = new Settings()
-    s.processArguments(recreateArgs, true)
+    s.processArguments(recreateArgs, processAll = true)
     s
   }
 
@@ -126,7 +126,7 @@ class MutableSettings(val errorFn: String => Unit)
 
     // if arg is of form -Xfoo:bar,baz,quux
     def parseColonArg(s: String): Option[List[String]] = {
-      val (p, args) = StringOps.splitWhere(s, _ == ':', true) getOrElse (return None)
+      val (p, args) = StringOps.splitWhere(s, _ == ':', doDropIndex = true) getOrElse (return None)
 
       // any non-Nil return value means failure and we return s unmodified
       tryToSetIfExists(p, (args split ",").toList, (s: Setting) => s.tryToSetColon _)
@@ -248,11 +248,11 @@ class MutableSettings(val errorFn: String => Unit)
     private def checkDir(dir: AbstractFile, name: String, allowJar: Boolean = false): AbstractFile = (
       if (dir != null && dir.isDirectory)
         dir
-// was:      else if (allowJar && dir == null && Path.isJarOrZip(name, false))
-      else if (allowJar && dir == null && Jar.isJarOrZip(name, false))
+      else if (allowJar && dir == null && Jar.isJarOrZip(name, examineFile = false))
         new PlainFile(Path(name))
       else
-        throw new FatalError(name + " does not exist or is not a directory")
+//      throw new FatalError(name + " does not exist or is not a directory")
+        dir
     )
 
     /** Set the single output directory. From now on, all files will
@@ -260,7 +260,7 @@ class MutableSettings(val errorFn: String => Unit)
      */
     def setSingleOutput(outDir: String) {
       val dst = AbstractFile.getDirectory(outDir)
-      setSingleOutput(checkDir(dst, outDir, true))
+      setSingleOutput(checkDir(dst, outDir, allowJar = true))
     }
 
     def getSingleOutput: Option[AbstractFile] = singleOutDir
@@ -323,12 +323,12 @@ class MutableSettings(val errorFn: String => Unit)
         case Some(d) =>
           d match {
               case _: VirtualDirectory | _: io.ZipArchive => Nil
-              case _                   => List(d.lookupPathUnchecked(srcPath, false))
+              case _                   => List(d.lookupPathUnchecked(srcPath, directory = false))
           }
         case None =>
           (outputs filter (isBelow _).tupled) match {
             case Nil => Nil
-            case matches => matches.map(_._1.lookupPathUnchecked(srcPath, false))
+            case matches => matches.map(_._1.lookupPathUnchecked(srcPath, directory = false))
           }
       }
     }
@@ -382,7 +382,7 @@ class MutableSettings(val errorFn: String => Unit)
     def max = range map (_._2) getOrElse IntMax
 
     override def value_=(s: Int) =
-      if (isInputValid(s)) super.value_=(s) else errorMsg
+      if (isInputValid(s)) super.value_=(s) else errorMsg()
 
     // Validate that min and max are consistent
     assert(min <= max)
@@ -414,7 +414,7 @@ class MutableSettings(val errorFn: String => Unit)
       if (args.isEmpty) errorAndValue("missing argument", None)
       else parseArgument(args.head) match {
         case Some(i)  => value = i ; Some(args.tail)
-        case None     => errorMsg ; None
+        case None     => errorMsg() ; None
       }
 
     def unparse: List[String] =
@@ -486,8 +486,6 @@ class MutableSettings(val errorFn: String => Unit)
     descr: String,
     default: ScalaVersion)
   extends Setting(name, descr) {
-    import ScalaVersion._
-    
     type T = ScalaVersion
     protected var v: T = NoScalaVersion
 
@@ -495,14 +493,14 @@ class MutableSettings(val errorFn: String => Unit)
       value = default
       Some(args)
     }
-    
+
     override def tryToSetColon(args: List[String]) = args match {
       case Nil      => value = default; Some(Nil)
       case x :: xs  => value = ScalaVersion(x, errorFn) ; Some(xs)
     }
-    
+
     override def tryToSetFromPropertyValue(s: String) = tryToSet(List(s))
-    
+
     def unparse: List[String] = if (value == NoScalaVersion) Nil else List(s"${name}:${value.unparse}")
 
     withHelpSyntax(s"${name}:<${arg}>")
