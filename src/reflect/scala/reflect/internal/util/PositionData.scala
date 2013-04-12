@@ -4,6 +4,107 @@
  */
 package scala.reflect.internal.util
 
+import java.lang.Long.{ toBinaryString => longBinaryString, numberOfTrailingZeros => longNumberOfTrailingZeros, highestOneBit => longHighestOneBit, bitCount => longBitCount }
+import java.lang.Integer.{ toBinaryString => intBinaryString }
+
+trait BitPack[T] {
+  def size: Int
+  def pack(value: T): Int
+  def unpack(x: Int): T
+}
+
+object BitPack {
+  object Identity extends BitPack[Int] {
+    def size: Int           = Int.MaxValue
+    def pack(x: Int): Int   = x
+    def unpack(x: Int): Int = x
+  }
+  object NextPowerOfTwo extends BitPack[Long] {
+    def size: Int            = 64
+    def pack(x: Long): Int   = if (x == 0) 0 else longNumberOfTrailingZeros(longHighestOneBit(x)) + 1
+    def unpack(x: Int): Long = 1L << x
+  }
+
+  def join[T1, T2](p1: BitPack[T1], p2: BitPack[T2]): BitPack[(T1, T2)] = {
+    new BitPack[(T1, T2)] {
+      val size = p1.size * p2.size
+      def pack(x: (T1, T2)): Int   = (p1 pack x._1) * p1.size + (p2 pack x._2)
+      def unpack(x: Int): (T1, T2) = {
+        val v1 = x % p1.size
+        val v2 = (x - v1) / p1.size
+        ((p1 unpack v1, p2 unpack v2))
+      }
+    }
+  }
+}
+
+trait BitStrings extends Any {
+  private def grouped(in: String, size: Int): String = in grouped size mkString " "
+  private def zeroPad(s: String) = s.replace(' ', '0')
+
+  def bitString(x: Long): String = zeroPad("%64s" format longBinaryString(x))
+  def bitString(x: Int): String  = zeroPad("%32s" format intBinaryString(x))
+
+  def hexString(x: Long): String = zeroPad(f"$x%16x")
+  def hexString(x: Int): String  = zeroPad(f"$x%8x")
+
+  def nibbleString(x: Long): String = grouped(bitString(x), 4)
+  def nibbleString(x: Int): String  = grouped(bitString(x), 4)
+
+  def byteString(x: Long): String = grouped(bitString(x), 8)
+  def byteString(x: Int): String = grouped(bitString(x), 8)
+
+  def sliceInt(x: Long, start: Int, end: Int): Int = {
+    require(0 <= start && start <= 64 && 0 <= end && end < 64 && start >= end, ((start, end)))
+    require(start - end <= 32, ((start, end)))
+
+    if (start == end) 0
+    else {
+      val shifted = x >>> end
+      val width = start - end
+      val mask: Long = (1L << (width)) - 1
+      (shifted & mask).toInt
+    }
+  }
+  def sliceLong(x: Long, start: Int, end: Int): Long = {
+    require(0 <= start && start <= 64 && 0 <= end && end < 64 && start >= end, ((start, end)))
+    if (start == end) 0L
+    else {
+      val shifted = x >>> end
+      val width = start - end
+      val mask: Long = if (width == 64) -1L else (1L << (width)) - 1
+      shifted & mask
+    }
+  }
+}
+
+trait ByteSlices extends Any {
+  def byteArray(x: Long): Array[Byte] = {
+    val res = new Array[Byte](8)
+    var i = 0
+    while (i < 8) {
+      val shifted = x >>> ((7 - i) * 8)
+      val masked  = shifted & 0xFF
+      res(i) = masked
+      i += 1
+    }
+    res
+  }
+
+
+  def bytes(x: Long): String      = grouped(longBits(x), 8)
+  def intNibbles(x: Long): String = grouped(longBits(x), 4)
+  def longBytes(x: Long): String  = grouped(longBits(x), 8)
+
+
+
+  "%64s" format java.lang.Long.toBinaryString(res2) replace (' ', '0') grouped 4 map (_ mkString) mkString " "
+
+  final def sliceLongLong(value: Long, start: Int, end: Int): Long
+  final def sliceLongInt(value: Long, start: Int, end: Int): Int = (value >>> (63 - end)).toInt & ((1 << start) - 1)
+  final def sliceIntInt(value: Int, start: Int, end: Int): Int
+}
+
 final class PositionData private (val underlying: Long) extends AnyVal {
   import PositionData._
 
