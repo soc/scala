@@ -1570,7 +1570,7 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
       informTime("total", startTime)
 
       // Clear any sets or maps created via perRunCaches.
-      perRunCaches.clearAll()
+      // perRunCaches.clearAll()
 
       // Reset project
       if (!stopPhase("namer")) {

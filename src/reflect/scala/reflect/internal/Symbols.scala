@@ -681,7 +681,7 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
       (fs | ((fs & LateFlags) >>> LateShift)) & ~(fs >>> AntiShift)
     }
     def flags_=(fs: Long) = rawflags = fs
-    def rawflags_=(x: Long) { if (x == 0L) flagsOf remove id else flagsOf(this) = x }
+    def rawflags_=(x: Long) { if (x == 0L) flagsOf remove this else flagsOf(this) = x }
 
     final def hasGetter = isTerm && nme.isLocalName(name)
 
@@ -1189,7 +1189,7 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
     }
     def privateWithin_=(sym: Symbol) { accessBoundaryOf(this) = sym }
     def setPrivateWithin(sym: Symbol): this.type = {
-      if (sym eq NoSymbol) accessBoundaryOf remove id
+      if (sym eq NoSymbol) accessBoundaryOf remove this
       else accessBoundaryOf(this) = sym
 
       this
@@ -1593,9 +1593,9 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
     /** Reset symbol to initial state
      */
     def reset(completer: Type): this.type = {
-      flagsOf remove id
-      infosOf remove id
-      validToOf remove id
+      flagsOf remove this
+      infosOf remove this
+      validToOf remove this
       setInfo(completer)
     }
 
@@ -2597,7 +2597,7 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
     }
 
     def referenced: Symbol = referencedBy(this)
-    def referenced_=(x: Symbol) { if (x eq NoSymbol) referencedBy remove id else referencedBy(this) = x }
+    def referenced_=(x: Symbol) { if (x eq NoSymbol) referencedBy remove this else referencedBy(this) = x }
 
     def existentialBound = singletonBounds(this.tpe)
 
@@ -2682,8 +2682,8 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
   extends TermSymbol(initOwner, initPos, initName) with ModuleSymbolApi {
     override def associatedFile = moduleClass.associatedFile
     override def associatedFile_=(f: AbstractFile) {
-      if ((f eq NoAbstractFile) || (f eq null)) associatedFileOf remove moduleClass.id
-      else associatedFileOf(moduleClass.id) = f
+      if ((f eq NoAbstractFile) || (f eq null)) associatedFileOf remove moduleClass
+      else associatedFileOf(moduleClass) = f
     }
 
     override def moduleClass = referenced
@@ -2698,7 +2698,7 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
     override def name: TermName = {
       if (Statistics.hotEnabled) Statistics.incCounter(nameCount)
       if (!isMethod && needsFlatClasses)
-        flatNameOf.getOrElseUpdate(id, nme.flattenedName(rawowner.name, rawname)).asInstanceOf[TermName]
+        flatNameOf.getOrElseUpdate(this, nme.flattenedName(rawowner.name, rawname)).asInstanceOf[TermName]
       else
         rawname
     }
@@ -3062,13 +3062,13 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
 
     override def associatedFile = if (!isTopLevel) super.associatedFile else associatedFileOf(this)
     override def associatedFile_=(f: AbstractFile) {
-      if ((f eq NoAbstractFile) || (f eq null)) associatedFileOf remove id
+      if ((f eq NoAbstractFile) || (f eq null)) associatedFileOf remove this
       else associatedFileOf(this) = f
     }
 
     override def reset(completer: Type): this.type = {
       super.reset(completer)
-      thisSymOf -= id
+      thisSymOf remove this
       this
     }
 
@@ -3090,13 +3090,13 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
     override def name: TypeName = {
       if (Statistics.canEnable) Statistics.incCounter(nameCount)
       if (needsFlatClasses)
-        flatNameOf.getOrElseUpdate(id, tpnme.flattenedName(rawowner.name, rawname)).asInstanceOf[TypeName]
+        flatNameOf.getOrElseUpdate(this, tpnme.flattenedName(rawowner.name, rawname)).asInstanceOf[TypeName]
       else
         rawname
     }
 
     /** A symbol carrying the self type of the class as its type */
-    override def thisSym = if (thisSymOf contains id) thisSymOf(this) else this
+    override def thisSym = if (thisSymOf contains this) thisSymOf(this) else this
 
     /** Sets the self type of the class */
     override def typeOfThis_=(tp: Type) {
@@ -3109,7 +3109,7 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
         clone.typeOfThis = typeOfThis
         clone.thisSym setName thisSym.name
       }
-      associatedFileOf(clone.id) = associatedFileOf(this)
+      associatedFileOf(clone) = associatedFileOf(this)
       clone
     }
 
