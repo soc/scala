@@ -29,17 +29,17 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
    *  EnclosingMethod attributes.
    */
   private val originalOwner    = perRunCaches.newMap[Symbol, Symbol]()
-  private val nameOf           = mutable.Map[Int, Name]() withDefault (id => printResult(s"No name for $id !")(nme.NO_NAME))
-  private val thisSymOf        = mutable.Map[Int, Symbol]()
-  private val flatNameOf       = mutable.Map[Int, Name]()
+  private val nameOf           = perRunCaches.newWeakMap[Symbol, Name]() withDefault (id => printResult(s"No name for $id !")(nme.NO_NAME))
+  private val thisSymOf        = perRunCaches.newWeakMap[Symbol, Symbol]()
+  private val flatNameOf       = perRunCaches.newWeakMap[Symbol, Name]()
 
-  private val ownerOf          = mutable.Map[Int, Symbol]() withDefaultValue NoSymbol
-  private val flagsOf          = mutable.Map[Int, Long]() withDefaultValue 0L
-  private val accessBoundaryOf = mutable.Map[Int, Symbol]() withDefaultValue NoSymbol
-  private val referencedBy     = mutable.Map[Int, Symbol]() withDefaultValue NoSymbol
-  private val infosOf          = mutable.Map[Int, TypeHistory]() withDefaultValue null
-  private val validToOf        = mutable.Map[Int, Period]() withDefaultValue NoPeriod
-  private val associatedFileOf = mutable.Map[Int, AbstractFile]() withDefaultValue NoAbstractFile
+  private val ownerOf          = perRunCaches.newWeakMap[Symbol, Symbol]() withDefaultValue NoSymbol
+  private val flagsOf          = perRunCaches.newWeakMap[Symbol, Long]() withDefaultValue 0L
+  private val accessBoundaryOf = perRunCaches.newWeakMap[Symbol, Symbol]() withDefaultValue NoSymbol
+  private val referencedBy     = perRunCaches.newWeakMap[Symbol, Symbol]() withDefaultValue NoSymbol
+  private val infosOf          = perRunCaches.newWeakMap[Symbol, TypeHistory]() withDefaultValue null
+  private val validToOf        = perRunCaches.newWeakMap[Symbol, Period]() withDefaultValue NoPeriod
+  private val associatedFileOf = perRunCaches.newWeakMap[Symbol, AbstractFile]() withDefaultValue NoAbstractFile
 
   private def dumpMaps() {
     val pairs = List(
@@ -175,9 +175,9 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
     rawatt = initPos
 
     if (initOwner ne null)
-      ownerOf(id) = initOwner
+      ownerOf(this) = initOwner
 
-    nameOf(id)  = initName
+    nameOf(this)  = initName
     // Console.err.println(s"nameOf($id) == $initName in $initOwner")
 
     // Abstract here so TypeSymbol and TermSymbol can have a private[this] field
@@ -187,15 +187,15 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
     def asNameType(n: Name): NameType
 
     def name_=(n: Name) { setName(n) }
-    def rawowner = ownerOf(id)
-    def rawflags = flagsOf(id)
+    def rawowner = ownerOf(this)
+    def rawflags = flagsOf(this)
 
     if (traceSymbolActivity)
       traceSymbols.recordNewSymbol(this)
 
-    def validTo = validToOf(id)
-    def validTo_=(x: Period) { validToOf(id) = x }
-    def setName(name: Name): this.type = { nameOf(id) = asNameType(name) ; this }
+    def validTo = validToOf(this)
+    def validTo_=(x: Period) { validToOf(this) = x }
+    def setName(name: Name): this.type = { nameOf(this) = asNameType(name) ; this }
 
     // Update the surrounding scopes
     protected[this] def changeNameInOwners(name: Name) {
@@ -681,7 +681,7 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
       (fs | ((fs & LateFlags) >>> LateShift)) & ~(fs >>> AntiShift)
     }
     def flags_=(fs: Long) = rawflags = fs
-    def rawflags_=(x: Long) { if (x == 0L) flagsOf remove id else flagsOf(id) = x }
+    def rawflags_=(x: Long) { if (x == 0L) flagsOf remove id else flagsOf(this) = x }
 
     final def hasGetter = isTerm && nme.isLocalName(name)
 
@@ -989,7 +989,7 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
       assert(isCompilerUniverse, "owner_= is not thread-safe; cannot be run in reflexive code")
       if (traceSymbolActivity)
         traceSymbols.recordNewSymbolOwner(this, owner)
-      ownerOf(id) = owner
+      ownerOf(this) = owner
     }
 
     def ownerChain: List[Symbol] = this :: owner.ownerChain
@@ -1185,12 +1185,12 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
 
     def privateWithin = {
       if (!isCompilerUniverse && needsInitialize(isFlagRelated = false, mask = 0)) initialize
-      accessBoundaryOf(id)
+      accessBoundaryOf(this)
     }
-    def privateWithin_=(sym: Symbol) { accessBoundaryOf(id) = sym }
+    def privateWithin_=(sym: Symbol) { accessBoundaryOf(this) = sym }
     def setPrivateWithin(sym: Symbol): this.type = {
       if (sym eq NoSymbol) accessBoundaryOf remove id
-      else accessBoundaryOf(id) = sym
+      else accessBoundaryOf(this) = sym
 
       this
     }
@@ -1200,8 +1200,8 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
 
 // ------ info and type -------------------------------------------------------------------
 
-    private[Symbols] def infos: TypeHistory = infosOf(id)
-    private[Symbols] def infos_=(x: TypeHistory) = infosOf(id) = x
+    private[Symbols] def infos: TypeHistory = infosOf(this)
+    private[Symbols] def infos_=(x: TypeHistory) = infosOf(this) = x
 
     def originalInfo = {
       if (infos eq null) null
@@ -2525,7 +2525,7 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
   extends Symbol(initOwner, initPos, initName) with TermSymbolApi {
     type TypeOfClonedSymbol = TermSymbol
 
-    def rawname = asNameType(nameOf(id))
+    def rawname = asNameType(nameOf(this))
     def name = {
       if (Statistics.hotEnabled) Statistics.incCounter(nameCount)
       rawname
@@ -2534,7 +2534,7 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
       if (name != rawname) {
         super.name_=(name)   // logging
         changeNameInOwners(name)
-        nameOf(id) = name.toTermName
+        nameOf(this) = name.toTermName
       }
     }
     final def asNameType(n: Name) = n.toTermName
@@ -2596,8 +2596,8 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
       case _            => super.resolveOverloadedFlag(flag)
     }
 
-    def referenced: Symbol = referencedBy(id)
-    def referenced_=(x: Symbol) { if (x eq NoSymbol) referencedBy remove id else referencedBy(id) = x }
+    def referenced: Symbol = referencedBy(this)
+    def referenced_=(x: Symbol) { if (x eq NoSymbol) referencedBy remove id else referencedBy(this) = x }
 
     def existentialBound = singletonBounds(this.tpe)
 
@@ -2797,7 +2797,7 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
     type TypeOfClonedSymbol >: Null <: TypeSymbol
     // cloneSymbolImpl still abstract in TypeSymbol.
 
-    def rawname = asNameType(nameOf(id))
+    def rawname = asNameType(nameOf(this))
     def name = {
       if (Statistics.hotEnabled) Statistics.incCounter(nameCount)
       rawname
@@ -2836,7 +2836,7 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
       if (name != rawname) {
         super.name_=(name)  // logging
         changeNameInOwners(name)
-        nameOf(id) = name.toTypeName
+        nameOf(this) = name.toTypeName
       }
     }
 
@@ -3060,10 +3060,10 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
       if (c.isOverloaded) c.alternatives.head else c
     }
 
-    override def associatedFile = if (!isTopLevel) super.associatedFile else associatedFileOf(id)
+    override def associatedFile = if (!isTopLevel) super.associatedFile else associatedFileOf(this)
     override def associatedFile_=(f: AbstractFile) {
       if ((f eq NoAbstractFile) || (f eq null)) associatedFileOf remove id
-      else associatedFileOf(id) = f
+      else associatedFileOf(this) = f
     }
 
     override def reset(completer: Type): this.type = {
@@ -3096,11 +3096,11 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
     }
 
     /** A symbol carrying the self type of the class as its type */
-    override def thisSym = if (thisSymOf contains id) thisSymOf(id) else this
+    override def thisSym = if (thisSymOf contains id) thisSymOf(this) else this
 
     /** Sets the self type of the class */
     override def typeOfThis_=(tp: Type) {
-      thisSymOf(id) = (newThisSym(nme.this_, pos) setInfo tp)
+      thisSymOf(this) = (newThisSym(nme.this_, pos) setInfo tp)
     }
 
     override def cloneSymbolImpl(owner: Symbol, newFlags: Long): ClassSymbol = {
@@ -3109,7 +3109,7 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
         clone.typeOfThis = typeOfThis
         clone.thisSym setName thisSym.name
       }
-      associatedFileOf(clone.id) = associatedFileOf(id)
+      associatedFileOf(clone.id) = associatedFileOf(this)
       clone
     }
 
@@ -3271,15 +3271,11 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
     def name = nme.NO_NAME
     override def name_=(n: Name) = abort("Cannot set NoSymbol's name to " + n)
 
-    // synchronized {
-    //   infosOf(id) = NoType
-    // }
-    // override def attachments = NoPosition
     override def info_=(info: Type) = {
       rawatt = NoPosition
-      infosOf(id) = TypeHistory(1, NoType, null)
+      infosOf(this) = TypeHistory(1, NoType, null)
       unlock()
-      validToOf(id) = currentPeriod
+      validToOf(this) = currentPeriod
     }
     override def flagMask = AllFlags
     override def exists = false
