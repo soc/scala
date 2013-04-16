@@ -46,4 +46,16 @@ public class TrackStack<T> {
     try     { return op.call(); }
     finally { stack.pop(); }
   }
+
+  @Override public String toString() {
+    int depth = 0;
+    StringBuilder sb = new StringBuilder();
+    for (Elem x: stack.descendingIterator()) {
+      for (int i = 0; i < depth; i++) {
+        sb.append("  ");
+      }
+      sb.append("" + x + "\n");
+    }
+    return sb.toString();
+  }
 }
