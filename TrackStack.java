@@ -1,60 +1,77 @@
 package improving;
 
 import java.util.ArrayDeque;
+import java.util.Iterator;
 import java.util.concurrent.Callable;
 
+public class Frame<T> {
+  private T elem;
+  private long stamp;
+  private int id;
+
+  public T elem() { return elem; }
+  public long stamp() { return stamp; }
+  public int id() { return id; }
+
+  public Frame(T elem, int id) {
+    this.elem = elem;
+    this.id = id;
+    this.stamp = System.nanoTime();
+  }
+
+  @Override public String toString() {
+    return String.format("Frame(elem=%s, id=%s, stamp=%s)", elem, id, new java.util.Date(stamp));
+  }
+}
+
+interface TrackStackCallBack<T> {
+  public void done(Frame<T> frame, int currentId);
+}
+
 public class TrackStack<T> {
-  private ArrayDeque<Elem> stack;
-  private int nextid;
+  private ArrayDeque<Frame<T>> stack;
+  private int id;
 
   public TrackStack() {
-    this.stack = new ArrayDeque<Elem>();
+    this.stack = new ArrayDeque<Frame<T>>();
     this.nextid = 1;
   }
 
   private int nextId() {
-    try     { return nextid; }
-    finally { nextid += 1; }
+    try     { return id; }
+    finally { id += 1; }
   }
 
-  private class Elem {
-    private T elem;
-    private int id;
-
-    Elem(T elem) {
-      this.elem = elem;
-      this.id = nextId();
-    }
-
-    public int id() { return id; }
-    public T elem() { return elem; }
-
-    @Override public String toString() {
-      return String.format("Elem(id=%s, %s)", id, elem);
-    }
-  }
-
-  public int popId() { return stack.pop().id(); }
-  public T popElem() { return stack.pop().elem(); }
-  public T headElem() { return stack.peek().elem(); }
-  public int headId() { return stack.peek().id(); }
+  public Frame<T> pop() { return stack.pop().elem(); }
+  public Frame<T> head() { return stack.peek().elem(); }
   public int depth() { return stack.size(); }
-  public void push(T elem) { stack.push(new Elem(elem)); }
+  public void push(T elem) { stack.push(new Frame(elem, nextId())); }
 
-  public <U> U runWith(T elem, Callable<U> op) throws Exception {
+  public <U> U runWith(T elem) throws Exception {
+    runWith(new TrackStackCallBack<T>() {
+      public void done(Frame<T> frame, int currentDepth, int currentId) {
+        System.err.printf("%s currentDepth=%s currentId=%s\n", frame, currentDepth, currentId);
+      }
+    });
+  }
+
+  public <U> U runWith(T elem, TrackStackCallBack<U> callback) throws Exception {
     push(elem);
     try     { return op.call(); }
-    finally { stack.pop(); }
+    finally { callback.done(stack.pop(), id); }
   }
 
   @Override public String toString() {
     int depth = 0;
     StringBuilder sb = new StringBuilder();
-    for (Elem x: stack.descendingIterator()) {
+    Iterator<Elem> it = stack.descendingIterator();
+    while (it.hasNext()) {
+      T x = it.next().elem();
       for (int i = 0; i < depth; i++) {
         sb.append("  ");
       }
       sb.append("" + x + "\n");
+      depth++;
     }
     return sb.toString();
   }
