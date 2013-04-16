@@ -81,66 +81,6 @@ trait Typers extends Modes with Adaptations with Tags {
 
   private def isPastTyper = phase.id > currentRun.typerPhase.id
 
-  // To enable decent error messages when the typer crashes.
-  // TODO - this only catches trees which go through def typed,
-  // but there are all kinds of back ways - typedClassDef, etc. etc.
-  // Funnel everything through one doorway.
-  var lastTreeToTyper: Tree = EmptyTree
-
-  private var printTypingStack: List[Tree] = EmptyTree :: Nil
-
-  // TODO - account for colors so the color of a multiline string
-  // doesn't infect the connector lines
-  private def typingIndent = "|    " * (printTypingStack.length - 1)
-
-  private[typechecker] final def indentTyping(tree: Tree, cond: Boolean, show: => String) {
-    if (cond && !noPrintTyping(tree)) {
-      printTyping("""|-- """ + show)
-      printTypingStack ::= tree
-    }
-  }
-  private[typechecker] final def deindentTyping(tree: Tree, cond: Boolean, show: => String) {
-    if (cond && (tree eq printTypingStack.head)) {
-      printTypingStack = printTypingStack.tail
-      printTyping("""\-> """ + show)
-    }
-  }
-  @inline final def printTyping(s: => String) = {
-    if (printTypings && !noPrintTyping(printTypingStack.head)) {
-      // This allows for call sites of printTyping to have a "filter"
-      // which is only run when typing information is being printed.
-      // That is, we want to be able to write code like
-      //   printTyping({ val info = foo.toString ; if (!info.isInteresting) "" else info })
-      // If we have to do the isInteresting test before calling printTyping,
-      // it defeats the purpose of the by-name argument.
-      val s1 = s.replaceAll("\n", "\n" + typingIndent)
-      if (s1 != "")
-        println(typingIndent + s1)
-    }
-  }
-  @inline final def printInference(s: => String) = {
-    if (printInfers)
-      println(s)
-  }
-
-  // Some trees which are typed with mind-numbing frequency and
-  // which add nothing by being printed. Did () type to Unit? Let's
-  // gamble on yes.
-  private def noPrintTyping(t: Tree): Boolean = t match {
-    case PackageDef(_, _)                                               => false
-    case TypeBoundsTree(lo, hi)                                         => noPrintTyping(lo) && noPrintTyping(hi)
-    case Select(sel, nme.scala_)                                        => noPrintTyping(sel)
-    case Select(sel, tpnme.Nothing | tpnme.Any | tpnme.AnyRef)          => noPrintTyping(sel)
-    case Block(Nil, expr)                                               => noPrintTyping(expr)
-    case Apply(fn, Nil)                                                 => noPrintTyping(fn)
-    case Block(stmt :: Nil, expr)                                       => noPrintTyping(stmt) && noPrintTyping(expr)
-    case DefDef(_, nme.CONSTRUCTOR, Nil, ListOfNil, _, rhs)             => noPrintTyping(rhs)
-    case Literal(Constant(()))                                          => true
-    case Select(Super(This(tpnme.EMPTY), tpnme.EMPTY), nme.CONSTRUCTOR) => true
-    case Ident(nme.ROOTPKG)                                             => true
-    case _                                                              => false
-  }
-
   // when true:
   //  - we may virtualize matches (if -Xexperimental and there's a suitable __match in scope)
   //  - we synthesize PartialFunction implementations for `x => x match {...}` and `match {...}` when the expected type is PartialFunction
@@ -5602,59 +5542,11 @@ trait Typers extends Modes with Adaptations with Tags {
     }
 
     def typed(tree: Tree, mode: Int, pt: Type): Tree = {
-      import typeDebug._
-      lastTreeToTyper = tree
-      var typedTree: Tree = null
-      val alreadyTyped = tree.tpe ne null
-
-      def showBefore(): String = {
-        def implicits_s = (
-          if (context.enrichmentEnabled)
-            if (context.implicitsEnabled) ""
-            else "implicits: " + inRed("enrichment")
-          else "implicits: " + inRed("disabled")
-        )
-        def owner_long_s = (
-          if (settings.debug.value) {
-            def flags_s = context.owner.debugFlagString match {
-              case "" => ""
-              case s  => " with flags " + s
-            }
-            s", a ${context.owner.shortSymbolClass}$flags_s"
-          }
-          else ""
-        )
-        def owner_s = "" + context.owner + (
-          if (context.owner.isClass) ""
-          else " in " + context.owner.enclClass
-        )
-        def tree_s = inGreen(ptTree(tree))
-        def pt_s = if (pt.isWildcard) "" else s": pt=$pt"
-        def what = if (alreadyTyped) "(already typed) " else ""
-
-        "%s%s%s (%s)".format(what, tree_s, pt_s, ptLine(
-          "undetparams"       -> context.undetparams,
-          ""         -> implicits_s,
-          ""                  -> modeString(mode),
-          ""                  -> ( if (context.bufferErrors) inRed("silent") else "" ),
-          "owner"             -> (owner_s + owner_long_s))
-        )
-      }
-      def showAfter(): String = {
-        if (typedTree eq null)
-          "[exception]"
-        else tree match {
-          case md: MemberDef if typedTree.tpe eq NoType => inLightGreen(s"[${md.keyword} ${md.name}]") + "\n"
-          case _                                        => inBlue(typedTree.tpe.toLongString)
-        }
-      }
-
-      try {
-        indentTyping(tree, printTypings, showBefore)
-        typedTree = typedInternal(tree, mode, pt)
-        typedTree
-      }
-      finally deindentTyping(tree, printTypings, showAfter)
+      typeDebug.lastTreeToTyper = tree
+      if (printTypings && !typeDebug.noPrintTyping(tree))
+        typeDebug.printTypingOf(tree, mode, pt, context)(typedInternal(tree, mode, pt))
+      else
+        typedInternal(tree, mode, pt)
     }
 
     private def typedInternal(tree: Tree, mode: Int, pt: Type): Tree = {

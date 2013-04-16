@@ -62,13 +62,6 @@ trait Implicits {
       if (isView) "view" else "implicit",
       tree, pt, context.owner.enclClass)
     )
-    // printTyping(
-    //   ptBlock("infer implicit" + (if (isView) " view" else ""),
-    //     "tree"        -> tree,
-    //     "pt"          -> pt,
-    //     "undetparams" -> context.outer.undetparams
-    //   )
-    // )
     val shouldPrint = printInfers && !tree.isEmpty && !context.undetparams.isEmpty
     def body = {
       val rawTypeStart    = if (Statistics.canEnable) Statistics.startCounter(rawTypeImpl) else null
@@ -94,10 +87,10 @@ trait Implicits {
       result
     }
 
-    indentTyping(tree, shouldPrint, s"implicit: $tree ${context.undetparamsString}")
-    var result: SearchResult = null
-    try { result = body ; result }
-    finally deindentTyping(tree, shouldPrint, ", implicit search yielded: " + result)
+    if (shouldPrint && !typeDebug.noPrintTyping(tree))
+      printImplicitSearchOf(tree)(body)
+    else
+      body
   }
 
   /** Find all views from type `tp` (in which `tpars` are free)

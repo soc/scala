@@ -51,7 +51,7 @@ abstract class ToolBoxFactory[U <: JavaUniverse](val u: U) { factorySelf =>
       def cleanupCaches(): Unit = {
         perRunCaches.clearAll()
         undoLog.clear()
-        analyzer.lastTreeToTyper = EmptyTree
+        typeDebug.lastTreeToTyper = EmptyTree
         lastSeenSourceFile = NoSourceFile
         lastSeenContext = null
       }

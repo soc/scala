@@ -31,7 +31,6 @@ abstract class SymbolTable extends macros.Universe
                               with Trees
                               with Printers
                               with Positions
-                              with TypeDebugging
                               with Importers
                               with Required
                               with CapturedVariables

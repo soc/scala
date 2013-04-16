@@ -36,6 +36,7 @@ import scala.reflect.ClassTag
 
 class Global(var currentSettings: Settings, var reporter: Reporter)
     extends SymbolTable
+    with TypeDebugging
     with CompilationUnits
     with Plugins
     with PhaseAssembly
@@ -43,6 +44,10 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
     with Printers
     with DocComments
     with Positions { self =>
+
+  /** Switch to turn on detailed type logs */
+  printTypings = settings.Ytyperdebug.value
+  printInfers = settings.Yinferdebug.value
 
   // the mirror --------------------------------------------------
 
@@ -470,10 +475,6 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
       }
     }
   }
-
-  /** Switch to turn on detailed type logs */
-  var printTypings = settings.Ytyperdebug.value
-  var printInfers = settings.Yinferdebug.value
 
   // phaseName = "parser"
   object syntaxAnalyzer extends {
