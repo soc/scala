@@ -6,42 +6,42 @@ import java.util.concurrent.Callable;
 import java.io.Writer;
 import java.io.PrintWriter;
 
-public class TrackStackPrinter {
-  private Writer out;
-  private int depth;
-  private String indent() {
-    StringBuilder sb = new StringBuilder();
-    for (int i = 0; i < depth; i++)
-      sb.append("|   ");
+// public class TrackStackPrinter {
+//   private Writer out;
+//   private int depth;
+//   private String indent() {
+//     StringBuilder sb = new StringBuilder();
+//     for (int i = 0; i < depth; i++)
+//       sb.append("|   ");
 
-    return sb.toString();
-  }
+//     return sb.toString();
+//   }
 
-  public TrackStackPrinter(Writer writer) {
-    this.out = writer;
-  }
+//   public TrackStackPrinter(Writer writer) {
+//     this.out = writer;
+//   }
 
-  public TrackStackPrinter() {
-    this.out = new PrintWriter(System.err);
-  }
+//   public TrackStackPrinter() {
+//     this.out = new PrintWriter(System.err);
+//   }
 
-  public void pushed(Frame<T> frame) {
-    out.println(indent() + "|-- " + frame.elem());
-    depth++;
-  }
-  public void popped(Frame<T> frame) {
-    depth--;
-    out.println(indent() + "\\->" + frame.elem());
-  }
-}
+//   public void pushed(Result<T> frame) {
+//     out.println(indent() + "|-- " + frame.elem());
+//     depth++;
+//   }
+//   public void popped(Result<T> frame) {
+//     depth--;
+//     out.println(indent() + "\\->" + frame.elem());
+//   }
+// }
 
 
 public class TrackStack<T> {
-  private ArrayDeque<Frame<T>> stack;
+  private ArrayDeque<Running<T>> stack;
   private int id;
 
   public TrackStack() {
-    this.stack = new ArrayDeque<Frame<T>>();
+    this.stack = new ArrayDeque<Running<T>>();
     this.id = 1;
   }
 
@@ -50,19 +50,20 @@ public class TrackStack<T> {
     finally { id += 1; }
   }
 
-  public Frame<T> pop(int expectedId) {
-    Frame<T> frame = stack.pop();
+  public Result<T> pop(int expectedId) {
+    Running<T> frame = stack.pop();
     assert(frame.id() == expectedId);
-    return frame;
+    return frame.finish(null, id);
   }
-  public Frame<T> head() { return stack.peek(); }
+
+  public Running<T> head() { return stack.peek(); }
   public int depth() { return stack.size(); }
-  public void push(T elem) { stack.push(new Frame<T>(elem, nextId())); }
+  public void push(T elem) { stack.push(new Result<T>(elem, nextId())); }
 
   // public <U> U runWith(T in, Callable<U> op) throws Exception {
   //   TrackStackCallBack<T, U> callback = (
   //     new TrackStackCallBack<T, U>() {
-  //       public void done(Frame<T> in, Frame<U> out) {
+  //       public void done(Result<T> in, Result<U> out) {
   //         System.err.printf("%s %s\n", in, out);
   //       }
   //     }
@@ -71,19 +72,24 @@ public class TrackStack<T> {
   //   return this.runWith(in, op, callback);
   // }
 
-  public <U> Frame<U> pushRunPop(T in, Callable<U> op) throws Exception {
+  public <U> Result<U> pushRunPop(T in, Callable<U> op) throws Exception {
     push(in);
-    U out = null;
+    try {
+      U out = op.call();
+      Result<T> res = stack.pop();
+
+
+
     try     { out = op.call(); return out; }
-    finally { callback.done(stack.pop(), new Frame<U>(out, id)); }
+    finally { callback.done(stack.pop(), new Result<U>(out, id)); }
   }
 
   @Override public String toString() {
     int depth = 0;
     StringBuilder sb = new StringBuilder();
-    Iterator<Frame<T>> it = stack.descendingIterator();
+    Iterator<Result<T>> it = stack.descendingIterator();
     while (it.hasNext()) {
-      Frame<T> x = it.next();
+      Result<T> x = it.next();
       for (int i = 0; i < depth; i++) {
         sb.append("  ");
       }
