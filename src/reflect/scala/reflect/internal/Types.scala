@@ -1029,7 +1029,9 @@ trait Types extends api.Types { self: SymbolTable =>
       else if ((str endsWith ".type") && !typeSymbol.isModuleClass)
         widen match {
           case RefinedType(_, _)                      => "" + widen
-          case _                                      => s"$str (with underlying type $widen)"
+          case _                                      =>
+            if (widen.toString.trim == "") str
+            else s"$str (with underlying type $widen)"
         }
       else str
     }

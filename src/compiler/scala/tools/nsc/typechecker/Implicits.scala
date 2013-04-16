@@ -31,7 +31,6 @@ trait Implicits {
   import definitions._
   import ImplicitsStats._
   import typeDebug.{ ptTree, ptBlock, ptLine }
-  import global.typer.{ printTyping, deindentTyping, indentTyping, printInference }
 
   def inferImplicit(tree: Tree, pt: Type, reportAmbiguous: Boolean, isView: Boolean, context: Context): SearchResult =
     inferImplicit(tree, pt, reportAmbiguous, isView, context, true, tree.pos)
@@ -63,37 +62,42 @@ trait Implicits {
       if (isView) "view" else "implicit",
       tree, pt, context.owner.enclClass)
     )
-    printTyping(
-      ptBlock("infer implicit" + (if (isView) " view" else ""),
-        "tree"        -> tree,
-        "pt"          -> pt,
-        "undetparams" -> context.outer.undetparams
-      )
-    )
-    indentTyping()
+    // printTyping(
+    //   ptBlock("infer implicit" + (if (isView) " view" else ""),
+    //     "tree"        -> tree,
+    //     "pt"          -> pt,
+    //     "undetparams" -> context.outer.undetparams
+    //   )
+    // )
+    val shouldPrint = printInfers && !tree.isEmpty && !context.undetparams.isEmpty
+    def body = {
+      val rawTypeStart    = if (Statistics.canEnable) Statistics.startCounter(rawTypeImpl) else null
+      val findMemberStart = if (Statistics.canEnable) Statistics.startCounter(findMemberImpl) else null
+      val subtypeStart    = if (Statistics.canEnable) Statistics.startCounter(subtypeImpl) else null
+      val start           = if (Statistics.canEnable) Statistics.startTimer(implicitNanos) else null
+      if (shouldPrint)
+        printTyping("typing implicit: %s %s".format(tree, context.undetparamsString))
+      val implicitSearchContext = context.makeImplicit(reportAmbiguous)
+      val result = new ImplicitSearch(tree, pt, isView, implicitSearchContext, pos).bestImplicit
+      if (saveAmbiguousDivergent && implicitSearchContext.hasErrors) {
+        context.updateBuffer(implicitSearchContext.errBuffer.filter(err => err.kind == ErrorKinds.Ambiguous || err.kind == ErrorKinds.Divergent))
+        debugwarn("update buffer: " + implicitSearchContext.errBuffer)
+      }
+      printInference("[infer implicit] inferred " + result)
+      context.undetparams = context.undetparams filterNot result.subst.from.contains
 
-    val rawTypeStart    = if (Statistics.canEnable) Statistics.startCounter(rawTypeImpl) else null
-    val findMemberStart = if (Statistics.canEnable) Statistics.startCounter(findMemberImpl) else null
-    val subtypeStart    = if (Statistics.canEnable) Statistics.startCounter(subtypeImpl) else null
-    val start           = if (Statistics.canEnable) Statistics.startTimer(implicitNanos) else null
-    if (printInfers && !tree.isEmpty && !context.undetparams.isEmpty)
-      printTyping("typing implicit: %s %s".format(tree, context.undetparamsString))
-    val implicitSearchContext = context.makeImplicit(reportAmbiguous)
-    val result = new ImplicitSearch(tree, pt, isView, implicitSearchContext, pos).bestImplicit
-    if (saveAmbiguousDivergent && implicitSearchContext.hasErrors) {
-      context.updateBuffer(implicitSearchContext.errBuffer.filter(err => err.kind == ErrorKinds.Ambiguous || err.kind == ErrorKinds.Divergent))
-      debugwarn("update buffer: " + implicitSearchContext.errBuffer)
+      if (Statistics.canEnable) Statistics.stopTimer(implicitNanos, start)
+      if (Statistics.canEnable) Statistics.stopCounter(rawTypeImpl, rawTypeStart)
+      if (Statistics.canEnable) Statistics.stopCounter(findMemberImpl, findMemberStart)
+      if (Statistics.canEnable) Statistics.stopCounter(subtypeImpl, subtypeStart)
+
+      result
     }
-    printInference("[infer implicit] inferred " + result)
-    context.undetparams = context.undetparams filterNot result.subst.from.contains
 
-    if (Statistics.canEnable) Statistics.stopTimer(implicitNanos, start)
-    if (Statistics.canEnable) Statistics.stopCounter(rawTypeImpl, rawTypeStart)
-    if (Statistics.canEnable) Statistics.stopCounter(findMemberImpl, findMemberStart)
-    if (Statistics.canEnable) Statistics.stopCounter(subtypeImpl, subtypeStart)
-    deindentTyping()
-    printTyping("Implicit search yielded: "+ result)
-    result
+    indentTyping(tree, shouldPrint, s"implicit: $tree ${context.undetparamsString}")
+    var result: SearchResult = null
+    try { result = body ; result }
+    finally deindentTyping(tree, shouldPrint, ", implicit search yielded: " + result)
   }
 
   /** Find all views from type `tp` (in which `tpars` are free)
@@ -149,7 +153,7 @@ trait Implicits {
   class SearchResult(val tree: Tree, val subst: TreeTypeSubstituter) {
     override def toString = "SearchResult(%s, %s)".format(tree,
       if (subst.isEmpty) "" else subst)
-    
+
     def isFailure          = false
     def isAmbiguousFailure = false
     final def isSuccess    = !isFailure
@@ -158,7 +162,7 @@ trait Implicits {
   lazy val SearchFailure = new SearchResult(EmptyTree, EmptyTreeTypeSubstituter) {
     override def isFailure = true
   }
-  
+
   lazy val AmbiguousSearchFailure = new SearchResult(EmptyTree, EmptyTreeTypeSubstituter) {
     override def isFailure          = true
     override def isAmbiguousFailure = true
@@ -639,7 +643,7 @@ trait Implicits {
 
           if (matchesPt(itree2.tpe, ptInstantiated, undetParams)) {
             if (tvars.nonEmpty)
-              printTyping(ptLine("" + info.sym, "tvars" -> tvars, "tvars.constr" -> tvars.map(_.constr)))
+              printTyping("" + info.sym + ptLine("tvars" -> tvars, "tvars.constr" -> tvars.map(_.constr)))
 
             val targs = solvedTypes(tvars, undetParams, undetParams map varianceInType(pt),
                                     false, lubDepth(List(itree2.tpe, pt)))

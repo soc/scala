@@ -13,6 +13,18 @@ trait TypeDebugging {
 
   // @M toString that is safe during debugging (does not normalize, ...)
   object typeDebug {
+    import scala.Console._
+
+    private val colorsOk = sys.props contains "scala.color"
+    private def inColor(s: String, color: String) = if (colorsOk && s != "") color +        s + RESET else s
+    private def inBold(s: String, color: String)  = if (colorsOk && s != "") color + BOLD + s + RESET else s
+
+    def inLightGreen(s: String)    = inColor(s, GREEN)
+    def inGreen(s: String): String = inBold(s, GREEN)
+    def inRed(s: String): String   = inBold(s, RED)
+    def inBlue(s: String): String  = inBold(s, BLUE)
+    def inCyan(s: String): String  = inBold(s, CYAN)
+
     private def to_s(x: Any): String = x match {
       // otherwise case classes are caught looking like products
       case _: Tree | _: Type     => "" + x
@@ -31,15 +43,19 @@ trait TypeDebugging {
         strs.mkString(label + " {\n  ", "\n  ", "\n}")
       }
     }
-    def ptLine(label: String, pairs: (String, Any)*): String = {
-      val strs = pairs map { case (k, v) => k + "=" + to_s(v) }
-      strs.mkString(label + ": ", ", ", "")
-    }
+    def ptLine(pairs: (String, Any)*): String = (
+      pairs
+              map { case (k,  v) => (k, to_s(v)) }
+        filterNot { case (_,  v) => v == "" }
+              map { case ("", v) => v ; case (k, v) => s"$k=$v" }
+        mkString ", "
+    )
     def ptTree(t: Tree) = t match {
-      case PackageDef(pid, _)            => "package " + pid
-      case ModuleDef(_, name, _)         => "object " + name
-      case ClassDef(_, name, tparams, _) => "class " + name + str.brackets(tparams)
-      case _                             => to_s(t)
+      case PackageDef(pid, _)                => "package " + pid
+      case ClassDef(_, name, tparams, _)     => "class " + name + str.brackets(tparams)
+      case DefDef(_, name, tparams, _, _, _) => "def " + name + str.brackets(tparams)
+      case ModuleDef(_, name, _)             => "object " + name
+      case _                                 => to_s(t)
     }
 
     object str {

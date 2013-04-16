@@ -22,7 +22,6 @@ trait Infer extends Checkable {
 
   import global._
   import definitions._
-  import typer.printInference
   import typeDebug.ptBlock
 
 /* -- Type parameter inference utility functions --------------------------- */

@@ -87,6 +87,60 @@ trait Typers extends Modes with Adaptations with Tags {
   // Funnel everything through one doorway.
   var lastTreeToTyper: Tree = EmptyTree
 
+  private var printTypingStack: List[Tree] = EmptyTree :: Nil
+
+  // TODO - account for colors so the color of a multiline string
+  // doesn't infect the connector lines
+  private def typingIndent = "|    " * (printTypingStack.length - 1)
+
+  private[typechecker] final def indentTyping(tree: Tree, cond: Boolean, show: => String) {
+    if (cond && !noPrintTyping(tree)) {
+      printTyping("""|-- """ + show)
+      printTypingStack ::= tree
+    }
+  }
+  private[typechecker] final def deindentTyping(tree: Tree, cond: Boolean, show: => String) {
+    if (cond && (tree eq printTypingStack.head)) {
+      printTypingStack = printTypingStack.tail
+      printTyping("""\-> """ + show)
+    }
+  }
+  @inline final def printTyping(s: => String) = {
+    if (printTypings && !noPrintTyping(printTypingStack.head)) {
+      // This allows for call sites of printTyping to have a "filter"
+      // which is only run when typing information is being printed.
+      // That is, we want to be able to write code like
+      //   printTyping({ val info = foo.toString ; if (!info.isInteresting) "" else info })
+      // If we have to do the isInteresting test before calling printTyping,
+      // it defeats the purpose of the by-name argument.
+      val s1 = s.replaceAll("\n", "\n" + typingIndent)
+      if (s1 != "")
+        println(typingIndent + s1)
+    }
+  }
+  @inline final def printInference(s: => String) = {
+    if (printInfers)
+      println(s)
+  }
+
+  // Some trees which are typed with mind-numbing frequency and
+  // which add nothing by being printed. Did () type to Unit? Let's
+  // gamble on yes.
+  private def noPrintTyping(t: Tree): Boolean = t match {
+    case PackageDef(_, _)                                               => false
+    case TypeBoundsTree(lo, hi)                                         => noPrintTyping(lo) && noPrintTyping(hi)
+    case Select(sel, nme.scala_)                                        => noPrintTyping(sel)
+    case Select(sel, tpnme.Nothing | tpnme.Any | tpnme.AnyRef)          => noPrintTyping(sel)
+    case Block(Nil, expr)                                               => noPrintTyping(expr)
+    case Apply(fn, Nil)                                                 => noPrintTyping(fn)
+    case Block(stmt :: Nil, expr)                                       => noPrintTyping(stmt) && noPrintTyping(expr)
+    case DefDef(_, nme.CONSTRUCTOR, Nil, ListOfNil, _, rhs)             => noPrintTyping(rhs)
+    case Literal(Constant(()))                                          => true
+    case Select(Super(This(tpnme.EMPTY), tpnme.EMPTY), nme.CONSTRUCTOR) => true
+    case Ident(nme.ROOTPKG)                                             => true
+    case _                                                              => false
+  }
+
   // when true:
   //  - we may virtualize matches (if -Xexperimental and there's a suitable __match in scope)
   //  - we synthesize PartialFunction implementations for `x => x match {...}` and `match {...}` when the expected type is PartialFunction
@@ -95,7 +149,7 @@ trait Typers extends Modes with Adaptations with Tags {
 
   abstract class Typer(context0: Context) extends TyperDiagnostics with Adaptation with Tag with TyperContextErrors {
     import context0.unit
-    import typeDebug.{ ptTree, ptBlock, ptLine }
+    import typeDebug.{ ptTree, ptBlock, ptLine, inGreen, inRed }
     import TyperErrorGen._
 
     val infer = new Inferencer(context0) {
@@ -4068,17 +4122,6 @@ trait Typers extends Modes with Adaptations with Tags {
       }
     }
 
-    final def deindentTyping() = context.typingIndentLevel -= 2
-    final def indentTyping() = context.typingIndentLevel += 2
-    @inline final def printTyping(s: => String) = {
-      if (printTypings)
-        println(context.typingIndent + s.replaceAll("\n", "\n" + context.typingIndent))
-    }
-    @inline final def printInference(s: => String) = {
-      if (printInfers)
-        println(s)
-    }
-
     def typed1(tree: Tree, mode: Int, pt: Type): Tree = {
       def isPatternMode = inPatternMode(mode)
 
@@ -4499,11 +4542,11 @@ trait Typers extends Modes with Adaptations with Tags {
             def errorInResult(tree: Tree) = treesInResult(tree) exists (_.pos == typeError.errPos)
 
             val retry = (typeError.errPos != null) && (fun :: tree :: args exists errorInResult)
-            printTyping {
+            printTyping({
               val funStr = ptTree(fun) + " and " + (args map ptTree mkString ", ")
               if (retry) "second try: " + funStr
               else "no second try: " + funStr + " because error not in result: " + typeError.errPos+"!="+tree.pos
-            }
+            })
             if (retry) {
               val Select(qual, name) = fun
               tryTypedArgs(args, forArgMode(fun, mode)) match {
@@ -5558,16 +5601,63 @@ trait Typers extends Modes with Adaptations with Tags {
       }
     }
 
-    /**
-     *  @param tree ...
-     *  @param mode ...
-     *  @param pt   ...
-     *  @return     ...
-     */
     def typed(tree: Tree, mode: Int, pt: Type): Tree = {
+      import typeDebug._
       lastTreeToTyper = tree
-      indentTyping()
+      var typedTree: Tree = null
+      val alreadyTyped = tree.tpe ne null
 
+      def showBefore(): String = {
+        def implicits_s = (
+          if (context.enrichmentEnabled)
+            if (context.implicitsEnabled) ""
+            else "implicits: " + inRed("enrichment")
+          else "implicits: " + inRed("disabled")
+        )
+        def owner_long_s = (
+          if (settings.debug.value) {
+            def flags_s = context.owner.debugFlagString match {
+              case "" => ""
+              case s  => " with flags " + s
+            }
+            s", a ${context.owner.shortSymbolClass}$flags_s"
+          }
+          else ""
+        )
+        def owner_s = "" + context.owner + (
+          if (context.owner.isClass) ""
+          else " in " + context.owner.enclClass
+        )
+        def tree_s = inGreen(ptTree(tree))
+        def pt_s = if (pt.isWildcard) "" else s": pt=$pt"
+        def what = if (alreadyTyped) "(already typed) " else ""
+
+        "%s%s%s (%s)".format(what, tree_s, pt_s, ptLine(
+          "undetparams"       -> context.undetparams,
+          ""         -> implicits_s,
+          ""                  -> modeString(mode),
+          ""                  -> ( if (context.bufferErrors) inRed("silent") else "" ),
+          "owner"             -> (owner_s + owner_long_s))
+        )
+      }
+      def showAfter(): String = {
+        if (typedTree eq null)
+          "[exception]"
+        else tree match {
+          case md: MemberDef if typedTree.tpe eq NoType => inLightGreen(s"[${md.keyword} ${md.name}]") + "\n"
+          case _                                        => inBlue(typedTree.tpe.toLongString)
+        }
+      }
+
+      try {
+        indentTyping(tree, printTypings, showBefore)
+        typedTree = typedInternal(tree, mode, pt)
+        typedTree
+      }
+      finally deindentTyping(tree, printTypings, showAfter)
+    }
+
+    private def typedInternal(tree: Tree, mode: Int, pt: Type): Tree = {
       val ptPlugins = pluginsPt(pt, this, tree, mode)
 
       val startByType = if (Statistics.canEnable) Statistics.pushTimer(byTypeStack, byTypeNanos(tree.getClass)) else null
@@ -5580,38 +5670,48 @@ trait Typers extends Modes with Adaptations with Tags {
         }
 
         val alreadyTyped = tree.tpe ne null
-        var tree1: Tree = if (alreadyTyped) tree else {
-          printTyping(
-            ptLine("typing %s: pt = %s".format(ptTree(tree), ptPlugins),
-              "undetparams"      -> context.undetparams,
-              "implicitsEnabled" -> context.implicitsEnabled,
-              "enrichmentEnabled"   -> context.enrichmentEnabled,
-              "mode"             -> modeString(mode),
-              "silent"           -> context.bufferErrors,
-              "context.owner"    -> context.owner
-            )
-          )
-          typed1(tree, mode, dropExistential(ptPlugins))
-        }
+        var tree1: Tree = if (alreadyTyped) tree else typed1(tree, mode, dropExistential(ptPlugins))
+        // {
+        //   printTyping({
+        //     def pt_s        = if (ptPlugins.isWildcard) "" else s": pt=$ptPlugins"
+        //     def implicits_s = (
+        //       if (context.enrichmentEnabled)
+        //         if (context.implicitsEnabled) "all"
+        //         else "enrichment"
+        //       else "none"
+        //     )
+        //     ptLine("typing %s#%s %s%s".format(tree.shortClass, tree.id, ptTree(tree), pt_s),
+        //       "undetparams"       -> context.undetparams,
+        //       "implicits"         -> implicits_s,
+        //       ""                  -> modeString(mode),
+        //       ""                  -> ( if (context.bufferErrors) "silent" else "" ),
+        //       "owner"             -> context.owner
+        //     )
+        //   })
+        //   typed1(tree, mode, dropExistential(ptPlugins))
+        // }
         // Can happen during erroneous compilation - error(s) have been
         // reported, but we need to avoid causing an NPE with this tree
         if (tree1.tpe eq null)
           return setError(tree)
 
-        if (!alreadyTyped) {
-          printTyping("typed %s: %s%s".format(
-            ptTree(tree1), tree1.tpe,
-            if (isSingleType(tree1.tpe)) " with underlying "+tree1.tpe.widen else "")
-          )
-        }
+        // if (!alreadyTyped) {
+        //   printTyping("""\- #%s: %s%s""".format(
+        //     // ptTree(tree1),
+        //     tree1.id, tree1.tpe,
+        //     if (isSingleType(tree1.tpe)) " with underlying "+tree1.tpe.widen else "")
+        //   )
+        // }
 
         tree1.tpe = pluginsTyped(tree1.tpe, this, tree1, mode, ptPlugins)
         val result = if (tree1.isEmpty) tree1 else adapt(tree1, mode, ptPlugins, tree)
 
         if (!alreadyTyped) {
-          printTyping("adapted %s: %s to %s, %s".format(
-            tree1, tree1.tpe.widen, ptPlugins, context.undetparamsString)
-          ) //DEBUG
+          if (!ptPlugins.isWildcard) {
+            printTyping("adapted %s: %s to %s, %s".format(
+              tree1, tree1.tpe.widen, ptPlugins, context.undetparamsString)
+            ) //DEBUG
+          }
         }
         if (!isPastTyper) signalDone(context.asInstanceOf[analyzer.Context], tree, result)
         result
@@ -5620,7 +5720,6 @@ trait Typers extends Modes with Adaptations with Tags {
           tree.tpe = null
           // The only problematic case are (recoverable) cyclic reference errors which can pop up almost anywhere.
           printTyping("caught %s: while typing %s".format(ex, tree)) //DEBUG
-
           reportTypeError(context, tree.pos, ex)
           setError(tree)
         case ex: Exception =>
@@ -5631,7 +5730,6 @@ trait Typers extends Modes with Adaptations with Tags {
           throw ex
       }
       finally {
-        deindentTyping()
         if (Statistics.canEnable) Statistics.popTimer(byTypeStack, startByType)
       }
     }

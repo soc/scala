@@ -140,9 +140,6 @@ trait Contexts { self: Analyzer =>
     var savedTypeBounds: List[(Symbol, Type)] = List() // saved type bounds
        // for type parameters which are narrowed in a GADT
 
-    var typingIndentLevel: Int = 0
-    def typingIndent = "  " * typingIndentLevel
-
     var buffer: Set[AbsTypeError] = _
     var warningsBuffer: Set[(Position, String)] = _
 
@@ -281,7 +278,6 @@ trait Contexts { self: Analyzer =>
       c.inSelfSuperCall = inSelfSuperCall
       c.restoreState(this.state)
       c.diagnostic = this.diagnostic
-      c.typingIndentLevel = typingIndentLevel
       c.implicitsEnabled = this.implicitsEnabled
       c.macrosEnabled = this.macrosEnabled
       c.enrichmentEnabled = this.enrichmentEnabled
