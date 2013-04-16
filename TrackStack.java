@@ -4,14 +4,12 @@ import java.util.ArrayDeque;
 import java.util.concurrent.Callable;
 
 public class TrackStack<T> {
-  private ArrayDeque<T> stack;
+  private ArrayDeque<Elem> stack;
   private int nextid;
-  private int depth;
 
   public TrackStack() {
-    this.stack = new ArrayDeque<T>();
+    this.stack = new ArrayDeque<Elem>();
     this.nextid = 1;
-    this.depth = 0;
   }
 
   private int nextId() {
@@ -19,18 +17,33 @@ public class TrackStack<T> {
     finally { nextid += 1; }
   }
 
-  public void push(T elem) {
-    stack.push(elem);
+  private class Elem {
+    private T elem;
+    private int id;
+
+    Elem(T elem) {
+      this.elem = elem;
+      this.id = nextId();
+    }
+
+    public int id() { return id; }
+    public T elem() { return elem; }
+
+    @Override public String toString() {
+      return String.format("Elem(id=%s, %s)", id, elem);
+    }
   }
 
-  public void pop(T elem) {
-    T popped = stack.pop();
-    assert(elem == popped);
-  }
+  public int popId() { return stack.pop().id(); }
+  public T popElem() { return stack.pop().elem(); }
+  public T headElem() { return stack.peek().elem(); }
+  public int headId() { return stack.peek().id(); }
+  public int depth() { return stack.size(); }
+  public void push(T elem) { stack.push(new Elem(elem)); }
 
   public <U> U runWith(T elem, Callable<U> op) throws Exception {
     push(elem);
     try     { return op.call(); }
-    finally { pop(elem); }
+    finally { stack.pop(); }
   }
 }
