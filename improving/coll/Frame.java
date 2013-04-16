@@ -1,4 +1,4 @@
-package improving;
+package improving.coll;
 
 public class Frame<T> {
   private T elem;

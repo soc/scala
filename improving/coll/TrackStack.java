@@ -1,4 +1,4 @@
-package improving;
+package improving.coll;
 
 import java.util.ArrayDeque;
 import java.util.Iterator;
