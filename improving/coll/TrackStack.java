@@ -4,10 +4,6 @@ import java.util.ArrayDeque;
 import java.util.Iterator;
 import java.util.concurrent.Callable;
 
-interface TrackStackCallBack<T> {
-  public void done(Frame<T> frame, int currentId);
-}
-
 public class TrackStack<T> {
   private ArrayDeque<Frame<T>> stack;
   private int id;
