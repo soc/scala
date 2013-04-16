@@ -1,5 +1,5 @@
 package improving;
 
-public interface TrackStackCallBack<T> {
-  public void done(Frame<T> frame, int currentId);
+public interface TrackStackCallBack<T, U> {
+  public void done(Frame<T> in, Frame<U> out);
 }

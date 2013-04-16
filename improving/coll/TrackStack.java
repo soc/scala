@@ -10,7 +10,7 @@ public class TrackStack<T> {
 
   public TrackStack() {
     this.stack = new ArrayDeque<Frame<T>>();
-    this.nextid = 1;
+    this.id = 1;
   }
 
   private int nextId() {
@@ -18,31 +18,36 @@ public class TrackStack<T> {
     finally { id += 1; }
   }
 
-  public Frame<T> pop() { return stack.pop().elem(); }
-  public Frame<T> head() { return stack.peek().elem(); }
+  public Frame<T> pop() { return stack.pop(); }
+  public Frame<T> head() { return stack.peek(); }
   public int depth() { return stack.size(); }
-  public void push(T elem) { stack.push(new Frame(elem, nextId())); }
+  public void push(T elem) { stack.push(new Frame<T>(elem, nextId())); }
 
-  public <U> U runWith(T elem) throws Exception {
-    runWith(new TrackStackCallBack<T>() {
-      public void done(Frame<T> frame, int currentDepth, int currentId) {
-        System.err.printf("%s currentDepth=%s currentId=%s\n", frame, currentDepth, currentId);
+  public <U> U runWith(T in, Callable<U> op) throws Exception {
+    TrackStackCallBack<T, U> callback = (
+      new TrackStackCallBack<T, U>() {
+        public void done(Frame<T> in, Frame<U> out) {
+          System.err.printf("%s %s\n", in, out);
+        }
       }
-    });
+    );
+
+    return this.runWith(in, op, callback);
   }
 
-  public <U> U runWith(T elem, TrackStackCallBack<U> callback) throws Exception {
-    push(elem);
-    try     { return op.call(); }
-    finally { callback.done(stack.pop(), id); }
+  public <U> U runWith(T in, Callable<U> op, TrackStackCallBack<T, U> callback) throws Exception {
+    push(in);
+    U out = null;
+    try     { out = op.call(); return out; }
+    finally { callback.done(stack.pop(), new Frame<U>(out, id)); }
   }
 
   @Override public String toString() {
     int depth = 0;
     StringBuilder sb = new StringBuilder();
-    Iterator<Elem> it = stack.descendingIterator();
+    Iterator<Frame<T>> it = stack.descendingIterator();
     while (it.hasNext()) {
-      T x = it.next().elem();
+      Frame<T> x = it.next();
       for (int i = 0; i < depth; i++) {
         sb.append("  ");
       }
