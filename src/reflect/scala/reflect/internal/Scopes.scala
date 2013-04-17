@@ -10,6 +10,17 @@ import scala.annotation.tailrec
 
 trait Scopes extends api.Scopes { self: SymbolTable =>
 
+  private val printOnScopeEnter = sys.props contains "scalac.debug.scope"
+  private def scopeEnterDebugString(sym: Symbol, scope: Scope): String = {
+    def size   = scope.size
+    def depth  = scope.nestingLevel
+    def clazz  = sym.shortSymbolClass
+    def name   = sym.nameString
+    def oname  = sym.owner.kindString + " " + sym.owner.fullNameString
+
+    f"""${sym.id}%-6d size=$size%3d  $clazz%20s  $name%-20s     in     $oname"""
+  }
+
   /** An ADT to represent the results of symbol name lookups.
    */
   sealed trait NameLookup { def symbol: Symbol ; def isSuccess = false }
@@ -111,6 +122,9 @@ trait Scopes extends api.Scopes { self: SymbolTable =>
     /** enter a scope entry
      */
     protected def enterEntry(e: ScopeEntry) {
+      if (printOnScopeEnter)
+        println(scopeEnterDebugString(e.sym, this))
+
       flushElemsCache()
       if (hashtable ne null)
         enterInHash(e)
