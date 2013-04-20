@@ -5,6 +5,28 @@
 package scala.reflect
 package api
 
+final class TypedTree[+T <: Trees#Tree] private (val tree: T) extends AnyVal { }
+
+object TypedTree {
+  implicit def lowerTypedTree[T <: Trees#Tree](decoratedTree: TypedTree[T]): T = decoratedTree.tree
+
+  def apply[T <: Trees#Tree](tree: T) = {
+    assert(tree.tpe ne null, "Untyped Tree passed to TypedTree: " + tree)
+    new TypedTree(tree)
+  }
+}
+
+final class SymboledTree[+T <: Trees#Tree] private (val tree: T) extends AnyVal { }
+
+object SymboledTree {
+  implicit def lowerSymboledTree[T <: Trees#Tree](decoratedTree: SymboledTree[T]): T = decoratedTree.tree
+
+  def apply[T <: Trees#Tree](tree: T) = {
+    assert(tree.symbol ne null, "Tree with no Symbol passed to SymboledTree: " + tree)
+    new SymboledTree(tree)
+  }
+}
+
 /**
  * <span class="badge badge-red" style="float: right;">EXPERIMENTAL</span>
  *
