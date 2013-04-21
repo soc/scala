@@ -72,11 +72,6 @@ trait Erasure {
     if (cls.owner.isClass) cls.owner.tpe_* else pre // why not cls.isNestedClass?
   }
 
-  def unboxDerivedValueClassMethod(clazz: Symbol): Symbol =
-    (clazz.info.decl(nme.unbox)) orElse
-    (clazz.info.decls.find(_ hasAllFlags PARAMACCESSOR | METHOD) getOrElse
-     NoSymbol)
-
   def underlyingOfValueClass(clazz: Symbol): Type =
     clazz.derivedValueClassUnbox.tpe.resultType
 
@@ -93,6 +88,13 @@ trait Erasure {
       scalaErasure(underlyingOfValueClass(clazz))
     }
   }
+
+  /** The type of the argument of a value class reference after erasure.
+   */
+  def erasedUnboxedType(tpe: ErasedValueType) = (
+    if (tpe.isParametric) boxingErasure(tpe.unboxedType)
+    else scalaErasure(tpe.unboxedType)
+  )
 
   /** Does this vakue class have an underlying type that's a type parameter of
    *  the class itself?

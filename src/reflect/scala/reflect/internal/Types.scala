@@ -3356,6 +3356,20 @@ trait Types
    *  @param   original  The underlying type before erasure
    */
   abstract case class ErasedValueType(original: TypeRef) extends UniqueType {
+
+    /** Does this value class have an underlying type that's a type
+     *  parameter of the class itself?
+     */
+    def isParametric = {
+      assert(!phase.erasedTypes, phase)
+      valueTypeParams exists (unboxedPrototype contains _)
+    }
+    def underlyingClass   = original.sym
+    def valueTypeParams   = underlyingClass.typeParams
+    def unboxMethod       = underlyingClass.derivedValueClassUnbox
+    def unboxedPrototype  = unboxMethod.tpe.resultType.normalize
+    def unboxedType       = (original memberType unboxMethod).resultType
+
     override def safeToString = "ErasedValueType("+original+")"
   }
 
