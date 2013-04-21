@@ -230,7 +230,7 @@ object ScalaRunTime {
     val high = (lv >>> 32).toInt
     low ^ (high + lowSign)
   }
-  def hash(x: Number): Int  = runtime.BoxesRunTime.hashFromNumber(x)
+  def hash(x: Number): Int = if (x eq null) 0 else BoxesRunTime.hashFromNumber(x)
 
   // The remaining overloads are here for completeness, but the compiler
   // inlines these definitions directly so they're not generally used.
