@@ -129,19 +129,14 @@ abstract class Erasure extends AddInterfaces
         if (sym == ArrayClass && args.nonEmpty)
           if (unboundedGenericArrayLevel(tp1) == 1) ObjectClass.tpe
           else mapOver(tp1)
-        else if (sym == AnyClass || sym == AnyValClass || sym == SingletonClass)
-          ObjectClass.tpe
-        else if (sym == UnitClass)
-          BoxedUnitClass.tpe
-        else if (sym == NothingClass)
-          RuntimeNothingClass.tpe
-        else if (sym == NullClass)
-          RuntimeNullClass.tpe
         else {
-          val pre1 = apply(pre)
-          val args1 = args mapConserve argApply
-          if ((pre1 eq pre) && (args1 eq args)) tp1
-          else TypeRef(pre1, sym, args1)
+          val sym1 = erasedClassForClass(sym)
+          if (sym ne sym1) sym1.tpe else {
+            val pre1 = apply(pre)
+            val args1 = args mapConserve argApply
+            if ((pre1 eq pre) && (args1 eq args)) tp1
+            else TypeRef(pre1, sym, args1)
+          }
         }
       case tp1 @ MethodType(params, restpe) =>
         val params1 = mapOver(params)
@@ -244,9 +239,12 @@ abstract class Erasure extends AddInterfaces
               )
             )
           }
+          val erasedSym = erasedClassForClass(sym)
 
+          if (sym ne erasedSym)
+            jsig(erasedSym.tpe)
           // If args isEmpty, Array is being used as a type constructor
-          if (sym == ArrayClass && args.nonEmpty) {
+          else if (sym == ArrayClass && args.nonEmpty) {
             if (unboundedGenericArrayLevel(tp) == 1) jsig(ObjectClass.tpe)
             else ARRAY_TAG.toString+(args map (jsig(_))).mkString
           }
@@ -254,18 +252,9 @@ abstract class Erasure extends AddInterfaces
             assert(!sym.isAliasType, "Unexpected alias type: " + sym)
             "" + TVAR_TAG + sym.name + ";"
           }
-          else if (sym == AnyClass || sym == AnyValClass || sym == SingletonClass)
-            jsig(ObjectClass.tpe)
-          else if (sym == UnitClass)
-            jsig(BoxedUnitClass.tpe)
-          else if (sym == NothingClass)
-            jsig(RuntimeNothingClass.tpe)
-          else if (sym == NullClass)
-            jsig(RuntimeNullClass.tpe)
           else if (isPrimitiveValueClass(sym)) {
-            if (!primitiveOK) jsig(ObjectClass.tpe)
-            else if (sym == UnitClass) jsig(BoxedUnitClass.tpe)
-            else abbrvTag(sym).toString
+            if (primitiveOK) abbrvTag(sym).toString
+            else jsig(ObjectClass.tpe)
           }
           else if (sym.isDerivedValueClass) {
             val unboxed     = sym.derivedValueClassUnbox.info.finalResultType
@@ -719,13 +708,16 @@ abstract class Erasure extends AddInterfaces
             case _ =>
           }
             tree
+        case Select(qual, nme.CONSTRUCTOR) =>
+          // For constructors associated with classes with non-standard erasures.
+          val erasedOwner = erasedClassForClass(tree.symbol.safeOwner)
+          if (tree.symbol.owner eq erasedOwner) tree
+          else tree setSymbol erasedOwner.primaryConstructor
+
         case Select(qual, name) =>
-          if (tree.symbol == NoSymbol) {
+          if (tree.symbol == NoSymbol)
             tree
-          } else if (name == nme.CONSTRUCTOR) {
-            if (tree.symbol.owner == AnyValClass) tree.symbol = ObjectClass.primaryConstructor
-            tree
-          } else if (tree.symbol == Any_asInstanceOf)
+          else if (tree.symbol == Any_asInstanceOf)
             adaptMember(atPos(tree.pos)(Select(qual, Object_asInstanceOf)))
           else if (tree.symbol == Any_isInstanceOf)
             adaptMember(atPos(tree.pos)(Select(qual, Object_isInstanceOf)))

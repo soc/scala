@@ -214,6 +214,7 @@ trait StdNames {
 
     final val Any: NameType             = "Any"
     final val AnyVal: NameType          = "AnyVal"
+    final val BoxedAnyVal: NameType     = "BoxedAnyVal"
     final val Mirror: NameType          = "Mirror"
     final val Nothing: NameType         = "Nothing"
     final val Null: NameType            = "Null"
