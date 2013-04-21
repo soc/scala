@@ -11,6 +11,19 @@ trait Erasure {
   import global._
   import definitions._
 
+  /** Types carrying certain symbols erase to different classes.
+   *  Returns the argument for all others.
+   */
+  def erasedClassForClass(sym: Symbol): Symbol = sym match {
+    case AnyClass       => ObjectClass
+    case AnyValClass    => BoxedAnyValClass
+    case SingletonClass => ObjectClass
+    case UnitClass      => BoxedUnitClass
+    case NothingClass   => RuntimeNothingClass
+    case NullClass      => RuntimeNullClass
+    case _              => sym
+  }
+
   /** An extractor object for generic arrays */
   object GenericArray {
 
@@ -106,13 +119,14 @@ trait Erasure {
   }
 
   abstract class ErasureMap extends TypeMap {
-    private lazy val ObjectArray  = arrayType(ObjectClass.tpe)
     private lazy val ErasedObject = erasedTypeRef(ObjectClass)
+    private lazy val ErasedUnit   = erasedTypeRef(BoxedUnitClass)
+    private lazy val ErasedAnyVal = erasedTypeRef(BoxedAnyValClass)
 
     def mergeParents(parents: List[Type]): Type
 
     def eraseNormalClassRef(pre: Type, clazz: Symbol): Type =
-      typeRef(apply(rebindInnerClass(pre, clazz)), clazz, List()) // #2585
+      typeRef(apply(rebindInnerClass(pre, clazz)), clazz, Nil) // #2585
 
     protected def eraseDerivedValueClassRef(tref: TypeRef): Type = erasedValueClassArg(tref)
 
@@ -121,16 +135,13 @@ trait Erasure {
         tp
       case st: SubType =>
         apply(st.supertype)
+      case TypeRef(pre, ArrayClass, arg :: Nil) =>
+        if (unboundedGenericArrayLevel(tp) == 1) ErasedObject
+        else typeRef(apply(pre), ArrayClass, applyInArray(arg) :: Nil)
       case tref @ TypeRef(pre, sym, args) =>
-        if (sym == ArrayClass)
-          if (unboundedGenericArrayLevel(tp) == 1) ObjectClass.tpe
-          else if (args.head.typeSymbol.isBottomClass) ObjectArray
-          else typeRef(apply(pre), sym, args map applyInArray)
-        else if (sym == AnyClass || sym == AnyValClass || sym == SingletonClass) ErasedObject
-        else if (sym == UnitClass) erasedTypeRef(BoxedUnitClass)
-        else if (sym.isRefinementClass) apply(mergeParents(tp.parents))
+        if (sym.isRefinementClass) apply(sym.info)
         else if (sym.isDerivedValueClass) eraseDerivedValueClassRef(tref)
-        else if (sym.isClass) eraseNormalClassRef(pre, sym)
+        else if (sym.isClass) eraseNormalClassRef(pre, erasedClassForClass(sym))
         else apply(sym.info asSeenFrom (pre, sym.owner)) // alias type or abstract type
       case PolyType(tparams, restpe) =>
         apply(restpe)
@@ -157,9 +168,13 @@ trait Erasure {
         mapOver(tp)
     }
 
+    /** This is ensuring that given value class Foo(value: Int), Array[Foo] erases
+     *  to Array[Foo] and not Array[Int].
+     */
     def applyInArray(tp: Type): Type = tp match {
-      case TypeRef(pre, sym, args) if (sym.isDerivedValueClass) => eraseNormalClassRef(pre, sym)
-      case _ => apply(tp)
+      case TypeRef(_, NullClass | NothingClass, _)         => ObjectClass.tpe
+      case TypeRef(pre, sym, _) if sym.isDerivedValueClass => eraseNormalClassRef(pre, sym)
+      case _                                               => apply(tp)
     }
   }
 

@@ -291,6 +291,8 @@ trait Definitions extends api.StandardDefinitions {
     lazy val AnyValTpe  = definitions.AnyValClass.toTypeConstructor
       def AnyVal_getClass = getMemberMethod(AnyValClass, nme.getClass_)
 
+    lazy val BoxedAnyValClass = ScalaPackageClass.info member tpnme.BoxedAnyVal
+
     // bottom types
     lazy val RuntimeNothingClass  = getClassByName(fulltpnme.RuntimeNothing)
     lazy val RuntimeNullClass     = getClassByName(fulltpnme.RuntimeNull)

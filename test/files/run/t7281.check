@@ -1,0 +1,9 @@
+Bippy1 super: class scala.BoxedAnyVal
+Bippy2 super: class scala.BoxedAnyVal
+public <T> T Bippy3.generic1(T)
+public <T> T Bippy3.generic2(T)
+public int Bippy3.boxed1()
+public int Bippy3.unboxed1()
+public int Bippy3.unboxed2()
+public scala.BoxedAnyVal Bippy3.boxed1()
+public scala.BoxedAnyVal Bippy3.boxed2()
