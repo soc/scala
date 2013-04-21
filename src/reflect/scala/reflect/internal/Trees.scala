@@ -538,12 +538,11 @@ trait Trees extends api.Trees { self: SymbolTable =>
     def original: Tree = orig
     def setOriginal(tree: Tree): this.type = {
       def followOriginal(t: Tree): Tree = t match {
-        case tt: TypeTree => followOriginal(tt.original)
-        case t => t
+        case tt: TypeTree if tt.original ne null => followOriginal(tt.original)
+        case t                                   => t
       }
-
-      orig = followOriginal(tree); setPos(tree.pos)
-      this
+      orig = followOriginal(tree)
+      this setPos tree.pos
     }
 
     override def defineType(tp: Type): this.type = {
