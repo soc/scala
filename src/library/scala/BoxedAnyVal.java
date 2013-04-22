@@ -12,4 +12,4 @@ package scala
  *  @see      [[scala.AnyVal]]
  *  @since    2.11
  */
-abstract class BoxedAnyVal
+abstract class BoxedAnyVal { }
