@@ -135,7 +135,7 @@ trait Erasure {
       case st: SubType =>
         apply(st.supertype)
       case TypeRef(pre, ArrayClass, arg :: Nil) =>
-        if (unboundedGenericArrayLevel(tp) == 1) ErasedObject
+        if (unboundedGenericArrayLevel(tp) == 1) ObjectClass.tpe
         else typeRef(apply(pre), ArrayClass, applyInArray(arg) :: Nil)
       case tref @ TypeRef(pre, sym, args) =>
         if (sym.isRefinementClass) apply(sym.info)

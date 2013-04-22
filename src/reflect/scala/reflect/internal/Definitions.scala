@@ -742,6 +742,20 @@ trait Definitions extends api.StandardDefinitions {
     lazy val Any_isInstanceOf = newT1NullaryMethod(AnyClass, nme.isInstanceOf_, FINAL)(_ => booltype)
     lazy val Any_asInstanceOf = newT1NullaryMethod(AnyClass, nme.asInstanceOf_, FINAL)(_.typeConstructor)
 
+    // For some reason isInstanceOf and asInstanceOf have different
+    // names in Object (e.g. "$asInstanceOf" instead of "asInstanceOf")
+    def erasureOfAnyClassMember(sym: Symbol): Symbol = sym match {
+      case Any_==           => Object_==
+      case Any_!=           => Object_!=
+      case Any_##           => Object_##
+      case Any_equals       => Object_equals
+      case Any_hashCode     => Object_hashCode
+      case Any_toString     => Object_toString
+      case Any_isInstanceOf => Object_isInstanceOf
+      case Any_asInstanceOf => Object_asInstanceOf
+      case _                => getMember(ObjectClass, sym.name)
+    }
+
   // A type function from T => Class[U], used to determine the return
     // type of getClass calls.  The returned type is:
     //

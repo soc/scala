@@ -709,10 +709,15 @@ abstract class Erasure extends AddInterfaces
           }
             tree
         case Select(qual, nme.CONSTRUCTOR) =>
+          if (tree.symbol.safeOwner == AnyValClass)
+            tree.symbol = BoxedAnyValClass.primaryConstructor
+
+          tree
           // For constructors associated with classes with non-standard erasures.
-          val erasedOwner = erasedClassForClass(tree.symbol.safeOwner)
-          if (tree.symbol.owner eq erasedOwner) tree
-          else tree setSymbol erasedOwner.primaryConstructor
+          // val owner = tree.symbol.safeOwner
+          // val erasedOwner = erasedClassForClass(owner)
+          // if (owner eq erasedOwner) tree
+          // else tree setSymbol erasedOwner.primaryConstructor
 
         case Select(qual, name) =>
           if (tree.symbol == NoSymbol)
