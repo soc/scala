@@ -6,10 +6,10 @@
 **                          |/                                          **
 \*                                                                      */
 
-package scala
+package scala;
 
 /** An internal class used in boxed representations of value classes.
  *  @see      [[scala.AnyVal]]
  *  @since    2.11
  */
-abstract class BoxedAnyVal { }
+public abstract class BoxedAnyVal { }
