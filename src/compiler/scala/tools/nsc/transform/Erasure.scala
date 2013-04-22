@@ -673,10 +673,102 @@ abstract class Erasure extends AddInterfaces
      *     x.m where m is the corresponding member of the boxed class.
      */
     private def adaptMember(tree: Tree): Tree = {
+      def sym       = tree.symbol
+      def primitive = isPrimitiveValueMember(sym)
+      def symOwner  = sym.safeOwner
+      def needsAdapt(qual: Tree, tpe: Tree) = (
+           isErasedValueType(tpe)
+        || !primitive &&  isPrimitiveValueType(tpe)
+        ||  primitive && !isPrimitiveValueType(tpe)
+        || (symOwner == AnyClass)
+      )
+
+      def adaptAnyMember(qual: Tree, targ: Tree) = {
+        def needsAdapt = isPrimitiveValueType(targ.tpe) || isErasedValueType(targ.tpe)
+
+        sym match {
+          case Any_asInstanceOf if needsAdapt =>
+            val noNullCheckNeeded = targ.tpe match {
+              case ErasedValueType(tref) =>
+                enteringPhase(currentRun.erasurePhase) {
+                  isPrimitiveValueClass(erasedValueClassArg(tref).typeSymbol)
+                }
+              case _ =>
+                true
+            }
+            if (noNullCheckNeeded) unbox(qual1, targ.tpe)
+            else {
+              val untyped = gen.evalOnce(qual1, context.owner, context.unit) { qual =>
+                If(Apply(Select(qual(), nme.eq), List(Literal(Constant(null)) setType NullClass.tpe)),
+                   Literal(Constant(null)) setType targ.tpe,
+                   unbox(qual(), targ.tpe))
+              }
+              typed(untyped)
+            }
+          case Any_isInstanceOf if needsAdapt =>
+            targ.tpe match {
+              case ErasedValueType(tref) => targ setType tref.sym.tpe
+              case _                     =>
+            }
+            tree
+          case _ =>
+        }
+      }
+
+      if (symOwner == AnyClass) {
+        tree match {
+          case Apply(TypeApply(Select(qual, _), targ :: Nil), Nil) => adaptAnyMember(qual, targ)
+          case Select(qual, _)                                     => adaptMember(atPos(tree.pos)(Select(qual, erasureOfAnyClassMember(sym))))
+          case tree                                                => tree
+        }
+      }
+      else
+
+          case Apply(TypeApply(sel @ Select(qual, name), List(targ)), Nil) if sym == Any_asInstanceOf =>
+            val qual1 = typedQualifier(qual, NOmode, ObjectClass.tpe) // need to have an expected type, see #3037
+
+  //           if (isPrimitiveValueType(targ.tpe) || isErasedValueType(targ.tpe)) {
+  //             val noNullCheckNeeded = targ.tpe match {
+  //               case ErasedValueType(tref) =>
+  //                 enteringPhase(currentRun.erasurePhase) {
+  //                   isPrimitiveValueClass(erasedValueClassArg(tref).typeSymbol)
+  //                 }
+  //               case _ =>
+  //                 true
+  //             }
+  //             if (noNullCheckNeeded) unbox(qual1, targ.tpe)
+  //             else {
+  //               val untyped =
+  // //                util.trace("new asinstanceof test") {
+  //                   gen.evalOnce(qual1, context.owner, context.unit) { qual =>
+  //                     If(Apply(Select(qual(), nme.eq), List(Literal(Constant(null)) setType NullClass.tpe)),
+  //                        Literal(Constant(null)) setType targ.tpe,
+  //                        unbox(qual(), targ.tpe))
+  //                   }
+  // //                }
+  //               typed(untyped)
+  //             }
+  //           } else tree
+          case Apply(TypeApply(sel @ Select(qual, name), List(targ)), List()) if sym == Any_isInstanceOf =>
+            targ.tpe match {
+              case ErasedValueType(tref) => targ.setType(tref.sym.tpe)
+              case _ =>
+            }
+              tree
+
+              case Select(qual, name) if symOwner == AnyClass =>
+                adaptMember(atPos(tree.pos)(Select(qual, erasureOfAnyClassMember(sym))))
+
+      }
+
+      if (symOwner == AnyClass)
+        adaptAnyMember()
+      else {
+
       //Console.println("adaptMember: " + tree);
       tree match {
         case Apply(TypeApply(sel @ Select(qual, name), List(targ)), List())
-        if tree.symbol == Any_asInstanceOf =>
+        if sym == Any_asInstanceOf =>
           val qual1 = typedQualifier(qual, NOmode, ObjectClass.tpe) // need to have an expected type, see #3037
 
           if (isPrimitiveValueType(targ.tpe) || isErasedValueType(targ.tpe)) {
@@ -702,49 +794,52 @@ abstract class Erasure extends AddInterfaces
             }
           } else tree
         case Apply(TypeApply(sel @ Select(qual, name), List(targ)), List())
-        if tree.symbol == Any_isInstanceOf =>
+        if sym == Any_isInstanceOf =>
           targ.tpe match {
             case ErasedValueType(tref) => targ.setType(tref.sym.tpe)
             case _ =>
           }
             tree
         case Select(qual, nme.CONSTRUCTOR) =>
-          val owner = tree.symbol.safeOwner
           // For constructors associated with classes with non-standard erasures.
-          val erasedOwner = erasedClassForClass(owner)
-          if (owner eq erasedOwner) tree
+          val erasedOwner = erasedClassForClass(symOwner)
+          if (symOwner eq erasedOwner) tree
           else tree setSymbol erasedOwner.primaryConstructor
 
-        case Select(qual, name) if tree.symbol.safeOwner == AnyClass =>
-          adaptMember(atPos(tree.pos)(Select(qual, erasureOfAnyClassMember(tree.symbol))))
+        case Select(qual, name) if symOwner == AnyClass =>
+          adaptMember(atPos(tree.pos)(Select(qual, erasureOfAnyClassMember(sym))))
 
         case Select(qual, name) =>
-          if (tree.symbol == NoSymbol)
+          if (sym == NoSymbol)
             tree
           else {
-            var qual1 = typedQualifier(qual)
-            if ((isPrimitiveValueType(qual1.tpe) && !isPrimitiveValueMember(tree.symbol)) ||
-                 isErasedValueType(qual1.tpe))
-              qual1 = box(qual1, "owner "+tree.symbol.owner)
-            else if (!isPrimitiveValueType(qual1.tpe) && isPrimitiveValueMember(tree.symbol))
-              qual1 = unbox(qual1, tree.symbol.owner.tpe)
-
-            def selectFrom(qual: Tree) = treeCopy.Select(tree, qual, name)
-
-            if (isPrimitiveValueMember(tree.symbol) && !isPrimitiveValueType(qual1.tpe)) {
-              tree.symbol = NoSymbol
-              selectFrom(qual1)
-            } else if (isMethodTypeWithEmptyParams(qual1.tpe)) {
-              assert(qual1.symbol.isStable, qual1.symbol)
-              val applied = Apply(qual1, List()) setPos qual1.pos setType qual1.tpe.resultType
-              adaptMember(selectFrom(applied))
-            } else if (!(qual1.isInstanceOf[Super] || (qual1.tpe.typeSymbol isSubClass tree.symbol.owner))) {
-              assert(tree.symbol.owner != ArrayClass)
-              selectFrom(cast(qual1, tree.symbol.owner.tpe))
-            } else {
-              selectFrom(qual1)
+            // Primitive qualifier, non-primitive operation: box the qualifier
+            // Non-primitive qualifier, primitive operation: unbox the qualifier
+            // Qualifier needs empty parentheses, wrap it in Apply(m, Nil)
+            // Otherwise, leave qualifier alone
+            val qual1 = typedQualifier(qual) match {
+              case q if isErasedValueType(q.tpe) || !primitive && isPrimitiveValueType(q.tpe) => box(q, s"owner $symOwner")
+              case q if primitive && !isPrimitiveValueType(q.tpe)                             => unbox(q, symOwner.tpe)
+              case q                                                                          => q
             }
-          }
+            def adaptedQualifier = {
+              // If primitive op on non-primitive after unboxing attempt, clear the tree symbol
+              // (I assume this is sending an error signal - why this way, anyone?)
+              def erroneous = primitive && !isPrimitiveValueType(qual1.tpe) && {
+                sym = NoSymbol
+                true
+              }
+              def noCast = qual1 match {
+                case Super(_, _) => true
+                case _           => qual1.tpe.typeSymbol isSubClass symOwner
+              }
+              if (erroneous || noCast) qual1 else cast(qual1, symOwner.tpe)
+            }
+
+            if (isMethodTypeWithEmptyParams(qual1.tpe))
+              adaptMember(treeCopy.Select(tree, gen.mkApplyIfNeeded(qual1), name)) // Notice this case is fed back into adapt.
+            else
+              treeCopy.Select(tree, adaptedQualifier, name)
         case SelectFromArray(qual, name, erasure) =>
           var qual1 = typedQualifier(qual)
           if (!(qual1.tpe <:< erasure)) qual1 = cast(qual1, erasure)
