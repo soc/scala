@@ -1143,6 +1143,19 @@ trait Definitions extends api.StandardDefinitions {
       else if (sym == BoxedUnitClass) UnitClass
       else boxedClass.map(kvp => (kvp._2: Symbol, kvp._1)).getOrElse(sym, NoSymbol)
 
+    /** Types carrying certain symbols erase to different classes.
+     *  Returns the argument for all others.
+     */
+    def boxedClassIfUnboxed(sym: Symbol): Symbol = sym match {
+      case AnyClass       => ObjectClass
+      case AnyValClass    => BoxedAnyValClass
+      case SingletonClass => ObjectClass
+      case UnitClass      => BoxedUnitClass
+      case NothingClass   => RuntimeNothingClass
+      case NullClass      => RuntimeNullClass
+      case _              => boxedClass.getOrElse(sym, sym)
+    }
+
     /** Is type's symbol a numeric value class? */
     def isNumericValueType(tp: Type): Boolean = tp match {
       case TypeRef(_, sym, _) => isNumericValueClass(sym)

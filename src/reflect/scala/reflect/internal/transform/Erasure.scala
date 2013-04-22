@@ -10,19 +10,6 @@ trait Erasure {
   import global._
   import definitions._
 
-  /** Types carrying certain symbols erase to different classes.
-   *  Returns the argument for all others.
-   */
-  def erasedClassForClass(sym: Symbol): Symbol = sym match {
-    case AnyClass       => ObjectClass
-    case AnyValClass    => BoxedAnyValClass
-    case SingletonClass => ObjectClass
-    case UnitClass      => BoxedUnitClass
-    case NothingClass   => RuntimeNothingClass
-    case NullClass      => RuntimeNullClass
-    case _              => sym
-  }
-
   /** An extractor object for generic arrays */
   object GenericArray {
 
@@ -140,7 +127,7 @@ trait Erasure {
       case tref @ TypeRef(pre, sym, args) =>
         if (sym.isRefinementClass) apply(sym.info)
         else if (sym.isDerivedValueClass) eraseDerivedValueClassRef(tref)
-        else if (sym.isClass) eraseNormalClassRef(pre, erasedClassForClass(sym))
+        else if (sym.isClass) eraseNormalClassRef(pre, boxedClassIfUnboxed(sym))
         else apply(sym.info asSeenFrom (pre, sym.owner)) // alias type or abstract type
       case PolyType(tparams, restpe) =>
         apply(restpe)

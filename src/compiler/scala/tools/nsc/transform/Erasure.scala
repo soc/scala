@@ -129,14 +129,13 @@ abstract class Erasure extends AddInterfaces
         if (sym == ArrayClass && args.nonEmpty)
           if (unboundedGenericArrayLevel(tp1) == 1) ObjectClass.tpe
           else mapOver(tp1)
-        else {
-          val sym1 = erasedClassForClass(sym)
-          if (sym ne sym1) sym1.tpe else {
+        else boxedClassIfUnboxed(sym) match {
+          case sym1 if sym1 ne sym => sym1.tpe
+          case _                   =>
             val pre1 = apply(pre)
             val args1 = args mapConserve argApply
             if ((pre1 eq pre) && (args1 eq args)) tp1
             else TypeRef(pre1, sym, args1)
-          }
         }
       case tp1 @ MethodType(params, restpe) =>
         val params1 = mapOver(params)
@@ -516,8 +515,16 @@ abstract class Erasure extends AddInterfaces
 
     private def isPrimitiveValueType(tpe: Type) = isPrimitiveValueClass(tpe.typeSymbol)
 
-    private def isDifferentErasedValueType(tpe: Type, other: Type) =
-      isErasedValueType(tpe) && (tpe ne other)
+    private def isDifferentErasedValueType(tpe: Type, other: Type) = printResult(s"isDifferentErasedValueType($tpe, $other)")(
+         isErasedValueType(tpe)
+      && (tpe ne other)
+      && {
+        println(s"isDifferentErasedValueType($tpe, $other) == true. Other erased? $other, ${isErasedValueType(other)}")
+        true
+      }
+      // && printResult(s"isDifferentErasedValueType($tpe, $other)/ other erased? ${isErasedValueType(other)}")(true)
+      // && isErasedValueType(other)
+    )
 
     private def isPrimitiveValueMember(sym: Symbol) =
       sym != NoSymbol && isPrimitiveValueClass(sym.owner)
@@ -534,34 +541,32 @@ abstract class Erasure extends AddInterfaces
         val ldef = deriveLabelDef(tree)(box1)
         ldef setType ldef.rhs.tpe
       case _ =>
-        val tree1 = tree.tpe match {
-          case ErasedValueType(tref) =>
-            val clazz = tref.sym
-            New(clazz, cast(tree, underlyingOfValueClass(clazz)))
-          case _ =>
-            tree.tpe.typeSymbol match {
-          case UnitClass  =>
-            if (treeInfo isExprSafeToInline tree) REF(BoxedUnit_UNIT)
-            else BLOCK(tree, REF(BoxedUnit_UNIT))
-          case NothingClass => tree // a non-terminating expression doesn't need boxing
-          case x          =>
-            assert(x != ArrayClass)
-            tree match {
-              /* Can't always remove a Box(Unbox(x)) combination because the process of boxing x
-               * may lead to throwing an exception.
-               *
-               * This is important for specialization: calls to the super constructor should not box/unbox specialized
-               * fields (see TupleX). (ID)
-               */
-              case Apply(boxFun, List(arg)) if isSafelyRemovableUnbox(tree, arg) =>
-                log(s"boxing an unbox: ${tree.symbol} -> ${arg.tpe}")
-                arg
-              case _ =>
-                (REF(boxMethod(x)) APPLY tree) setPos (tree.pos) setType ObjectClass.tpe
-            }
-            }
+        typedPos(tree.pos) {
+          tree.tpe match {
+            case ErasedValueType(tref) => New(tref.sym, cast(tree, underlyingOfValueClass(tref.sym)))
+            case _                     =>
+              tree.tpe.typeSymbol match {
+                case UnitClass if treeInfo isExprSafeToInline tree => REF(BoxedUnit_UNIT)
+                case UnitClass                                     => BLOCK(tree, REF(BoxedUnit_UNIT))
+                case NothingClass                                  => tree // a non-terminating expression doesn't need boxing
+                case clazz                                         =>
+                  assert(clazz != ArrayClass, tree)
+                  /* Can't always remove a Box(Unbox(x)) combination because the process of boxing x
+                   * may lead to throwing an exception.
+                   *
+                   * This is important for specialization: calls to the super constructor should not box/unbox specialized
+                   * fields (see TupleX). (ID)
+                   */
+                  tree match {
+                    case Apply(boxFun, arg :: Nil) if isSafelyRemovableUnbox(tree, arg) =>
+                      log(s"boxing an unbox: ${tree.symbol} -> ${arg.tpe}")
+                      arg
+                    case _ =>
+                      (REF(boxMethod(clazz)) APPLY tree) setType ObjectClass.tpe
+                  }
+              }
+          }
         }
-        typedPos(tree.pos)(tree1)
     }
 
     private def unbox(tree: Tree, pt: Type): Tree = {
