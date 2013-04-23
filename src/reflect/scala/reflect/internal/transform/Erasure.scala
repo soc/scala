@@ -106,8 +106,6 @@ trait Erasure {
 
   abstract class ErasureMap extends TypeMap {
     private lazy val ErasedObject = erasedTypeRef(ObjectClass)
-    private lazy val ErasedUnit   = erasedTypeRef(BoxedUnitClass)
-    private lazy val ErasedAnyVal = erasedTypeRef(BoxedAnyValClass)
 
     def mergeParents(parents: List[Type]): Type
 
@@ -171,7 +169,6 @@ trait Erasure {
      *  to Array[Foo] and not Array[Int].
      */
     def applyInArray(tp: Type): Type = tp match {
-      case TypeRef(_, NullClass | NothingClass, _)         => ObjectClass.tpe
       case TypeRef(pre, sym, _) if sym.isDerivedValueClass => eraseNormalClassRef(pre, sym)
       case _                                               => apply(tp)
     }
