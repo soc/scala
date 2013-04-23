@@ -517,7 +517,7 @@ abstract class Erasure extends AddInterfaces
 
     private def isPrimitiveValueType(tpe: Type) = isPrimitiveValueClass(tpe.typeSymbol)
 
-    private def isDifferentErasedValueType(tpe: Type, other: Type) = printResult(s"isDifferentErasedValueType($tpe, $other)")(
+    private def isDifferentErasedValueType(tpe: Type, other: Type) = /*printResult(s"isDifferentErasedValueType($tpe, $other)")*/(
          isErasedValueType(tpe)
       && (tpe ne other)
       && {
