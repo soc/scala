@@ -2480,29 +2480,45 @@ trait Typers extends Adaptations with Tags {
 
     def adaptCase(cdef: CaseDef, mode: Mode, tpe: Type): CaseDef = deriveCaseDef(cdef)(adapt(_, mode, tpe))
 
-    // (Type, needsAdaptation)
-    def ptOrLub(tps: List[Type], pt: Type): (Type, Boolean) =
-      if (isFullyDefined(pt)) (pt, false) else weakLub(tps map (_.deconst))
-    //   val res = if (isFullyDefined(pt)) (pt, false) else weakLub(tps map (_.deconst))
-    //   val res1 = if (res._1.typeSymbolDirect == AnyValClass) UnitClass.tpe else res._1
-    //   (res1, res._2)
-    // }
+    def packedTypesForLub(trees: List[Tree]): List[Type] = trees map (c => packedType(c, context.owner).deconst)
 
-    // printResult(s"ptOrLub(pt=$pt)")(if (isFullyDefined(pt)) (pt, false) else weakLub(tps map (_.deconst)))
-    def ptOrLubPacked(trees: List[Tree], pt: Type) =
-      if (isFullyDefined(pt)) (pt, false) else weakLub(trees map (c => packedType(c, context.owner).deconst))
+    def ptOrLub(tps: List[Type], pt: Type) = (
+      if (isFullyDefined(pt)) (pt, false)
+      else weakLub(tps) match {
+        case NoType => (lub(tps), false)
+        case tpe    => (tpe, true)
+      }
+    )
+    def ptOrLubPacked(trees: List[Tree], pt: Type) = {
+      if (isFullyDefined(pt)) (pt, false)
+      else {
+        val tps = packedTypesForLub(trees)
+        weakLub(tps) match {
+          case NoType => (lub(tps), false)
+          case tpe    => (tpe, true)
+        }
+      }
+    }
 
     // takes untyped sub-trees of a match and type checks them
     def typedMatch(selector: Tree, cases: List[CaseDef], mode: Mode, pt: Type, tree: Tree = EmptyTree): Match = {
       val selector1  = checkDead(typed(selector, EXPRmode | BYVALmode, WildcardType))
       val selectorTp = packCaptured(selector1.tpe.widen).skolemizeExistential(context.owner, selector)
-      val casesTyped = typedCases(cases, selectorTp, pt)
+      var resTp      = pt
+      var casesTyped = typedCases(cases, selectorTp, pt)
 
-      val (resTp, needAdapt) = ptOrLubPacked(casesTyped, pt)
+      if (!isFullyDefined(pt)) {
+        val packed = packedTypesForLub(casesTyped)
+        weakLub(packed) match {
+          case NoType =>
+            resTp = lub(packed)
+          case tpe    =>
+            resTp = tpe
+            casesTyped = casesTyped map (adaptCase(_, mode, resTp))
+        }
+      }
 
-      val casesAdapted = if (!needAdapt) casesTyped else casesTyped map (adaptCase(_, mode, resTp))
-
-      treeCopy.Match(tree, selector1, casesAdapted) setType resTp
+      treeCopy.Match(tree, selector1, casesTyped) setType resTp
     }
 
     // match has been typed -- virtualize it during type checking so the full context is available
