@@ -129,8 +129,10 @@ abstract class Erasure extends AddInterfaces
         if (sym == ArrayClass && args.nonEmpty)
           if (unboundedGenericArrayLevel(tp1) == 1) ObjectClass.tpe
           else mapOver(tp1)
-        else if (sym == AnyClass || sym == AnyValClass || sym == SingletonClass)
+        else if (sym == AnyClass || sym == SingletonClass)
           ObjectClass.tpe
+        else if (sym == AnyValClass)
+          BoxedAnyValClass.tpe
         else if (sym == UnitClass)
           BoxedUnitClass.tpe
         else if (sym == NothingClass)
@@ -254,7 +256,9 @@ abstract class Erasure extends AddInterfaces
             assert(!sym.isAliasType, "Unexpected alias type: " + sym)
             "" + TVAR_TAG + sym.name + ";"
           }
-          else if (sym == AnyClass || sym == AnyValClass || sym == SingletonClass)
+          else if (sym == AnyValClass)
+            jsig(BoxedAnyValClass.tpe)
+          else if (sym == AnyClass || sym == SingletonClass)
             jsig(ObjectClass.tpe)
           else if (sym == UnitClass)
             jsig(BoxedUnitClass.tpe)
