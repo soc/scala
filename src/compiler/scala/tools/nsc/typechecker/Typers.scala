@@ -2480,6 +2480,7 @@ trait Typers extends Adaptations with Tags {
 
     def adaptCase(cdef: CaseDef, mode: Mode, tpe: Type): CaseDef = deriveCaseDef(cdef)(adapt(_, mode, tpe))
 
+    // (Type, needsAdaptation)
     def ptOrLub(tps: List[Type], pt: Type): (Type, Boolean) =
       if (isFullyDefined(pt)) (pt, false) else weakLub(tps map (_.deconst))
     //   val res = if (isFullyDefined(pt)) (pt, false) else weakLub(tps map (_.deconst))

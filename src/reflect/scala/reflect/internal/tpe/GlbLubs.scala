@@ -215,12 +215,16 @@ private[internal] trait GlbLubs {
   }
 
   def weakLub(ts: List[Type]) = (
-    if (ts.nonEmpty && (ts forall isNumericValueType))
+    if (ts.isEmpty)
+      (NothingClass.tpe, true)
+    else if (ts exists (_.typeSymbolDirect == UnitClass))
+      (UnitClass.tpe, true)
+    else if (ts forall isNumericValueType0
       (numericLub(ts), true)
     else if (ts exists typeHasAnnotations)
       (annotationsLub(lub(ts map (_.withoutAnnotations)), ts), true)
     else lub(ts) match {
-      case tp if tp.typeSymbolDirect == AnyValClass => (UnitClass.tpe, false)
+      case tp if tp.typeSymbolDirect == AnyValClass => (UnitClass.tpe, true)
       case tp                                       => (tp, false)
     }
   )
