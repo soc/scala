@@ -2480,8 +2480,16 @@ trait Typers extends Adaptations with Tags {
 
     def adaptCase(cdef: CaseDef, mode: Mode, tpe: Type): CaseDef = deriveCaseDef(cdef)(adapt(_, mode, tpe))
 
-    def ptOrLub(tps: List[Type], pt: Type  )       = if (isFullyDefined(pt)) (pt, false) else weakLub(tps map (_.deconst))
-    def ptOrLubPacked(trees: List[Tree], pt: Type) = if (isFullyDefined(pt)) (pt, false) else weakLub(trees map (c => packedType(c, context.owner).deconst))
+    def ptOrLub(tps: List[Type], pt: Type): (Type, Boolean) =
+      if (isFullyDefined(pt)) (pt, false) else weakLub(tps map (_.deconst))
+    //   val res = if (isFullyDefined(pt)) (pt, false) else weakLub(tps map (_.deconst))
+    //   val res1 = if (res._1.typeSymbolDirect == AnyValClass) UnitClass.tpe else res._1
+    //   (res1, res._2)
+    // }
+
+    // printResult(s"ptOrLub(pt=$pt)")(if (isFullyDefined(pt)) (pt, false) else weakLub(tps map (_.deconst)))
+    def ptOrLubPacked(trees: List[Tree], pt: Type) =
+      if (isFullyDefined(pt)) (pt, false) else weakLub(trees map (c => packedType(c, context.owner).deconst))
 
     // takes untyped sub-trees of a match and type checks them
     def typedMatch(selector: Tree, cases: List[CaseDef], mode: Mode, pt: Type, tree: Tree = EmptyTree): Match = {
@@ -3991,6 +3999,7 @@ trait Typers extends Adaptations with Tags {
     }
 
     def typed1(tree: Tree, mode: Mode, pt: Type): Tree = {
+      def isInferringType = pt eq WildcardType
       def isPatternMode = mode.inPatternMode
       def inPatternConstructor = mode.inAll(PATTERNmode | FUNmode)
       def isQualifierMode      = mode.inAll(QUALmode)

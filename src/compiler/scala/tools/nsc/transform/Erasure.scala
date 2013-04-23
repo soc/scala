@@ -132,7 +132,7 @@ abstract class Erasure extends AddInterfaces
         else if (sym == AnyClass || sym == SingletonClass)
           ObjectClass.tpe
         else if (sym == AnyValClass)
-          BoxedAnyValClass.tpe
+          ObjectClass.tpe
         else if (sym == UnitClass)
           BoxedUnitClass.tpe
         else if (sym == NothingClass)
@@ -257,7 +257,7 @@ abstract class Erasure extends AddInterfaces
             "" + TVAR_TAG + sym.name + ";"
           }
           else if (sym == AnyValClass)
-            jsig(BoxedAnyValClass.tpe)
+            jsig(ObjectClass.tpe)
           else if (sym == AnyClass || sym == SingletonClass)
             jsig(ObjectClass.tpe)
           else if (sym == UnitClass)
