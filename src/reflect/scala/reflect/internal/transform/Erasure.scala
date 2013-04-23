@@ -116,6 +116,18 @@ trait Erasure {
 
     protected def eraseDerivedValueClassRef(tref: TypeRef): Type = erasedValueClassArg(tref)
 
+    private def erasureBasedOnSymbol(sym: Symbol): Type = {
+      if (sym.isRefinementClass) apply(sym.info)
+      else sym match {
+        case AnyClass       => ObjectClass.tpe
+        case AnyValClass    => BoxedAnyValClass.tpe
+        case SingletonClass => ObjectClass.tpe
+        case NothingClass   => RuntimeNothingClass.tpe
+        case NullClass      => RuntimeNullClass.tpe
+        case _              => NoType
+      }
+    }
+
     def apply(tp: Type): Type = tp match {
       case ConstantType(_) =>
         tp
@@ -124,11 +136,12 @@ trait Erasure {
       case TypeRef(pre, ArrayClass, arg :: Nil) =>
         if (unboundedGenericArrayLevel(tp) == 1) ObjectClass.tpe
         else typeRef(apply(pre), ArrayClass, applyInArray(arg) :: Nil)
-      case tref @ TypeRef(pre, sym, args) =>
-        if (sym.isRefinementClass) apply(sym.info)
-        else if (sym.isDerivedValueClass) eraseDerivedValueClassRef(tref)
-        else if (sym.isClass) eraseNormalClassRef(pre, boxedClassIfUnboxed(sym))
-        else apply(sym.info asSeenFrom (pre, sym.owner)) // alias type or abstract type
+      case tref @ TypeRef(pre, sym, _) =>
+        erasureBasedOnSymbol(sym) orElse (
+          if (sym.isDerivedValueClass) eraseDerivedValueClassRef(tref)
+          else if (sym.isClass) eraseNormalClassRef(pre, sym)
+          else apply(sym.info asSeenFrom (pre, sym.owner)) // alias type or abstract type
+        )
       case PolyType(tparams, restpe) =>
         apply(restpe)
       case ExistentialType(tparams, restpe) =>

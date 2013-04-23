@@ -1146,14 +1146,13 @@ trait Definitions extends api.StandardDefinitions {
     /** Types carrying certain symbols erase to different classes.
      *  Returns the argument for all others.
      */
-    def boxedClassIfUnboxed(sym: Symbol): Symbol = sym match {
+    def phantomErasedClass(sym: Symbol): Symbol = sym match {
       case AnyClass       => ObjectClass
       case AnyValClass    => BoxedAnyValClass
       case SingletonClass => ObjectClass
-      case UnitClass      => BoxedUnitClass
       case NothingClass   => RuntimeNothingClass
       case NullClass      => RuntimeNullClass
-      case _              => boxedClass.getOrElse(sym, sym)
+      case _              => sym
     }
 
     /** Is type's symbol a numeric value class? */

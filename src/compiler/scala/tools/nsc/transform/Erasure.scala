@@ -129,7 +129,7 @@ abstract class Erasure extends AddInterfaces
         if (sym == ArrayClass && args.nonEmpty)
           if (unboundedGenericArrayLevel(tp1) == 1) ObjectClass.tpe
           else mapOver(tp1)
-        else boxedClassIfUnboxed(sym) match {
+        else phantomErasedClass(sym) match {
           case sym1 if sym1 ne sym => sym1.tpe
           case _                   =>
             val pre1 = apply(pre)
@@ -238,20 +238,8 @@ abstract class Erasure extends AddInterfaces
               )
             )
           }
-          val erasedSym = erasedClassForClass(sym)
 
-          if (sym ne erasedSym)
-            jsig(erasedSym.tpe)
-          // If args isEmpty, Array is being used as a type constructor
-          else if (sym == ArrayClass && args.nonEmpty) {
-            if (unboundedGenericArrayLevel(tp) == 1) jsig(ObjectClass.tpe)
-            else ARRAY_TAG.toString+(args map (jsig(_))).mkString
-          }
-          else if (isTypeParameterInSig(sym, sym0)) {
-            assert(!sym.isAliasType, "Unexpected alias type: " + sym)
-            "" + TVAR_TAG + sym.name + ";"
-          }
-          else if (isPrimitiveValueClass(sym)) {
+          if (isPrimitiveValueClass(sym)) {
             if (primitiveOK) abbrvTag(sym).toString
             else jsig(ObjectClass.tpe)
           }
@@ -266,10 +254,24 @@ abstract class Erasure extends AddInterfaces
                 jsig(unboxedSeen, existentiallyBound, toplevel, primitiveOK)
             }
           }
-          else if (sym.isClass)
-            classSig
-          else
-            jsig(erasure(sym0)(tp), existentiallyBound, toplevel, primitiveOK)
+          else {
+            val phantomErasure = phantomErasedClass(sym)
+            if (phantomErasure ne sym)
+              jsig(phantomErasure.tpe)
+            // If args isEmpty, Array is being used as a type constructor
+            else if (sym == ArrayClass && args.nonEmpty) {
+              if (unboundedGenericArrayLevel(tp) == 1) jsig(ObjectClass.tpe)
+              else ARRAY_TAG.toString+(args map (jsig(_))).mkString
+            }
+            else if (isTypeParameterInSig(sym, sym0)) {
+              assert(!sym.isAliasType, "Unexpected alias type: " + sym)
+              "" + TVAR_TAG + sym.name + ";"
+            }
+            else if (sym.isClass)
+              classSig
+            else
+              jsig(erasure(sym0)(tp), existentiallyBound, toplevel, primitiveOK)
+          }
         case PolyType(tparams, restpe) =>
           assert(tparams.nonEmpty)
           val poly = if (toplevel) polyParamSig(tparams) else ""
