@@ -104,8 +104,8 @@ abstract class SpecializeTypes extends InfoTransform with TypingTransformers {
 
   private def specializedOn(sym: Symbol): List[Symbol] = {
     sym getAnnotation SpecializedClass match {
-      case Some(AnnotationInfo(_, Nil, _)) => specializableTypes.map(_.typeSymbol)
-      case Some(ann @ AnnotationInfo(_, args, _)) => {
+      case Opt(AnnotationInfo(_, Nil, _))        => specializableTypes.map(_.typeSymbol)
+      case Opt(ann @ AnnotationInfo(_, args, _)) => {
         args map (_.tpe) flatMap { tp =>
           tp baseType GroupOfSpecializable match {
             case TypeRef(_, GroupOfSpecializable, arg :: Nil) =>
@@ -296,9 +296,9 @@ abstract class SpecializeTypes extends InfoTransform with TypingTransformers {
           if (isSpecializedAnyRefSubtype(tp, orig)) AnyRefClass.tpe
           else tp
         )
-        specializedClass.get((sym, TypeEnv.fromSpecialization(sym, args1))) match {
-          case Some(sym1) => typeRef(pre1, sym1, survivingArgs(sym, args))
-          case None       => typeRef(pre1, sym, args)
+        specializedClass valueGet ((sym, TypeEnv.fromSpecialization(sym, args1))) match {
+          case Opt(sym1) => typeRef(pre1, sym1, survivingArgs(sym, args))
+          case _         => typeRef(pre1, sym, args)
         }
       case _ => tp
     }
@@ -399,7 +399,7 @@ abstract class SpecializeTypes extends InfoTransform with TypingTransformers {
     )
   )
 
-  def isNormalizedMember(m: Symbol) = m.isSpecialized && (info get m exists {
+  def isNormalizedMember(m: Symbol) = m.isSpecialized && (info valueGet m exists {
     case NormalizedMember(_)  => true
     case _                    => false
   })
@@ -636,9 +636,9 @@ abstract class SpecializeTypes extends InfoTransform with TypingTransformers {
       def forwardToOverload(m: Symbol): Symbol = {
         val specMember = enterMember(cloneInSpecializedClass(m, f => (f | OVERRIDE) & ~(DEFERRED | CASEACCESSOR)))
         val om         = specializedOverload(sClass, m, env).setFlag(OVERRIDE)
-        val original = info.get(m) match {
-          case Some(NormalizedMember(tg)) => tg
-          case _                          => m
+        val original = info valueGet m match {
+          case Opt(NormalizedMember(tg)) => tg
+          case _                         => m
         }
         info(specMember) = Forward(om)
         info(om)         = if (original.isDeferred) Forward(original) else Implementation(original)
@@ -648,7 +648,7 @@ abstract class SpecializeTypes extends InfoTransform with TypingTransformers {
         enterMember(om)
       }
 
-      for (m <- normMembers ; if needsSpecialization(outerEnv ++ env, m) && satisfiable(fullEnv)) {
+      for (m <- normMembers ; if needsSpecialization(fullEnv, m) && satisfiable(fullEnv)) {
         if (!m.isDeferred)
           addConcreteSpecMethod(m)
         // specialized members have to be overridable.

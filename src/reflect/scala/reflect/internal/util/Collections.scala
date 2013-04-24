@@ -202,9 +202,9 @@ trait Collections {
     true
   }
 
-  final def transposeSafe[A](ass: List[List[A]]): Option[List[List[A]]] = try {
-    Some(ass.transpose)
+  final def transposeSafe[A](ass: List[List[A]]): Opt[List[List[A]]] = try {
+    Opt(ass.transpose)
   } catch {
-    case _: IllegalArgumentException => None
+    case _: IllegalArgumentException => Opt.None
   }
 }

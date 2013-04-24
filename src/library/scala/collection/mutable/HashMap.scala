@@ -56,13 +56,28 @@ extends AbstractMap[A, B]
 
   override def par = new ParHashMap[A, B](hashTableContents)
 
-  // contains and apply overridden to avoid option allocations.
+  // Overridden to avoid option allocations:
+  //  apply, contains, withDefault{Value}, getOrElseUpdate, update.
   override def contains(key: A): Boolean = findEntry(key) != null
 
   override def apply(key: A): B = {
     val result = findEntry(key)
     if (result eq null) default(key)
     else result.value
+  }
+  override def withDefault(d: A => B): mutable.Map[A, B] =
+    new Map.WithDefault[A, B](this, d) {
+      override def contains(key: A): Boolean = findEntry(key) != null
+      override def apply(key: A): B = findEntry(key) match {
+        case null  => d(key)
+        case entry => entry.value
+      }
+    }
+  override def withDefaultValue(d: B): mutable.Map[A, B] = withDefault(_ => d)
+
+  override def getOrElseUpdate(key: A, op: => B): B = findEntry(key) match {
+    case null  => val d = op; this(key) = d; d
+    case entry => entry.value
   }
 
   def get(key: A): Option[B] = {
@@ -77,7 +92,11 @@ extends AbstractMap[A, B]
     else { val v = e.value; e.value = value; Some(v) }
   }
 
-  override def update(key: A, value: B): Unit = put(key, value)
+  override def update(key: A, value: B) {
+    val e = findOrAddEntry(key, value)
+    if (e ne null)
+      e.value = value
+  }
 
   override def remove(key: A): Option[B] = {
     val e = removeEntry(key)

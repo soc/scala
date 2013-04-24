@@ -325,7 +325,7 @@ private[internal] trait TypeMaps {
   def rawToExistential = new TypeMap {
     private var expanded = immutable.Set[Symbol]()
     def apply(tp: Type): Type = tp match {
-      case TypeRef(pre, sym, List()) if isRawIfWithoutArgs(sym) =>
+      case TypeRef(pre, sym, Nil) if isRawIfWithoutArgs(sym) =>
         if (expanded contains sym) AnyRefClass.tpe
         else try {
           expanded += sym
@@ -533,7 +533,11 @@ private[internal] trait TypeMaps {
       else if (rhsSym.tpe_*.parents exists typeIsErroneous)        // don't be too zealous with the exceptions, see #2641
         ErrorType
       else
-        abort(s"something is wrong: cannot make sense of type application\n  $lhs\n  $rhs")
+        abort(s"""
+          |something is wrong: cannot make sense of type application
+          |  In AsSeenFromMap($seenFromPrefix, $seenFromClass)
+          |  correspondingTypeArgument(lhs=$lhs, rhs=$rhs)")
+          |""".stripMargin.trim)
     }
 
     // 0) @pre: `classParam` is a class type parameter

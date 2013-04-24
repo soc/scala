@@ -757,9 +757,9 @@ trait Contexts { self: Analyzer =>
         else
           qual.tpe
       def collect(sels: List[ImportSelector]): List[ImplicitInfo] = sels match {
-        case List() =>
-          List()
-        case List(ImportSelector(nme.WILDCARD, _, _, _)) =>
+        case Nil =>
+          Nil
+        case ImportSelector(nme.WILDCARD, _, _, _) :: Nil =>
           collectImplicits(pre.implicitMembers, pre, imported = true)
         case ImportSelector(from, _, to, _) :: sels1 =>
           var impls = collect(sels1) filter (info => info.name != from)
@@ -1277,8 +1277,8 @@ trait Contexts { self: Analyzer =>
       importableMembers(qual.tpe) flatMap (transformImport(tree.selectors, _))
 
     private def transformImport(selectors: List[ImportSelector], sym: Symbol): List[Symbol] = selectors match {
-      case List() => List()
-      case List(ImportSelector(nme.WILDCARD, _, _, _)) => List(sym)
+      case Nil => Nil
+      case ImportSelector(nme.WILDCARD, _, _, _) :: Nil => List(sym)
       case ImportSelector(from, _, to, _) :: _ if from == sym.name =>
         if (to == nme.WILDCARD) List()
         else List(sym.cloneSymbol(sym.owner, sym.rawflags, to))

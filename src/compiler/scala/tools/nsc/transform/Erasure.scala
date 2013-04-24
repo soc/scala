@@ -173,7 +173,7 @@ abstract class Erasure extends AddInterfaces
   /** The Java signature of type 'info', for symbol sym. The symbol is used to give the right return
    *  type for constructors.
    */
-  def javaSig(sym0: Symbol, info: Type): Option[String] = enteringErasure {
+  def javaSig(sym0: Symbol, info: Type): Opt[String] = enteringErasure {
     val isTraitSignature = sym0.enclClass.isTrait
 
     def superSig(parents: List[Type]) = {
@@ -310,10 +310,10 @@ abstract class Erasure extends AddInterfaces
       }
     }
     if (needsJavaSig(info)) {
-      try Some(jsig(info, toplevel = true))
-      catch { case ex: UnknownSig => None }
+      try Opt(jsig(info, toplevel = true))
+      catch { case ex: UnknownSig => Opt.None }
     }
-    else None
+    else Opt.None
   }
 
   class UnknownSig extends Exception

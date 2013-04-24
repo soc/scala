@@ -65,11 +65,11 @@ trait BaseTypeSeqs {
             pending += i
             try {
               mergePrefixAndArgs(variants, Variance.Contravariant, lubDepth(variants)) match {
-                case Some(tp0) =>
+                case Opt(tp0) =>
                   pending(i) = false
                   elems(i) = tp0
                   tp0
-                case None =>
+                case _ =>
                   typeError(
                     "no common type instance of base types "+(variants mkString ", and ")+" exists.")
               }

@@ -204,7 +204,7 @@ trait Macros extends scala.tools.reflect.FastTrack with Traces {
   }
 
   private def loadMacroImplBinding(macroDef: Symbol): MacroImplBinding = {
-    val Some(AnnotationInfo(_, List(pickle), _)) = macroDef.getAnnotation(MacroImplAnnotation)
+    val Opt(AnnotationInfo(_, pickle :: Nil, _)) = macroDef.getAnnotation(MacroImplAnnotation)
     MacroImplBinding.unpickle(pickle)
   }
 

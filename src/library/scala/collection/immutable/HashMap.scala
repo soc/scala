@@ -47,6 +47,8 @@ class HashMap[A, +B] extends AbstractMap[A, B]
 
   override def foreach[U](f: ((A, B)) =>  U): Unit = { }
 
+  override def contains(key: A) = contains0(key, computeHash(key))
+
   def get(key: A): Option[B] =
     get0(key, computeHash(key), 0)
 
@@ -76,6 +78,7 @@ class HashMap[A, +B] extends AbstractMap[A, B]
 
   import HashMap.{Merger, MergeFunction, liftMerger}
 
+  private[collection] def contains0(key: A, hash: Int): Boolean = false
   private[collection] def get0(key: A, hash: Int, level: Int): Option[B] = None
 
   private[collection] def updated0[B1 >: B](key: A, hash: Int, level: Int, value: B1, kv: (A, B1), merger: Merger[A, B1]): HashMap[A, B1] =
@@ -176,8 +179,11 @@ object HashMap extends ImmutableMapFactory[HashMap] with BitOperations.Int {
     private[collection] def getHash = hash
     private[collection] def computeHashFor(k: A) = computeHash(k)
 
+    override def contains0(key: A, hash: Int): Boolean =
+      hash == this.hash && key == this.key
+
     override def get0(key: A, hash: Int, level: Int): Option[B] =
-      if (hash == this.hash && key == this.key) Some(value) else None
+      if (contains0(key, hash)) Some(value) else None
 
     // override def updated0[B1 >: B](key: A, hash: Int, level: Int, value: B1, kv: (A, B1)): HashMap[A, B1] =
     //   if (hash == this.hash && key == this.key) new HashMap1(key, hash, value, kv)
@@ -232,8 +238,9 @@ object HashMap extends ImmutableMapFactory[HashMap] with BitOperations.Int {
 
     override def size = kvs.size
 
+    override def contains0(key: A, hash: Int) = hash == this.hash
     override def get0(key: A, hash: Int, level: Int): Option[B] =
-      if (hash == this.hash) kvs.get(key) else None
+      if (contains0(key, hash)) kvs.get(key) else None
 
     private[collection] override def updated0[B1 >: B](key: A, hash: Int, level: Int, value: B1, kv: (A, B1), merger: Merger[A, B1]): HashMap[A, B1] =
       if (hash == this.hash) {
@@ -300,6 +307,7 @@ object HashMap extends ImmutableMapFactory[HashMap] with BitOperations.Int {
 */
     override def size = size0
 
+    override def contains0(key: A, hash: Int) = get0(key, hash, 0).isDefined
     override def get0(key: A, hash: Int, level: Int): Option[B] = {
       val index = (hash >>> level) & 0x1f
       val mask = (1 << index)

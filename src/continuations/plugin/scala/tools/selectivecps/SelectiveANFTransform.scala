@@ -100,7 +100,7 @@ abstract class SelectiveANFTransform extends PluginComponent with Transform with
             val rhs =
               if (cpsParamTypes(tpt.tpe).nonEmpty) removeTailReturns(rhs0)
               else rhs0
-            val rhs1 = transExpr(rhs, None, getExternalAnswerTypeAnn(tpt.tpe))(getExternalAnswerTypeAnn(tpt.tpe).isDefined)
+            val rhs1 = transExpr(rhs, Opt.None, getExternalAnswerTypeAnn(tpt.tpe))(getExternalAnswerTypeAnn(tpt.tpe).isDefined)
 
             debuglog("result "+rhs1)
             debuglog("result is of type "+rhs1.tpe)
@@ -130,15 +130,15 @@ abstract class SelectiveANFTransform extends PluginComponent with Transform with
             def transformPureMatch(tree: Tree, selector: Tree, cases: List[CaseDef]) = {
               val caseVals = cases map { case cd @ CaseDef(pat, guard, body) =>
                 // if (!hasPlusMarker(body.tpe)) body modifyType (_ withAnnotation newPlusMarker()) // TODO: to avoid warning
-                val bodyVal = transExpr(body, None, ext) // ??? triggers "cps-transformed unexpectedly" warning in transTailValue
+                val bodyVal = transExpr(body, Opt.None, ext) // ??? triggers "cps-transformed unexpectedly" warning in transTailValue
                 treeCopy.CaseDef(cd, transform(pat), transform(guard), bodyVal)
               }
               treeCopy.Match(tree, transform(selector), caseVals)
             }
 
             def transformPureVirtMatch(body: Block, selDef: ValDef, cases: List[Tree], matchEnd: Tree) = {
-              val stats = transform(selDef) :: (cases map (transExpr(_, None, ext)))
-              treeCopy.Block(body, stats, transExpr(matchEnd, None, ext))
+              val stats = transform(selDef) :: (cases map (transExpr(_, Opt.None, ext)))
+              treeCopy.Block(body, stats, transExpr(matchEnd, Opt.None, ext))
             }
 
             val body1 = body match {
@@ -158,7 +158,7 @@ abstract class SelectiveANFTransform extends PluginComponent with Transform with
                 treeCopy.Block(body, List(transform(selDef0)), transformPureVirtMatch(mat, selDef, cases, matchEnd))
 
               case _ =>
-                transExpr(body, None, ext)
+                transExpr(body, Opt.None, ext)
             }
 
             debuglog("anf result "+body1+"\nresult is of type "+body1.tpe)
@@ -173,7 +173,7 @@ abstract class SelectiveANFTransform extends PluginComponent with Transform with
 
             atOwner(vd.symbol) {
 
-              val rhs1 = transExpr(rhs, None, None)
+              val rhs1 = transExpr(rhs, Opt.None, Opt.None)
 
               treeCopy.ValDef(vd, mods, name, transform(tpt), rhs1)
             }
@@ -189,7 +189,7 @@ abstract class SelectiveANFTransform extends PluginComponent with Transform with
         case Apply(_,_) =>
           // this allows reset { ... } in object constructors
           // it's kind of a hack to put it here (see note above)
-          transExpr(tree, None, None)
+          transExpr(tree, Opt.None, Opt.None)
 
         case _ =>
           if (hasAnswerTypeAnn(tree.tpe)) {
@@ -227,7 +227,7 @@ abstract class SelectiveANFTransform extends PluginComponent with Transform with
         tp match {
           case TypeRef(_, ByNameParamClass, List(elemtp)) =>
             // note that we're not passing just isAnyParentImpure
-            (Nil, transExpr(a, None, getAnswerTypeAnn(elemtp))(getAnswerTypeAnn(elemtp).isDefined || isAnyParentImpure))
+            (Nil, transExpr(a, Opt.None, getAnswerTypeAnn(elemtp))(getAnswerTypeAnn(elemtp).isDefined || isAnyParentImpure))
           case _ =>
             val (valStm, valExpr, valSpc) = transInlineValue(a, spc)
             spc = valSpc
@@ -261,7 +261,7 @@ abstract class SelectiveANFTransform extends PluginComponent with Transform with
           val (condStats, condVal, spc) = transInlineValue(cond, cpsA)
           val (cpsA2, cpsR2) = if (hasSynthMarker(tree.tpe))
             (spc, linearize(spc, getAnswerTypeAnn(tree.tpe))) else
-            (None, getAnswerTypeAnn(tree.tpe)) // if no cps in condition, branches must conform to tree.tpe directly
+            (Opt.None, getAnswerTypeAnn(tree.tpe)) // if no cps in condition, branches must conform to tree.tpe directly
           val thenVal = transExpr(thenp, cpsA2, cpsR2)(cpsR2.isDefined || isAnyParentImpure)
           val elseVal = transExpr(elsep, cpsA2, cpsR2)(cpsR2.isDefined || isAnyParentImpure)
 
@@ -280,7 +280,7 @@ abstract class SelectiveANFTransform extends PluginComponent with Transform with
           val (selStats, selVal, spc) = transInlineValue(selector, cpsA)
           val (cpsA2, cpsR2) =
             if (hasSynthMarker(tree.tpe)) (spc, linearize(spc, getAnswerTypeAnn(tree.tpe)))
-            else (None, getAnswerTypeAnn(tree.tpe))
+            else (Opt.None, getAnswerTypeAnn(tree.tpe))
 
           val caseVals = cases map { case cd @ CaseDef(pat, guard, body) =>
             val bodyVal = transExpr(body, cpsA2, cpsR2)(cpsR2.isDefined || isAnyParentImpure)
@@ -301,7 +301,7 @@ abstract class SelectiveANFTransform extends PluginComponent with Transform with
             // currentOwner.newMethod(name, tree.pos, Flags.SYNTHETIC) setInfo ldef.symbol.info
             val sym    = ldef.symbol resetFlag Flags.LABEL
             val rhs1   = rhs //new TreeSymSubstituter(List(ldef.symbol), List(sym)).transform(rhs)
-            val rhsVal = transExpr(rhs1, None, getAnswerTypeAnn(tree.tpe))(getAnswerTypeAnn(tree.tpe).isDefined || isAnyParentImpure) changeOwner (currentOwner -> sym)
+            val rhsVal = transExpr(rhs1, Opt.None, getAnswerTypeAnn(tree.tpe))(getAnswerTypeAnn(tree.tpe).isDefined || isAnyParentImpure) changeOwner (currentOwner -> sym)
 
             val stm1 = localTyper.typed(DefDef(sym, rhsVal))
             // since virtpatmat does not rely on fall-through, don't call the labels it emits
@@ -315,7 +315,7 @@ abstract class SelectiveANFTransform extends PluginComponent with Transform with
               (List(stm1), localTyper.typed{Apply(Ident(sym), List())}, cpsA)
             }
           } else {
-            val rhsVal = transExpr(rhs, None, None)
+            val rhsVal = transExpr(rhs, Opt.None, Opt.None)
             (Nil, updateSynthFlag(treeCopy.LabelDef(tree, name, params, rhsVal)), cpsA)
           }
 
@@ -330,7 +330,7 @@ abstract class SelectiveANFTransform extends PluginComponent with Transform with
             treeCopy.CaseDef(cd, transform(pat), transform(guard), bodyVal)
           }
 
-          val finallyVal = transExpr(finalizer, None, None) // for now, no cps in finally
+          val finallyVal = transExpr(finalizer, Opt.None, Opt.None) // for now, no cps in finally
 
           (Nil, updateSynthFlag(treeCopy.Try(tree, blockVal, catchVals, finallyVal)), cpsA)
 
@@ -399,7 +399,7 @@ abstract class SelectiveANFTransform extends PluginComponent with Transform with
             unit.warning(tree.pos, "expression " + tree + " is cps-transformed unexpectedly")
 
           try {
-            val Some((a, b)) = cpsR
+            val Opt((a, b)) = cpsR
             /* Since shiftUnit is bounded [A,B,C>:B] this may not typecheck
              * if C is overly specific.  So if !(B <:< C), call shiftUnit0
              * instead, which takes only two type arguments.
@@ -459,10 +459,10 @@ abstract class SelectiveANFTransform extends PluginComponent with Transform with
 
     def transInlineValue(tree: Tree, cpsA: CPSInfo)(implicit isAnyParentImpure: Boolean): (List[Tree], Tree, CPSInfo) = {
 
-      val (stms, expr, spc) = transValue(tree, cpsA, None) // never required to be cps
+      val (stms, expr, spc) = transValue(tree, cpsA, Opt.None) // never required to be cps
 
       getAnswerTypeAnn(expr.tpe) match {
-        case spcVal @ Some(_) =>
+        case spcVal @ Opt(_) =>
 
           val valueTpe = removeAllCPSAnnotations(expr.tpe)
 
@@ -492,7 +492,7 @@ abstract class SelectiveANFTransform extends PluginComponent with Transform with
         // TODO: what about lazy vals?
 
         case tree @ ValDef(mods, name, tpt, rhs) =>
-          val (stms, anfRhs, spc) = atOwner(tree.symbol) { transValue(rhs, cpsA, None) }
+          val (stms, anfRhs, spc) = atOwner(tree.symbol) { transValue(rhs, cpsA, Opt.None) }
 
           val tv = new ChangeOwnerTraverser(tree.symbol, currentOwner)
           stms.foreach(tv.traverse(_))

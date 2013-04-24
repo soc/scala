@@ -44,15 +44,16 @@ trait Definitions extends api.StandardDefinitions {
 
     import ClassfileConstants._
 
-    private val nameToWeight = Map[Name, Int](
-      tpnme.Byte   -> 2,
-      tpnme.Char   -> 3,
-      tpnme.Short  -> 4,
-      tpnme.Int    -> 12,
-      tpnme.Long   -> 24,
-      tpnme.Float  -> 48,
-      tpnme.Double -> 96
-    )
+    private def numericWeight(sym: Symbol): Int = sym match {
+      case ByteClass   => 2
+      case CharClass   => 3
+      case ShortClass  => 4
+      case IntClass    => 12
+      case LongClass   => 24
+      case FloatClass  => 48
+      case DoubleClass => 96
+      case _           => -1
+    }
 
     private val nameToTag = Map[Name, Char](
       tpnme.Byte    -> BYTE_TAG,
@@ -92,7 +93,6 @@ trait Definitions extends api.StandardDefinitions {
     private def boxedName(name: Name) = sn.Boxed(name.toTypeName)
 
     lazy val abbrvTag         = symbolsMap(ScalaValueClasses, nameToTag) withDefaultValue OBJECT_TAG
-    lazy val numericWeight    = symbolsMapFilt(ScalaValueClasses, nameToWeight.keySet, nameToWeight)
     lazy val boxedModule      = classesMap(x => getModule(boxedName(x)))
     lazy val boxedClass       = classesMap(x => getClassByName(boxedName(x)))
     lazy val refClass         = classesMap(x => getRequiredClass("scala.runtime." + x + "Ref"))
@@ -100,14 +100,15 @@ trait Definitions extends api.StandardDefinitions {
     lazy val boxMethod        = classesMap(x => valueCompanionMember(x, nme.box))
     lazy val unboxMethod      = classesMap(x => valueCompanionMember(x, nme.unbox))
 
-    def isNumericSubClass(sub: Symbol, sup: Symbol) = (
-         (numericWeight contains sub)
-      && (numericWeight contains sup)
-      && (numericWeight(sup) % numericWeight(sub) == 0)
-    )
-
+    def isNumericSubClass(sub: Symbol, sup: Symbol) = {
+      val w1 = numericWeight(sub)
+      w1 > 0 && {
+        val w2 = numericWeight(sup)
+        (w2 > 0) && (w2 % w1 == 0)
+      }
+    }
     /** Is symbol a numeric value class? */
-    def isNumericValueClass(sym: Symbol) = ScalaNumericValueClasses contains sym
+    def isNumericValueClass(sym: Symbol) = numericWeight(sym) > 0
 
     def isGetClass(sym: Symbol) =
       (sym.name == nme.getClass_) && flattensToEmpty(sym.paramss)

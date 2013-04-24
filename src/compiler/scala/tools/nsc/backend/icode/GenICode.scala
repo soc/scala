@@ -172,7 +172,7 @@ abstract class GenICode extends SubComponent  {
 
       case Assign(lhs, rhs) =>
         val ctx1 = genLoad(rhs, ctx, toTypeKind(lhs.symbol.info))
-        val Some(l) = ctx.method.lookupLocal(lhs.symbol)
+        val Opt(l) = ctx.method.lookupLocal(lhs.symbol)
         ctx1.bb.emit(STORE_LOCAL(l), tree.pos)
         ctx1
 
@@ -705,7 +705,7 @@ abstract class GenICode extends SubComponent  {
           }
           genLoadApply3
 
-        case Apply(fun @ _, List(expr)) if (definitions.isBox(fun.symbol)) =>
+        case Apply(fun @ _, expr :: Nil) if (definitions.isBox(fun.symbol)) =>
           def genLoadApply4 = {
             debuglog("BOX : " + fun.symbol.fullName)
             val ctx1 = genLoad(expr, ctx, toTypeKind(expr.tpe))
@@ -724,7 +724,7 @@ abstract class GenICode extends SubComponent  {
           }
           genLoadApply4
 
-        case Apply(fun @ _, List(expr)) if (definitions.isUnbox(fun.symbol)) =>
+        case Apply(fun @ _, expr :: Nil) if (definitions.isUnbox(fun.symbol)) =>
           debuglog("UNBOX : " + fun.symbol.fullName)
           val ctx1 = genLoad(expr, ctx, toTypeKind(expr.tpe))
           val boxType = toTypeKind(fun.symbol.owner.linkedClassOfClass.tpe)
@@ -879,7 +879,7 @@ abstract class GenICode extends SubComponent  {
                 generatedType = toTypeKind(sym.info)
               } else {
                 try {
-                  val Some(l) = ctx.method.lookupLocal(sym)
+                  val Opt(l) = ctx.method.lookupLocal(sym)
                   ctx.bb.emit(LOAD_LOCAL(l), tree.pos)
                   generatedType = l.kind
                 } catch {
@@ -1242,8 +1242,8 @@ abstract class GenICode extends SubComponent  {
      */
     private lazy val String_valueOf: Symbol = getMember(StringModule, nme.valueOf) filter (sym =>
       sym.info.paramTypes match {
-        case List(pt) => pt.typeSymbol == ObjectClass
-        case _        => false
+        case pt :: Nil => pt.typeSymbol == ObjectClass
+        case _         => false
       }
     )
 
@@ -1271,7 +1271,7 @@ abstract class GenICode extends SubComponent  {
     def genStringConcat(tree: Tree, ctx: Context): Context = {
       liftStringConcat(tree) match {
         // Optimization for expressions of the form "" + x.  We can avoid the StringBuilder.
-        case List(Literal(Constant("")), arg) =>
+        case Literal(Constant("")) :: arg :: Nil =>
           debuglog("Rewriting \"\" + x as String.valueOf(x) for: " + arg)
           val ctx1 = genLoad(arg, ctx, ObjectReference)
           ctx1.bb.emit(CALL_METHOD(String_valueOf, Static(onInstance = false)), arg.pos)

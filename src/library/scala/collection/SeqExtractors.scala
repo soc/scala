@@ -3,9 +3,9 @@ package scala.collection
 /** An extractor used to head/tail deconstruct sequences. */
 object +: {
   def unapply[T,Coll <: SeqLike[T, Coll]](
-      t: Coll with SeqLike[T, Coll]): Option[(T, Coll)] =
-    if(t.isEmpty) None
-    else Some(t.head -> t.tail)
+      t: Coll with SeqLike[T, Coll]): Opt[(T, Coll)] =
+    if(t.isEmpty) Opt.None
+    else Opt(t.head -> t.tail)
 }
 
 /** An extractor used to init/last deconstruct sequences. */
@@ -14,9 +14,9 @@ object :+ {
    * @return Some((init, tail)) if sequence is non-empty. None otherwise.
    */
   def unapply[T,Coll <: SeqLike[T, Coll]](
-      t: Coll with SeqLike[T, Coll]): Option[(Coll, T)] =
-    if(t.isEmpty) None
-    else Some(t.init -> t.last)
+      t: Coll with SeqLike[T, Coll]): Opt[(Coll, T)] =
+    if(t.isEmpty) Opt.None
+    else Opt(t.init -> t.last)
 }
 
 // Dummy to fool ant

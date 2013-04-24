@@ -48,11 +48,11 @@ trait AnnotationInfos extends api.Annotations { self: SymbolTable =>
       //OPT inlined from exists to save on #closures; was:  annotations exists (_ matches cls)
       dropOtherAnnotations(annotations, cls).nonEmpty
 
-    def getAnnotation(cls: Symbol): Option[AnnotationInfo] =
+    def getAnnotation(cls: Symbol): Opt[AnnotationInfo] =
       //OPT inlined from exists to save on #closures; was:  annotations find (_ matches cls)
       dropOtherAnnotations(annotations, cls) match {
-        case ann :: _ => Some(ann)
-        case _ => None
+        case ann :: _ => Opt(ann)
+        case _        => Opt.None
       }
 
     def removeAnnotation(cls: Symbol): Self = filterAnnotations(ann => !(ann matches cls))
@@ -163,8 +163,7 @@ trait AnnotationInfos extends api.Annotations { self: SymbolTable =>
     def apply(atp: Type, args: List[Tree], assocs: List[(Name, ClassfileAnnotArg)]): AnnotationInfo =
       new CompleteAnnotationInfo(atp, args, assocs)
 
-    def unapply(info: AnnotationInfo): Option[(Type, List[Tree], List[(Name, ClassfileAnnotArg)])] =
-      Some((info.atp, info.args, info.assocs))
+    def unapply(info: AnnotationInfo): Opt[Product3[Type, List[Tree], List[(Name, ClassfileAnnotArg)]]] = Opt(info)
   }
 
   class CompleteAnnotationInfo(
@@ -231,7 +230,12 @@ trait AnnotationInfos extends api.Annotations { self: SymbolTable =>
    *
    *  `assocs` stores arguments to classfile annotations as name-value pairs.
    */
-  abstract class AnnotationInfo extends AnnotationApi {
+  abstract class AnnotationInfo extends AnnotationApi with Product3[Type, List[Tree], List[(Name, ClassfileAnnotArg)]] {
+    def canEqual(other: Any) = other.isInstanceOf[AnnotationInfo]
+    def _1: Type = atp
+    def _2: List[Tree] = args
+    def _3: List[(Name, ClassfileAnnotArg)] = assocs
+
     def atp: Type
     def args: List[Tree]
     def assocs: List[(Name, ClassfileAnnotArg)]
@@ -303,9 +307,9 @@ trait AnnotationInfos extends api.Annotations { self: SymbolTable =>
     /** Check whether any of the arguments mention a symbol */
     def refsSymbol(sym: Symbol) = hasArgWhich(_.symbol == sym)
 
-    def stringArg(index: Int) = constantAtIndex(index) map (_.stringValue)
-    def intArg(index: Int)    = constantAtIndex(index) map (_.intValue)
-    def symbolArg(index: Int) = argAtIndex(index) collect {
+    def stringArg(index: Int): Opt[String] = constantAtIndex(index) map (_.stringValue)
+    def intArg(index: Int): Option[Int]    = constantAtIndex(index).toOption map (_.intValue)
+    def symbolArg(index: Int): Opt[TermName] = argAtIndex(index) collect {
       case Apply(fun, Literal(str) :: Nil) if fun.symbol == definitions.Symbol_apply =>
         newTermName(str.stringValue)
     }
@@ -313,11 +317,11 @@ trait AnnotationInfos extends api.Annotations { self: SymbolTable =>
     // !!! when annotation arguments are not literals, but any sort of
     // expression, there is a fair chance they will turn up here not as
     // Literal(const) but some arbitrary AST.
-    def constantAtIndex(index: Int): Option[Constant] =
+    def constantAtIndex(index: Int): Opt[Constant] =
       argAtIndex(index) collect { case Literal(x) => x }
 
-    def argAtIndex(index: Int): Option[Tree] =
-      if (index < args.size) Some(args(index)) else None
+    def argAtIndex(index: Int): Opt[Tree] =
+      if (index < args.size) Opt(args(index)) else Opt.None
 
     override def hashCode = atp.## + args.## + assocs.##
     override def equals(other: Any) = other match {
@@ -330,8 +334,9 @@ trait AnnotationInfos extends api.Annotations { self: SymbolTable =>
   object Annotation extends AnnotationExtractor {
     def apply(tpe: Type, scalaArgs: List[Tree], javaArgs: ListMap[Name, ClassfileAnnotArg]): Annotation =
       AnnotationInfo(tpe, scalaArgs, javaArgs.toList)
-    def unapply(annotation: Annotation): Option[(Type, List[Tree], ListMap[Name, ClassfileAnnotArg])] =
-      Some((annotation.tpe, annotation.scalaArgs, annotation.javaArgs))
+
+    def unapply(annotation: Annotation): Opt[Product3[Type, List[Tree], ListMap[Name, ClassfileAnnotArg]]] =
+      Opt((annotation.tpe, annotation.scalaArgs, annotation.javaArgs))
   }
   implicit val AnnotationTag = ClassTag[AnnotationInfo](classOf[AnnotationInfo])
 

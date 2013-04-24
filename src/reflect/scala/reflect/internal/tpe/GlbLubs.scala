@@ -123,8 +123,8 @@ private[internal] trait GlbLubs {
           }
           val tails = tsBts map (_.tail)
           mergePrefixAndArgs(elimSub(ts1, depth) map elimHigherOrderTypeParam, Covariant, depth) match {
-            case Some(tp) => loop(tp :: pretypes, tails)
-            case _        => loop(pretypes, tails)
+            case Opt(tp) => loop(tp :: pretypes, tails)
+            case _       => loop(pretypes, tails)
           }
         }
         else {
@@ -161,7 +161,7 @@ private[internal] trait GlbLubs {
 
   /** A minimal type list which has a given list of types as its base type sequence */
   def spanningTypes(ts: List[Type]): List[Type] = ts match {
-    case List() => List()
+    case Nil           => Nil
     case first :: rest =>
       first :: spanningTypes(
         rest filter (t => !first.typeSymbol.isSubClass(t.typeSymbol)))
@@ -170,8 +170,8 @@ private[internal] trait GlbLubs {
   /** Eliminate from list of types all elements which are a supertype
     *  of some other element of the list. */
   private def elimSuper(ts: List[Type]): List[Type] = ts match {
-    case List() => List()
-    case List(t) => List(t)
+    case Nil      => ts
+    case t :: Nil => ts
     case t :: ts1 =>
       val rest = elimSuper(ts1 filter (t1 => !(t <:< t1)))
       if (rest exists (t1 => t1 <:< t)) rest else t :: rest
@@ -181,8 +181,8 @@ private[internal] trait GlbLubs {
     *  of some other element of the list. */
   private def elimSub(ts: List[Type], depth: Int): List[Type] = {
     def elimSub0(ts: List[Type]): List[Type] = ts match {
-      case List() => List()
-      case List(t) => List(t)
+      case Nil      => ts
+      case t :: Nil => ts
       case t :: ts1 =>
         val rest = elimSub0(ts1 filter (t1 => !isSubType(t1, t, decr(depth))))
         if (rest exists (t1 => isSubType(t, t1, decr(depth)))) rest else t :: rest
@@ -247,9 +247,9 @@ private[internal] trait GlbLubs {
   }
 
   def lub(ts: List[Type]): Type = ts match {
-    case List() => NothingClass.tpe
-    case List(t) => t
-    case _ =>
+    case Nil      => NothingClass.tpe
+    case t :: Nil => t
+    case _        =>
       if (Statistics.canEnable) Statistics.incCounter(lubCount)
       val start = if (Statistics.canEnable) Statistics.pushTimer(typeOpsStack, lubNanos) else null
       try {
@@ -276,8 +276,8 @@ private[internal] trait GlbLubs {
   /** The least upper bound wrt <:< of a list of types */
   protected[internal] def lub(ts: List[Type], depth: Int): Type = {
     def lub0(ts0: List[Type]): Type = elimSub(ts0, depth) match {
-      case List() => NothingClass.tpe
-      case List(t) => t
+      case Nil => NothingClass.tpe
+      case t :: Nil => t
       case ts @ PolyType(tparams, _) :: _ =>
         val tparams1 = map2(tparams, matchingBounds(ts, tparams).transpose)((tparam, bounds) =>
           tparam.cloneSymbol.setInfo(glb(bounds, depth)))
@@ -291,15 +291,12 @@ private[internal] trait GlbLubs {
       case ts @ AnnotatedType(annots, tpe, _) :: rest =>
         annotationsLub(lub0(ts map (_.withoutAnnotations)), ts)
       case ts =>
-        lubResults get (depth, ts) match {
-          case Some(lubType) =>
-            lubType
-          case None =>
-            lubResults((depth, ts)) = AnyClass.tpe
-            val res = if (depth < 0) AnyClass.tpe else lub1(ts)
-            lubResults((depth, ts)) = res
-            res
-        }
+        lubResults.getOrElse((depth, ts), {
+          lubResults((depth, ts)) = AnyClass.tpe
+          val res = if (depth < 0) AnyClass.tpe else lub1(ts)
+          lubResults((depth, ts)) = res
+          res
+        })
     }
     def lub1(ts0: List[Type]): Type = {
       val (ts, tparams)            = stripExistentialsAndTypeVars(ts0)
@@ -412,9 +409,9 @@ private[internal] trait GlbLubs {
 
   /** The greatest lower bound of a list of types (as determined by `<:<`). */
   def glb(ts: List[Type]): Type = elimSuper(ts) match {
-    case List() => AnyClass.tpe
-    case List(t) => t
-    case ts0 =>
+    case Nil      => AnyClass.tpe
+    case t :: Nil => t
+    case ts0      =>
       if (Statistics.canEnable) Statistics.incCounter(lubCount)
       val start = if (Statistics.canEnable) Statistics.pushTimer(typeOpsStack, lubNanos) else null
       try {
@@ -427,17 +424,17 @@ private[internal] trait GlbLubs {
   }
 
   protected[internal] def glb(ts: List[Type], depth: Int): Type = elimSuper(ts) match {
-    case List() => AnyClass.tpe
-    case List(t) => t
-    case ts0 => glbNorm(ts0, depth)
+    case Nil      => AnyClass.tpe
+    case t :: Nil => t
+    case ts0      => glbNorm(ts0, depth)
   }
 
   /** The greatest lower bound of a list of types (as determined by `<:<`), which have been normalized
     *  with regard to `elimSuper`. */
   protected def glbNorm(ts: List[Type], depth: Int): Type = {
     def glb0(ts0: List[Type]): Type = ts0 match {
-      case List() => AnyClass.tpe
-      case List(t) => t
+      case Nil => AnyClass.tpe
+      case t :: Nil => t
       case ts @ PolyType(tparams, _) :: _ =>
         val tparams1 = map2(tparams, matchingBounds(ts, tparams).transpose)((tparam, bounds) =>
           tparam.cloneSymbol.setInfo(lub(bounds, depth)))
@@ -449,15 +446,12 @@ private[internal] trait GlbLubs {
       case ts @ TypeBounds(_, _) :: rest =>
         TypeBounds(lub(ts map (_.bounds.lo), depth), glb(ts map (_.bounds.hi), depth))
       case ts =>
-        glbResults get (depth, ts) match {
-          case Some(glbType) =>
-            glbType
-          case _ =>
-            glbResults((depth, ts)) = NothingClass.tpe
-            val res = if (depth < 0) NothingClass.tpe else glb1(ts)
-            glbResults((depth, ts)) = res
-            res
-        }
+        glbResults.getOrElse((depth, ts), {
+          glbResults((depth, ts)) = NothingClass.tpe
+          val res = if (depth < 0) NothingClass.tpe else glb1(ts)
+          glbResults((depth, ts)) = res
+          res
+        })
     }
     def glb1(ts0: List[Type]): Type = {
       try {

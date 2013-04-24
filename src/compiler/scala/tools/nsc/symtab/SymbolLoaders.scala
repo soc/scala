@@ -141,14 +141,14 @@ abstract class SymbolLoaders {
    */
   def initializeFromClassPath(owner: Symbol, classRep: ClassPath[platform.BinaryRepr]#ClassRep) {
     ((classRep.binary, classRep.source) : @unchecked) match {
-      case (Some(bin), Some(src))
+      case (Opt(bin), Opt(src))
       if platform.needCompile(bin, src) && !binaryOnly(owner, classRep.name) =>
         if (settings.verbose) inform("[symloader] picked up newer source file for " + src.path)
         global.loaders.enterToplevelsFromSource(owner, classRep.name, src)
-      case (None, Some(src)) =>
+      case (_, Opt(src)) =>
         if (settings.verbose) inform("[symloader] no class, picked up source file for " + src.path)
         global.loaders.enterToplevelsFromSource(owner, classRep.name, src)
-      case (Some(bin), _) =>
+      case (Opt(bin), _) =>
         global.loaders.enterClassAndModule(owner, classRep.name, platform.newClassLoader(bin))
     }
   }
@@ -164,7 +164,7 @@ abstract class SymbolLoaders {
     /** Load source or class file for `root`, return */
     protected def doComplete(root: Symbol): Unit
 
-    def sourcefile: Option[AbstractFile] = None
+    def sourcefile: Opt[AbstractFile] = Opt.None
 
     /**
      * Description of the resource (ClassPath, AbstractFile)
@@ -265,13 +265,13 @@ abstract class SymbolLoaders {
       }
       if (Statistics.canEnable) Statistics.stopTimer(classReadNanos, start)
     }
-    override def sourcefile: Option[AbstractFile] = classfileParser.srcfile
+    override def sourcefile: Opt[AbstractFile] = classfileParser.srcfile
   }
 
   class SourcefileLoader(val srcfile: AbstractFile) extends SymbolLoader with FlagAssigningCompleter {
     protected def description = "source file "+ srcfile.toString
     override def fromSource = true
-    override def sourcefile = Some(srcfile)
+    override def sourcefile = Opt(srcfile)
     protected def doComplete(root: Symbol): Unit = global.currentRun.compileLate(srcfile)
   }
 

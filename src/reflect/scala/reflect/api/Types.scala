@@ -428,7 +428,8 @@ trait Types {
    */
   abstract class TypeRefExtractor {
     def apply(pre: Type, sym: Symbol, args: List[Type]): Type // not TypeRefbecause of implementation details
-    def unapply(tpe: TypeRef): Option[(Type, Symbol, List[Type])]
+    def unapply(tpe: TypeRef): Opt[Product3[Type, Symbol, List[Type]]]
+    // def unapply(tpe: TypeRef): Option[(Type, Symbol, List[Type])]
   }
 
   /** The API that all type refs support.

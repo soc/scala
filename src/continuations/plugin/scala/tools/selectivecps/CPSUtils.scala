@@ -99,11 +99,11 @@ trait CPSUtils {
     cpsParamTypes(tp) orElse {
       if (hasPlusMarker(tp))
         global.warning("trying to instantiate type " + tp + " to unknown cps type")
-      None
+      Opt.None
     }
   }
 
-  def getAnswerTypeAnn(tp: Type): Option[(Type, Type)] =
+  def getAnswerTypeAnn(tp: Type): Opt[(Type, Type)] =
     cpsParamTypes(tp) filterNot (_ => hasPlusMarker(tp))
 
   def hasAnswerTypeAnn(tp: Type) =
@@ -117,21 +117,21 @@ trait CPSUtils {
       tree
   }
 
-  type CPSInfo = Option[(Type,Type)]
+  type CPSInfo = Opt[(Type,Type)]
 
   def linearize(a: CPSInfo, b: CPSInfo)(implicit unit: CompilationUnit, pos: Position): CPSInfo = {
     (a,b) match {
-      case (Some((u0,v0)), Some((u1,v1))) =>
+      case (Opt((u0,v0)), Opt((u1,v1))) =>
         vprintln("check lin " + a + " andThen " + b)
         if (!(v1 <:< u0)) {
           unit.error(pos,"cannot change answer type in composition of cps expressions " +
           "from " + u1 + " to " + v0 + " because " + v1 + " is not a subtype of " + u0 + ".")
           throw new Exception("check lin " + a + " andThen " + b)
         }
-        Some((u1,v0))
-      case (Some(_), _) => a
-      case (_, Some(_)) => b
-      case _ => None
+        Opt((u1,v0))
+      case (Opt(_), _) => a
+      case (_, Opt(_)) => b
+      case _ => Opt.None
     }
   }
 }

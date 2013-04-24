@@ -316,12 +316,12 @@ abstract class CleanUp extends Transform with ast.TreeDSL {
             // If there's any chance this signature could be met by an Array.
             val isArrayMethodSignature = {
               def typesMatchApply = paramTypes match {
-                case List(tp) => tp <:< IntClass.tpe
-                case _        => false
+                case tp :: Nil => tp <:< IntClass.tpe
+                case _         => false
               }
               def typesMatchUpdate = paramTypes match {
-                case List(tp1, tp2) => (tp1 <:< IntClass.tpe) && isMaybeUnit
-                case _              => false
+                case tp1 :: tp2 :: Nil => (tp1 <:< IntClass.tpe) && isMaybeUnit
+                case _                 => false
               }
 
               (methSym.name == nme.length && params.isEmpty) ||
@@ -610,10 +610,10 @@ abstract class CleanUp extends Transform with ast.TreeDSL {
       // with just `ArrayValue(...).$asInstanceOf[...]`
       //
       // See SI-6611; we must *only* do this for literal vararg arrays.
-      case Apply(appMeth, List(Apply(wrapRefArrayMeth, List(arg @ StripCast(ArrayValue(_, _)))), _))
+      case Apply(appMeth, Apply(wrapRefArrayMeth, (arg @ StripCast(ArrayValue(_, _))) :: Nil) :: _ :: Nil)
       if wrapRefArrayMeth.symbol == Predef_wrapRefArray && appMeth.symbol == ArrayModule_genericApply =>
         super.transform(arg)
-      case Apply(appMeth, List(elem0, Apply(wrapArrayMeth, List(rest @ ArrayValue(elemtpt, _)))))
+      case Apply(appMeth, elem0 :: Apply(wrapArrayMeth, (rest @ ArrayValue(elemtpt, _)) :: Nil) :: Nil)
       if wrapArrayMeth.symbol == Predef_wrapArray(elemtpt.tpe) && appMeth.symbol == ArrayModule_apply(elemtpt.tpe) =>
         super.transform(treeCopy.ArrayValue(rest, rest.elemtpt, elem0 :: rest.elems))
 

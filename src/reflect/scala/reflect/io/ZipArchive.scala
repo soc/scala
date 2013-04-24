@@ -107,9 +107,9 @@ abstract class ZipArchive(override val file: JFile) extends AbstractFile with Eq
     //   parent.entries(baseName(path)) = dir
     //   dir
     // })
-    dirs get path match {
-      case Some(v) => v
-      case None =>
+    dirs valueGet path match {
+      case Opt(v) => v
+      case _      =>
         val parent = ensureDir(dirs, dirName(path), null)
         val dir    = new DirEntry(path)
         parent.entries(baseName(path)) = dir
@@ -139,7 +139,7 @@ final class FileZipArchive(file: JFile) extends ZipArchive(file) {
           override def getArchive   = zipFile
           override def lastModified = zipEntry.getTime()
           override def input        = getArchive getInputStream zipEntry
-          override def sizeOption   = Some(zipEntry.getSize().toInt)
+          override def sizeOption   = Size(zipEntry.getSize().toInt)
         }
         val f = new FileEntry()
         dir.entries(f.name) = f
@@ -155,7 +155,7 @@ final class FileZipArchive(file: JFile) extends ZipArchive(file) {
   def input        = File(file).inputStream()
   def lastModified = file.lastModified
 
-  override def sizeOption = Some(file.length.toInt)
+  override def sizeOption = Size(file.length.toInt)
   override def canEqual(other: Any) = other.isInstanceOf[FileZipArchive]
   override def hashCode() = file.hashCode
   override def equals(that: Any) = that match {
@@ -174,7 +174,7 @@ final class URLZipArchive(val url: URL) extends ZipArchive(null) {
       val zipEntry = in.getNextEntry()
       class EmptyFileEntry() extends Entry(zipEntry.getName) {
         override def toByteArray: Array[Byte] = null
-        override def sizeOption = Some(0)
+        override def sizeOption = Size(0)
       }
       class FileEntry() extends Entry(zipEntry.getName) {
         override val toByteArray: Array[Byte] = {
@@ -196,7 +196,7 @@ final class URLZipArchive(val url: URL) extends ZipArchive(null) {
           if (offset == arr.length) arr
           else throw new IOException("Input stream truncated: read %d of %d bytes".format(offset, len))
         }
-        override def sizeOption = Some(zipEntry.getSize().toInt)
+        override def sizeOption = Size(zipEntry.getSize().toInt)
       }
 
       if (zipEntry != null) {
@@ -247,7 +247,7 @@ final class ManifestResources(val url: URL) extends ZipArchive(null) {
         class FileEntry() extends Entry(zipEntry.getName) {
           override def lastModified = zipEntry.getTime()
           override def input        = resourceInputStream(path)
-          override def sizeOption   = None
+          override def sizeOption   = Size.NoSize
         }
         val f = new FileEntry()
         dir.entries(f.name) = f
@@ -267,8 +267,8 @@ final class ManifestResources(val url: URL) extends ZipArchive(null) {
   def input = url.openStream()
   def lastModified =
     try url.openConnection().getLastModified()
-    catch { case _: IOException => 0 }  
-  
+    catch { case _: IOException => 0 }
+
   override def canEqual(other: Any) = other.isInstanceOf[ManifestResources]
   override def hashCode() = url.hashCode
   override def equals(that: Any) = that match {

@@ -1795,18 +1795,20 @@ trait Types
     private final val Initializing = 1
     private final val Initialized = 2
 
-    private type RefMap = Map[Symbol, immutable.Set[Symbol]]
+    private class RefMap extends mutable.HashMap[Symbol, Set[Symbol]]() {
+      override def default(key: Symbol) = emptySymbolSet
+    }
 
     /** All type parameters reachable from given type parameter
      *  by a path which contains at least one expansive reference.
      *  @See Kennedy, Pierce: On Decidability of Nominal Subtyping with Variance
      */
-    private[scala] def expansiveRefs(tparam: Symbol) = {
+    private[scala] def expansiveRefs(tparam: Symbol): Set[Symbol] = {
       if (state == UnInitialized) {
         computeRefs()
         while (state != Initialized) propagate()
       }
-      getRefs(Expansive, tparam)
+      expansive.getOrElse(tparam, emptySymbolSet)
     }
 
     /* The rest of this class is auxiliary code for `expansiveRefs`
@@ -1819,7 +1821,9 @@ trait Types
      *  it is accessed only from expansiveRefs, which is called only from
      *  Typer.
      */
-    private var refs: Array[RefMap] = _
+    private val nonExpansive = new RefMap
+    private val expansive    = new RefMap
+    private def totalRefs    = expansive.size + nonExpansive.size
 
     /** The initialization state of the class: UnInialized --> Initializing --> Initialized
      *  Syncnote: This var need not be protected with synchronized, because
@@ -1827,30 +1831,6 @@ trait Types
      *  Typer.
      */
     private var state = UnInitialized
-
-    /** Get references for given type parameter
-     *  @param  which in {NonExpansive, Expansive}
-     *  @param  from  The type parameter from which references originate.
-     */
-    private def getRefs(which: Int, from: Symbol): Set[Symbol] = refs(which) get from match {
-      case Some(set) => set
-      case none => Set()
-    }
-
-    /** Augment existing refs map with reference <pre>from -> to</pre>
-     *  @param  which <- {NonExpansive, Expansive}
-     */
-    private def addRef(which: Int, from: Symbol, to: Symbol) {
-      refs(which) = refs(which) + (from -> (getRefs(which, from) + to))
-    }
-
-    /** Augment existing refs map with references <pre>from -> sym</pre>, for
-     *  all elements <pre>sym</pre> of set `to`.
-     *  @param  which <- {NonExpansive, Expansive}
-     */
-    private def addRefs(which: Int, from: Symbol, to: Set[Symbol]) {
-      refs(which) = refs(which) + (from -> (getRefs(which, from) ++ to))
-    }
 
     /** The ClassInfoType which belongs to the class containing given type parameter
      */
@@ -1873,9 +1853,9 @@ trait Types
 
             foreach2(tparams, args) { (tparam1, arg) =>
               if (arg contains tparam) {
-                addRef(NonExpansive, tparam, tparam1)
+                nonExpansive(tparam) += tparam1
                 if (arg.typeSymbol != tparam)
-                  addRef(Expansive, tparam, tparam1)
+                  expansive(tparam) += tparam1
               }
             }
           case _ =>
@@ -1891,7 +1871,6 @@ trait Types
     /** Compute initial (one-step) references and set state to `Initializing`.
      */
     private def computeRefs() {
-      refs = Array(Map(), Map())
       typeSymbol.typeParams foreach { tparam =>
         parents foreach { p =>
           enterRefs.enter(tparam, p)
@@ -1907,25 +1886,27 @@ trait Types
     private def propagate(): Boolean = {
       if (state == UnInitialized) computeRefs()
       //Console.println("Propagate "+symbol+", initial expansive = "+refs(Expansive)+", nonexpansive = "+refs(NonExpansive))//DEBUG
-      val lastRefs = Array(refs(0), refs(1))
+      val lastRefsSize = totalRefs
       state = Initialized
       var change = false
-      for ((from, targets) <- refs(NonExpansive).iterator)
+      for ((from, targets) <- nonExpansive.iterator)
         for (target <- targets) {
           val thatInfo = classInfo(target)
           if (thatInfo.state != Initialized)
             change = change | thatInfo.propagate()
-          addRefs(NonExpansive, from, thatInfo.getRefs(NonExpansive, target))
-          addRefs(Expansive, from, thatInfo.getRefs(Expansive, target))
+
+          nonExpansive(from) ++= thatInfo.nonExpansive(target)
+          expansive(from) ++= thatInfo.expansiveRefs(target)
         }
-      for ((from, targets) <- refs(Expansive).iterator)
+      for ((from, targets) <- expansive.iterator)
         for (target <- targets) {
           val thatInfo = classInfo(target)
           if (thatInfo.state != Initialized)
             change = change | thatInfo.propagate()
-          addRefs(Expansive, from, thatInfo.getRefs(NonExpansive, target))
+
+          expansive(from) ++= thatInfo.expansiveRefs(target)
         }
-      change = change || refs(0) != lastRefs(0) || refs(1) != lastRefs(1)
+      change = change || (totalRefs != lastRefsSize)
       if (change) state = Initializing
       //else Console.println("Propagate "+symbol+", final expansive = "+refs(Expansive)+", nonexpansive = "+refs(NonExpansive))//DEBUG
       change
@@ -2242,17 +2223,20 @@ trait Types
    *  This saddles us with implementing the case class logic by hand, because
    *  the whole compiler depends on TypeRefs behaving like case classes.
    */
-  abstract class TypeRef(val sym: Symbol) extends UniqueType with TypeRefApi {
+  abstract class TypeRef(val sym: Symbol) extends UniqueType with TypeRefApi with Product3[Type, Symbol, List[Type]] {
     def pre: Type
     def args: List[Type]
 
     override def productPrefix = "TypeRef"
-    override def productArity = 3
-    override def productElement(n: Int) = n match {
-      case 0 => pre
-      case 1 => sym
-      case 2 => args
-    }
+    def _1: Type = pre
+    def _2: Symbol = sym
+    def _3: List[Type] = args
+    // override def productArity = 3
+    // override def productElement(n: Int) = n match {
+    //   case 0 => pre
+    //   case 1 => sym
+    //   case 2 => args
+    // }
     override def canEqual(other: Any) = other.isInstanceOf[TypeRef]
     override def equals(other: Any) = (this eq other.asInstanceOf[AnyRef]) || (other match {
       case tr: TypeRef => (tr canEqual this) && pre == tr.pre && sym == tr.sym && args == tr.args
@@ -2456,7 +2440,7 @@ trait Types
   private final class ClassNoArgsTypeRef(val pre: Type, sym: Symbol) extends NoArgsTypeRef(sym) with ClassTypeRef
 
   object TypeRef extends TypeRefExtractor {
-    def unapply(tr: TypeRef) = Some((tr.pre, tr.sym, tr.args))
+    def unapply(tr: TypeRef) = Opt(tr)
     def apply(pre: Type, sym: Symbol, args: List[Type]): Type = unique({
       if (args.nonEmpty) {
         if (sym.isAliasType)
@@ -4338,9 +4322,9 @@ trait Types
    *  Return `Some(x)` if the computation succeeds with result `x`.
    *  Return `None` if the computation fails.
    */
-  def mergePrefixAndArgs(tps: List[Type], variance: Variance, depth: Int): Option[Type] = tps match {
-    case List(tp) =>
-      Some(tp)
+  def mergePrefixAndArgs(tps: List[Type], variance: Variance, depth: Int): Opt[Type] = tps match {
+    case tp :: Nil =>
+      Opt(tp)
     case TypeRef(_, sym, _) :: rest =>
       val pres = tps map (_.prefix) // prefix normalizes automatically
       val pre = if (variance.isPositive) lub(pres, depth) else glb(pres, depth)
@@ -4352,22 +4336,18 @@ trait Types
           // if argss contain one value type and some other type, the lub is Object
           // if argss contain several reference types, the lub is an array over lub of argtypes
           if (argss exists typeListIsEmpty) {
-            None  // something is wrong: an array without a type arg.
+            Opt.None  // something is wrong: an array without a type arg.
           } else {
             val args = argss map (_.head)
-            if (args.tail forall (_ =:= args.head)) Some(typeRef(pre, sym, List(args.head)))
-            else if (args exists (arg => isPrimitiveValueClass(arg.typeSymbol))) Some(ObjectClass.tpe)
-            else Some(typeRef(pre, sym, List(lub(args))))
+            Opt(
+              if (args.tail forall (_ =:= args.head)) typeRef(pre, sym, List(args.head))
+              else if (args exists (arg => isPrimitiveValueClass(arg.typeSymbol))) ObjectClass.tpe
+              else typeRef(pre, sym, List(lub(args)))
+            )
           }
         }
         else transposeSafe(argss) match {
-          case None =>
-            // transpose freaked out because of irregular argss
-            // catching just in case (shouldn't happen, but also doesn't cost us)
-            // [JZ] It happens: see SI-5683.
-            debuglog("transposed irregular matrix!?" +(tps, argss))
-            None
-          case Some(argsst) =>
+          case Opt(argsst) =>
             val args = map2(sym.typeParams, argsst) { (tparam, as0) =>
               val as = as0.distinct
               if (as.size == 1) as.head
@@ -4397,19 +4377,25 @@ trait Types
                 }
               }
             }
-            if (args contains NoType) None
-            else Some(existentialAbstraction(capturedParams.toList, typeRef(pre, sym, args)))
+            if (args contains NoType) Opt.None
+            else Opt(existentialAbstraction(capturedParams.toList, typeRef(pre, sym, args)))
+          case _ =>
+            // transpose freaked out because of irregular argss
+            // catching just in case (shouldn't happen, but also doesn't cost us)
+            // [JZ] It happens: see SI-5683.
+            debuglog("transposed irregular matrix!?" +(tps, argss))
+            Opt.None
         }
       } catch {
-        case ex: MalformedType => None
+        case ex: MalformedType => Opt.None
       }
     case SingleType(_, sym) :: rest =>
       val pres = tps map (_.prefix)
       val pre = if (variance.isPositive) lub(pres, depth) else glb(pres, depth)
       try {
-        Some(singleType(pre, sym))
+        Opt(singleType(pre, sym))
       } catch {
-        case ex: MalformedType => None
+        case ex: MalformedType => Opt.None
       }
     case ExistentialType(tparams, quantified) :: rest =>
       mergePrefixAndArgs(quantified :: rest, variance, depth) map (existentialAbstraction(tparams, _))

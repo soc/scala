@@ -146,7 +146,7 @@ abstract class AbstractFile extends Iterable[AbstractFile] {
   def bufferedOutput: BufferedOutputStream = new BufferedOutputStream(output)
 
   /** size of this file if it is a concrete file. */
-  def sizeOption: Option[Int] = None
+  def sizeOption: Size = Size.NoSize
 
   def toURL: URL = if (file == null) null else file.toURI.toURL
 
@@ -163,7 +163,7 @@ abstract class AbstractFile extends Iterable[AbstractFile] {
   def toByteArray: Array[Byte] = {
     val in = input
     sizeOption match {
-      case Some(size) =>
+      case Size(size) =>
         var rest = size
         val arr = new Array[Byte](rest)
         while (rest > 0) {
@@ -174,7 +174,7 @@ abstract class AbstractFile extends Iterable[AbstractFile] {
         }
         in.close()
         arr
-      case None =>
+      case _ =>
         val out = new ByteArrayOutputStream()
         var c = in.read()
         while(c != -1) {

@@ -89,7 +89,7 @@ object ClassPath {
   /** A class modeling aspects of a ClassPath which should be
    *  propagated to any classpaths it creates.
    */
-  abstract class ClassPathContext[T] {
+  abstract class ClassPathContext[T >: Null] {
     /** A filter which can be used to exclude entities from the classpath
      *  based on their name.
      */
@@ -161,7 +161,7 @@ import ClassPath._
 /**
  * Represents a package which contains classes and other packages
  */
-abstract class ClassPath[T] {
+abstract class ClassPath[T >: Null] {
   type AnyClassRep = ClassPath[T]#ClassRep
 
   /**
@@ -196,10 +196,10 @@ abstract class ClassPath[T] {
   /**
    * Represents classes which can be loaded with a ClassfileLoader and/or SourcefileLoader.
    */
-  case class ClassRep(binary: Option[T], source: Option[AbstractFile]) {
+  case class ClassRep(binary: Opt[T], source: Opt[AbstractFile]) {
     def name: String = binary match {
-      case Some(x)  => context.toBinaryName(x)
-      case _        =>
+      case Opt(x) => context.toBinaryName(x)
+      case _      =>
         assert(source.isDefined)
         toSourceName(source.get)
     }
@@ -215,22 +215,22 @@ abstract class ClassPath[T] {
    * Find a ClassRep given a class name of the form "package.subpackage.ClassName".
    * Does not support nested classes on .NET
    */
-  def findClass(name: String): Option[AnyClassRep] =
+  def findClass(name: String): Opt[AnyClassRep] =
     splitWhere(name, _ == '.', doDropIndex = true) match {
       case Some((pkg, rest)) =>
-        val rep = packages find (_.name == pkg) flatMap (_ findClass rest)
-        rep map {
-          case x: ClassRep  => x
-          case x            => throw new FatalError("Unexpected ClassRep '%s' found searching for name '%s'".format(x, name))
+        val rep = packages find2 (_.name == pkg) flatMap (_ findClass rest)
+        rep match {
+          case Opt(x: ClassRep) => Opt(x)
+          case x                => throw new FatalError("Unexpected ClassRep '%s' found searching for name '%s'".format(x, name))
         }
       case _ =>
-        classes find (_.name == name)
+        classes find2 (_.name == name)
     }
 
-  def findSourceFile(name: String): Option[AbstractFile] =
+  def findSourceFile(name: String): Opt[AbstractFile] =
     findClass(name) match {
-      case Some(ClassRep(Some(x: AbstractFile), _)) => Some(x)
-      case _                                        => None
+      case Opt(ClassRep(Opt(x: AbstractFile), _)) => Opt(x)
+      case _                                      => Opt.None
     }
 
   def sortString = join(split(asClasspathString).sorted: _*)
@@ -244,7 +244,7 @@ abstract class ClassPath[T] {
 /**
  * A Classpath containing source files
  */
-class SourcePath[T](dir: AbstractFile, val context: ClassPathContext[T]) extends ClassPath[T] {
+class SourcePath[T >: Null](dir: AbstractFile, val context: ClassPathContext[T]) extends ClassPath[T] {
   def name = dir.name
   override def origin = dir.underlyingSource map (_.path)
   def asURLs = if (dir.file == null) Nil else List(dir.toURL)
@@ -256,7 +256,7 @@ class SourcePath[T](dir: AbstractFile, val context: ClassPathContext[T]) extends
     val packageBuf = immutable.Vector.newBuilder[SourcePath[T]]
     dir foreach { f =>
       if (!f.isDirectory && validSourceFile(f.name))
-        classBuf += ClassRep(None, Some(f))
+        classBuf += ClassRep(Opt.None, Opt(f))
       else if (f.isDirectory && validPackage(f.name))
         packageBuf += new SourcePath[T](f, context)
     }
@@ -296,7 +296,7 @@ class DirectoryClassPath(val dir: AbstractFile, val context: ClassPathContext[Ab
             f.isDirectory
         }
         if (!isDirectory && validClassFile(f.name))
-          classBuf += ClassRep(Some(f), None)
+          classBuf += ClassRep(Opt(f), Opt.None)
         else if (isDirectory && validPackage(f.name))
           packageBuf += new DirectoryClassPath(f, context)
     }
@@ -307,7 +307,7 @@ class DirectoryClassPath(val dir: AbstractFile, val context: ClassPathContext[Ab
   override def toString() = "directory classpath: "+ origin.getOrElse("?")
 }
 
-class DeltaClassPath[T](original: MergedClassPath[T], subst: Map[ClassPath[T], ClassPath[T]])
+class DeltaClassPath[T >: Null](original: MergedClassPath[T], subst: Map[ClassPath[T], ClassPath[T]])
 extends MergedClassPath[T](original.entries map (e => subst getOrElse (e, e)), original.context) {
   // not sure we should require that here. Commented out for now.
   // require(subst.keySet subsetOf original.entries.toSet)
@@ -317,7 +317,7 @@ extends MergedClassPath[T](original.entries map (e => subst getOrElse (e, e)), o
 /**
  * A classpath unifying multiple class- and sourcepath entries.
  */
-class MergedClassPath[T](
+class MergedClassPath[T >: Null](
   val entries: IndexedSeq[ClassPath[T]],
   val context: ClassPathContext[T])
 extends ClassPath[T] {

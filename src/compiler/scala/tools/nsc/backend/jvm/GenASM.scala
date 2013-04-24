@@ -549,8 +549,8 @@ abstract class GenASM extends SubComponent with BytecodeWriters with GenJVMASM {
       if(emitStackMapFrame && hasInternalName) {
         val internalName = cachedJN.toString()
         val trackedSym = jsymbol(sym)
-        reverseJavaName.get(internalName) match {
-          case Some(oldsym) if oldsym.exists && trackedSym.exists =>
+        reverseJavaName.valueGet(internalName) match {
+          case Opt(oldsym) if oldsym.exists && trackedSym.exists =>
             assert(
               // In contrast, neither NothingClass nor NullClass show up bytecode-level.
               (oldsym == trackedSym) || (oldsym == RuntimeNothingClass) || (oldsym == RuntimeNullClass) || (oldsym.isModuleClass && (oldsym.sourceModule == trackedSym.sourceModule)),
@@ -664,14 +664,14 @@ abstract class GenASM extends SubComponent with BytecodeWriters with GenJVMASM {
           )
 
           assert(jname != null, "javaName is broken.") // documentation
-          val doAdd = entries.get(jname) match {
+          val doAdd = entries.valueGet(jname) match {
             // TODO is it ok for prevOName to be null? (Someone should really document the invariants of the InnerClasses bytecode attribute)
-            case Some(prevOName) =>
+            case Opt(prevOName) =>
               // this occurs e.g. when innerClassBuffer contains both class Thread$State, object Thread$State,
               // i.e. for them it must be the case that oname == java/lang/Thread
               assert(prevOName == oname, "duplicate")
               false
-            case None => true
+            case _ => true
           }
 
           if(doAdd) {
@@ -827,7 +827,7 @@ abstract class GenASM extends SubComponent with BytecodeWriters with GenJVMASM {
 
       val memberTpe = enteringErasure(owner.thisType.memberInfo(sym))
 
-      val jsOpt: Option[String] = erasure.javaSig(sym, memberTpe)
+      val jsOpt = erasure.javaSig(sym, memberTpe)
       if (jsOpt.isEmpty) { return null }
 
       val sig = jsOpt.get
@@ -1263,7 +1263,7 @@ abstract class GenASM extends SubComponent with BytecodeWriters with GenJVMASM {
 
     def isParcelableClass = isAndroidParcelableClass(clasz.symbol)
 
-    def serialVUID: Option[Long] = clasz.symbol getAnnotation SerialVersionUIDAttr collect {
+    def serialVUID: Option[Long] = (clasz.symbol getAnnotation SerialVersionUIDAttr).toOption collect {
       case AnnotationInfo(_, Literal(const) :: _, _) => const.longValue
     }
 

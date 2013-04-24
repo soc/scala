@@ -52,7 +52,7 @@ abstract class SelectiveCPSTransform extends PluginComponent with
       case TypeRef(pre, sym, args) => TypeRef(pre, sym, args.map(transformCPSType(_)))
       case _ =>
         getExternalAnswerTypeAnn(tp) match {
-          case Some((res, outer)) =>
+          case Opt((res, outer)) =>
             appliedType(Context.tpeHK, List(removeAllCPSAnnotations(tp), res, outer))
           case _ =>
             removeAllCPSAnnotations(tp)

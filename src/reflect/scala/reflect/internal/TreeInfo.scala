@@ -95,7 +95,7 @@ abstract class TreeInfo {
     case Apply(Select(free @ Ident(_), nme.apply), _) if free.symbol.name endsWith nme.REIFY_FREE_VALUE_SUFFIX =>
       // see a detailed explanation of this trick in `GenSymbols.reifyFreeTerm`
       free.symbol.hasStableFlag && isExprSafeToInline(free)
-    case Apply(fn, List()) =>
+    case Apply(fn, Nil) =>
       // Note: After uncurry, field accesses are represented as Apply(getter, Nil),
       // so an Apply can also be pure.
       // However, before typing, applications of nullary functional values are also
@@ -586,7 +586,12 @@ abstract class TreeInfo {
    *      * targs = Nil
    *      * argss = List(List(arg11, arg12...), List(arg21, arg22, ...))
    */
-  class Applied(val tree: Tree) {
+  class Applied(val tree: Tree) extends Product3[Tree, List[Tree], List[List[Tree]]] {
+    def canEqual(other: Any) = other.isInstanceOf[Applied]
+    def _1 = core
+    def _2 = targs
+    def _3 = argss
+
     /** The tree stripped of the possibly nested applications.
      *  The original tree if it's not an application.
      */
@@ -663,11 +668,14 @@ abstract class TreeInfo {
   object Applied {
     def apply(tree: Tree): Applied = new Applied(tree)
 
-    def unapply(applied: Applied): Option[(Tree, List[Tree], List[List[Tree]])] =
-      Some((applied.core, applied.targs, applied.argss))
+    def unapply(applied: Applied): Opt[Product3[Tree, List[Tree], List[List[Tree]]]] = Opt(applied)
+    // : Option[(Tree, List[Tree], List[List[Tree]])] =
+    //   Some((applied.core, applied.targs, applied.argss))
 
-    def unapply(tree: Tree): Option[(Tree, List[Tree], List[List[Tree]])] =
-      unapply(dissectApplied(tree))
+    def unapply(tree: Tree): Opt[Product3[Tree, List[Tree], List[List[Tree]]]] = unapply(dissectApplied(tree))
+
+    // : Option[(Tree, List[Tree], List[List[Tree]])] =
+    //   unapply(dissectApplied(tree))
   }
 
   /** Is this file the body of a compilation unit which should not

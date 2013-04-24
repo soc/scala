@@ -236,6 +236,10 @@ private[collection] trait Wrappers {
 
     override def size = underlying.size
 
+    // Avoiding needless allocations.
+    override def contains(key: A): Boolean = underlying containsKey key
+    override def apply(key: A): B = if (underlying containsKey key) underlying get key else super.apply(key)
+
     def get(k: A) = {
       val v = underlying get k
       if (v != null)

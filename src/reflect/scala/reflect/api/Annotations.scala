@@ -56,7 +56,7 @@ trait Annotations { self: Universe =>
     */
   abstract class AnnotationExtractor {
     def apply(tpe: Type, scalaArgs: List[Tree], javaArgs: ListMap[Name, JavaArgument]): Annotation
-    def unapply(ann: Annotation): Option[(Type, List[Tree], ListMap[Name, JavaArgument])]
+    def unapply(ann: Annotation): Opt[Product3[Type, List[Tree], ListMap[Name, JavaArgument]]]
   }
 
   /** The API of `Annotation` instances.

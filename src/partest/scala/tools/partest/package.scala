@@ -15,8 +15,9 @@ package object partest {
   type Directory    = scala.reflect.io.Directory
   type Path         = scala.reflect.io.Path
   type PathResolver = scala.tools.util.PathResolver
-  type ClassPath[T] = scala.tools.nsc.util.ClassPath[T]
   type StringWriter = java.io.StringWriter
+
+  type ClassPath[T >: Null] = scala.tools.nsc.util.ClassPath[T]
 
   val SFile        = scala.reflect.io.File
   val Directory    = scala.reflect.io.Directory

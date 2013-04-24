@@ -140,6 +140,7 @@ trait Infer extends Checkable {
         // TODO: update spec to reflect we allow any ProductN, not just TupleN
         else productArgs
       }
+      //   throw new TypeError(s"result type $resTp of unapply defined in ${unappSym.fullLocationString} does not conform to Option[_] or Boolean")
 
     // for unapplySeq, replace last vararg by as many instances as required by nbSubPats
     val formalsExpanded =

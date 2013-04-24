@@ -298,6 +298,31 @@ object Predef extends LowPriorityImplicits with DeprecatedPredef {
   @inline implicit def augmentString(x: String): StringOps = new StringOps(x)
   @inline implicit def unaugmentString(x: StringOps): String = x.repr
 
+
+  implicit final class ReferenceMapOps[K, V >: Null](val map: collection.Map[K, V]) extends AnyVal {
+    def valueGet(key: K): Opt[V] = if (map contains key) Opt(map(key)) else Opt.None
+  }
+
+  implicit final class MutableReferenceMapOps[K, V >: Null](val map: mutable.Map[K, V]) extends AnyVal {
+    @inline final def getOrElseUpdate(key: K, op: => V): V = {
+      if (map contains key) map(key) else {
+        val result = op
+        map(key) = result
+        result
+      }
+    }
+  }
+
+  implicit final class TraversableValueOps[A >: Null <: AnyRef](val coll: TraversableOnce[A]) extends AnyVal {
+    @inline final def find2(p: A => Boolean): Opt[A] = {
+      for (x <- coll) {
+        if (p(x))
+          return Opt(x)
+      }
+      Opt.None
+    }
+  }
+
   // printing and reading -----------------------------------------------
 
   def print(x: Any) = Console.print(x)

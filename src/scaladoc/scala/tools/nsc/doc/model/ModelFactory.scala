@@ -151,7 +151,7 @@ class ModelFactory(val global: Global, val settings: doc.Settings) {
     }
     def deprecation =
       if (sym.isDeprecated)
-        Some((sym.deprecationMessage, sym.deprecationVersion) match {
+        Some((sym.deprecationMessage.toOption, sym.deprecationVersion.toOption) match {
           case (Some(msg), Some(ver)) => parseWiki("''(Since version " + ver + ")'' " + msg, NoPosition, Some(inTpl))
           case (Some(msg), None) => parseWiki(msg, NoPosition, Some(inTpl))
           case (None, Some(ver)) =>  parseWiki("''(Since version " + ver + ")''", NoPosition, Some(inTpl))
@@ -161,7 +161,7 @@ class ModelFactory(val global: Global, val settings: doc.Settings) {
         comment flatMap { _.deprecated }
     def migration =
       if(sym.hasMigrationAnnotation)
-        Some((sym.migrationMessage, sym.migrationVersion) match {
+        Some((sym.migrationMessage.toOption, sym.migrationVersion.toOption) match {
           case (Some(msg), Some(ver)) => parseWiki("''(Changed in version " + ver + ")'' " + msg, NoPosition, Some(inTpl))
           case (Some(msg), None) => parseWiki(msg, NoPosition, Some(inTpl))
           case (None, Some(ver)) =>  parseWiki("''(Changed in version " + ver + ")''", NoPosition, Some(inTpl))

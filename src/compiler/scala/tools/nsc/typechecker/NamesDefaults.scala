@@ -527,7 +527,7 @@ trait NamesDefaults { self: Analyzer =>
         case arg @ AssignOrNamedArg(Ident(name), rhs) =>
           def matchesName(param: Symbol) = !param.isSynthetic && (
             (param.name == name) || (param.deprecatedParamName match {
-              case Some(`name`) =>
+              case Opt(`name`) =>
                 context0.unit.deprecationWarning(arg.pos,
                   "the parameter name "+ name +" has been deprecated. Use "+ param.name +" instead.")
                 true

@@ -1259,7 +1259,7 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
       }
       for (fullname <- toReload)
         classPath.findClass(fullname) match {
-          case Some(classRep) =>
+          case Opt(classRep) =>
             if (settings.verbose) inform("[reset] reinit "+fullname)
             loaders.initializeFromClassPath(root, classRep)
           case _ =>

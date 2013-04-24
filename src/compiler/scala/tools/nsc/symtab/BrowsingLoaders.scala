@@ -26,7 +26,7 @@ abstract class BrowsingLoaders extends SymbolLoaders {
    */
   override protected def enterIfNew(owner: Symbol, member: Symbol, completer: SymbolLoader): Symbol = {
     completer.sourcefile match {
-      case Some(src) =>
+      case Opt(src) =>
         (if (member.isModule) member.moduleClass else member).associatedFile = src
       case _ =>
     }

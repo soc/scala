@@ -173,8 +173,8 @@ abstract class CPSAnnotationChecker extends CPSUtils {
           vprintln("checking enclosing method's result type without annotations")
           tree.tpe <:< pt.withoutAnnotations
         } else if (!hasMinusMarker(tree.tpe) && !annots1.isEmpty && mode.inByValMode) {
-          val optCpsTypes: Option[(Type, Type)]         = cpsParamTypes(tree.tpe)
-          val optExpectedCpsTypes: Option[(Type, Type)] = cpsParamTypes(pt)
+          val optCpsTypes: Opt[(Type, Type)]         = cpsParamTypes(tree.tpe)
+          val optExpectedCpsTypes: Opt[(Type, Type)] = cpsParamTypes(pt)
           if (optCpsTypes.isEmpty || optExpectedCpsTypes.isEmpty) {
             vprintln("yes we can!! (byval)")
             true

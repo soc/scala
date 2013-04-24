@@ -219,8 +219,8 @@ trait JavaParsers extends ast.parser.ParsersCommon with JavaScanners {
     /** Convert (qual)ident to type identifier
      */
     def convertToTypeId(tree: Tree): Tree = gen.convertToTypeName(tree) match {
-      case Some(t)  => t setPos tree.pos
-      case _        => tree match {
+      case Opt(t) => t setPos tree.pos
+      case _      => tree match {
         case AppliedTypeTree(_, _) | ExistentialTypeTree(_, _) | SelectFromTypeTree(_, _) =>
           tree
         case _ =>
@@ -838,8 +838,8 @@ trait JavaParsers extends ast.parser.ParsersCommon with JavaScanners {
           Ident(nme.EMPTY_PACKAGE_NAME)
         }
       thisPackageName = gen.convertToTypeName(pkg) match {
-        case Some(t)  => t.name.toTypeName
-        case _        => tpnme.EMPTY
+        case Opt(t) => t.name.toTypeName
+        case _      => tpnme.EMPTY
       }
       val buf = new ListBuffer[Tree]
       while (in.token == IMPORT)

@@ -38,10 +38,10 @@ abstract class ClassfileParser {
   protected var isScala: Boolean = _        // does class file describe a scala class?
   protected var isScalaAnnot: Boolean = _   // does class file describe a scala class with its pickled info in an annotation?
   protected var isScalaRaw: Boolean = _     // this class file is a scala class with no pickled info
-  protected var busy: Option[Symbol] = None // lock to detect recursive reads
+  protected var busy: Opt[Symbol] = Opt.None // lock to detect recursive reads
   protected var currentClass: Name = _      // JVM name of the current class
   protected var classTParams = Map[Name,Symbol]()
-  protected var srcfile0 : Option[AbstractFile] = None
+  protected var srcfile0 : Opt[AbstractFile] = Opt.None
   protected def moduleClass: Symbol = staticModule.moduleClass
   private var sawPrivateConstructor = false
 
@@ -94,15 +94,15 @@ abstract class ClassfileParser {
   }
   @inline private def pushBusy[T](sym: Symbol)(body: => T): T = {
     busy match {
-      case Some(`sym`)  => throw new IOException("unsatisfiable cyclic dependency in '%s'".format(sym))
-      case Some(sym1)   => throw new IOException("illegal class file dependency between '%s' and '%s'".format(sym, sym1))
-      case _            => ()
+      case Opt(`sym`) => throw new IOException("unsatisfiable cyclic dependency in '%s'".format(sym))
+      case Opt(sym1)  => throw new IOException("illegal class file dependency between '%s' and '%s'".format(sym, sym1))
+      case _          => ()
     }
 
-    busy = Some(sym)
+    busy = Opt(sym)
     try body
     catch parseErrorHandler
-    finally busy = None
+    finally busy = Opt.None
   }
   @inline private def raiseLoaderLevel[T](body: => T): T = {
     loaders.parentsLevel += 1
@@ -289,8 +289,8 @@ abstract class ClassfileParser {
      */
     private def getNameAndType(index: Int, ownerTpe: Type): (Name, Type) = {
       if (index <= 0 || len <= index) errorBadIndex(index)
-      (values(index): @unchecked) match {
-        case p: ((Name, Type)) => p
+      values(index) match {
+        case p: ((Name @unchecked, Type @unchecked)) => p
         case _                 =>
           val start = firstExpecting(index, CONSTANT_NAMEANDTYPE)
           val name = getName(in.getChar(start).toInt)
@@ -874,11 +874,10 @@ abstract class ClassfileParser {
             val scalaSigAnnot = parseAnnotations(attrLen)
             if (isScalaAnnot)
               scalaSigAnnot match {
-                case Some(san: AnnotationInfo) =>
-                  val bytes =
-                    san.assocs.find({ _._1 == nme.bytes }).get._2.asInstanceOf[ScalaSigBytes].bytes
-                  unpickler.unpickle(bytes, 0, clazz, staticModule, in.file.name)
-                case None =>
+                case Opt(san: AnnotationInfo) =>
+                  for ((nme.bytes, v: ScalaSigBytes) <- san.assocs)
+                    unpickler.unpickle(v.bytes, 0, clazz, staticModule, in.file.name)
+                case _ =>
                   throw new RuntimeException("Scala class file does not contain Scala annotation")
               }
             debuglog("[class] << " + sym.fullName + sym.annotationsString)
@@ -902,51 +901,51 @@ abstract class ClassfileParser {
             case rootMirror.EmptyPackage => srcfileLeaf
             case pkg => pkg.fullName(File.separatorChar)+File.separator+srcfileLeaf
           }
-          srcfile0 = settings.outputDirs.srcFilesFor(in.file, srcpath).find(_.exists)
+          srcfile0 = Opt fromOption settings.outputDirs.srcFilesFor(in.file, srcpath).find(_.exists)
         case _ =>
           in.skip(attrLen)
       }
     }
 
-    def parseAnnotArg: Option[ClassfileAnnotArg] = {
+    def parseAnnotArg: Opt[ClassfileAnnotArg] = {
       val tag = u1
       val index = u2
       tag match {
         case STRING_TAG =>
-          Some(LiteralAnnotArg(Constant(pool.getName(index).toString)))
+          Opt(LiteralAnnotArg(Constant(pool.getName(index).toString)))
         case BOOL_TAG | BYTE_TAG | CHAR_TAG | SHORT_TAG | INT_TAG |
              LONG_TAG | FLOAT_TAG | DOUBLE_TAG =>
-          Some(LiteralAnnotArg(pool.getConstant(index)))
+          Opt(LiteralAnnotArg(pool.getConstant(index)))
         case CLASS_TAG  =>
-          Some(LiteralAnnotArg(Constant(pool.getType(index))))
+          Opt(LiteralAnnotArg(Constant(pool.getType(index))))
         case ENUM_TAG   =>
           val t = pool.getType(index)
           val n = readName()
           val s = t.typeSymbol.companionModule.info.decls.lookup(n)
           assert(s != NoSymbol, t)
-          Some(LiteralAnnotArg(Constant(s)))
+          Opt(LiteralAnnotArg(Constant(s)))
         case ARRAY_TAG  =>
           val arr = new ArrayBuffer[ClassfileAnnotArg]()
           var hasError = false
           for (i <- 0 until index)
             parseAnnotArg match {
-              case Some(c) => arr += c
-              case None => hasError = true
+              case Opt(c) => arr += c
+              case _      => hasError = true
             }
-          if (hasError) None
-          else Some(ArrayAnnotArg(arr.toArray))
+          if (hasError) Opt.None
+          else Opt(ArrayAnnotArg(arr.toArray))
         case ANNOTATION_TAG =>
           parseAnnotation(index) map (NestedAnnotArg(_))
       }
     }
 
-    def parseScalaSigBytes: Option[ScalaSigBytes] = {
+    def parseScalaSigBytes: Opt[ScalaSigBytes] = {
       val tag = u1
       assert(tag == STRING_TAG, tag)
-      Some(ScalaSigBytes(pool getBytes u2))
+      Opt(ScalaSigBytes(pool getBytes u2))
     }
 
-    def parseScalaLongSigBytes: Option[ScalaSigBytes] = {
+    def parseScalaLongSigBytes: Opt[ScalaSigBytes] = {
       val tag = u1
       assert(tag == ARRAY_TAG, tag)
       val stringCount = u2
@@ -956,13 +955,13 @@ abstract class ClassfileParser {
           assert(stag == STRING_TAG, stag)
           u2.toInt
         }
-      Some(ScalaSigBytes(pool.getBytes(entries.toList)))
+      Opt(ScalaSigBytes(pool.getBytes(entries.toList)))
     }
 
     /* Parse and return a single annotation.  If it is malformed,
      * return None.
      */
-    def parseAnnotation(attrNameIndex: Char): Option[AnnotationInfo] = try {
+    def parseAnnotation(attrNameIndex: Char): Opt[AnnotationInfo] = try {
       val attrType = pool.getType(attrNameIndex)
       val nargs = u2
       val nvpairs = new ListBuffer[(Name, ClassfileAnnotArg)]
@@ -974,22 +973,22 @@ abstract class ClassfileParser {
         // is encoded as a string because of limitations in the Java class file format.
         if ((attrType == ScalaSignatureAnnotation.tpe) && (name == nme.bytes))
           parseScalaSigBytes match {
-            case Some(c) => nvpairs += ((name, c))
-            case None => hasError = true
+            case Opt(c) => nvpairs += ((name, c))
+            case _ => hasError = true
           }
         else if ((attrType == ScalaLongSignatureAnnotation.tpe) && (name == nme.bytes))
           parseScalaLongSigBytes match {
-            case Some(c) => nvpairs += ((name, c))
-            case None => hasError = true
+            case Opt(c) => nvpairs += ((name, c))
+            case _ => hasError = true
           }
         else
           parseAnnotArg match {
-            case Some(c) => nvpairs += ((name, c))
-            case None => hasError = true
+            case Opt(c) => nvpairs += ((name, c))
+            case _ => hasError = true
           }
       }
-      if (hasError) None
-      else Some(AnnotationInfo(attrType, List(), nvpairs.toList))
+      if (hasError) Opt.None
+      else Opt(AnnotationInfo(attrType, List(), nvpairs.toList))
     } catch {
       case f: FatalError => throw f // don't eat fatal errors, they mean a class was not found
       case ex: Throwable =>
@@ -1002,7 +1001,7 @@ abstract class ClassfileParser {
         warning("Caught: " + ex + " while parsing annotations in " + in.file)
         if (settings.debug) ex.printStackTrace()
 
-        None // ignore malformed annotations
+        Opt.None // ignore malformed annotations
     }
 
     /*
@@ -1023,18 +1022,18 @@ abstract class ClassfileParser {
 
     /* Parse a sequence of annotations and attaches them to the
      * current symbol sym, except for the ScalaSignature annotation that it returns, if it is available. */
-    def parseAnnotations(len: Int): Option[AnnotationInfo] =  {
+    def parseAnnotations(len: Int): Opt[AnnotationInfo] =  {
       val nAttr = u2
-      var scalaSigAnnot: Option[AnnotationInfo] = None
+      var scalaSigAnnot: Opt[AnnotationInfo] = Opt.None
       for (n <- 0 until nAttr)
         parseAnnotation(u2) match {
-          case Some(scalaSig) if (scalaSig.atp == ScalaSignatureAnnotation.tpe) =>
-            scalaSigAnnot = Some(scalaSig)
-          case Some(scalaSig) if (scalaSig.atp == ScalaLongSignatureAnnotation.tpe) =>
-            scalaSigAnnot = Some(scalaSig)
-          case Some(annot) =>
+          case Opt(scalaSig) if (scalaSig.atp == ScalaSignatureAnnotation.tpe) =>
+            scalaSigAnnot = Opt(scalaSig)
+          case Opt(scalaSig) if (scalaSig.atp == ScalaLongSignatureAnnotation.tpe) =>
+            scalaSigAnnot = Opt(scalaSig)
+          case Opt(annot) =>
             sym.addAnnotation(annot)
-          case None =>
+          case _ =>
         }
       scalaSigAnnot
     }

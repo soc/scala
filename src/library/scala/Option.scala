@@ -8,6 +8,53 @@
 
 package scala
 
+final class Size private (val size: Int) extends AnyVal {
+  def isEmpty = size < 0
+  def get = size
+}
+object Size {
+  val NoSize = new Size(-1)
+  def apply(size: Int): Size = if (size < 0) NoSize else new Size(size)
+  def unapply(size: Size): Size = size
+}
+
+final class Index private (val index: Int) extends AnyVal {
+}
+object Index {
+  final val NoIndex = new Index(-1)
+  def apply(index: Int): Index = if (index < 0) NoIndex else new Index(index)
+}
+
+final class Opt[+A >: Null](val value: A) extends AnyVal {
+  @inline final def filter(p: A => Boolean): Opt[A] = if (isEmpty || p(value)) this else Opt.None
+  @inline final def filterNot(p: A => Boolean): Opt[A] = if (isEmpty || !p(value)) this else Opt.None
+  @inline final def orElse[B >: A](alt: => Opt[B]): Opt[B] = if (isEmpty) alt else this
+  @inline final def exists(p: A => Boolean) = !isEmpty && p(value)
+  @inline final def forall(p: A => Boolean) = isEmpty || p(value)
+  @inline final def getOrElse[B >: A](default: => B): B = if (isEmpty) default else value
+  @inline final def map[B >: Null](f: A => B): Opt[B] = if (isEmpty) Opt.None else Opt(f(value))
+  @inline final def flatMap[B >: Null](f: A => Opt[B]): Opt[B] = if (isEmpty) Opt.None else f(value)
+  @inline final def foreach[U](f: A => U): Unit = if (!isEmpty) f(value)
+  @inline final def collect[B >: Null](pf: PartialFunction[A, B]): Opt[B] = (
+    if (isEmpty) Opt.None
+    else if (pf isDefinedAt value) Opt(pf(value))
+    else Opt.None
+  )
+  def get: A  = value
+  def isEmpty = value == null
+
+  def nonEmpty = !isEmpty
+  def isDefined = !isEmpty
+  def toOption: Option[A] = if (isEmpty) scala.None else scala.Some(value)
+}
+object Opt {
+  final val None = new Opt[Null](null)
+  def unapply[A >: Null](x: Opt[A]): Opt[A] = if (x == null) None else x
+  def empty[A >: Null] = None
+  def apply[A >: Null](value: A): Opt[A] = if (value == null) None else new Opt[A](value)
+  def fromOption[A >: Null](opt: Option[A]): Opt[A] = if (opt.isEmpty) Opt.None else apply(opt.get)
+}
+
 object Option {
 
   import scala.language.implicitConversions
@@ -210,7 +257,7 @@ sealed abstract class Option[+A] extends Product with Serializable {
   }
 
   /** Tests whether the option contains a given value as an element.
-   * 
+   *
    *  @param elem the element to test.
    *  @return `true` if the option has an element that is equal (as
    *  determined by `==`) to `elem`, `false` otherwise.
@@ -310,7 +357,6 @@ final case class Some[+A](x: A) extends Option[A] {
   def isEmpty = false
   def get = x
 }
-
 
 /** This case object represents non-existent values.
  *
