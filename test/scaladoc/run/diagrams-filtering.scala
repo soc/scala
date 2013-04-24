@@ -50,7 +50,7 @@ object Test extends ScaladocModelTest {
     // Assert we have 7 nodes and 6 edges
     val base = rootPackage._package("scala")._package("test")._package("scaladoc")._package("diagrams")
     val packDiag = base.contentDiagram.get
-    assert(packDiag.nodes.length == 6)
+    assert(packDiag.nodes.length == 6, packDiag.nodes.length + ": (\n  " + packDiag.nodes.mkString("\n  ") + "\n)")
     assert(packDiag.edges.map(_._2.length).sum == 5)
 
     // trait A

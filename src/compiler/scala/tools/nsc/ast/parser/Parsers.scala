@@ -2682,12 +2682,13 @@ self =>
      *  }}}
      */
     def packageObjectDef(start: Offset): PackageDef = {
-      val defn   = objectDef(start, NoMods)
+      val defn   = objectDef(in.offset, NoMods)
       val module = copyModuleDef(defn)(name = nme.PACKAGEkw)
       val pid    = atPos(o2p(defn.pos.startOrPoint))(Ident(defn.name))
 
       makePackaging(start, pid, module :: Nil)
     }
+    // -              joinComment(List(makePackageObject(start, objectDef(in.offset, NoMods))))
     def packageOrPackageObject(start: Offset): Tree = (
       if (in.token == OBJECT)
         joinComment(packageObjectDef(start) :: Nil).head
