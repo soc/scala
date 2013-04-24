@@ -526,7 +526,7 @@ private[internal] trait TypeMaps {
       require(lhsSym.safeOwner == rhsSym, s"$lhsSym is not a type parameter of $rhsSym")
 
       // Find the type parameter position; we'll use the corresponding argument
-      val argIndex = rhsSym.typeParams indexOf lhsSym
+      val argIndex = (rhsSym.typeParams indexOf lhsSym).intValue
 
       if (argIndex >= 0 && argIndex < rhsArgs.length)             // @M! don't just replace the whole thing, might be followed by type application
         appliedType(rhsArgs(argIndex), lhsArgs mapConserve this)
@@ -735,10 +735,7 @@ private[internal] trait TypeMaps {
     object mapTreeSymbols extends TypeMapTransformer {
       val strictCopy = newStrictTreeCopier
 
-      def termMapsTo(sym: Symbol) = from indexOf sym match {
-        case -1   => None
-        case idx  => Some(to(idx))
-      }
+      def termMapsTo(sym: Symbol) = (from indexOf sym).toOption map to
 
       // if tree.symbol is mapped to another symbol, passes the new symbol into the
       // constructor `trans` and sets the symbol and the type on the resulting tree.
@@ -777,9 +774,9 @@ private[internal] trait TypeMaps {
       object trans extends TypeMapTransformer {
         override def transform(tree: Tree) = tree match {
           case Ident(name) =>
-            from indexOf tree.symbol match {
-              case -1   => super.transform(tree)
-              case idx  =>
+            (from indexOf tree.symbol).toOption match {
+              case None      => super.transform(tree)
+              case Some(idx) =>
                 val totpe = to(idx)
                 if (totpe.isStable) tree.duplicate setType totpe
                 else giveup()
@@ -841,7 +838,7 @@ private[internal] trait TypeMaps {
         )
     }
     private object Arg {
-      def unapply(param: Symbol) = Some(params indexOf param) filter (_ >= 0)
+      def unapply(param: Symbol) = params indexOf param toOption
     }
 
     def apply(tp: Type): Type = mapOver(tp) match {

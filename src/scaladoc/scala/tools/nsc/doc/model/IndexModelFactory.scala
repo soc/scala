@@ -7,7 +7,7 @@ package scala.tools.nsc
 package doc
 package model
 
-import scala.collection._
+import scala.collection.{ mutable, immutable }
 
 object IndexModelFactory {
 
@@ -26,10 +26,10 @@ object IndexModelFactory {
             if(ch.isLetterOrDigit) ch else '_'
           }
           val letter = this.get(firstLetter).getOrElse {
-            immutable.SortedMap[String, SortedSet[MemberEntity]]()
+            immutable.SortedMap[String, collection.SortedSet[MemberEntity]]()
           }
           val members = letter.get(d.name).getOrElse {
-            SortedSet.empty[MemberEntity](Ordering.by { _.toString })
+            collection.SortedSet.empty[MemberEntity](Ordering.by { _.toString })
           } + d
           this(firstLetter) = letter + (d.name -> members)
         }

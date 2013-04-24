@@ -148,11 +148,10 @@ trait AnyValReps {
     // Given two numeric values v and w the operation type of v and w is the operation type
     // of their run-time types.
     def opType(that: AnyValNum): AnyValNum = {
-      val rank = IndexedSeq(I, L, F, D)
-      (rank indexOf this, rank indexOf that) match {
-        case (-1, -1)   => I
-        case (r1, r2)   => rank apply (r1 max r2)
-      }
+      val rank  = IndexedSeq(I, L, F, D)
+      val index = (rank indexOf this) max (rank indexOf that) orElse 0
+
+      rank(index)
     }
 
     def mkCoercions = numeric map (x => "def to%s: %s".format(x, x))

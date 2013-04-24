@@ -125,7 +125,7 @@ trait GenSeqLike[+A, +Repr] extends Any with GenIterableLike[A, Repr] with Equal
    *    $mayNotTerminateInf
    *
    */
-  def indexOf[B >: A](elem: B): Int = indexOf(elem, 0)
+  def indexOf[B >: A](elem: B): Index = indexOf(elem, 0)
 
   /** Finds index of first occurrence of some value in this $coll after or at some start index.
    *
@@ -141,7 +141,7 @@ trait GenSeqLike[+A, +Repr] extends Any with GenIterableLike[A, Repr] with Equal
    *    $mayNotTerminateInf
    *
    */
-  def indexOf[B >: A](elem: B, from: Int): Int = indexWhere(elem == _, from)
+  def indexOf[B >: A](elem: B, from: Index): Index = indexWhere(elem == _, from)
 
   /** Finds index of last occurrence of some value in this $coll.
    *

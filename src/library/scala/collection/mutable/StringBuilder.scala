@@ -372,7 +372,7 @@ final class StringBuilder(private val underlying: JavaStringBuilder)
    *  @param    str       the target string to search for
    *  @return             the first applicable index where target occurs, or -1 if not found.
    */
-  def indexOf(str: String): Int = underlying.indexOf(str)
+  def indexOf(str: String): Index = underlying.indexOf(str)
 
   /** Finds the index of the first occurrence of the specified substring.
    *
@@ -380,7 +380,7 @@ final class StringBuilder(private val underlying: JavaStringBuilder)
    *  @param    fromIndex the smallest index in the source string to consider
    *  @return             the first applicable index where target occurs, or -1 if not found.
    */
-  def indexOf(str: String, fromIndex: Int): Int = underlying.indexOf(str, fromIndex)
+  def indexOf(str: String, fromIndex: Index): Index = underlying.indexOf(str, fromIndex)
 
   /** Finds the index of the last occurrence of the specified substring.
    *

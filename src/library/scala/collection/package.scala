@@ -78,6 +78,11 @@ package scala
 package object collection {
   import scala.collection.generic.CanBuildFrom
 
+  type Index = scala.math.Index
+
+  implicit def liftIntToIndex(x: Int): Index = scala.math.Index(x)
+  implicit def lowerIndexToInt(x: math.Index): Int = x.intValue
+
   /** Provides a CanBuildFrom instance that builds a specific target collection (`To')
    *  irrespective of the original collection (`From').
    */
