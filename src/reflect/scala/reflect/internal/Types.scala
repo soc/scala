@@ -4383,7 +4383,7 @@ trait Types
             // transpose freaked out because of irregular argss
             // catching just in case (shouldn't happen, but also doesn't cost us)
             // [JZ] It happens: see SI-5683.
-            debuglog("transposed irregular matrix!?" +(tps, argss))
+            debuglog(s"transposed irregular matrix!? tps=$tps argss=$argss")
             Opt.None
         }
       } catch {
