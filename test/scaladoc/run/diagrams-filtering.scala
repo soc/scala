@@ -5,42 +5,50 @@ import scala.tools.partest.ScaladocModelTest
 object Test extends ScaladocModelTest {
 
   override def code = """
-        package scala.test.scaladoc
+package scala.test.scaladoc
 
-        /** @contentDiagram hideNodes "scala.test.*.A" "java.*", hideEdges ("*G" -> "*E") */
-        package object diagrams {
-          def foo = 4
-        }
+/** @contentDiagram hideNodes "scala.test.*.A" "java.*", hideEdges ("*G" -> "*E") */
+package object diagrams {
+  def foo = 4
+}
 
-        package diagrams {
-          import language.implicitConversions
+package diagrams {
+  import language.implicitConversions
 
-          /** @inheritanceDiagram hideIncomingImplicits, hideNodes "*E" */
-          trait A
-          trait AA extends A
-          trait B
-          trait AAA extends B
+  /** @inheritanceDiagram hideIncomingImplicits, hideNodes "*E" */
+  trait A
+  trait AA extends A
+  trait B
+  trait AAA extends B
 
-          /** @inheritanceDiagram hideDiagram */
-          trait C
-          trait AAAA extends C
+  /** @inheritanceDiagram hideDiagram */
+  trait C
+  trait AAAA extends C
 
-          /** @inheritanceDiagram hideEdges("*E" -> "*A") */
-          class E extends A with B with C
-          class F extends E
-          /** @inheritanceDiagram hideNodes "*G" "G" */
-          class G extends E
-          private class H extends E /* since it's private, it won't go into the diagram */
-          class T { def t = true }
-          object E {
-            implicit def eToT(e: E) = new T
-            implicit def eToA(e: E) = new A { }
-          }
-        }
+  /** @inheritanceDiagram hideEdges("*E" -> "*A") */
+  class E extends A with B with C
+  class F extends E
+  /** @inheritanceDiagram hideNodes "*G" "G" */
+  class G extends E
+  private class H extends E /* since it's private, it won't go into the diagram */
+  class T { def t = true }
+  object E {
+    implicit def eToT(e: E) = new T
+    implicit def eToA(e: E) = new A { }
+  }
+}
     """
 
   // diagrams must be started. In case there's an error with dot, it should not report anything
   def scaladocSettings = "-diagrams -implicits"
+
+  def assert(cond: Boolean) = {
+    if (cond)
+      println("ok")
+    else
+      (new Throwable).getStackTrace.take(5).foreach(println)
+
+  }
 
   def testModel(rootPackage: Package) = {
     // get the quick access implicit defs in scope (_package(s), _class(es), _trait(s), object(s) _method(s), _value(s))
@@ -50,7 +58,8 @@ object Test extends ScaladocModelTest {
     // Assert we have 7 nodes and 6 edges
     val base = rootPackage._package("scala")._package("test")._package("scaladoc")._package("diagrams")
     val packDiag = base.contentDiagram.get
-    assert(packDiag.nodes.length == 6, packDiag.nodes.length + ": (\n  " + packDiag.nodes.mkString("\n  ") + "\n)")
+    assert(packDiag.nodes.length == 9) //, packDiag.nodes.length + ": (\n  " + packDiag.nodes.mkString("\n  ") + "\n)")
+    println("packDiag.edges.map(_._2.length).sum = " + packDiag.edges.map(_._2.length).sum)
     assert(packDiag.edges.map(_._2.length).sum == 5)
 
     // trait A
@@ -82,7 +91,7 @@ object Test extends ScaladocModelTest {
 
     val (outgoingSuperclass, outgoingImplicit) = outgoing.head._2.partition(_.isNormalNode)
     assert(outgoingSuperclass.length == 2) // B and C
-    assert(outgoingImplicit.length == 1, outgoingImplicit) // T
+    assert(outgoingImplicit.length == 1) //, outgoingImplicit) // T
 
     val (incomingSubclass, incomingImplicit) = incoming.partition(_._1.isNormalNode)
     assert(incomingSubclass.length == 2) // F and G
