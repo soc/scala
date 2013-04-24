@@ -92,15 +92,14 @@ trait MatchCodeGen extends Interface {
 
   trait PureMatchMonadInterface extends MatchMonadInterface {
     val matchStrategy: Tree
-
-    def inMatchMonad(tp: Type): Type = appliedType(oneSig, List(tp)).finalResultType
-    def pureType(tp: Type): Type     = appliedType(oneSig, List(tp)).paramTypes.headOption getOrElse NoType // fail gracefully (otherwise we get crashes)
-    protected def matchMonadSym      = oneSig.finalResultType.typeSymbol
-
     import CODE._
     def _match(n: Name): SelectStart = matchStrategy DOT n
 
-    private lazy val oneSig: Type = typer.typedOperator(_match(vpmName.one)).tpe  // TODO: error message
+    private lazy val oneType         = typer.typedOperator(_match(vpmName.one)).tpe  // TODO: error message
+    private def oneApplied(tp: Type) = appliedType(oneType, tp :: Nil)
+
+    override def pureType(tp: Type)                          = oneApplied(tp).paramTypes.headOption getOrElse NoType
+    override def mapResultType(prev: Type, elem: Type): Type = oneApplied(elem).finalResultType
   }
 
   trait PureCodegen extends CodegenCore with PureMatchMonadInterface {
@@ -132,13 +131,7 @@ trait MatchCodeGen extends Interface {
     }
   }
 
-  trait OptimizedMatchMonadInterface extends MatchMonadInterface {
-    override def inMatchMonad(tp: Type): Type = optionType(tp)
-    override def pureType(tp: Type): Type     = tp
-    override protected def matchMonadSym      = OptionClass
-  }
-
-  trait OptimizedCodegen extends CodegenCore with TypedSubstitution with OptimizedMatchMonadInterface {
+  trait OptimizedCodegen extends CodegenCore with TypedSubstitution with MatchMonadInterface {
     override def codegen: AbsCodegen = optimizedCodegen
 
     // when we know we're targetting Option, do some inlining the optimizer won't do
@@ -168,7 +161,6 @@ trait MatchCodeGen extends Interface {
 
           LabelDef(currCase, Nil, mkCase(new OptimizedCasegen(matchEnd, nextCase)))
         }
-
         // must compute catchAll after caseLabels (side-effects nextCase)
         // catchAll.isEmpty iff no synthetic default case needed (the (last) user-defined case is a default)
         // if the last user-defined case is a default, it will never jump to the next case; it will go immediately to matchEnd
@@ -206,15 +198,38 @@ trait MatchCodeGen extends Interface {
         // next: MatchMonad[U]
         // returns MatchMonad[U]
         def flatMap(prev: Tree, b: Symbol, next: Tree): Tree = {
-          val tp      = inMatchMonad(b.tpe)
-          val prevSym = freshSym(prev.pos, tp, "o")
-          val isEmpty = tp member vpmName.isEmpty
-          val get     = tp member vpmName.get
+          // If we use this packedType instead of b.tpe, 'object Ticket522'
+          // in pos/patmat.scala compiles, but this fails:
+          // trait Other {
+          //   class Quux
+          //   object Baz { def unapply(x: Any): Option[Quux] = None }
+          // }
+          // trait Reifiers {
+          //   def f() {
+          //     val u2: Other = null
+          //     (null: Any) match { case u2.Baz(x) => println(x: u2.Quux) }
+          //     // The underlying error was: type mismatch;
+          //     //  found   : Other#Quux
+          //     //  required: u2.Quux
+          //     //     x match { case u2.Baz(x) => println(x: u2.Quux) }
+          //     //       ^
+          //     // one error found
+          //   }
+          // }
+          // val bType    = typer.packedType(TypeTree(b.tpe), matchOwner)
+          val bType    = b.tpe
+          val nextType = mapResultType(prev.tpe, bType)
+          val prevSym  = freshSym(prev.pos, nextType, "o")
+          val select1  = Select(CODE.REF(prevSym), vpmName.isEmpty)
+          val select2  = Select(CODE.REF(prevSym), vpmName.get)
 
           BLOCK(
             VAL(prevSym) === prev,
             // must be isEmpty and get as we don't control the target of the call (prev is an extractor call)
-            ifThenElseZero(NOT(prevSym DOT isEmpty), Substitution(b, prevSym DOT get)(next))
+            ifThenElseZero(
+              NOT(select1),
+              Substitution(b, select2)(next)
+            )
           )
         }
 
