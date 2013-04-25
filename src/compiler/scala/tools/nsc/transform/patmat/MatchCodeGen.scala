@@ -65,7 +65,7 @@ trait MatchCodeGen extends Interface {
       def fun(arg: Symbol, body: Tree): Tree           = Function(List(ValDef(arg)), body)
       def tupleSel(binder: Symbol)(i: Int): Tree       = (REF(binder) DOT nme.productAccessorName(i)) // make tree that accesses the i'th component of the tuple referenced by binder
       def index(tgt: Tree)(i: Int): Tree               = tgt APPLY (LIT(i))
-      def drop(tgt: Tree)(n: Int): Tree                = gen.mkMethodCall(traversableDropMethod, Nil, tgt :: LIT(n) :: Nil)
+      def drop(tgt: Tree)(n: Int): Tree                = gen.mkRuntimeCall(nme.drop, tgt :: LIT(n) :: Nil)
       def _equals(checker: Tree, binder: Symbol): Tree = checker MEMBER_== REF(binder)          // NOTE: checker must be the target of the ==, that's the patmat semantics for ya
 
       // the force is needed mainly to deal with the GADT typing hack (we can't detect it otherwise as tp nor pt need contain an abstract type, we're just casting wildly)

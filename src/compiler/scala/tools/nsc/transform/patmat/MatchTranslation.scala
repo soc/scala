@@ -517,7 +517,7 @@ trait MatchTranslation { self: PatternMatching  =>
           // ...if binder has a lengthCompare method, otherwise
           // `scala.math.signum(binder.length - expectedLength)`
           def checkExpectedLength = seqTp member nme.lengthCompare match {
-            case NoSymbol => compareInts(Select(seqTree(binder), nme.length), LIT(expectedLength))
+            case NoSymbol => compareInts(seqTree(binder) DOT nme.length, LIT(expectedLength))
             case lencmp   => (seqTree(binder) DOT lencmp)(LIT(expectedLength))
           }
 
