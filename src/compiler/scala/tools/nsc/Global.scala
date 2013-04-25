@@ -1254,11 +1254,11 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
             toReload += sym.fullName
               // note: toReload could be set twice with the same name
               // but reinit must happen only once per name. That's why
-              // the following classPath.findClass { ... } code cannot be moved here.
+              // the following classPath.optFindClass { ... } code cannot be moved here.
           }
       }
       for (fullname <- toReload)
-        classPath.findClass(fullname) match {
+        classPath.optFindClass(fullname) match {
           case Opt(classRep) =>
             if (settings.verbose) inform("[reset] reinit "+fullname)
             loaders.initializeFromClassPath(root, classRep)

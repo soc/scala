@@ -120,7 +120,7 @@ abstract class BytecodeTest extends ASMConverters {
 
   protected def loadClassNode(name: String, skipDebugInfo: Boolean = true): ClassNode = {
     val classBytes: InputStream = (for {
-      classRep <- classpath.findClass(name)
+      classRep <- classpath.optFindClass(name)
       binary <- classRep.binary
     } yield binary.input) getOrElse sys.error(s"failed to load class '$name'; classpath = $classpath")
 

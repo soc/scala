@@ -16,7 +16,7 @@ trait Platform {
   import global._
 
   /** The binary classfile representation type */
-  type BinaryRepr >: Null
+  type BinaryRepr
 
   /** The compiler classpath. */
   def classPath: ClassPath[BinaryRepr]

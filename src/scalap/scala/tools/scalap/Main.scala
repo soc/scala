@@ -105,7 +105,7 @@ class Main {
         // we can afford allocations because this is not a performance critical code
         classname.split('.').map(NameTransformer.encode).mkString(".")
     }
-    val cls = path.findClass(encName)
+    val cls = path.optFindClass(encName)
     if (cls.isDefined && cls.get.binary.isDefined) {
       val cfile = cls.get.binary.get
       if (verbose) {
