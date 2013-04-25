@@ -470,6 +470,7 @@ trait Infer extends Checkable {
       }
       existentialAbstraction(tparams.toList, tp1)
     }
+    def ensureFullyDefined(tp: Type): Type = if (isFullyDefined(tp)) tp else makeFullyDefined(tp)
 
     /** Return inferred type arguments of polymorphic expression, given
      *  its type parameters and result type and a prototype `pt`.
