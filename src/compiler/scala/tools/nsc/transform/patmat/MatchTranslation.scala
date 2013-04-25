@@ -422,6 +422,7 @@ trait MatchTranslation { self: PatternMatching  =>
     }
 
     abstract class ExtractorCall(val args: List[Tree]) {
+      import CODE._
       val nbSubPats = args.length
 
       // everything okay, captain?
@@ -432,6 +433,8 @@ trait MatchTranslation { self: PatternMatching  =>
 
       // to which type should the previous binder be casted?
       def paramType  : Type
+
+      protected def rawSubPatTypes: List[Type]
 
       /** Create the TreeMaker that embodies this extractor call
        *
@@ -458,25 +461,25 @@ trait MatchTranslation { self: PatternMatching  =>
         case (b, PatternBoundToUnderscore()) => b
       }.toSet
 
-      def subPatTypes: List[Type] =
-        if(isSeq) {
-          val TypeRef(pre, SeqClass, args) = seqTp
+      def subPatTypes: List[Type] = rawSubPatTypes match {
+        case tps if !isSeq => tps
+        case init :+ last  =>
+          val elem = unapplySeqElementType(last)
           // do repeated-parameter expansion to match up with the expected number of arguments (in casu, subpatterns)
-          val formalsWithRepeated = rawSubPatTypes.init :+ typeRef(pre, RepeatedParamClass, args)
+          val formalsWithRepeated = init :+ scalaRepeatedType(elem)
+          if (lastIsStar)
+            formalTypes(formalsWithRepeated, nbSubPats - 1) :+ last
+          else
+            formalTypes(formalsWithRepeated, nbSubPats)
+      }
 
-          if (lastIsStar) formalTypes(formalsWithRepeated, nbSubPats - 1) :+ seqTp
-          else formalTypes(formalsWithRepeated, nbSubPats)
-        } else rawSubPatTypes
-
-      protected def rawSubPatTypes: List[Type]
-
-      protected def seqTp = rawSubPatTypes.last baseType SeqClass
-      protected def seqLenCmp                = rawSubPatTypes.last member nme.lengthCompare
-      protected lazy val firstIndexingBinder = rawSubPatTypes.length - 1 // rawSubPatTypes.last is the Seq, thus there are `rawSubPatTypes.length - 1` non-seq elements in the tuple
-      protected lazy val lastIndexingBinder  = if(lastIsStar) nbSubPats-2 else nbSubPats-1
-      protected lazy val expectedLength      = lastIndexingBinder - firstIndexingBinder + 1
-      protected lazy val minLenToCheck       = if(lastIsStar) 1 else 0
-      protected def seqTree(binder: Symbol)  = tupleSel(binder)(firstIndexingBinder+1)
+      protected def seqTp                                  = rawSubPatTypes.last
+      protected def seqLenCmp                              = seqTp member nme.lengthCompare
+      protected lazy val firstIndexingBinder               = rawSubPatTypes.length - 1 // rawSubPatTypes.last is the Seq, thus there are `rawSubPatTypes.length - 1` non-seq elements in the tuple
+      protected lazy val lastIndexingBinder                = if(lastIsStar) nbSubPats-2 else nbSubPats-1
+      protected lazy val expectedLength                    = lastIndexingBinder - firstIndexingBinder + 1
+      protected lazy val minLenToCheck                     = if(lastIsStar) 1 else 0
+      protected def seqTree(binder: Symbol)                = tupleSel(binder)(firstIndexingBinder+1)
       protected def tupleSel(binder: Symbol)(i: Int): Tree = codegen.tupleSel(binder)(i)
 
       // the trees that select the subpatterns on the extractor's result, referenced by `binder`
@@ -504,11 +507,19 @@ trait MatchTranslation { self: PatternMatching  =>
         else if (isSeq) subPatRefsSeq(binder)
         else ((1 to nbSubPats) map tupleSel(binder)).toList
 
+      private def compareInts(t1: Tree, t2: Tree) =
+        gen.mkMethodCall(termMember(ScalaPackage, "math"), TermName("signum"), Nil, (t1 INT_- t2) :: Nil)
+
       protected def lengthGuard(binder: Symbol): Option[Tree] =
         // no need to check unless it's an unapplySeq and the minimal length is non-trivially satisfied
-        checkedLength map { expectedLength => import CODE._
+        checkedLength map { expectedLength =>
           // `binder.lengthCompare(expectedLength)`
-          def checkExpectedLength = (seqTree(binder) DOT seqLenCmp)(LIT(expectedLength))
+          // ...if binder has a lengthCompare method, otherwise
+          // `scala.math.signum(binder.length - expectedLength)`
+          def checkExpectedLength = seqTp member nme.lengthCompare match {
+            case NoSymbol => compareInts(Select(seqTree(binder), nme.length), LIT(expectedLength))
+            case lencmp   => (seqTree(binder) DOT lencmp)(LIT(expectedLength))
+          }
 
           // the comparison to perform
           // when the last subpattern is a wildcard-star the expectedLength is but a lower bound

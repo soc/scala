@@ -380,6 +380,7 @@ trait Definitions extends api.StandardDefinitions {
       def arrayCloneMethod = getMemberMethod(ScalaRunTimeModule, nme.array_clone)
       def ensureAccessibleMethod = getMemberMethod(ScalaRunTimeModule, nme.ensureAccessible)
       def arrayClassMethod = getMemberMethod(ScalaRunTimeModule, nme.arrayClass)
+      def traversableDropMethod = getMemberMethod(ScalaRunTimeModule, nme.drop)
 
     // classes with special meanings
     lazy val StringAddClass             = requiredClass[scala.runtime.StringAdd]
@@ -405,6 +406,10 @@ trait Definitions extends api.StandardDefinitions {
     lazy val JavaRepeatedParamClass = specialPolyClass(tpnme.JAVA_REPEATED_PARAM_CLASS_NAME, COVARIANT)(tparam => arrayType(tparam.tpe))
     lazy val RepeatedParamClass     = specialPolyClass(tpnme.REPEATED_PARAM_CLASS_NAME, COVARIANT)(tparam => seqType(tparam.tpe))
 
+    def dropByName(tp: Type): Type = tp match {
+      case TypeRef(_, ByNameParamClass, arg :: Nil) => arg
+      case _                                        => tp
+    }
     def isByNameParamType(tp: Type)        = tp.typeSymbol == ByNameParamClass
     def isScalaRepeatedParamType(tp: Type) = tp.typeSymbol == RepeatedParamClass
     def isJavaRepeatedParamType(tp: Type)  = tp.typeSymbol == JavaRepeatedParamClass
@@ -418,6 +423,11 @@ trait Definitions extends api.StandardDefinitions {
     def isScalaVarArgs(params: Seq[Symbol]) = params.nonEmpty && isScalaRepeatedParamType(params.last.tpe)
     def isVarArgsList(params: Seq[Symbol])  = params.nonEmpty && isRepeatedParamType(params.last.tpe)
     def isVarArgTypes(formals: Seq[Type])   = formals.nonEmpty && isRepeatedParamType(formals.last)
+
+    def isImplicitParamss(paramss: List[List[Symbol]]) = paramss match {
+      case (p :: _) :: _ => p.isImplicit
+      case _             => false
+    }
 
     def hasRepeatedParam(tp: Type): Boolean = tp match {
       case MethodType(formals, restpe) => isScalaVarArgs(formals) || hasRepeatedParam(restpe)
@@ -685,9 +695,27 @@ trait Definitions extends api.StandardDefinitions {
     def scalaRepeatedType(arg: Type) = appliedType(RepeatedParamClass, arg)
     def seqType(arg: Type)           = appliedType(SeqClass, arg)
 
-    def typeOfMemberNamedGet(tp: Type) = tp member nme.get filter (_.paramss.isEmpty) match {
-      case NoSymbol => NoType
-      case get      => (tp memberType get).finalResultType
+    def typeOfMemberNamedGet(tp: Type) = resultOfMatchingMethod(tp, "get")()
+
+    def unapplySeqElementType(seqType: Type) = (
+             resultOfMatchingMethod(seqType, "apply")(IntClass.tpe)
+      orElse resultOfMatchingMethod(seqType, "head")()
+    )
+
+    /** If `tp` has a term member `name`, the first parameter list of which
+     *  matches the given types, and which either has no further parameter
+     *  lists or only an implicit one, then the result type of the matching
+     *  method. Otherwise, NoType.
+     */
+    def resultOfMatchingMethod(tp: Type, name: String)(paramTypes: Type*): Type = {
+      def matchesParams(member: Symbol) = member.paramss match {
+        case Nil        => paramTypes.isEmpty
+        case ps :: rest => (rest.isEmpty || isImplicitParamss(rest)) && (ps corresponds paramTypes)(_.tpe =:= _)
+      }
+      tp member TermName(name) filter matchesParams match {
+        case NoSymbol => NoType
+        case member   => (tp memberType member).finalResultType
+      }
     }
 
     def ClassType(arg: Type) = if (phase.erasedTypes) ClassClass.tpe else appliedType(ClassClass, arg)

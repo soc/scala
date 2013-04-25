@@ -588,6 +588,7 @@ trait StdNames {
     val classOf: NameType              = "classOf"
     val clone_ : NameType              = "clone"
     val conforms: NameType             = "conforms"
+    val compare: NameType              = "compare"
     val copy: NameType                 = "copy"
     val currentMirror: NameType        = "currentMirror"
     val delayedInit: NameType          = "delayedInit"
