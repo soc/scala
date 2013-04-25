@@ -422,6 +422,11 @@ trait Definitions extends api.StandardDefinitions {
     def isVarArgsList(params: Seq[Symbol])  = params.nonEmpty && isRepeatedParamType(params.last.tpe)
     def isVarArgTypes(formals: Seq[Type])   = formals.nonEmpty && isRepeatedParamType(formals.last)
 
+    def isImplicitParamss(paramss: List[List[Symbol]]) = paramss match {
+      case (p :: _) :: _ => p.isImplicit
+      case _             => false
+    }
+
     def hasRepeatedParam(tp: Type): Boolean = tp match {
       case MethodType(formals, restpe) => isScalaVarArgs(formals) || hasRepeatedParam(restpe)
       case PolyType(_, restpe)         => hasRepeatedParam(restpe)
@@ -688,9 +693,22 @@ trait Definitions extends api.StandardDefinitions {
     def scalaRepeatedType(arg: Type) = appliedType(RepeatedParamClass, arg)
     def seqType(arg: Type)           = appliedType(SeqClass, arg)
 
-    def typeOfMemberNamedGet(tp: Type) = tp member nme.get filter (_.paramss.isEmpty) match {
-      case NoSymbol => NoType
-      case get      => (tp memberType get).finalResultType
+    def typeOfMemberNamedGet(tp: Type) = resultOfMatchingMethod(tp, "get")()
+
+    /** If `tp` has a term member `name`, the first parameter list of which
+     *  matches the given types, and which either has no further parameter
+     *  lists or only an implicit one, then the result type of the matching
+     *  method. Otherwise, NoType.
+     */
+    def resultOfMatchingMethod(tp: Type, name: String)(paramTypes: Type*): Type = {
+      def matchesParams(member: Symbol) = member.paramss match {
+        case Nil        => paramTypes.isEmpty
+        case ps :: rest => (rest.isEmpty || isImplicitParamss(rest)) && (ps corresponds paramTypes)(_.tpe =:= _)
+      }
+      tp member TermName(name) filter matchesParams match {
+        case NoSymbol => NoType
+        case member   => (tp memberType member).finalResultType
+      }
     }
 
     def ClassType(arg: Type) = if (phase.erasedTypes) ClassClass.tpe else appliedType(ClassClass, arg)

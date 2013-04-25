@@ -31,18 +31,27 @@ trait Infer extends Checkable {
 
   /** The formal parameter types corresponding to `formals`.
    *  If `formals` has a repeated last parameter, a list of
-   *  (nargs - params.length + 1) copies of its type is returned.
-   *  By-name types are replaced with their underlying type.
+   *  (numArgs - numFormals + 1) copies of its type is appended
+   *  to the other formals. By-name types are replaced with their
+   *  underlying type.
    *
    *  @param removeByName allows keeping ByName parameters. Used in NamesDefaults.
    *  @param removeRepeated allows keeping repeated parameter (if there's one argument). Used in NamesDefaults.
    */
-  def formalTypes(formals: List[Type], nargs: Int, removeByName: Boolean = true, removeRepeated: Boolean = true): List[Type] = {
-    val formals1 = if (removeByName) formals mapConserve dropByName else formals
-    if (isVarArgTypes(formals1) && (removeRepeated || formals.length != nargs)) {
-      val ft = formals1.last.dealiasWiden.typeArgs.head
-      formals1.init ::: (for (i <- List.range(formals1.length - 1, nargs)) yield ft)
-    } else formals1
+  def formalTypes(formals: List[Type], numArgs: Int, removeByName: Boolean = true, removeRepeated: Boolean = true): List[Type] = {
+    val numFormals = formals.length
+    val formals1   = if (removeByName) formals mapConserve dropByName else formals
+    val expandLast = (
+         (removeRepeated || numFormals != numArgs)
+      && isVarArgTypes(formals1)
+    )
+    def lastType = formals1.last.dealiasWiden.typeArgs.head
+    def expanded(n: Int) = (1 to n).toList map (_ => lastType)
+
+    if (expandLast)
+      formals1.init ::: expanded(numArgs - numFormals + 1)
+    else
+      formals1
   }
 
   /** Sorts the alternatives according to the given comparison function.
@@ -82,69 +91,55 @@ trait Infer extends Checkable {
    *   An `unapply` method with result type `R` in an object `x` matches the
    *   pattern `x(p_1, ..., p_n)` if it takes exactly one argument and, either:
    *     - `n = 0` and `R =:= Boolean`, or
-   *     - `n = 1` and `R <:< Option[T]`, for some type `T`.
+   *     - `n = 1` and `R <:< { def isEmpty: Boolean ; def get: T }, for some type `T`.
    *        The argument pattern `p1` is typed in turn with expected type `T`.
-   *     - Or, `n > 1` and `R <:< Option[Product_n[T_1, ..., T_n]]`, for some
-   *       types `T_1, ..., T_n`. The argument patterns `p_1, ..., p_n` are
+   *     - Or, `n > 1` and `R <:< { def isEmpty: Boolean ; def get: Product_n[T_1, ..., T_n] `,
+   *       for some types `T_1, ..., T_n`. The argument patterns `p_1, ..., p_n` are
    *       typed with expected types `T_1, ..., T_n`.
    *
    *   An `unapplySeq` method in an object `x` matches the pattern `x(p_1, ..., p_n)`
-   *   if it takes exactly one argument and its result type is of the form `Option[S]`,
-   *   where either:
-   *     - `S` is a subtype of `Seq[U]` for some element type `U`, (set `m = 0`)
-   *     - or `S` is a `ProductX[T_1, ..., T_m]` and `T_m <: Seq[U]` (`m <= n`).
+   *   if it takes exactly one argument and its result type is of one of these forms:
+   *     type IndSeq[T] = { def length: Int ; def apply(idx: Int): T }
+   *     type LinSeq[T] = { def head: T ; def tail: LinSeq[T] }
    *
    *   The argument patterns `p_1, ..., p_n` are typed with expected types
    *   `T_1, ..., T_m, U, ..., U`. Here, `U` is repeated `n-m` times.
    *
    */
-  def extractorFormalTypes(pos: Position, resTp: Type, nbSubPats: Int, unappSym: Symbol): (List[Type], List[Type]) = {
-    val isUnapplySeq     = unappSym.name == nme.unapplySeq
-    val booleanExtractor = resTp.typeSymbolDirect == BooleanClass
-
-    def seqToRepeatedChecked(tp: Type) = {
-      val toRepeated = seqToRepeated(tp)
-      if (tp eq toRepeated) throw new TypeError("(the last tuple-component of) the result type of an unapplySeq must be a Seq[_]")
-      else toRepeated
+  def extractorFormalTypes(pos: Position, unapplyResult: Type, subpatternCount: Int, unappSym: Symbol): (List[Type], List[Type]) = {
+    val typeOfGet = unapplyResult.dealias.typeSymbolDirect match {
+      case BooleanClass => UnitClass.tpe  // aka "Tuple0"
+      case _            => resultOfMatchingMethod(unapplyResult, "get")()
     }
-    // empty list --> error, otherwise length == 1
-    lazy val optionArg = typeOfMemberNamedGet(resTp)
+    // product element types when n > 1
+    def productArgs  = getProductArgs(typeOfGet)
+    def productArity = productArgs.size
+    def productLast  = if (productArgs.isEmpty) typeOfGet else productArgs.last
+    def elementType  = resultOfMatchingMethod(productLast, "apply")(IntClass.tpe) orElse resultOfMatchingMethod(productLast, "head")()
+    def isUnapplySeq = unappSym.name == nme.unapplySeq
 
-    // empty list --> not a ProductN, otherwise product element types
-    def productArgs = getProductArgs(optionArg)
+    if (typeOfGet.isErroneous)
+      throw new TypeError(s"result type $unapplyResult of ${unappSym.name} in ${unappSym.fullLocationString} does not have a member `get`")
+    else if (isUnapplySeq && elementType == NoType)
+      throw new TypeError("(the last tuple-component of) the result type of an unapplySeq must have a conformant `head` or `apply` method")
+    if (subpatternCount == 1 && productArity > 1 && settings.lint)
+      global.currentUnit.warning(pos, s"extractor pattern binds a single value to a Product${productArity} of type $typeOfGet")
 
-    val formals =
-      // convert Seq[T] to the special repeated argument type
-      // so below we can use formalTypes to expand formals to correspond to the number of actuals
-      if (isUnapplySeq) {
-        if (optionArg.isErroneous)
-          throw new TypeError(s"result type $resTp of unapplySeq defined in ${unappSym.fullLocationString} does not conform to Option[_]")
-        else
-          productArgs match {
-            case Nil                => seqToRepeatedChecked(optionArg) :: Nil
-            case normalTps :+ seqTp => normalTps :+ seqToRepeatedChecked(seqTp)
-          }
+    val formals = (
+      if (isUnapplySeq)
+        (productArgs dropRight 1) :+ scalaRepeatedType(elementType)
+      else subpatternCount match {
+        case 0 => Nil
+        case 1 => typeOfGet :: Nil
+        case _ => productArgs
       }
-      else {
-        if (booleanExtractor && nbSubPats == 0) Nil
-        else if (optionArg.isErroneous) productArgs
-        else if (nbSubPats == 1) {
-          val productArity = productArgs.size
-          if (productArity > 1 && settings.lint)
-            global.currentUnit.warning(pos, s"extractor pattern binds a single value to a Product${productArity} of type $optionArg")
-          optionArg :: Nil
-        }
-        // TODO: update spec to reflect we allow any ProductN, not just TupleN
-        else productArgs
-      }
-
+    )
     // for unapplySeq, replace last vararg by as many instances as required by nbSubPats
-    val formalsExpanded =
-      if (isUnapplySeq && formals.nonEmpty) formalTypes(formals, nbSubPats)
-      else formals
-
-    if (formalsExpanded.lengthCompare(nbSubPats) != 0) (null, null)
-    else (formals, formalsExpanded)
+    val formalsExpanded = if (isUnapplySeq) formalTypes(formals, subpatternCount) else formals
+    if (formalsExpanded.length != subpatternCount)
+      (null, null)
+    else
+      (formals, formalsExpanded)
   }
 
   /** A fresh type variable with given type parameter as origin.
