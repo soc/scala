@@ -99,7 +99,7 @@ trait Infer extends Checkable {
    *
    *   An `unapplySeq` method in an object `x` matches the pattern `x(p_1, ..., p_n)`
    *   if it takes exactly one argument and its result type is of one of these forms:
-   *     type IndSeq[T] = { def length: Int ; def apply(idx: Int): T }
+   *     type IndSeq[T] = { def length: Int ; def apply(index: Int): T }
    *     type LinSeq[T] = { def head: T ; def tail: LinSeq[T] }
    *
    *   The argument patterns `p_1, ..., p_n` are typed with expected types
@@ -115,7 +115,7 @@ trait Infer extends Checkable {
     def productArgs  = getProductArgs(typeOfGet)
     def productArity = productArgs.size
     def productLast  = if (productArgs.isEmpty) typeOfGet else productArgs.last
-    def elementType  = resultOfMatchingMethod(productLast, "apply")(IntClass.tpe) orElse resultOfMatchingMethod(productLast, "head")()
+    def elementType  = unapplySeqElementType(productLast)
     def isUnapplySeq = unappSym.name == nme.unapplySeq
 
     if (typeOfGet.isErroneous)
@@ -126,6 +126,7 @@ trait Infer extends Checkable {
       global.currentUnit.warning(pos, s"extractor pattern binds a single value to a Product${productArity} of type $typeOfGet")
 
     val formals = (
+      // Note that dropRight 1 is purposefully Nil-resistant
       if (isUnapplySeq)
         (productArgs dropRight 1) :+ scalaRepeatedType(elementType)
       else subpatternCount match {

@@ -379,6 +379,7 @@ trait Definitions extends api.StandardDefinitions {
       def arrayCloneMethod = getMemberMethod(ScalaRunTimeModule, nme.array_clone)
       def ensureAccessibleMethod = getMemberMethod(ScalaRunTimeModule, nme.ensureAccessible)
       def arrayClassMethod = getMemberMethod(ScalaRunTimeModule, nme.arrayClass)
+      def traversableDropMethod = getMemberMethod(ScalaRunTimeModule, nme.drop)
 
     // classes with special meanings
     lazy val StringAddClass             = requiredClass[scala.runtime.StringAdd]
@@ -694,6 +695,11 @@ trait Definitions extends api.StandardDefinitions {
     def seqType(arg: Type)           = appliedType(SeqClass, arg)
 
     def typeOfMemberNamedGet(tp: Type) = resultOfMatchingMethod(tp, "get")()
+
+    def unapplySeqElementType(seqType: Type) = (
+             resultOfMatchingMethod(seqType, "apply")(IntClass.tpe)
+      orElse resultOfMatchingMethod(seqType, "head")()
+    )
 
     /** If `tp` has a term member `name`, the first parameter list of which
      *  matches the given types, and which either has no further parameter
