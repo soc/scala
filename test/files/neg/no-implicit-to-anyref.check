@@ -1,5 +1,5 @@
 no-implicit-to-anyref.scala:11: error: type mismatch;
- found   : Int(1)
+ found   : 1.type (with underlying type Int)
  required: AnyRef
 Note: an implicit exists from scala.Int => java.lang.Integer, but
 methods inherited from Object are rendered ambiguous.  This is to avoid

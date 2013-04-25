@@ -1,5 +1,5 @@
 Macros_Test_2.scala:7: error: type mismatch;
- found   : String("42")
+ found   : "42".type (with underlying type String)
  required: Int
   val s: String = foo("42")
                       ^
