@@ -198,8 +198,11 @@ trait MatchCodeGen extends Interface {
         // next: MatchMonad[U]
         // returns MatchMonad[U]
         def flatMap(prev: Tree, b: Symbol, next: Tree): Tree = {
-          // If we use this packedType instead of b.tpe, 'object Ticket522'
-          // in pos/patmat.scala compiles, but this fails:
+          // If we use this packed type instead of b.tpe:
+          //    val bType = typer.packedType(TypeTree(b.tpe), matchOwner)
+          //
+          // then 'object Ticket522' in pos/patmat.scala compiles, but this fails:
+          //
           // trait Other {
           //   class Quux
           //   object Baz { def unapply(x: Any): Option[Quux] = None }
@@ -216,19 +219,15 @@ trait MatchCodeGen extends Interface {
           //     // one error found
           //   }
           // }
-          // val bType    = typer.packedType(TypeTree(b.tpe), matchOwner)
-          val bType    = b.tpe
-          val nextType = mapResultType(prev.tpe, bType)
+          val nextType = mapResultType(prev.tpe, b.tpe)
           val prevSym  = freshSym(prev.pos, nextType, "o")
-          val select1  = Select(CODE.REF(prevSym), vpmName.isEmpty)
-          val select2  = Select(CODE.REF(prevSym), vpmName.get)
 
           BLOCK(
             VAL(prevSym) === prev,
             // must be isEmpty and get as we don't control the target of the call (prev is an extractor call)
             ifThenElseZero(
-              NOT(select1),
-              Substitution(b, select2)(next)
+              NOT(prevSym DOT vpmName.isEmpty),
+              Substitution(b, prevSym DOT vpmName.get)(next)
             )
           )
         }

@@ -179,7 +179,7 @@ trait Interface extends ast.TreeDSL {
     def mapResultType(prev: Type, elem: Type): Type = {
       // default to Option[U] if we can't reliably infer the types
       def fallback = optionType(elem)
-      // The type of "get" in CC[T] is the tell us what was wrapped.
+      // The type of "get" in CC[T] is what settles what was wrapped.
       val prevElem = matchMonadResult(prev)
       if (prevElem =:= elem) prev
       else prev.typeArgs match {
