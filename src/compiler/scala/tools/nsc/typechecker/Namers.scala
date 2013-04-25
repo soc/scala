@@ -25,6 +25,8 @@ trait Namers extends MethodSynthesis {
   private var _lockedCount = 0
   def lockedCount = this._lockedCount
 
+  private var inferDependentTypes = false
+
   /** Replaces any Idents for which cond is true with fresh TypeTrees().
    *  Does the same for any trees containing EmptyTrees.
    */
@@ -793,7 +795,7 @@ trait Namers extends MethodSynthesis {
      *  value should not be widened, so it has a use even in situations
      *  whether it is otherwise redundant (such as in a singleton.)
      */
-    private def widenIfNecessary(sym: Symbol, tpe: Type, pt: Type): Type = {
+    private def widenIfNecessary(sym: Symbol, tpe: Type, pt: Type, isLiteral: Boolean): Type = {
       val getter =
         if (sym.isValue && sym.owner.isClass && sym.isPrivate)
           sym.getter(sym.owner)
@@ -815,6 +817,7 @@ trait Namers extends MethodSynthesis {
             || sym.isMethod && !sym.hasAccessorFlag
             || isHidden(tpe)
            )
+        && !(isLiteral && inferDependentTypes)
       )
       dropIllegalStarTypes(
         if (shouldWiden) tpe.widen
@@ -830,7 +833,7 @@ trait Namers extends MethodSynthesis {
         if (tree.symbol.isTermMacro) defnTyper.computeMacroDefType(tree, pt)
         else defnTyper.computeType(tree.rhs, pt)
 
-      val defnTpe = widenIfNecessary(tree.symbol, rhsTpe, pt)
+      val defnTpe = widenIfNecessary(tree.symbol, rhsTpe, pt, tree.rhs.isInstanceOf[Literal])
       tree.tpt defineType defnTpe setPos tree.pos.focus
       tree.tpt.tpe
     }
@@ -1158,6 +1161,7 @@ trait Namers extends MethodSynthesis {
           rt.withAnnotation(AnnotationInfo(uncheckedVarianceClass.tpe, List(), List()))
         else rt
       })
+
       pluginsTypeSig(res, typer, ddef, methResTp)
     }
 

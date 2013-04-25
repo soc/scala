@@ -5152,10 +5152,13 @@ trait Typers extends Adaptations with Tags {
       def typedSingletonTypeTree(tree: SingletonTypeTree) = {
         val ref1 = checkStable(
           context.withImplicitsDisabled(
-            typed(tree.ref, EXPRmode | QUALmode | (mode & TYPEPATmode), AnyRefClass.tpe)
+            typed(tree.ref, EXPRmode | QUALmode | (mode & TYPEPATmode), AnyClass.tpe)
           )
         )
-        tree setType ref1.tpe.resultType
+        tree setType (
+          if (tree.isLiteral) ref1.tpe.resultType.asDeclaredSingleton
+          else ref1.tpe.resultType
+        )
       }
 
       def typedSelectFromTypeTree(tree: SelectFromTypeTree) = {

@@ -211,12 +211,13 @@ self =>
       unit.deprecationWarning(o2p(offset), msg)
     }
 
-    private var smartParsing = false
+    private var _smartParsing = false
+    private def smartParsing = if (sys.props contains "scalac.no-smart-parse") false else _smartParsing
     @inline private def withSmartParsing[T](body: => T): T = {
-      val saved = smartParsing
-      smartParsing = true
+      val saved = _smartParsing
+      _smartParsing = true
       try body
-      finally smartParsing = saved
+      finally _smartParsing = saved
     }
     def withPatches(patches: List[BracePatch]): UnitParser = new UnitParser(unit, patches)
 
@@ -634,11 +635,11 @@ self =>
 
     def isExprIntro: Boolean = isExprIntroToken(in.token)
 
-    def isTypeIntroToken(token: Int): Boolean = token match {
+    def isTypeIntroToken(token: Int): Boolean = isLiteralToken(token) || (token match {
       case IDENTIFIER | BACKQUOTED_IDENT | THIS |
            SUPER | USCORE | LPAREN | AT => true
       case _ => false
-    }
+    })
 
     def isStatSeqEnd = in.token == RBRACE || in.token == EOF
 
@@ -870,9 +871,20 @@ self =>
       private def typeProjection(t: Tree): Tree = {
         val hashOffset = in.skipToken()
         val nameOffset = in.offset
-        val name       = identForType(skipIt = false)
-        val point      = if (name == tpnme.ERROR) hashOffset else nameOffset
-        atPos(t.pos.startOrPoint, point)(SelectFromTypeTree(t, name))
+        if (isLiteral) {
+          val targ = literalType()
+          atPos(t.pos.startOrPoint, in.offset)(
+            t match {
+              case AppliedTypeTree(fn, targs) => AppliedTypeTree(fn, targs :+ targ)
+              case _                          => AppliedTypeTree(t, targ :: Nil)
+            }
+          )
+        }
+        else {
+          val name       = identForType(skipIt = false)
+          val point      = if (name == tpnme.ERROR) hashOffset else nameOffset
+          atPos(t.pos.startOrPoint, point)(SelectFromTypeTree(t, name))
+        }
       }
       def simpleTypeRest(t: Tree): Tree = in.token match {
         case HASH     => simpleTypeRest(typeProjection(t))
@@ -959,6 +971,13 @@ self =>
     /** For when it's known already to be a type name. */
     def identForType(): TypeName = ident().toTypeName
     def identForType(skipIt: Boolean): TypeName = ident(skipIt).toTypeName
+    def literalType() = {
+      val start = in.offset
+      val lit = literal(false)
+      accept(DOT)
+      accept(TYPE)
+      atPos(start)(new SingletonTypeTree(lit) { override val isLiteral = true })
+    }
 
     def selector(t: Tree): Tree = {
       val point = in.offset
@@ -992,6 +1011,9 @@ self =>
         if (in.token == DOT) t = selectors(t, typeOK, in.skipToken())
       } else {
         val tok = in.token
+        if (!isIdent && tok != NULL)
+          return literalType()
+
         val name = ident()
         t = atPos(start) {
           if (tok == BACKQUOTED_IDENT) Ident(name) updateAttachment BackquotedIdentifierAttachment

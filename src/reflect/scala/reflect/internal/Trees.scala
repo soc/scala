@@ -492,7 +492,7 @@ trait Trees extends api.Trees { self: SymbolTable =>
   object Annotated extends AnnotatedExtractor
 
   case class SingletonTypeTree(ref: Tree)
-        extends TypTree with SingletonTypeTreeApi
+        extends TypTree with SingletonTypeTreeApi { def isLiteral = false }
   object SingletonTypeTree extends SingletonTypeTreeExtractor
 
   case class SelectFromTypeTree(qualifier: Tree, name: TypeName)
