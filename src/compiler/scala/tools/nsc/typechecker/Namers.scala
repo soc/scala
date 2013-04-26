@@ -9,6 +9,7 @@ package typechecker
 import scala.collection.mutable
 import scala.annotation.tailrec
 import symtab.Flags._
+import scala.language.postfixOps
 
 /** This trait declares methods to create symbols and to enter them into scopes.
  *
@@ -47,7 +48,6 @@ trait Namers extends MethodSynthesis {
 
   private class NormalNamer(context: Context) extends Namer(context)
   def newNamer(context: Context): Namer = new NormalNamer(context)
-  def newNamerFor(context: Context, tree: Tree): Namer = newNamer(context.makeNewScope(tree, tree.symbol))
 
   abstract class Namer(val context: Context) extends MethodSynth with NamerContextErrors { thisNamer =>
     // overridden by the presentation compiler
@@ -184,7 +184,7 @@ trait Namers extends MethodSynthesis {
            (newS.owner.isTypeParameter || newS.owner.isAbstractType)
            // FIXME: name comparisons not successful, are these underscores
            // sometimes nme.WILDCARD and sometimes tpnme.WILDCARD?
-        && (newS.name.toString == nme.WILDCARD.toString)
+        && (newS.name string_== nme.WILDCARD)
        )
     )
 
@@ -254,7 +254,7 @@ trait Namers extends MethodSynthesis {
           case DocDef(_, defn)                               => enterSym(defn)
           case tree @ Import(_, _)                           =>
             assignSymbol(tree)
-            returnContext = context.makeNewImport(tree)
+            returnContext = context.make(tree)
           case _ =>
         }
         returnContext
@@ -323,7 +323,7 @@ trait Namers extends MethodSynthesis {
       }
     }
     private def createFieldSymbol(tree: ValDef): TermSymbol =
-      owner.newValue(nme.getterToLocal(tree.name), tree.pos, tree.mods.flags & FieldFlags | PrivateLocal)
+      owner.newValue(tree.localName, tree.pos, tree.mods.flags & FieldFlags | PrivateLocal)
 
     private def createImportSymbol(tree: Tree) =
       NoSymbol.newImport(tree.pos) setInfo completerOf(tree)
@@ -523,14 +523,20 @@ trait Namers extends MethodSynthesis {
         if (from != nme.WILDCARD && base != ErrorType) {
           if (isValid(from)) {
             // for Java code importing Scala objects
-            if (!nme.isModuleName(from) || isValid(nme.stripModuleSuffix(from))) {
+            if (!nme.isModuleName(from) || isValid(from.dropModule)) {
               typer.TyperErrorGen.NotAMemberError(tree, expr, from)
             }
           }
           // Setting the position at the import means that if there is
           // more than one hidden name, the second will not be warned.
           // So it is the position of the actual hidden name.
-          checkNotRedundant(tree.pos withPoint fromPos, from, to)
+          //
+          // Note: java imports have precence over definitions in the same package
+          //       so don't warn for them. There is a corresponding special treatment
+          //       in the shadowing rules in typedIdent to (SI-7232). In any case,
+          //       we shouldn't be emitting warnings for .java source files.
+          if (!context.unit.isJava)
+            checkNotRedundant(tree.pos withPoint fromPos, from, to)
         }
       }
 
@@ -654,9 +660,6 @@ trait Namers extends MethodSynthesis {
       tree.symbol setInfo completerOf(tree)
 
       if (mods.isCase) {
-        if (primaryConstructorArity > MaxFunctionArity)
-          MaxParametersCaseClassError(tree)
-
         val m = ensureCompanionObject(tree, caseModuleDef)
         m.moduleClass.updateAttachment(new ClassForCaseCompanionAttachment(tree))
       }
@@ -669,7 +672,7 @@ trait Namers extends MethodSynthesis {
         m.updateAttachment(new ConstructorDefaultsAttachment(tree, null))
       }
       val owner = tree.symbol.owner
-      if (settings.lint.value && owner.isPackageObjectClass && !mods.isImplicit) {
+      if (settings.lint && owner.isPackageObjectClass && !mods.isImplicit) {
         context.unit.warning(tree.pos,
           "it is not recommended to define classes/objects inside of package objects.\n" +
           "If possible, define " + tree.symbol + " in " + owner.skipPackageObject + " instead."
@@ -705,7 +708,7 @@ trait Namers extends MethodSynthesis {
           // check that lower bound is not an F-bound
           // but carefully: class Foo[T <: Bar[_ >: T]] should be allowed
           for (tp1 @ TypeRef(_, sym, _) <- lo) {
-            if (settings.breakCycles.value) {
+            if (settings.breakCycles) {
               if (!sym.maybeInitialize) {
                 log(s"Cycle inspecting $lo for possible f-bounds: ${sym.fullLocationString}")
                 return sym
@@ -1373,7 +1376,9 @@ trait Namers extends MethodSynthesis {
       if (!cdef.symbol.hasAbstractFlag)
         namer.enterSyntheticSym(caseModuleApplyMeth(cdef))
 
-      namer.enterSyntheticSym(caseModuleUnapplyMeth(cdef))
+      val primaryConstructorArity = treeInfo.firstConstructorArgs(cdef.impl.body).size
+      if (primaryConstructorArity <= MaxTupleArity)
+        namer.enterSyntheticSym(caseModuleUnapplyMeth(cdef))
     }
 
     def addCopyMethod(cdef: ClassDef, namer: Namer) {
@@ -1624,7 +1629,7 @@ trait Namers extends MethodSynthesis {
       // @M an abstract type's type parameters are entered.
       // TODO: change to isTypeMember ?
       if (defnSym.isAbstractType)
-        newNamerFor(ctx, tree) enterSyms tparams //@M
+        newNamer(ctx.makeNewScope(tree, tree.symbol)) enterSyms tparams //@M
       restp complete sym
     }
   }

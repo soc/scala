@@ -188,7 +188,7 @@ abstract class TreeInfo {
   def isVariableOrGetter(tree: Tree) = {
     def sym       = tree.symbol
     def isVar     = sym.isVariable
-    def isGetter  = mayBeVarGetter(sym) && sym.owner.info.member(nme.getterToSetter(sym.name.toTermName)) != NoSymbol
+    def isGetter  = mayBeVarGetter(sym) && sym.owner.info.member(sym.setterName) != NoSymbol
 
     tree match {
       case Ident(_)                               => isVar
@@ -401,8 +401,15 @@ abstract class TreeInfo {
   /** Is this argument node of the form <expr> : _* ?
    */
   def isWildcardStarArg(tree: Tree): Boolean = tree match {
-    case Typed(_, Ident(tpnme.WILDCARD_STAR)) => true
-    case _                                  => false
+    case WildcardStarArg(_) => true
+    case _                  => false
+  }
+
+  object WildcardStarArg {
+    def unapply(tree: Typed): Option[Tree] = tree match {
+      case Typed(expr, Ident(tpnme.WILDCARD_STAR)) => Some(expr)
+      case _                                       => None
+    }
   }
 
   /** If this tree has type parameters, those.  Otherwise Nil.
@@ -663,20 +670,9 @@ abstract class TreeInfo {
       unapply(dissectApplied(tree))
   }
 
-  /** Does list of trees start with a definition of
-   *  a class of module with given name (ignoring imports)
-   */
-  def firstDefinesClassOrObject(trees: List[Tree], name: Name): Boolean = trees match {
-      case Import(_, _) :: xs               => firstDefinesClassOrObject(xs, name)
-      case Annotated(_, tree1) :: Nil       => firstDefinesClassOrObject(List(tree1), name)
-      case ModuleDef(_, `name`, _) :: Nil   => true
-      case ClassDef(_, `name`, _, _) :: Nil => true
-      case _                                => false
-    }
-
-
   /** Is this file the body of a compilation unit which should not
-   *  have Predef imported?
+   *  have Predef imported? This is the case iff the first import in the
+   *  unit explicitly refers to Predef.
    */
   def noPredefImportForUnit(body: Tree) = {
     // Top-level definition whose leading imports include Predef.
@@ -685,13 +681,7 @@ abstract class TreeInfo {
       case Import(expr, _)      => isReferenceToPredef(expr)
       case _                    => false
     }
-    // Compilation unit is class or object 'name' in package 'scala'
-    def isUnitInScala(tree: Tree, name: Name) = tree match {
-      case PackageDef(Ident(nme.scala_), defs) => firstDefinesClassOrObject(defs, name)
-      case _                                   => false
-    }
-
-    isUnitInScala(body, nme.Predef) || isLeadingPredefImport(body)
+    isLeadingPredefImport(body)
   }
 
   def isAbsTypeDef(tree: Tree) = tree match {

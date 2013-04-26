@@ -22,7 +22,6 @@ import scala.language.implicitConversions
 
 trait InteractiveScaladocAnalyzer extends InteractiveAnalyzer with ScaladocAnalyzer {
   val global : Global
-  import global._
   override def newTyper(context: Context) = new Typer(context) with InteractiveTyper with ScaladocTyper {
     override def canAdaptConstantTypeToLiteral = false
   }
@@ -547,7 +546,7 @@ class Global(settings: Settings, _reporter: Reporter, projectName: String = "") 
     for (s <- allSources; if !ignoredFiles(s.file); unit <- getUnit(s)) {
       try {
         if (!unit.isUpToDate)
-          if (unit.problems.isEmpty || !settings.YpresentationStrict.value)
+          if (unit.problems.isEmpty || !settings.YpresentationStrict)
             typeCheck(unit)
           else debugLog("%s has syntax errors. Skipped typechecking".format(unit))
         else debugLog("already up to date: "+unit)

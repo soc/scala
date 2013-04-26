@@ -742,6 +742,8 @@ trait Types
       def map[T](f: Type => T): List[T]  = collect(Type.this) map f
     }
 
+    @inline final def orElse(alt: => Type): Type = if (this ne NoType) this else alt
+
     /** Returns optionally first type (in a preorder traversal) which satisfies predicate `p`,
      *  or None if none exists.
      */
@@ -871,7 +873,7 @@ trait Types
     def baseTypeSeqDepth: Int = 1
 
     /** The list of all baseclasses of this type (including its own typeSymbol)
-     *  in reverse linearization order, starting with the class itself and ending
+     *  in linearization order, starting with the class itself and ending
      *  in class Any.
      */
     def baseClasses: List[Symbol] = List()
@@ -1306,7 +1308,7 @@ trait Types
     override def isVolatile = false
     override def isHigherKinded = sym.isRefinementClass && underlying.isHigherKinded
     override def prefixString =
-      if (settings.debug.value) sym.nameString + ".this."
+      if (settings.debug) sym.nameString + ".this."
       else if (sym.isAnonOrRefinementClass) "this."
       else if (sym.isOmittablePrefix) ""
       else if (sym.isModuleClass) sym.fullNameString + "."
@@ -1522,7 +1524,7 @@ trait Types
       typeSymbol.isAnonOrRefinementClass && (decls exists symbolIsPossibleInRefinement)
 
     override def safeToString: String = parentsString(parents) + (
-      (if (settings.debug.value || parents.isEmpty || (decls.elems ne null))
+      (if (settings.debug || parents.isEmpty || (decls.elems ne null))
         fullyInitializeScope(decls).mkString("{", "; ", "}") else "")
     )
   }
@@ -1622,7 +1624,7 @@ trait Types
   object baseClassesCycleMonitor {
     private var open: List[Symbol] = Nil
     @inline private def cycleLog(msg: => String) {
-      if (settings.debug.value)
+      if (settings.debug)
         Console.err.println(msg)
     }
     def size = open.size
@@ -1868,7 +1870,7 @@ trait Types
         tp match {
           case tr @ TypeRef(_, sym, args) if args.nonEmpty =>
             val tparams = tr.initializedTypeParams
-            if (settings.debug.value && !sameLength(tparams, args))
+            if (settings.debug && !sameLength(tparams, args))
               devWarning(s"Mismatched zip in computeRefs(): ${sym.info.typeParams}, $args")
 
             foreach2(tparams, args) { (tparam1, arg) =>
@@ -1934,7 +1936,7 @@ trait Types
     override def kind = "ClassInfoType"
 
     override def safeToString =
-      if (settings.debug.value || decls.size > 1)
+      if (settings.debug || decls.size > 1)
         formattedToString
       else
         super.safeToString
@@ -1943,7 +1945,7 @@ trait Types
      */
     def formattedToString: String =
       parents.mkString("\n        with ") + (
-        if (settings.debug.value || parents.isEmpty || (decls.elems ne null))
+        if (settings.debug || parents.isEmpty || (decls.elems ne null))
          fullyInitializeScope(decls).mkString(" {\n  ", "\n  ", "\n}")
         else ""
       )
@@ -2352,7 +2354,7 @@ trait Types
 
     // ensure that symbol is not a local copy with a name coincidence
     private def needsPreString = (
-         settings.debug.value
+         settings.debug
       || !shorthands(sym.fullName)
       || (sym.ownersIterator exists (s => !s.isClass))
     )
@@ -2403,12 +2405,12 @@ trait Types
           ""
     }
     override def safeToString = {
-      val custom = if (settings.debug.value) "" else customToString
+      val custom = if (settings.debug) "" else customToString
       if (custom != "") custom
       else finishPrefix(preString + sym.nameString + argsString)
     }
     override def prefixString = "" + (
-      if (settings.debug.value)
+      if (settings.debug)
         super.prefixString
       else if (sym.isOmittablePrefix)
         ""
@@ -2422,20 +2424,28 @@ trait Types
     override def kind = "TypeRef"
   }
 
+  // No longer defined as anonymous classes in `object TypeRef` to avoid an unnecessary outer pointer.
+  private final class AliasArgsTypeRef(pre: Type, sym: Symbol, args: List[Type]) extends ArgsTypeRef(pre, sym, args) with AliasTypeRef
+  private final class AbstractArgsTypeRef(pre: Type, sym: Symbol, args: List[Type]) extends ArgsTypeRef(pre, sym, args) with AbstractTypeRef
+  private final class ClassArgsTypeRef(pre: Type, sym: Symbol, args: List[Type]) extends ArgsTypeRef(pre, sym, args) with ClassTypeRef
+  private final class AliasNoArgsTypeRef(pre: Type, sym: Symbol) extends NoArgsTypeRef(pre, sym) with AliasTypeRef
+  private final class AbstractNoArgsTypeRef(pre: Type, sym: Symbol) extends NoArgsTypeRef(pre, sym) with AbstractTypeRef
+  private final class ClassNoArgsTypeRef(pre: Type, sym: Symbol) extends NoArgsTypeRef(pre, sym) with ClassTypeRef
+
   object TypeRef extends TypeRefExtractor {
     def apply(pre: Type, sym: Symbol, args: List[Type]): Type = unique({
       if (args.nonEmpty) {
-        if (sym.isAliasType)              new ArgsTypeRef(pre, sym, args) with AliasTypeRef
-        else if (sym.isAbstractType)      new ArgsTypeRef(pre, sym, args) with AbstractTypeRef
-        else                              new ArgsTypeRef(pre, sym, args) with ClassTypeRef
+        if (sym.isAliasType)              new AliasArgsTypeRef(pre, sym, args)
+        else if (sym.isAbstractType)      new AbstractArgsTypeRef(pre, sym, args)
+        else                              new ClassArgsTypeRef(pre, sym, args)
       }
       else {
-        if (sym.isAliasType)              new NoArgsTypeRef(pre, sym) with AliasTypeRef
-        else if (sym.isAbstractType)      new NoArgsTypeRef(pre, sym) with AbstractTypeRef
+        if (sym.isAliasType)              new AliasNoArgsTypeRef(pre, sym)
+        else if (sym.isAbstractType)      new AbstractNoArgsTypeRef(pre, sym)
         else if (sym.isRefinementClass)   new RefinementTypeRef(pre, sym)
         else if (sym.isPackageClass)      new PackageTypeRef(pre, sym)
         else if (sym.isModuleClass)       new ModuleTypeRef(pre, sym)
-        else                              new NoArgsTypeRef(pre, sym) with ClassTypeRef
+        else                              new ClassNoArgsTypeRef(pre, sym)
       }
     })
   }
@@ -2714,10 +2724,10 @@ trait Types
     override def safeToString: String = {
       def clauses = {
         val str = quantified map (_.existentialToString) mkString (" forSome { ", "; ", " }")
-        if (settings.explaintypes.value) "(" + str + ")" else str
+        if (settings.explaintypes) "(" + str + ")" else str
       }
       underlying match {
-        case TypeRef(pre, sym, args) if !settings.debug.value && isRepresentableWithWildcards =>
+        case TypeRef(pre, sym, args) if !settings.debug && isRepresentableWithWildcards =>
           "" + TypeRef(pre, sym, Nil) + wildcardArgsString(quantified.toSet, args).mkString("[", ", ", "]")
         case MethodType(_, _) | NullaryMethodType(_) | PolyType(_, _) =>
           "(" + underlying + ")" + clauses
@@ -2948,12 +2958,14 @@ trait Types
     /** The variable's skolemization level */
     val level = skolemizationLevel
 
-    /** Two occurrences of a higher-kinded typevar, e.g. `?CC[Int]` and `?CC[String]`, correspond to
-     *  ''two instances'' of `TypeVar` that share the ''same'' `TypeConstraint`.
+    /** Applies this TypeVar to type arguments, if arity matches.
      *
-     *  `constr` for `?CC` only tracks type constructors anyway,
-     *   so when `?CC[Int] <:< List[Int]` and `?CC[String] <:< Iterable[String]`
-     *  `?CC's` hibounds contains List and Iterable.
+     * Different applications of the same type constructor variable `?CC`,
+     * e.g. `?CC[Int]` and `?CC[String]`, are modeled as distinct instances of `TypeVar`
+     * that share a `TypeConstraint`, so that the comparisons `?CC[Int] <:< List[Int]`
+     * and `?CC[String] <:< Iterable[String]` result in `?CC` being upper-bounded by `List` and `Iterable`.
+     *
+     * Applying the wrong number of type args results in a TypeVar whose instance is set to `ErrorType`.
      */
     def applyArgs(newArgs: List[Type]): TypeVar = (
       if (newArgs.isEmpty && typeArgs.isEmpty)
@@ -2963,7 +2975,7 @@ trait Types
         TypeVar.trace("applyArgs", "In " + originLocation + ", apply args " + newArgs.mkString(", ") + " to " + originName)(tv)
       }
       else
-        throw new Error("Invalid type application in TypeVar: " + params + ", " + newArgs)
+        TypeVar(typeSymbol).setInst(ErrorType)
     )
     // newArgs.length may differ from args.length (could've been empty before)
     //
@@ -2993,16 +3005,17 @@ trait Types
     // <region name="constraint mutators + undoLog">
     // invariant: before mutating constr, save old state in undoLog
     // (undoLog is used to reset constraints to avoid piling up unrelated ones)
-    def setInst(tp: Type) {
+    def setInst(tp: Type): this.type = {
       if (tp eq this) {
         log(s"TypeVar cycle: called setInst passing $this to itself.")
-        return
+        return this
       }
       undoLog record this
       // if we were compared against later typeskolems, repack the existential,
       // because skolems are only compatible if they were created at the same level
       val res = if (shouldRepackType) repackExistential(tp) else tp
       constr.inst = TypeVar.trace("setInst", "In " + originLocation + ", " + originName + "=" + res)(res)
+      this
     }
 
     def addLoBound(tp: Type, isNumericBound: Boolean = false) {
@@ -3051,7 +3064,7 @@ trait Types
         else lhs <:< rhs
       }
 
-      /** Simple case: type arguments can be ignored, because either this typevar has
+      /*  Simple case: type arguments can be ignored, because either this typevar has
        *  no type parameters, or we are comparing to Any/Nothing.
        *
        *  The latter condition is needed because HK unification is limited to constraints of the shape
@@ -3078,7 +3091,7 @@ trait Types
         } else false
       }
 
-      /** Full case: involving a check of the form
+      /*  Full case: involving a check of the form
        *  {{{
        *    TC1[T1,..., TN] <: TC2[T'1,...,T'N]
        *  }}}
@@ -3220,7 +3233,7 @@ trait Types
         if (sym.owner.isTerm && (sym.owner != encl)) Some(sym.owner) else None
       ).flatten map (s => s.decodedName + tparamsOfSym(s)) mkString "#"
     }
-    private def levelString = if (settings.explaintypes.value) level else ""
+    private def levelString = if (settings.explaintypes) level else ""
     override def safeToString = (
       if ((constr eq null) || (constr.inst eq null)) "TVar<" + originName + "=null>"
       else if (constr.inst ne NoType) "=?" + constr.inst
@@ -3752,10 +3765,11 @@ trait Types
       if (tp.isTrivial) tp
       else if (tp.prefix.typeSymbol isNonBottomSubClass owner) {
         val widened = tp match {
-          case _: ConstantType => tp        // Java enum constants: don't widen to the enum type!
-          case _               => tp.widen  // C.X.type widens to C.this.X.type, otherwise `tp asSeenFrom (pre, C)` has no effect.
+          case _: ConstantType => tp // Java enum constants: don't widen to the enum type!
+          case _               => tp.widen // C.X.type widens to C.this.X.type, otherwise `tp asSeenFrom (pre, C)` has no effect.
         }
-        widened asSeenFrom (pre, tp.typeSymbol.owner)
+        val memType = widened asSeenFrom (pre, tp.typeSymbol.owner)
+        if (tp eq widened) memType else memType.narrow
       }
       else loop(tp.prefix) memberType tp.typeSymbol
 
@@ -3783,7 +3797,7 @@ trait Types
    *  the maximum depth `bd` of all types in the base type sequences of these types.
    */
   private def lubDepthAdjust(td: Int, bd: Int): Int =
-    if (settings.XfullLubs.value) bd
+    if (settings.XfullLubs) bd
     else if (bd <= 3) bd
     else if (bd <= 5) td max (bd - 1)
     else if (bd <= 7) td max (bd - 2)
@@ -3875,9 +3889,14 @@ trait Types
     }
   }
 
-  def normalizePlus(tp: Type) =
+  def normalizePlus(tp: Type) = (
     if (isRawType(tp)) rawToExistential(tp)
-    else tp.normalize
+    else tp.normalize match {
+      // Unify the two representations of module classes
+      case st @ SingleType(_, sym) if sym.isModule => st.underlying.normalize
+      case _                                       => tp.normalize
+    }
+  )
 
   /*
   todo: change to:
@@ -4310,7 +4329,7 @@ trait Types
             // transpose freaked out because of irregular argss
             // catching just in case (shouldn't happen, but also doesn't cost us)
             // [JZ] It happens: see SI-5683.
-            debuglog("transposed irregular matrix!?" +(tps, argss))
+            debuglog(s"transposed irregular matrix!? tps=$tps argss=$argss")
             None
           case Some(argsst) =>
             val args = map2(sym.typeParams, argsst) { (tparam, as0) =>
@@ -4399,7 +4418,7 @@ trait Types
   /** An exception for cyclic references from which we can recover */
   case class RecoverableCyclicReference(sym: Symbol)
     extends TypeError("illegal cyclic reference involving " + sym) {
-    if (settings.debug.value) printStackTrace()
+    if (settings.debug) printStackTrace()
   }
 
   class NoCommonType(tps: List[Type]) extends Throwable(
@@ -4425,12 +4444,12 @@ trait Types
 
   /** If option `explaintypes` is set, print a subtype trace for `found <:< required`. */
   def explainTypes(found: Type, required: Type) {
-    if (settings.explaintypes.value) withTypesExplained(found <:< required)
+    if (settings.explaintypes) withTypesExplained(found <:< required)
   }
 
   /** If option `explaintypes` is set, print a subtype trace for `op(found, required)`. */
   def explainTypes(op: (Type, Type) => Any, found: Type, required: Type) {
-    if (settings.explaintypes.value) withTypesExplained(op(found, required))
+    if (settings.explaintypes) withTypesExplained(op(found, required))
   }
 
   /** Execute `op` while printing a trace of the operations on types executed. */

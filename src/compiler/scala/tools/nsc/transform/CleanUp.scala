@@ -32,19 +32,6 @@ abstract class CleanUp extends Transform with ast.TreeDSL {
       newStaticInits.clear()
       symbolsStoredAsStatic.clear()
     }
-    private def savingStatics[T](body: => T): T = {
-      val savedNewStaticMembers : mutable.Buffer[Tree] = newStaticMembers.clone()
-      val savedNewStaticInits   : mutable.Buffer[Tree] = newStaticInits.clone()
-      val savedSymbolsStoredAsStatic : mutable.Map[String, Symbol] = symbolsStoredAsStatic.clone()
-      val result = body
-
-      clearStatics()
-      newStaticMembers      ++= savedNewStaticMembers
-      newStaticInits        ++= savedNewStaticInits
-      symbolsStoredAsStatic ++= savedSymbolsStoredAsStatic
-
-      result
-    }
     private def transformTemplate(tree: Tree) = {
       val Template(_, _, body) = tree
       clearStatics()
@@ -85,7 +72,7 @@ abstract class CleanUp extends Transform with ast.TreeDSL {
     def transformApplyDynamic(ad: ApplyDynamic) = {
       val qual0 = ad.qual
       val params = ad.args
-        if (settings.logReflectiveCalls.value)
+        if (settings.logReflectiveCalls)
           unit.echo(ad.pos, "method invocation uses reflection")
 
         val typedPos = typedWithPos(ad.pos) _
@@ -266,7 +253,7 @@ abstract class CleanUp extends Transform with ast.TreeDSL {
             gen.mkMethodCall(definitions.Boxes_isNumber, t :: Nil)
         )
 
-        /** The Tree => Tree function in the return is necessary to prevent the original qual
+        /*  The Tree => Tree function in the return is necessary to prevent the original qual
          *  from being duplicated in the resulting code.  It may be a side-effecting expression,
          *  so all the test logic is routed through gen.evalOnce, which creates a block like
          *    { val x$1 = qual; if (x$1.foo || x$1.bar) f1(x$1) else f2(x$1) }
@@ -473,7 +460,7 @@ abstract class CleanUp extends Transform with ast.TreeDSL {
 
           /* For testing purposes, the dynamic application's condition
            * can be printed-out in great detail. Remove? */
-          if (settings.debug.value) {
+          if (settings.debug) {
             def paramsToString(xs: Any*) = xs map (_.toString) mkString ", "
             val mstr = ad.symbol.tpe match {
               case MethodType(mparams, resType) =>

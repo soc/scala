@@ -6,6 +6,7 @@
 package scala.reflect
 package internal
 
+import scala.language.postfixOps
 import scala.annotation.{ switch, meta }
 import scala.collection.{ mutable, immutable }
 import Flags._
@@ -244,8 +245,8 @@ trait Definitions extends api.StandardDefinitions {
          (sym eq NoSymbol)
       || sym.isConstructor
       || sym.isPrivateLocal
-      || isUniversalMember(sym)
     )
+    def isUnimportableUnlessRenamed(sym: Symbol) = isUnimportable(sym) || isUniversalMember(sym)
     def isImportable(sym: Symbol) = !isUnimportable(sym)
 
     /** Is this type equivalent to Any, AnyVal, or AnyRef? */
@@ -973,7 +974,7 @@ trait Definitions extends api.StandardDefinitions {
       getMemberIfDefined(owner, name) orElse {
         if (phase.flatClasses && name.isTypeName && !owner.isPackageObjectOrClass) {
           val pkg = owner.owner
-          val flatname = nme.flattenedName(owner.name, name)
+          val flatname = tpnme.flattenedName(owner.name, name)
           getMember(pkg, flatname)
         }
         else fatalMissingSymbol(owner, name)

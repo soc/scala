@@ -91,7 +91,7 @@ abstract class SuperAccessors extends transform.Transform with transform.TypingT
         if (!found.isErroneous && !req.isErroneous) {
           val msg = analyzer.ErrorUtils.typeErrorMsg(found, req, typer.infer.isPossiblyMissingArgs(found, req))
           typer.context.error(pos, analyzer.withAddendum(pos)(msg))
-          if (settings.explaintypes.value)
+          if (settings.explaintypes)
             explainTypes(found, req)
         }
       }
@@ -241,7 +241,7 @@ abstract class SuperAccessors extends transform.Transform with transform.TypingT
               // also exists in a superclass, because they may be surprised
               // to find out that a constructor parameter will shadow a
               // field. See SI-4762.
-              if (settings.lint.value) {
+              if (settings.lint) {
                 if (sym.isPrivateLocal && sym.paramss.isEmpty) {
                   qual.symbol.ancestors foreach { parent =>
                     parent.info.decls filterNot (x => x.isPrivate || x.hasLocalFlag) foreach { m2 =>
@@ -256,9 +256,16 @@ abstract class SuperAccessors extends transform.Transform with transform.TypingT
                 }
               }
 
-              // direct calls to aliases of param accessors to the superclass in order to avoid
+
+              def isAccessibleFromSuper(sym: Symbol) = {
+                val pre = SuperType(sym.owner.tpe, qual.tpe)
+                localTyper.context.isAccessible(sym, pre, superAccess = true)
+              }
+
+              // Direct calls to aliases of param accessors to the superclass in order to avoid
               // duplicating fields.
-              if (sym.isParamAccessor && sym.alias != NoSymbol) {
+              // ... but, only if accessible (SI-6793)
+              if (sym.isParamAccessor && sym.alias != NoSymbol && isAccessibleFromSuper(sym.alias)) {
                 val result = (localTyper.typedPos(tree.pos) {
                   Select(Super(qual, tpnme.EMPTY) setPos qual.pos, sym.alias)
                 }).asInstanceOf[Select]
@@ -296,7 +303,7 @@ abstract class SuperAccessors extends transform.Transform with transform.TypingT
 
             case Super(_, mix) =>
               if (sym.isValue && !sym.isMethod || sym.hasAccessorFlag) {
-                if (!settings.overrideVars.value)
+                if (!settings.overrideVars)
                   unit.error(tree.pos, "super may be not be used on " + sym.accessedOrSelf)
               } else if (isDisallowed(sym)) {
                 unit.error(tree.pos, "super not allowed here: use this." + name.decode + " instead")
@@ -388,7 +395,7 @@ abstract class SuperAccessors extends transform.Transform with transform.TypingT
       assert(clazz != NoSymbol, sym)
       debuglog("Decided for host class: " + clazz)
 
-      val accName    = nme.protName(sym.originalName)
+      val accName    = nme.protName(sym.unexpandedName)
       val hasArgs    = sym.tpe.paramSectionCount > 0
       val memberType = refChecks.toScalaRepeatedParam(sym.tpe) // fix for #2413
 
@@ -406,7 +413,7 @@ abstract class SuperAccessors extends transform.Transform with transform.TypingT
       }
 
       val protAcc = clazz.info.decl(accName).suchThat(s => s == NoSymbol || s.tpe =:= accType(s)) orElse {
-        val newAcc = clazz.newMethod(nme.protName(sym.originalName), tree.pos, newFlags = ARTIFACT)
+        val newAcc = clazz.newMethod(nme.protName(sym.unexpandedName), tree.pos, newFlags = ARTIFACT)
         newAcc setInfoAndEnter accType(newAcc)
 
         val code = DefDef(newAcc, {
@@ -466,7 +473,7 @@ abstract class SuperAccessors extends transform.Transform with transform.TypingT
       assert(clazz != NoSymbol, field)
       debuglog("Decided for host class: " + clazz)
 
-      val accName = nme.protSetterName(field.originalName)
+      val accName = nme.protSetterName(field.unexpandedName)
       val protectedAccessor = clazz.info decl accName orElse {
         val protAcc      = clazz.newMethod(accName, field.pos, newFlags = ARTIFACT)
         val paramTypes   = List(clazz.typeOfThis, field.tpe)

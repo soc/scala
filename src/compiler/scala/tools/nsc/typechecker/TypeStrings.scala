@@ -50,7 +50,7 @@ trait StructuredTypeStrings extends DestructureTypes {
     else block(level, grouping)(name, nodes)
   }
   private def shortClass(x: Any) = {
-    if (settings.debug.value) {
+    if (settings.debug) {
       val name   = (x.getClass.getName split '.').last
       val str    = if (TypeStrings.isAnonClass(x.getClass)) name else (name split '$').last
 
@@ -153,7 +153,7 @@ trait TypeStrings {
   private type JClass = java.lang.Class[_]
   private val ObjectClass = classOf[java.lang.Object]
   private val primitives = Set[String]("byte", "char", "short", "int", "long", "float", "double", "boolean", "void")
-  private val primitiveMap = primitives.toList map { x =>
+  private val primitiveMap = (primitives.toList map { x =>
     val key = x match {
       case "int"  => "Integer"
       case "char" => "Character"
@@ -165,7 +165,7 @@ trait TypeStrings {
     }
 
     ("java.lang." + key) -> ("scala." + value)
-  } toMap
+  }).toMap
 
   def isAnonClass(cl: Class[_]) = {
     val xs = cl.getName.reverse takeWhile (_ != '$')

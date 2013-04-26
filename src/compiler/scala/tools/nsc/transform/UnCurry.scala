@@ -347,10 +347,14 @@ abstract class UnCurry extends InfoTransform
         }
         else {
           log(s"Argument '$arg' at line ${arg.pos.safeLine} is $formal from ${fun.fullName}")
+          def canUseDirectly(recv: Tree) = (
+               recv.tpe.typeSymbol.isSubClass(FunctionClass(0))
+            && treeInfo.isExprSafeToInline(recv)
+          )
           arg match {
             // don't add a thunk for by-name argument if argument already is an application of
             // a Function0. We can then remove the application and use the existing Function0.
-            case Apply(Select(recv, nme.apply), Nil) if recv.tpe.typeSymbol isSubClass FunctionClass(0) =>
+            case Apply(Select(recv, nme.apply), Nil) if canUseDirectly(recv) =>
               recv
             case _ =>
               newFunction0(arg)
@@ -424,7 +428,7 @@ abstract class UnCurry extends InfoTransform
       val result = (
         // TODO - settings.noassertions.value temporarily retained to avoid
         // breakage until a reasonable interface is settled upon.
-        if ((sym ne null) && (sym.elisionLevel.exists (_ < settings.elidebelow.value || settings.noassertions.value)))
+        if ((sym ne null) && (sym.elisionLevel.exists (_ < settings.elidebelow.value || settings.noassertions)))
           replaceElidableTree(tree)
         else translateSynchronized(tree) match {
           case dd @ DefDef(mods, name, tparams, _, tpt, rhs) =>
@@ -628,7 +632,8 @@ abstract class UnCurry extends InfoTransform
      *
      * This transformation erases the dependent method types by:
      *   - Widening the formal parameter type to existentially abstract
-     *     over the prior parameters (using `packSymbols`)
+     *     over the prior parameters (using `packSymbols`). This transformation
+     *     is performed in the the `InfoTransform`er [[scala.reflect.internal.transform.UnCurry]].
      *   - Inserting casts in the method body to cast to the original,
      *     precise type.
      *
@@ -656,15 +661,14 @@ abstract class UnCurry extends InfoTransform
        */
       def erase(dd: DefDef): (List[List[ValDef]], Tree) = {
         import dd.{ vparamss, rhs }
-        val vparamSyms = vparamss flatMap (_ map (_.symbol))
-
         val paramTransforms: List[ParamTransform] =
-          vparamss.flatten.map { p =>
-            val declaredType = p.symbol.info
-            // existentially abstract over value parameters
-            val packedType = typer.packSymbols(vparamSyms, declaredType)
-            if (packedType =:= declaredType) Identity(p)
+          map2(vparamss.flatten, dd.symbol.info.paramss.flatten) { (p, infoParam) =>
+            val packedType = infoParam.info
+            if (packedType =:= p.symbol.info) Identity(p)
             else {
+              // The Uncurry info transformer existentially abstracted over value parameters
+              // from the previous parameter lists.
+
               // Change the type of the param symbol
               p.symbol updateInfo packedType
 
@@ -676,8 +680,8 @@ abstract class UnCurry extends InfoTransform
               // the method body to refer to this, rather than the parameter.
               val tempVal: ValDef = {
                 val tempValName = unit freshTermName (p.name + "$")
-                val newSym = dd.symbol.newTermSymbol(tempValName, p.pos, SYNTHETIC).setInfo(declaredType)
-                atPos(p.pos)(ValDef(newSym, gen.mkAttributedCast(Ident(p.symbol), declaredType)))
+                val newSym = dd.symbol.newTermSymbol(tempValName, p.pos, SYNTHETIC).setInfo(p.symbol.info)
+                atPos(p.pos)(ValDef(newSym, gen.mkAttributedCast(Ident(p.symbol), p.symbol.info)))
               }
               Packed(newParam, tempVal)
             }
@@ -695,13 +699,6 @@ abstract class UnCurry extends InfoTransform
           Block(tempVals, rhsSubstituted)
         }
 
-        // update the type of the method after uncurry.
-        dd.symbol updateInfo {
-          val GenPolyType(tparams, tp) = dd.symbol.info
-          logResult(s"erased dependent param types for ${dd.symbol.info}") {
-            GenPolyType(tparams, MethodType(allParams map (_.symbol), tp.finalResultType))
-          }
-        }
         (allParams :: Nil, rhs1)
       }
     }

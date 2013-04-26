@@ -265,7 +265,7 @@ abstract class Inliners extends SubComponent {
     }
 
     def analyzeClass(cls: IClass): Unit =
-      if (settings.inline.value) {
+      if (settings.inline) {
         inlineLog("class", s"${cls.symbol.decodedName}", s"analyzing ${cls.methods.size} methods in $cls")
 
         this.currentIClazz = cls
@@ -319,7 +319,7 @@ abstract class Inliners extends SubComponent {
      * */
     def analyzeMethod(m: IMethod): Unit = {
       // m.normalize
-      if (settings.debug.value)
+      if (settings.debug)
         inlineLog("caller", ownedName(m.symbol), "in " + m.symbol.owner.fullName)
 
       val sizeBeforeInlining  = m.code.blockCount
@@ -382,8 +382,8 @@ abstract class Inliners extends SubComponent {
         val shouldWarn = hasInline(i.method)
 
         def warnNoInline(reason: String): Boolean = {
-          def msg = "Could not inline required method %s because %s.".format(i.method.originalName.decode, reason)
-          if (settings.debug.value)
+          def msg = "Could not inline required method %s because %s.".format(i.method.unexpandedName.decode, reason)
+          if (settings.debug)
             inlineLog("fail", i.method.fullName, reason)
           if (shouldWarn)
             warn(i.pos, msg)
@@ -565,7 +565,7 @@ abstract class Inliners extends SubComponent {
       while (retry && count < MAX_INLINE_RETRY)
 
       for(inlFail <- tfa.warnIfInlineFails) {
-        warn(inlFail.pos, "At the end of the day, could not inline @inline-marked method " + inlFail.method.originalName.decode)
+        warn(inlFail.pos, "At the end of the day, could not inline @inline-marked method " + inlFail.method.unexpandedName.decode)
       }
 
       m.normalize()
@@ -935,7 +935,7 @@ abstract class Inliners extends SubComponent {
         // add exception handlers of the callee
         caller addHandlers (inc.handlers map translateExh)
         assert(pending.isEmpty, "Pending NEW elements: " + pending)
-        if (settings.debug.value) icodes.checkValid(caller.m)
+        if (settings.debug) icodes.checkValid(caller.m)
       }
 
       def isStampedForInlining(stackLength: Int): InlineSafetyInfo = {
@@ -958,6 +958,7 @@ abstract class Inliners extends SubComponent {
             if(isInlineForbidden)  { rs ::= "is annotated @noinline" }
             if(inc.isSynchronized) { rs ::= "is synchronized method" }
             if(inc.m.bytecodeHasEHs) { rs ::= "bytecode contains exception handlers / finally clause" } // SI-6188
+            if(inc.m.bytecodeHasInvokeDynamic) { rs ::= "bytecode contains invoke dynamic" }
             if(rs.isEmpty) null else rs.mkString("", ", and ", "")
           }
 

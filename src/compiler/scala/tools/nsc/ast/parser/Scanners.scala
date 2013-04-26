@@ -13,6 +13,7 @@ import scala.annotation.{ switch, tailrec }
 import scala.collection.{ mutable, immutable }
 import mutable.{ ListBuffer, ArrayBuffer }
 import scala.xml.Utility.{ isNameStart }
+import scala.language.postfixOps
 
 /** See Parsers.scala / ParsersCommon for some explanation of ScannersCommon.
  */
@@ -446,7 +447,7 @@ trait Scanners extends ScannersCommon {
                *  there a realistic situation where one would need it?
                */
               if (isDigit(ch)) {
-                if (settings.future.value) syntaxError("Non-zero numbers may not have a leading zero.")
+                if (settings.future) syntaxError("Non-zero numbers may not have a leading zero.")
                 else deprecationWarning("Treating numbers with a leading zero as octal is deprecated.")
               }
               base = 8
@@ -990,7 +991,7 @@ trait Scanners extends ScannersCommon {
         /* As of scala 2.11, it isn't a number unless c here is a digit, so
          * settings.future.value excludes the rest of the logic.
          */
-        if (settings.future.value && !isDigit(c))
+        if (settings.future && !isDigit(c))
           return setStrVal()
 
         val isDefinitelyNumber = (c: @switch) match {
@@ -1217,7 +1218,7 @@ trait Scanners extends ScannersCommon {
    */
   class SourceFileScanner(val source: SourceFile) extends Scanner {
     val buf = source.content
-    override val decodeUni: Boolean = !settings.nouescape.value
+    override val decodeUni: Boolean = !settings.nouescape
 
     // suppress warnings, throw exception on errors
     def deprecationWarning(off: Offset, msg: String): Unit = ()

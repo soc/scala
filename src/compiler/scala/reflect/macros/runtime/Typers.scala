@@ -11,7 +11,7 @@ trait Typers {
   def openImplicits: List[(Type, Tree)] = callsiteTyper.context.openImplicits
 
   /**
-   * @see [[scala.tools.reflect.Toolbox.typeCheck]]
+   * @see [[scala.tools.reflect.ToolBox.typeCheck]]
    */
   def typeCheck(tree: Tree, pt: Type = universe.WildcardType, silent: Boolean = false, withImplicitViewsDisabled: Boolean = false, withMacrosDisabled: Boolean = false): Tree = {
     macroLogVerbose("typechecking %s with expected type %s, implicit views = %s, macros = %s".format(tree, pt, !withImplicitViewsDisabled, !withMacrosDisabled))
@@ -54,8 +54,10 @@ trait Typers {
     wrapper(universe.analyzer.inferImplicit(tree, pt, reportAmbiguous = true, isView = isView, context = context, saveAmbiguousDivergent = !silent, pos = pos)) match {
       case failure if failure.tree.isEmpty =>
         macroLogVerbose("implicit search has failed. to find out the reason, turn on -Xlog-implicits")
-        if (context.hasErrors) throw new TypecheckException(context.errBuffer.head.errPos, context.errBuffer.head.errMsg)
-        universe.EmptyTree
+        context.firstError match {
+          case Some(err) => throw new TypecheckException(err.errPos, err.errMsg)
+          case None      => universe.EmptyTree
+        }
       case success =>
         success.tree
     }

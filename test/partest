@@ -1,7 +1,8 @@
-#!/bin/sh
+#!/usr/bin/env bash
+#
 
 ##############################################################################
-# Scala test runner 2.8.0
+# Scala test runner 2.10.0
 ##############################################################################
 # (c) 2002-2013 LAMP/EPFL
 #
@@ -9,6 +10,16 @@
 # There is NO warranty; not even for MERCHANTABILITY or FITNESS FOR A
 # PARTICULAR PURPOSE.
 ##############################################################################
+
+# Use tput to detect color-capable terminal.
+term_colors=$(tput colors 2>/dev/null)
+if [[ $? == 0 ]] && [[ $term_colors -gt 2 ]]; then
+  git_diff_options="--color=always --word-diff"
+  color_opts="-Dpartest.colors=$term_colors"
+else
+  unset color_opts
+  git_diff_options="--nocolor"
+fi
 
 cygwin=false;
 darwin=false;
@@ -53,14 +64,30 @@ if [ -z "$EXT_CLASSPATH" ] ; then
             fi
         done
     elif [ -f "$SCALA_HOME/build/pack/lib/scala-partest.jar" ] ; then
-        for lib in `echo "partest library reflect compiler"`; do
-            ext="$SCALA_HOME/build/pack/lib/scala-$lib.jar"
+        for lib in `echo "scala-partest scala-library scala-reflect scala-compiler diffutils"`; do
+            ext="$SCALA_HOME/build/pack/lib/$lib.jar"
             if [ -z "$EXT_CLASSPATH" ] ; then
                 EXT_CLASSPATH="$ext"
             else
                 EXT_CLASSPATH="$EXT_CLASSPATH:$ext"
             fi
         done
+    fi
+fi
+
+# Locate a javac command
+# Try: JAVA_HOME, sibling to specific JAVACMD, or PATH
+# Don't fail if there is no javac, since not all tests require it.
+if [ -z "$JAVAC_CMD" ] ; then
+    if [ -n "${JAVA_HOME}" ] && [ -f "${JAVA_HOME}/bin/javac" ] ; then
+        JAVAC_CMD="${JAVA_HOME}/bin/javac"
+    fi
+    if [ -z "$JAVAC_CMD" ] && [ -n "$JAVACMD" ] ; then
+        JDIR=`dirname "${JAVACMD}"`
+        JAVAC_CMD="${JDIR}/javac"
+    fi
+    if [ -z "$JAVAC_CMD" ] ; then
+        JAVAC_CMD=`type -p javac`
     fi
 fi
 
@@ -76,6 +103,9 @@ if $cygwin; then
     if [ -n "${JAVACMD}" ] ; then
         JAVACMD=`cygpath --$format "$JAVACMD"`
     fi
+    if [ -n "${JAVAC_CMD}" ] ; then
+        JAVAC_CMD=`cygpath --$format "$JAVAC_CMD"`
+    fi
     SCALA_HOME=`cygpath --$format "$SCALA_HOME"`
     EXT_CLASSPATH=`cygpath --path --$format "$EXT_CLASSPATH"`
 fi
@@ -86,8 +116,8 @@ fi
 JAVA_OPTS="-Xmx1024M -Xms64M -XX:MaxPermSize=128M $JAVA_OPTS"
 
 # the ant task doesn't supply any options by default,
-# so don't to that here either -- note that you may want to pass -optimise
-# to mimic what happens during nightlies
+# so don't do that here either -- note that you may want to pass -optimise
+# to mimic what happens during nightlies.
 # [ -n "$SCALAC_OPTS" ] || SCALAC_OPTS="-deprecation"
 
 partestDebugStr=""
@@ -98,9 +128,10 @@ fi
 "${JAVACMD:=java}" \
   $JAVA_OPTS -cp "$EXT_CLASSPATH" \
   ${partestDebugStr} \
+  "$color_opts" \
   -Dscala.home="${SCALA_HOME}" \
   -Dpartest.javacmd="${JAVACMD}" \
   -Dpartest.java_opts="${JAVA_OPTS}" \
   -Dpartest.scalac_opts="${SCALAC_OPTS}" \
-  -Dpartest.javac_cmd="${JAVA_HOME}/bin/javac" \
+  -Dpartest.javac_cmd="${JAVAC_CMD}" \
   scala.tools.partest.nest.NestRunner "$@"

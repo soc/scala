@@ -61,7 +61,7 @@ trait Members {
     startBlock = newBlock()
 
     def removeBlock(b: BasicBlock) {
-      if (settings.debug.value) {
+      if (settings.debug) {
         // only do this sanity check when debug is turned on because it's moderately expensive
         val referers = blocks filter (_.successors contains b)
         assert(referers.isEmpty, s"Trying to removing block $b (with preds ${b.predecessors.mkString}) but it is still refered to from block(s) ${referers.mkString}")
@@ -172,6 +172,7 @@ trait Members {
     var returnType: TypeKind = _
     var recursive: Boolean = false
     var bytecodeHasEHs = false // set by ICodeReader only, used by Inliner to prevent inlining (SI-6188)
+    var bytecodeHasInvokeDynamic = false // set by ICodeReader only, used by Inliner to prevent inlining until we have proper invoke dynamic support
 
     /** local variables and method parameters */
     var locals: List[Local] = Nil

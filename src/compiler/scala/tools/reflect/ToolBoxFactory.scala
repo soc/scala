@@ -184,7 +184,9 @@ abstract class ToolBoxFactory[U <: JavaUniverse](val u: U) { factorySelf =>
             analyzer.inferImplicit(tree, pt, reportAmbiguous = true, isView = isView, context = context, saveAmbiguousDivergent = !silent, pos = pos) match {
               case failure if failure.tree.isEmpty =>
                 trace("implicit search has failed. to find out the reason, turn on -Xlog-implicits: ")(failure.tree)
-                if (context.hasErrors) throw ToolBoxError("reflective implicit search has failed: %s".format(context.errBuffer.head.errMsg))
+                context.firstError foreach { err =>
+                  throw ToolBoxError("reflective implicit search has failed: %s".format(err.errMsg))
+                }
                 EmptyTree
               case success =>
                 success.tree
@@ -250,7 +252,7 @@ abstract class ToolBoxFactory[U <: JavaUniverse](val u: U) { factorySelf =>
         throwIfErrors()
 
         val className = mdef.symbol.fullName
-        if (settings.debug.value) println("generated: "+className)
+        if (settings.debug) println("generated: "+className)
         def moduleFileName(className: String) = className + "$"
         val jclazz = jClass.forName(moduleFileName(className), true, classLoader)
         val jmeth = jclazz.getDeclaredMethods.find(_.getName == wrapperMethodName).get
@@ -349,11 +351,11 @@ abstract class ToolBoxFactory[U <: JavaUniverse](val u: U) { factorySelf =>
     lazy val exporter = importer.reverse
 
     def typeCheck(tree: u.Tree, expectedType: u.Type, silent: Boolean = false, withImplicitViewsDisabled: Boolean = false, withMacrosDisabled: Boolean = false): u.Tree = compiler.withCleanupCaches {
-      if (compiler.settings.verbose.value) println("importing "+tree+", expectedType = "+expectedType)
+      if (compiler.settings.verbose) println("importing "+tree+", expectedType = "+expectedType)
       val ctree: compiler.Tree = importer.importTree(tree)
       val cexpectedType: compiler.Type = importer.importType(expectedType)
 
-      if (compiler.settings.verbose.value) println("typing "+ctree+", expectedType = "+expectedType)
+      if (compiler.settings.verbose) println("typing "+ctree+", expectedType = "+expectedType)
       val ttree: compiler.Tree = compiler.typeCheck(ctree, cexpectedType, silent = silent, withImplicitViewsDisabled = withImplicitViewsDisabled, withMacrosDisabled = withMacrosDisabled)
       val uttree = exporter.importTree(ttree)
       uttree
@@ -369,12 +371,12 @@ abstract class ToolBoxFactory[U <: JavaUniverse](val u: U) { factorySelf =>
     }
 
     private def inferImplicit(tree: u.Tree, pt: u.Type, isView: Boolean, silent: Boolean, withMacrosDisabled: Boolean, pos: u.Position): u.Tree = compiler.withCleanupCaches {
-      if (compiler.settings.verbose.value) println(s"importing pt=$pt, tree=$tree, pos=$pos")
+      if (compiler.settings.verbose) println(s"importing pt=$pt, tree=$tree, pos=$pos")
       val ctree: compiler.Tree = importer.importTree(tree)
       val cpt: compiler.Type = importer.importType(pt)
       val cpos: compiler.Position = importer.importPosition(pos)
 
-      if (compiler.settings.verbose.value) println("inferring implicit %s of type %s, macros = %s".format(if (isView) "view" else "value", pt, !withMacrosDisabled))
+      if (compiler.settings.verbose) println("inferring implicit %s of type %s, macros = %s".format(if (isView) "view" else "value", pt, !withMacrosDisabled))
       val itree: compiler.Tree = compiler.inferImplicit(ctree, cpt, isView = isView, silent = silent, withMacrosDisabled = withMacrosDisabled, pos = cpos)
       val uitree = exporter.importTree(itree)
       uitree
@@ -395,17 +397,17 @@ abstract class ToolBoxFactory[U <: JavaUniverse](val u: U) { factorySelf =>
     }
 
     def parse(code: String): u.Tree = {
-      if (compiler.settings.verbose.value) println("parsing "+code)
+      if (compiler.settings.verbose) println("parsing "+code)
       val ctree: compiler.Tree = compiler.parse(code)
       val utree = exporter.importTree(ctree)
       utree
     }
 
     def compile(tree: u.Tree): () => Any = {
-      if (compiler.settings.verbose.value) println("importing "+tree)
+      if (compiler.settings.verbose) println("importing "+tree)
       val ctree: compiler.Tree = importer.importTree(tree)
 
-      if (compiler.settings.verbose.value) println("compiling "+ctree)
+      if (compiler.settings.verbose) println("compiling "+ctree)
       compiler.compile(ctree)
     }
 

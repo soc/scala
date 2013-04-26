@@ -5,6 +5,8 @@
 package scala.tools
 package nsc
 
+import scala.language.postfixOps
+
 /** The main class for NSC, a compiler for the programming
  *  language Scala.
  */
@@ -17,7 +19,7 @@ class MainClass extends Driver with EvalLoop {
 
   override def newCompiler(): Global = Global(settings, reporter)
   override def doCompile(compiler: Global) {
-    if (settings.resident.value) resident(compiler)
+    if (settings.resident) resident(compiler)
     else super.doCompile(compiler)
   }
 }
