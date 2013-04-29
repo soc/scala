@@ -54,7 +54,12 @@ trait Trees extends scala.reflect.internal.Trees { self: Global =>
     case xs :: rest => rest.foldLeft(Apply(gen.mkSuperInitCall, xs): Tree)(Apply.apply)
   }
 
-    /** Generates a template with constructor corresponding to
+  def Template(clazz: Symbol, constrMods: Modifiers, vparamss: List[List[ValDef]], body: List[Tree], superPos: Position): Template = {
+    val self = if (clazz.thisSym == clazz || phase.erasedTypes) emptyValDef else ValDef(clazz.thisSym)
+    Template(clazz.info.parents map TypeTree, self, constrMods, vparamss, body, superPos)
+  }
+
+  /** Generates a template with constructor corresponding to
    *
    *  constrmods (vparams1_) ... (vparams_n) preSuper { presupers }
    *  extends superclass(args_1) ... (args_n) with mixins { self => body }
@@ -137,15 +142,9 @@ trait Trees extends scala.reflect.internal.Trees { self: Global =>
    */
   def ClassDef(sym: Symbol, constrMods: Modifiers, vparamss: List[List[ValDef]], body: List[Tree], superPos: Position): ClassDef = {
     // "if they have symbols they should be owned by `sym`"
-    assert(
-      mforall(vparamss)(p => (p.symbol eq NoSymbol) || (p.symbol.owner == sym)),
-      ((mmap(vparamss)(_.symbol), sym))
-    )
-
-    ClassDef(sym,
-      Template(sym.info.parents map TypeTree,
-               if (sym.thisSym == sym || phase.erasedTypes) emptyValDef else ValDef(sym.thisSym),
-               constrMods, vparamss, body, superPos))
+    def allsyms = mmap(vparamss)(_.symbol)
+    assert(mforall(allsyms)(p => (p eq NoSymbol) || (p.owner == sym)), (sym, allsyms))
+    ClassDef(sym, Template(sym, constrMods, vparamss, body, superPos))
   }
 
  // --- subcomponents --------------------------------------------------
