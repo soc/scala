@@ -165,11 +165,17 @@ abstract class Inliners extends SubComponent {
   val knownLacksInline = mutable.Set.empty[Symbol] // cache to avoid multiple inliner.hasInline() calls.
   val knownHasInline   = mutable.Set.empty[Symbol] // as above. Motivated by the need to warn on "inliner failures".
 
+  private def isDeclaredInInlineClass(sym: Symbol) = (
+       (!sym.isAccessor)
+    && (sym.enclClass hasAnnotation ScalaInlineClass)
+    && (sym.enclClass.info.decls.toList contains sym)
+  )
+
   def hasInline(sym: Symbol)    = {
     if     (knownLacksInline(sym)) false
     else if(knownHasInline(sym))   true
     else {
-      val b = (sym hasAnnotation ScalaInlineClass)
+      val b = (sym hasAnnotation ScalaInlineClass) || isDeclaredInInlineClass(sym)
       if(b) { knownHasInline   += sym }
       else  { knownLacksInline += sym }
 

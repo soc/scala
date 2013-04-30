@@ -338,14 +338,14 @@ import scala.io.ReadStdin
 
   // "Autoboxing" and "Autounboxing" ---------------------------------------------------
 
-  implicit def byte2Byte(x: Byte)           = java.lang.Byte.valueOf(x)
-  implicit def short2Short(x: Short)        = java.lang.Short.valueOf(x)
-  implicit def char2Character(x: Char)      = java.lang.Character.valueOf(x)
-  implicit def int2Integer(x: Int)          = java.lang.Integer.valueOf(x)
-  implicit def long2Long(x: Long)           = java.lang.Long.valueOf(x)
-  implicit def float2Float(x: Float)        = java.lang.Float.valueOf(x)
-  implicit def double2Double(x: Double)     = java.lang.Double.valueOf(x)
-  implicit def boolean2Boolean(x: Boolean)  = java.lang.Boolean.valueOf(x)
+  @inline implicit def byte2Byte(x: Byte)           = java.lang.Byte.valueOf(x)
+  @inline implicit def short2Short(x: Short)        = java.lang.Short.valueOf(x)
+  @inline implicit def char2Character(x: Char)      = java.lang.Character.valueOf(x)
+  @inline implicit def int2Integer(x: Int)          = java.lang.Integer.valueOf(x)
+  @inline implicit def long2Long(x: Long)           = java.lang.Long.valueOf(x)
+  @inline implicit def float2Float(x: Float)        = java.lang.Float.valueOf(x)
+  @inline implicit def double2Double(x: Double)     = java.lang.Double.valueOf(x)
+  @inline implicit def boolean2Boolean(x: Boolean)  = java.lang.Boolean.valueOf(x)
 
   // These next eight implicits exist solely to exclude AnyRef methods from the
   // eight implicits above so that primitives are not coerced to AnyRefs.  They
@@ -360,14 +360,14 @@ import scala.io.ReadStdin
   implicit def double2DoubleConflict(x: Double)     = new AnyRef
   implicit def boolean2BooleanConflict(x: Boolean)  = new AnyRef
 
-  implicit def Byte2byte(x: java.lang.Byte): Byte             = x.byteValue
-  implicit def Short2short(x: java.lang.Short): Short         = x.shortValue
-  implicit def Character2char(x: java.lang.Character): Char   = x.charValue
-  implicit def Integer2int(x: java.lang.Integer): Int         = x.intValue
-  implicit def Long2long(x: java.lang.Long): Long             = x.longValue
-  implicit def Float2float(x: java.lang.Float): Float         = x.floatValue
-  implicit def Double2double(x: java.lang.Double): Double     = x.doubleValue
-  implicit def Boolean2boolean(x: java.lang.Boolean): Boolean = x.booleanValue
+  @inline implicit def Byte2byte(x: java.lang.Byte): Byte             = x.byteValue
+  @inline implicit def Short2short(x: java.lang.Short): Short         = x.shortValue
+  @inline implicit def Character2char(x: java.lang.Character): Char   = x.charValue
+  @inline implicit def Integer2int(x: java.lang.Integer): Int         = x.intValue
+  @inline implicit def Long2long(x: java.lang.Long): Long             = x.longValue
+  @inline implicit def Float2float(x: java.lang.Float): Float         = x.floatValue
+  @inline implicit def Double2double(x: java.lang.Double): Double     = x.doubleValue
+  @inline implicit def Boolean2boolean(x: java.lang.Boolean): Boolean = x.booleanValue
 
   // Type Constraints --------------------------------------------------------------
 

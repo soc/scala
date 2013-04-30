@@ -26,7 +26,8 @@ import scala.annotation.unchecked.uncheckedPure
    *
    *  @return   Nothing.
    */
-  def error(message: String): Nothing = throw new RuntimeException(message)
+  @inline def error(message: String): Nothing = scala.runtime.Statics.error(message)
+  // throw new RuntimeException(message)
 
   /** Exit the JVM with the default status code.
    *

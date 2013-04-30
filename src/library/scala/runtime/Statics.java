@@ -4,6 +4,10 @@ package scala.runtime;
  */
 
 public final class Statics {
+  public static <T> T error(String message) {
+    throw new RuntimeException(message);
+  }
+
   public static int mix(int hash, int data) {
     int h = mixLast(hash, data);
     h = Integer.rotateLeft(h, 13);
