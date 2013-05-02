@@ -60,7 +60,14 @@ abstract class ClassfileParser {
   protected final def u2(): Char = in.nextChar
   protected final def u4(): Int  = in.nextInt
 
-  private def readInnerClassFlags() = readClassFlags()
+  private def readInnerClassFlags() = {
+    val rawFlags = u2
+    val jflags = JavaAccFlags classFlags rawFlags
+    if (jflags.isInterface && !jflags.isStatic)
+      JavaAccFlags classFlags rawFlags | JAVA_ACC_STATIC
+    else
+      jflags
+  }
   private def readClassFlags()      = JavaAccFlags classFlags u2
   private def readMethodFlags()     = JavaAccFlags methodFlags u2
   private def readFieldFlags()      = JavaAccFlags fieldFlags u2
