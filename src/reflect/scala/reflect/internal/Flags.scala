@@ -182,6 +182,8 @@ class Flags extends ModifierFlags {
 
   // ------- shift definitions -------------------------------------------------------
 
+  // 0x0001FFFFFFFFFFFFL == (1 << 49) - 1
+  // In other words we're out of room at flag #48.
   final val InitialFlags  = 0x0001FFFFFFFFFFFFL // flags that are enabled from phase 1.
   final val LateFlags     = 0x00FE000000000000L // flags that override flags in 0x1FC.
   final val AntiFlags     = 0x7F00000000000000L // flags that cancel flags in 0x07F
@@ -345,7 +347,8 @@ class Flags extends ModifierFlags {
   private final val MODULE_PKL     = (1 << 10)
   private final val INTERFACE_PKL  = (1 << 11)
 
-  private final val PKL_MASK       = 0x00000FFF
+  private final val PKL_MASK       = (1 << 12) - 1
+  // 0x00000FFF
 
   /** Pickler correspondence, ordered roughly by frequency of occurrence */
   private def rawPickledCorrespondence = Array[(Long, Long)](
