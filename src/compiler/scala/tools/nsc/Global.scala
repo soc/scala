@@ -1558,6 +1558,116 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
         advancePhase()
       }
 
+      def genGefx(nodes: List[Symbol]): String = {
+        import scala.xml.Utility.escape
+
+        val nextEdge = { var id = 0 ; () => try id finally id += 1 }
+
+        def str(s: Symbol) = escape(
+          enteringPickler {
+            if (s.isModule || s.isClass) s.accurateKindString + " " + s.fullNameString
+            else if (s.isMethod) s.defString + s.locationString
+            else s.fullLocationString
+          }
+        )
+
+        def mkNode2(s: Symbol) = {
+          // <node id="a" label="glossy">
+          //   <viz:color r="239" g="173" b="66" a="0.6"/>
+          //   <viz:position x="15.783598" y="40.109245" z="0.0"/>
+          //   <viz:size value="2.0375757"/>
+          //   <viz:shape value="disc"/>
+          // </node>
+        }
+
+        // def mkAttValues(s: Symbol) = {
+        //   s"""<attvalues><attvalue for="0" value="${str(s)}"/><attvalue for="1" value="${s.accurateKindString}"/></attvalues>"""
+        // }
+        def mkPid(s: Symbol) = (
+          if (s eq NoSymbol) ""
+          else if (s.isRoot || s.isPackage || s.isPackageClass) ""
+          else s""" pid="${s.owner.id}" """
+          // else if (s.isTerm || s.isTypeParameterOrSkolem) s""" pid="${s.owner.id}" """
+          // else ""
+        )
+        def mkNode(s: Symbol) = s"""<node id="${s.id}" label="${escape(s.accurateKindString + " " + s.decodedName)}"${mkPid(s)} />""" //+ mkAttValues(s)
+        def mkNodes = nodes map mkNode mkString "\n      "
+
+        def mkEdge(s: Symbol) = s"""<edge id="${nextEdge()}" source="${s.id}" target="${s.owner.id}" />"""
+        def mkEdges = nodes filterNot (_ == NoSymbol) map mkEdge mkString "\n      "
+
+        def gefx = s"""
+<?xml version="1.0" encoding="UTF-8"?>
+<gexf xmlns="http://www.gexf.net/1.2draft"
+      xmlns:viz="http://www.gexf.net/1.1draft/viz"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://www.gexf.net/1.2draft http://www.gexf.net/1.2draft/gexf.xsd"
+version="1.2">
+  <meta lastmodifieddate="2012-12-01">
+    <creator>Paul Phillips</creator>
+    <description>scala symbol table</description>
+  </meta>
+  <graph mode="static" defaultedgetype="directed" idtype="integer">
+    <nodes>
+      ${mkNodes}
+    </nodes>
+    <edges>
+      ${mkEdges}
+    </edges>
+  </graph>
+</gexf>"""
+
+  // <attributes class="node">
+    // <attribute id="0" title="description" type="string"/>
+    // <attribute id="1" title="kind" type="string"/>
+  // </attributes>
+
+
+        gefx.trim
+      }
+
+      if (true) {
+        val all = mutable.Set[Symbol]()
+        def expandType(tpe: Type): Unit = {
+          if ((tpe eq null) || (tpe eq NoType) || (tpe eq NoPrefix)) () else {
+            tpe foreach { t =>
+              expandSym(t.typeSymbol)
+            }
+          }
+        }
+        def expandSym(sym: Symbol): Unit = {
+          if ((sym eq null) || all(sym)) () else {
+            all += sym
+            if (sym ne sym.thisSym)
+              expandSym(sym.thisSym)
+
+            sym match {
+              case x: TermSymbol if x.referenced ne null => expandSym(x.referenced)
+              case _                                     =>
+            }
+            expandType(sym.tpe)
+            if (sym.tpe ne sym.info)
+              expandType(sym.info)
+
+            sym.ownerChain drop 1 foreach expandSym
+          }
+        }
+
+        for (unit <- units.toList; tree <- unit.body; t <- tree) {
+          expandSym(t.symbol)
+          expandType(t.tpe)
+        }
+        println(genGefx(all.toList.sortBy(_.id)))
+
+        // all.toList foreach (s => s.ownerChain drop 1 foreach (s1 => all -= s1))
+        // val all0 = all.toSet
+        // val allList = all.toList.sortBy(_.id)
+        // val leaves = all0 filter (s => !all0.exists(s1 => (s1 != s) && (s1.ownerChain contains s)))
+        // val all1 = leaves.toList.sortBy(_.id)
+
+        // all1 map (_.ownerChain map (_.id) mkString ";") foreach println
+      }
+
       if (traceSymbolActivity)
         units map (_.body) foreach (traceSymbols recordSymbolsInTree _)
 
