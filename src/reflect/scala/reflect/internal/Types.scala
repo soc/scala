@@ -742,6 +742,8 @@ trait Types
       def map[T](f: Type => T): List[T]  = collect(Type.this) map f
     }
 
+    @inline final def orElse(alt: => Type): Type = if (this ne NoType) this else alt
+
     /** Returns optionally first type (in a preorder traversal) which satisfies predicate `p`,
      *  or None if none exists.
      */
@@ -2956,12 +2958,14 @@ trait Types
     /** The variable's skolemization level */
     val level = skolemizationLevel
 
-    /** Two occurrences of a higher-kinded typevar, e.g. `?CC[Int]` and `?CC[String]`, correspond to
-     *  ''two instances'' of `TypeVar` that share the ''same'' `TypeConstraint`.
+    /** Applies this TypeVar to type arguments, if arity matches.
      *
-     *  `constr` for `?CC` only tracks type constructors anyway,
-     *   so when `?CC[Int] <:< List[Int]` and `?CC[String] <:< Iterable[String]`
-     *  `?CC's` hibounds contains List and Iterable.
+     * Different applications of the same type constructor variable `?CC`,
+     * e.g. `?CC[Int]` and `?CC[String]`, are modeled as distinct instances of `TypeVar`
+     * that share a `TypeConstraint`, so that the comparisons `?CC[Int] <:< List[Int]`
+     * and `?CC[String] <:< Iterable[String]` result in `?CC` being upper-bounded by `List` and `Iterable`.
+     *
+     * Applying the wrong number of type args results in a TypeVar whose instance is set to `ErrorType`.
      */
     def applyArgs(newArgs: List[Type]): TypeVar = (
       if (newArgs.isEmpty && typeArgs.isEmpty)
@@ -2971,7 +2975,7 @@ trait Types
         TypeVar.trace("applyArgs", "In " + originLocation + ", apply args " + newArgs.mkString(", ") + " to " + originName)(tv)
       }
       else
-        throw new Error("Invalid type application in TypeVar: " + params + ", " + newArgs)
+        TypeVar(typeSymbol).setInst(ErrorType)
     )
     // newArgs.length may differ from args.length (could've been empty before)
     //
@@ -3001,16 +3005,17 @@ trait Types
     // <region name="constraint mutators + undoLog">
     // invariant: before mutating constr, save old state in undoLog
     // (undoLog is used to reset constraints to avoid piling up unrelated ones)
-    def setInst(tp: Type) {
+    def setInst(tp: Type): this.type = {
       if (tp eq this) {
         log(s"TypeVar cycle: called setInst passing $this to itself.")
-        return
+        return this
       }
       undoLog record this
       // if we were compared against later typeskolems, repack the existential,
       // because skolems are only compatible if they were created at the same level
       val res = if (shouldRepackType) repackExistential(tp) else tp
       constr.inst = TypeVar.trace("setInst", "In " + originLocation + ", " + originName + "=" + res)(res)
+      this
     }
 
     def addLoBound(tp: Type, isNumericBound: Boolean = false) {
@@ -3059,7 +3064,7 @@ trait Types
         else lhs <:< rhs
       }
 
-      /** Simple case: type arguments can be ignored, because either this typevar has
+      /*  Simple case: type arguments can be ignored, because either this typevar has
        *  no type parameters, or we are comparing to Any/Nothing.
        *
        *  The latter condition is needed because HK unification is limited to constraints of the shape
@@ -3086,7 +3091,7 @@ trait Types
         } else false
       }
 
-      /** Full case: involving a check of the form
+      /*  Full case: involving a check of the form
        *  {{{
        *    TC1[T1,..., TN] <: TC2[T'1,...,T'N]
        *  }}}
@@ -4324,7 +4329,7 @@ trait Types
             // transpose freaked out because of irregular argss
             // catching just in case (shouldn't happen, but also doesn't cost us)
             // [JZ] It happens: see SI-5683.
-            debuglog("transposed irregular matrix!?" +(tps, argss))
+            debuglog(s"transposed irregular matrix!? tps=$tps argss=$argss")
             None
           case Some(argsst) =>
             val args = map2(sym.typeParams, argsst) { (tparam, as0) =>
@@ -4429,11 +4434,11 @@ trait Types
 
   /** Perform operation `p` on arguments `tp1`, `arg2` and print trace of computation. */
   protected def explain[T](op: String, p: (Type, T) => Boolean, tp1: Type, arg2: T): Boolean = {
-    Console.println(indent + tp1 + " " + op + " " + arg2 + "?" /* + "("+tp1.getClass+","+arg2.getClass+")"*/)
+    inform(indent + tp1 + " " + op + " " + arg2 + "?" /* + "("+tp1.getClass+","+arg2.getClass+")"*/)
     indent = indent + "  "
     val result = p(tp1, arg2)
     indent = indent stripSuffix "  "
-    Console.println(indent + result)
+    inform(indent + result)
     result
   }
 

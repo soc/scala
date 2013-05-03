@@ -34,7 +34,7 @@ abstract class Mixin extends InfoTransform with ast.TreeDSL {
   /** A member of a trait is implemented statically if its implementation after the
    *  mixin transform is in the static implementation module. To be statically
    *  implemented, a member must be a method that belonged to the trait's implementation class
-   *  before (e.g. it is not abstract). Not statically implemented are
+   *  before (i.e. it is not abstract). Not statically implemented are
    *   - non-private modules: these are implemented directly in the mixin composition class
    *     (private modules, on the other hand, are implemented statically, but their
    *      module variable is not. all such private modules are lifted, because
@@ -807,7 +807,7 @@ abstract class Mixin extends InfoTransform with ast.TreeDSL {
         override def apply[T <: Tree](tree: T): T = if (from.isEmpty) tree else super.apply(tree)
       }
 
-      /** return a 'lazified' version of rhs. It uses double-checked locking to ensure
+      /*  return a 'lazified' version of rhs. It uses double-checked locking to ensure
        *  initialization is performed at most once. For performance reasons the double-checked
        *  locking is split into two parts, the first (fast) path checks the bitmap without
        *  synchronizing, and if that fails it initializes the lazy val within the
@@ -1037,7 +1037,7 @@ abstract class Mixin extends InfoTransform with ast.TreeDSL {
         else if (!clazz.isTrait) {
           // This needs to be a def to avoid sharing trees
           def accessedRef = accessedReference(sym)
-          if (sym.hasAccessorFlag && (!sym.isDeferred || sym.hasFlag(lateDEFERRED))) {
+          if (isConcreteAccessor(sym)) {
             // add accessor definitions
             addDefDef(sym, {
               if (sym.isSetter) {
@@ -1145,7 +1145,7 @@ abstract class Mixin extends InfoTransform with ast.TreeDSL {
           qual
 
         case Apply(Select(qual, _), args) =>
-          /** Changes `qual.m(args)` where m refers to an implementation
+          /*  Changes `qual.m(args)` where m refers to an implementation
            *  class method to Q.m(S, args) where Q is the implementation module of
            *  `m` and S is the self parameter for the call, which
            *  is determined as follows:

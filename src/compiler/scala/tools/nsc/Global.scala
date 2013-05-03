@@ -218,7 +218,7 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
   // not deprecated yet, but a method called "error" imported into
   // nearly every trait really must go.  For now using globalError.
   def error(msg: String)                = globalError(msg)
-  def inform(msg: String)               = reporter.echo(msg)
+  override def inform(msg: String)      = reporter.echo(msg)
   override def globalError(msg: String) = reporter.error(NoPosition, msg)
   override def warning(msg: String)     =
     if (settings.fatalWarnings) globalError(msg)
@@ -1105,7 +1105,7 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
 
       ("\n" + info1) :: info2 :: info3 mkString "\n\n"
     }
-    catch { case x: Exception => errorMessage }
+    catch { case _: Exception | _: TypeError => errorMessage }
 
   /** The id of the currently active run
    */

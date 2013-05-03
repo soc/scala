@@ -15,14 +15,13 @@ import scala.reflect.internal.util.{ SourceFile, BatchSourceFile, Position, NoPo
 import scala.tools.nsc.reporters._
 import scala.tools.nsc.symtab._
 import scala.tools.nsc.doc.ScaladocAnalyzer
-import scala.tools.nsc.typechecker.{ Analyzer, DivergentImplicit }
+import scala.tools.nsc.typechecker.Analyzer
 import symtab.Flags.{ACCESSOR, PARAMACCESSOR}
 import scala.annotation.{ elidable, tailrec }
 import scala.language.implicitConversions
 
 trait InteractiveScaladocAnalyzer extends InteractiveAnalyzer with ScaladocAnalyzer {
   val global : Global
-  import global._
   override def newTyper(context: Context) = new Typer(context) with InteractiveTyper with ScaladocTyper {
     override def canAdaptConstantTypeToLiteral = false
   }
@@ -906,9 +905,9 @@ class Global(settings: Settings, _reporter: Reporter, projectName: String = "") 
   /** Implements CompilerControl.askDocComment */
   private[interactive] def getDocComment(sym: Symbol, source: SourceFile, site: Symbol, fragments: List[(Symbol,SourceFile)],
                                          response: Response[(String, String, Position)]) {
-    informIDE(s"getDocComment $sym at $source site $site")
+    informIDE(s"getDocComment $sym at $source, site $site")
     respond(response) {
-      withTempUnits(fragments.toList.unzip._2){ units =>
+      withTempUnits(fragments.unzip._2){ units =>
         for((sym, src) <- fragments) {
           val mirror = findMirrorSymbol(sym, units(src))
           if (mirror ne NoSymbol) forceDocComment(mirror, units(src))
@@ -921,6 +920,8 @@ class Global(settings: Settings, _reporter: Reporter, projectName: String = "") 
         }
       }
     }
+    // New typer run to remove temp units and drop per-run caches that might refer to symbols entered from temp units.
+    newTyperRun()
   }
 
   def stabilizedType(tree: Tree): Type = tree match {
@@ -1034,23 +1035,21 @@ class Global(settings: Settings, _reporter: Reporter, projectName: String = "") 
   }
 
   private def typeMembers(pos: Position): Stream[List[TypeMember]] = {
-    var tree = typedTreeAt(pos)
-
-    // if tree consists of just x. or x.fo where fo is not yet a full member name
-    // ignore the selection and look in just x.
-    tree match {
-      case Select(qual, name) if tree.tpe == ErrorType => tree = qual
-      case _ =>
+    // Choosing which tree will tell us the type members at the given position:
+    //   If pos leads to an Import, type the expr
+    //   If pos leads to a Select, type the qualifier as long as it is not erroneous
+    //     (this implies discarding the possibly incomplete name in the Select node)
+    //   Otherwise, type the tree found at 'pos' directly.
+    val tree0 = typedTreeAt(pos) match {
+      case sel @ Select(qual, _) if sel.tpe == ErrorType => qual
+      case Import(expr, _)                               => expr
+      case t                                             => t
     }
-
     val context = doLocateContext(pos)
-
-    if (tree.tpe == null)
-      // TODO: guard with try/catch to deal with ill-typed qualifiers.
-      tree = analyzer.newTyper(context).typedQualifier(tree)
+    // TODO: guard with try/catch to deal with ill-typed qualifiers.
+    val tree = if (tree0.tpe eq null) analyzer newTyper context typedQualifier tree0 else tree0
 
     debugLog("typeMembers at "+tree+" "+tree.tpe)
-
     val superAccess = tree.isInstanceOf[Super]
     val members = new Members[TypeMember]
 
@@ -1210,9 +1209,6 @@ class Global(settings: Settings, _reporter: Reporter, projectName: String = "") 
     } catch {
       case ex: TypeError =>
         debugLog("type error caught: "+ex)
-        alt
-      case ex: DivergentImplicit =>
-        debugLog("divergent implicit caught: "+ex)
         alt
     }
   }

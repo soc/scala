@@ -289,9 +289,9 @@ abstract class ClassfileParser {
      */
     private def getNameAndType(index: Int, ownerTpe: Type): (Name, Type) = {
       if (index <= 0 || len <= index) errorBadIndex(index)
-      (values(index): @unchecked) match {
-        case p: ((Name, Type)) => p
-        case _                 =>
+      values(index) match {
+        case p: ((Name @unchecked, Type @unchecked)) => p
+        case _                                       =>
           val start = firstExpecting(index, CONSTANT_NAMEANDTYPE)
           val name = getName(in.getChar(start).toInt)
           // create a dummy symbol for method types
@@ -1179,7 +1179,7 @@ abstract class ClassfileParser {
         else enclosing.info member name
       )
       enteringTyperIfPossible(getMember)
-      /** There used to be an assertion that this result is not NoSymbol; changing it to an error
+      /*  There used to be an assertion that this result is not NoSymbol; changing it to an error
        *  revealed it had been going off all the time, but has been swallowed by a catch t: Throwable
        *  in Repository.scala. Since it has been accomplishing nothing except misleading anyone who
        *  thought it wasn't triggering, I removed it entirely.
