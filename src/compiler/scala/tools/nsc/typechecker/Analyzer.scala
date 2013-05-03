@@ -72,6 +72,19 @@ trait Analyzer extends AnyRef
   }
 
   object typerFactory extends SubComponent {
+
+    class Owners(val unit: CompilationUnit, val owners: List[Tree]) {
+      override def toString = (
+        "" + unit + ":" + owners.head.pos.show + " " + owners.head //.pos
+        // "" + unit + " with owners:\n  " + (owners take 2).mkString("\n  -> ") + " ... (" + (owners drop 2).size + " more)"
+      )
+      override def equals(other: Any) = other match {
+        case that: Owners => unit == that.unit && owners == that.owners
+        case _            => super.equals(other)
+      }
+      override def hashCode = unit.## + owners.##
+    }
+
     import scala.reflect.internal.TypesStats.typerNanos
     val global: Analyzer.this.global.type = Analyzer.this.global
     val phaseName = "typer"
@@ -92,6 +105,66 @@ trait Analyzer extends AnyRef
           undoLog.clear()
         }
         if (Statistics.canEnable) Statistics.stopTimer(typerNanos, start)
+        val trees = perRunCaches.newMap[Int, List[Tree]]() withDefaultValue Nil
+        val ownersMap = perRunCaches.newMap[Tree, List[Owners]]() withDefaultValue Nil
+
+        currentRun.units foreach { unit =>
+          unit.body foreach { t =>
+            if (t != EmptyTree)
+              trees(t.##) ::= t
+          }
+        }
+        object stacker extends Traverser {
+          var stack: List[Tree] = Nil
+          var currentUnit: CompilationUnit = _
+
+          override def traverse(t: Tree) {
+            val o = new Owners(currentUnit, stack)
+            ownersMap(t) = (o :: ownersMap(t)).distinct
+            stack ::= t
+            try super.traverse(t)
+            finally stack = stack.tail
+          }
+          def apply(unit: CompilationUnit) {
+            currentUnit = unit
+            traverse(unit.body)
+          }
+        }
+        currentRun.units foreach (u => stacker(u))
+
+        val dups = trees.toList filter (_._2.tail.nonEmpty)
+        println(s"${trees.size} trees, ${dups.size} shared trees")
+        dups foreach println
+
+        val dups2 = ownersMap.toList filter (_._2.tail.nonEmpty)
+        dups2 foreach { case (t, o1 :: o2 :: _) =>
+          if (t != EmptyTree) {
+            val u = o1.unit
+            u.warning(t.pos, "Shared tree")
+            u.warning(o1.owners.head.pos, "  owner #1")
+            u.warning(o2.owners.head.pos, "  owner #2")
+
+            // println(s"$t/sym=${t.symbol}\n")
+            // println("in " + u + ":" + t.pos.line)
+            // println(s"+0   ${t.##}   $t")
+            var os1 = o1.owners take (o1.owners.indexWhere(_.isInstanceOf[ValOrDefDef]) + 1)
+            var os2 = o2.owners take (o2.owners.indexWhere(_.isInstanceOf[ValOrDefDef]) + 1)
+            var pairs: List[(Tree, Tree)] = Nil
+
+            while (os1.nonEmpty || os2.nonEmpty) {
+              val x1 = if (os1.isEmpty) EmptyTree else try os1.head finally os1 = os1.tail
+              val x2 = if (os2.isEmpty) EmptyTree else try os2.head finally os2 = os2.tail
+              pairs ::= ((x1, x2))
+            }
+            for (((x1, x2), n0) <- pairs.reverse.zipWithIndex) {
+              val n = n0 + 1
+              println(s"+$n  ${x1.##}  $x1")
+              println(s"+$n  ${x2.##}  $x2")
+              println("")
+            }
+            println("")
+          }
+        }
       }
       def apply(unit: CompilationUnit) {
         try {
