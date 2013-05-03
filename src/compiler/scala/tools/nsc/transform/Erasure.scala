@@ -966,6 +966,19 @@ abstract class Erasure extends AddInterfaces
      */
     private val preTransformer = new TypingTransformer(unit) {
 
+      def logClosure(fn: Tree) = {
+        if (currentClass.isAnonymousFunction) {
+          treeInfo.methPart(fn) match {
+            case Select(qual, _) if qual hasSymbolWhich (_.isOuterField) =>
+              val oname = nme.originalName(fn.symbol.name)
+              if (oname != nme.OUTER)
+                unit.warning(fn.pos, "Closure captures reference to " +
+                  List(fn.symbol.kindString, oname.decode, "in", fn.symbol.ownsString).mkString(" ")
+                )
+            case _ =>
+          }
+        }
+      }
       private def preEraseNormalApply(tree: Apply) = {
         val fn = tree.fun
         val args = tree.args
@@ -1038,6 +1051,7 @@ abstract class Erasure extends AddInterfaces
         } else if (fn.symbol.isMethodWithExtension && !fn.symbol.tpe.isErroneous) {
           Apply(gen.mkAttributedRef(extensionMethods.extensionMethod(fn.symbol)), qualifier :: args)
         } else {
+          logClosure(tree)
           tree
         }
       }

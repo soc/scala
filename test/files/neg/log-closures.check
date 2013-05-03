@@ -1,0 +1,6 @@
+log-closures.scala:3: warning: Closure captures reference to method z in class Foo
+  def f(xs: List[Int]) = xs map (_ => z)
+                                      ^
+error: No warnings can be incurred under -Xfatal-warnings.
+one warning found
+one error found
