@@ -644,7 +644,7 @@ trait Types
      *    T.asSeenFrom(ThisType(C), D)  (where D is owner of m)
      *      = Int
      */
-    def asSeenFrom(pre: Type, clazz: Symbol): Type = {
+    private def asSeenFromInternal(pre: Type, clazz: Symbol): Type = {
       val start = if (Statistics.canEnable) Statistics.pushTimer(typeOpsStack, asSeenFromNanos)  else null
       try {
         val trivial = (
@@ -662,6 +662,127 @@ trait Types
           else deriveType(m.capturedSkolems, _.cloneSymbol setFlag CAPTURED)(tp1)
         }
       } finally if (Statistics.canEnable) Statistics.popTimer(typeOpsStack, start)
+    }
+    def asSeenFrom(pre: Type, clazz: Symbol): Type = {
+      val res = asSeenFromInternal(pre, clazz)
+      val trivial = (
+           this.isTrivial
+        || phase.erasedTypes && pre.typeSymbol != ArrayClass
+        || skipPrefixOf(pre, clazz)
+      )
+      if (trivial || (pre eq NoPrefix) || (this eq NoPrefix) || (this eq NoType))
+        return res
+
+      def bippy(t: Type) = t match {
+        case TypeRef(pre, sym, args) if sym.isAbstractType =>
+          val pre1 = pre baseType sym.enclClass
+          if ((pre1 ne NoType) && (pre ne pre1)) {
+            val res1 = try res.asSeenFrom(pre1, clazz) catch { case t: Throwable => res }
+            if ((res eq res1) || (res =:= res1)) () else {
+              println(s"  jackpot $res  ==>  $res1")
+            }
+          }
+        case _ =>
+      }
+      if (this.isComplete)
+        this.dealiasWidenChain foreach bippy
+      else
+        bippy(this)
+
+      def findTypes() = {
+        var seen: Set[Type] = Set()
+        def loop(t: Type) {
+          if (!seen(t)) {
+            seen = seen + t
+            loop(t.prefix)
+            t.typeArgs foreach loop
+            t match {
+              case t: CompoundType => t.parents foreach loop
+              case _               =>
+            }
+          }
+        }
+        pre.dealiasWidenChain foreach loop
+        seen filterNot (_.isTrivial)
+      }
+
+      val okTypes = findTypes()
+      val okChains = (pre.dealiasWidenChain.flatMap(_.typeSymbolDirect.ownerChain) ++ clazz.ownerChain).distinct
+      def inChains(s: Symbol) = okChains contains s
+      def isOk(s: Symbol) = !s.hasModuleFlag && !inChains(s)
+      def unexpected(tp: Type, s: Symbol) = (
+           !(okChains contains s)
+        && !(okChains contains s.moduleClass)
+        && !(okTypes exists (_ =:= tp))
+        // && !(okTypes exists (_ =:= tp.narrow))
+        && !(s.hasPackageFlag)
+        && !(s.hasModuleFlag)
+        && !(tp.underlying.typeSymbol.isModuleClass)
+        && !(tp =:= pre)
+      )
+      def singles(tp: Type): List[(Symbol, Type)] = {
+        tp collect {
+          case tp @ ThisType(sym) if unexpected(tp, sym)         => sym -> tp
+          case tp @ SingleType(pre, sym) if unexpected(pre, sym) => sym -> tp
+        }
+      }
+      // val effectivePrefix = res match {
+      //   case NullaryMethodType(tpe) => tpe.prefix
+      //   case MethodType(_, restpe)  => restpe.prefix
+      //   case _                      => res.prefix
+      // }
+      val prefixSingleSymbols = (res.prefix collect { case tp: Type => singles(tp) }).flatten.distinct.toMap
+
+      def sym_s(s: Symbol) = (
+           s.shortSymbolClass + " in " + s.safeOwner.fullNameString
+        + (s.debugFlagString match { case "" => "" ; case fs => s" (flags: $fs)" })
+        + (if (s.isRefinementClass) " with parents" :: s.info.parents mkString s"\n%40s".format("") else "")
+      )
+
+      def tpe_s(t: Type) = t match {
+        case t: MethodType => "" + t
+        case _             =>
+          // if (t.isComplete)
+          //   "a " + util.shortClassOfInstance(t)  + " in " + t.typeSymbolDirect.safeOwner.fullNameString
+          // else
+            sym_s(t.typeSymbolDirect)
+        // +s sym_s(t.typeSymbolDirect)
+      }
+      def tpes_s(xs: Traversable[Type]) = xs map (tp => s"$tp, a ${util.shortClassOfInstance(tp)}") mkString ", "
+
+      if (prefixSingleSymbols.isEmpty) res
+      else {
+        val p_s    = tpes_s(prefixSingleSymbols.values)
+        val ok_s   = tpes_s(okTypes)
+        val this_o = this match {
+          case MethodType(_, _) => "" + this
+          case _                => "(" + this + " in " + this.typeSymbolDirect.safeOwner + ")"
+        }
+        val this_pre = this.prefix
+        // match {
+        //   case NoPrefix => (pre memberInfo typeSymbolDirect).prefix
+        //   case p        => p
+        // }
+        val pre_s = pre match {
+          case RefinedType(parents, _)                   => parents mkString " with "
+          case _ if pre.toString contains "<refinement>" => "<refinement> involving " + pre.underlying.firstParent
+          case _                                         => "" + pre
+        }
+        val maybePres = if (res.prefix =:= this.prefix) "" else
+          f"""|  target.pre: $this_pre%30s ${tpe_s(this_pre)}
+              |  result.pre: ${res.prefix}%30s ${tpe_s(res.prefix)}""".stripMargin
+
+        println(f"""|
+          |$this_o.asSeenFrom($pre_s, $clazz)
+          |  unexpected: $p_s
+          |     okTypes: $ok_s
+          |         pre: $pre%30s   ${tpe_s(pre)}
+          |       clazz: ${clazz.fullNameString}%30s   a ${sym_s(clazz)}
+          |$maybePres
+          |      target: $this%30s   ${tpe_s(this)}
+          |      result: $res%30s   ${tpe_s(res)}""".stripMargin)
+        res
+      }
     }
 
     /** The info of `sym`, seen as a member of this type.
