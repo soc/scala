@@ -93,13 +93,15 @@ trait SymbolTrackers {
     }
     class Node(val root: Symbol, val children: List[Hierarchy]) extends Hierarchy {
       def masked = root.flags & flagsMask
-      def indicatorString =
-        if (isAdded(root)) "* "
-        else List(
-          if (isFlagsChange(root)) "F" else "",
-          if (isOwnerChange(root)) "O" else "",
-          "  "
-        ).mkString take 2
+      def indicatorString = {
+        "%-5s" format List(
+          Some("*") filter (_ => isAdded(root)),
+          Some("F") filter (_ => isFlagsChange(root)),
+          Some("O") filter (_ => isOwnerChange(root)),
+          Some("U") filter (_ => !root.isInitialized),
+          Some("I") filter (_ => !root.hasCompleteInfo)
+        ).flatten.mkString("")
+      }
 
       def changedOwnerString = changed.owners get root match {
         case Some(prev) => " [Owner was " + prev + ", now " + root.owner + "]"

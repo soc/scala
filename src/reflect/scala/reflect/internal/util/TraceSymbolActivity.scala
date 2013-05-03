@@ -8,6 +8,10 @@ trait TraceSymbolActivity {
   val global: SymbolTable
   import global._
 
+  def printSymbolInfo = false
+  private type Set[T] = scala.collection.immutable.Set[T]
+  private val Set = scala.collection.immutable.Set
+
   private[this] var enabled = traceSymbolActivity
   if (enabled && global.isCompilerUniverse)
     scala.sys addShutdownHook showAllSymbols()
@@ -52,7 +56,7 @@ trait TraceSymbolActivity {
   }
   private def showSym(sym: Symbol) {
     def prefix = ("  " * (sym.ownerChain.length - 1)) + sym.id
-    try println("%s#%s %s".format(prefix, sym.accurateKindString, sym.name.decode))
+    try println("%s#%s %s%s".format(prefix, sym.accurateKindString, sym.name.decode, signature(sym.id)))
     catch {
       case x: Throwable => println(prefix + " failed: " + x)
     }
@@ -131,6 +135,13 @@ trait TraceSymbolActivity {
           owners.take(3).map({ case (k, v) => v + "/" + k }).mkString(", ") + ", ..."
         )
       })
+    }
+
+    if (printSymbolInfo) {
+      allSymbols.keys.toList.sorted foreach { id =>
+        try println("#%6s  %s".format(id, allSymbols(id).fullLocationString))
+        catch { case x: Throwable => println("failed: " + x) }
+      }
     }
 
     allSymbols.keys.toList.sorted foreach showIdAndRemove
