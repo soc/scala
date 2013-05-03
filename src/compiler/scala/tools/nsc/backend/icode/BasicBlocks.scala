@@ -158,6 +158,7 @@ trait BasicBlocks {
     /** ICode instructions, used as temporary storage while emitting code.
      * Once closed is called, only the `instrs` array should be used.
      */
+    private var instructions: collection.Seq[Instruction] with Freezable[Instruction] = _
     private var instructionList: List[Instruction] = Nil
     private var instrs: Array[Instruction] = _
 
