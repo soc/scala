@@ -1,13 +1,11 @@
 /* NSC -- new Scala compiler
- * Copyright 2005-2011 LAMP/EPFL
+ * Copyright 2005-2013 LAMP/EPFL
  * @author Paul Phillips
  */
 
 package scala.tools.partest
 
-import scala.tools.nsc._
-import nest.FileUtil._
-import io.Directory
+import scala.tools.partest.nest.FileUtil.compareContents
 
 /** A trait for testing icode.  All you need is this in a
  *  partest source file:

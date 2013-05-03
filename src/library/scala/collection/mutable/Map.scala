@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2003-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2003-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -47,7 +47,7 @@ trait Map[A, B]
    */
   def withDefaultValue(d: B): mutable.Map[A, B] = new Map.WithDefault[A, B](this, x => d)
 
-  /** Return a read-only projection of this map.  !!! or just use an (immutable) MapProxy?
+  /*  Return a read-only projection of this map.  !!! or just use an (immutable) MapProxy?
   def readOnly : scala.collection.Map[A, B] = new scala.collection.Map[A, B] {
     override def size = self.size
     override def update(key: A, value: B) = self.update(key, value)
@@ -71,7 +71,7 @@ object Map extends MutableMapFactory[Map] {
 
   def empty[A, B]: Map[A, B] = new HashMap[A, B]
 
-  class WithDefault[A, B](underlying: Map[A, B], d: A => B) extends collection.Map.WithDefault(underlying, d) with Map[A, B] {
+  class WithDefault[A, B](underlying: Map[A, B], d: A => B) extends scala.collection.Map.WithDefault(underlying, d) with Map[A, B] {
     override def += (kv: (A, B)) = {underlying += kv; this}
     def -= (key: A) = {underlying -= key; this}
     override def empty = new WithDefault(underlying.empty, d)

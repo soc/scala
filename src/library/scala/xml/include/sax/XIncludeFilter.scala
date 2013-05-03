@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2002-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2002-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -147,10 +147,10 @@ class XIncludeFilter extends XMLFilterImpl {
 
         if (parse equals "text") {
           val encoding = atts getValue "encoding"
-          includeTextDocument(href, encoding);
+          includeTextDocument(href, encoding)
         }
         else if (parse equals "xml") {
-          includeXMLDocument(href);
+          includeXMLDocument(href)
         }
         // Need to check this also in DOM and JDOM????
         else {
@@ -184,7 +184,7 @@ class XIncludeFilter extends XMLFilterImpl {
     }
   }
 
-  private var depth = 0;
+  private var depth = 0
 
   override def startDocument() {
     level = 0
@@ -240,7 +240,7 @@ class XIncludeFilter extends XMLFilterImpl {
     }
     locationString = (" in document included from " + publicID
     + " at " + systemID
-    + " at line " + line + ", column " + column);
+    + " at line " + line + ", column " + column)
 
     locationString
   }
@@ -258,7 +258,7 @@ class XIncludeFilter extends XMLFilterImpl {
     */
   private def includeTextDocument(url: String, encoding1: String) {
     var encoding = encoding1
-    if (encoding == null || encoding.trim().equals("")) encoding = "UTF-8";
+    if (encoding == null || encoding.trim().equals("")) encoding = "UTF-8"
     var source: URL = null
     try {
       val base = bases.peek().asInstanceOf[URL]
@@ -275,7 +275,7 @@ class XIncludeFilter extends XMLFilterImpl {
     try {
       val uc = source.openConnection()
       val in = new BufferedInputStream(uc.getInputStream())
-      var encodingFromHeader = uc.getContentEncoding()
+      val encodingFromHeader = uc.getContentEncoding()
       var contentType = uc.getContentType()
       if (encodingFromHeader != null)
         encoding = encodingFromHeader
@@ -284,13 +284,13 @@ class XIncludeFilter extends XMLFilterImpl {
         // MIME types are case-insensitive
         // Java may be picking this up from file URL
         if (contentType != null) {
-          contentType = contentType.toLowerCase();
+          contentType = contentType.toLowerCase()
           if (contentType.equals("text/xml")
               || contentType.equals("application/xml")
               || (contentType.startsWith("text/") && contentType.endsWith("+xml") )
               || (contentType.startsWith("application/") && contentType.endsWith("+xml"))) {
-                encoding = EncodingHeuristics.readEncodingFromStream(in);
-              }
+                encoding = EncodingHeuristics.readEncodingFromStream(in)
+          }
         }
       }
       val reader = new InputStreamReader(in, encoding)

@@ -1,18 +1,19 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2003-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2003-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
 \*                                                                      */
 
-package scala.collection
+package scala
+package collection
 
 import mutable.{ ListBuffer, ArraySeq }
 import immutable.{ List, Range }
 import generic._
 import parallel.ParSeq
-import scala.math.Ordering
+import scala.math.{ min, max, Ordering }
 
 /** A template trait for sequences of type `Seq[A]`
  *  $seqInfo
@@ -21,7 +22,7 @@ import scala.math.Ordering
  *  Sequences are special cases of iterable collections of class `Iterable`.
  *  Unlike iterables, sequences always have a defined order of elements.
  *  Sequences provide a method `apply` for indexing. Indices range from `0` up to the `length` of
- *  a sequence. Sequences support a number to find occurrences of elements or subsequences, including
+ *  a sequence. Sequences support a number of methods to find occurrences of elements or subsequences, including
  *  `segmentLength`, `prefixLength`, `indexWhere`, `indexOf`, `lastIndexWhere`, `lastIndexOf`,
  *  `startsWith`, `endsWith`, `indexOfSlice`.
  *
@@ -83,14 +84,20 @@ trait SeqLike[+A, +Repr] extends Any with IterableLike[A, Repr] with GenSeqLike[
    *  if computing `length` is cheap.
    */
   def lengthCompare(len: Int): Int = {
-    var i = 0
-    val it = iterator
-    while (it.hasNext && i <= len) {
-      it.next()
-      i += 1
+    if (len < 0) 1
+    else {
+      var i = 0
+      val it = iterator
+      while (it.hasNext) {
+        if (i == len) return if (it.hasNext) 1 else 0
+        it.next()
+        i += 1
+      }
+      i - len
     }
-    i - len
   }
+
+  override /*IterableLike*/ def isEmpty: Boolean = lengthCompare(0) == 0
 
   /** The size of this $coll, equivalent to `length`.
    *
@@ -100,7 +107,7 @@ trait SeqLike[+A, +Repr] extends Any with IterableLike[A, Repr] with GenSeqLike[
 
   def segmentLength(p: A => Boolean, from: Int): Int = {
     var i = 0
-    var it = iterator.drop(from)
+    val it = iterator.drop(from)
     while (it.hasNext && p(it.next()))
       i += 1
     i
@@ -108,7 +115,7 @@ trait SeqLike[+A, +Repr] extends Any with IterableLike[A, Repr] with GenSeqLike[
 
   def indexWhere(p: A => Boolean, from: Int): Int = {
     var i = from
-    var it = iterator.drop(from)
+    val it = iterator.drop(from)
     while (it.hasNext) {
       if (p(it.next())) return i
       else i += 1
@@ -120,7 +127,7 @@ trait SeqLike[+A, +Repr] extends Any with IterableLike[A, Repr] with GenSeqLike[
   def lastIndexWhere(p: A => Boolean, end: Int): Int = {
     var i = length - 1
     val it = reverseIterator
-    while (it.hasNext && { val elem = it.next; (i > end || !p(elem)) }) i -= 1
+    while (it.hasNext && { val elem = it.next(); (i > end || !p(elem)) }) i -= 1
     i
   }
 
@@ -149,10 +156,10 @@ trait SeqLike[+A, +Repr] extends Any with IterableLike[A, Repr] with GenSeqLike[
     def hasNext = _hasNext
     def next(): Repr = {
       if (!hasNext)
-        Iterator.empty.next
+        Iterator.empty.next()
 
       val forcedElms = new mutable.ArrayBuffer[A](elms.size) ++= elms
-      val result = (self.newBuilder ++= forcedElms).result
+      val result = (self.newBuilder ++= forcedElms).result()
       var i = idxs.length - 2
       while(i >= 0 && idxs(i) >= idxs(i+1))
         i -= 1
@@ -174,10 +181,10 @@ trait SeqLike[+A, +Repr] extends Any with IterableLike[A, Repr] with GenSeqLike[
       result
     }
     private def swap(i: Int, j: Int) {
-      var tmpI = idxs(i)
+      val tmpI = idxs(i)
       idxs(i) = idxs(j)
       idxs(j) = tmpI
-      var tmpE = elms(i)
+      val tmpE = elms(i)
       elms(i) = elms(j)
       elms(j) = tmpE
     }
@@ -201,15 +208,15 @@ trait SeqLike[+A, +Repr] extends Any with IterableLike[A, Repr] with GenSeqLike[
     def hasNext = _hasNext
     def next(): Repr = {
       if (!hasNext)
-        Iterator.empty.next
+        Iterator.empty.next()
 
-      /** Calculate this result. */
+      /* Calculate this result. */
       val buf = self.newBuilder
       for(k <- 0 until nums.length; j <- 0 until nums(k))
         buf += elms(offs(k)+j)
-      val res = buf.result
+      val res = buf.result()
 
-      /** Prepare for the next call to next. */
+      /* Prepare for the next call to next. */
       var idx = nums.length - 1
       while (idx >= 0 && nums(idx) == cnts(idx))
         idx -= 1
@@ -261,7 +268,7 @@ trait SeqLike[+A, +Repr] extends Any with IterableLike[A, Repr] with GenSeqLike[
     b.sizeHint(this)
     for (x <- xs)
       b += x
-    b.result
+    b.result()
   }
 
   def reverseMap[B, That](f: A => B)(implicit bf: CanBuildFrom[Repr, B, That]): That = {
@@ -272,7 +279,7 @@ trait SeqLike[+A, +Repr] extends Any with IterableLike[A, Repr] with GenSeqLike[
     for (x <- xs)
       b += f(x)
 
-    b.result
+    b.result()
   }
 
   /** An iterator yielding elements in reversed order.
@@ -328,7 +335,7 @@ trait SeqLike[+A, +Repr] extends Any with IterableLike[A, Repr] with GenSeqLike[
       if (from > l) -1
       else if (tl < 1) clippedFrom
       else if (l < tl) -1
-      else SeqLike.kmpSearch(thisCollection, clippedFrom, l, that.seq, 0, tl, true)
+      else SeqLike.kmpSearch(thisCollection, clippedFrom, l, that.seq, 0, tl, forward = true)
     }
     else {
       var i = from
@@ -365,7 +372,7 @@ trait SeqLike[+A, +Repr] extends Any with IterableLike[A, Repr] with GenSeqLike[
     if (end < 0) -1
     else if (tl < 1) clippedL
     else if (l < tl) -1
-    else SeqLike.kmpSearch(thisCollection, 0, clippedL+tl, that.seq, 0, tl, false)
+    else SeqLike.kmpSearch(thisCollection, 0, clippedL+tl, that.seq, 0, tl, forward = false)
   }
 
   /** Tests whether this $coll contains a given sequence as a slice.
@@ -383,7 +390,7 @@ trait SeqLike[+A, +Repr] extends Any with IterableLike[A, Repr] with GenSeqLike[
    *  @return     `true` if this $coll has an element that is equal (as
    *              determined by `==`) to `elem`, `false` otherwise.
    */
-  def contains(elem: Any): Boolean = exists (_ == elem)
+  def contains[A1 >: A](elem: A1): Boolean = exists (_ == elem)
 
   /** Produces a new sequence which contains all elements of this $coll and also all elements of
    *  a given sequence. `xs union ys`  is equivalent to `xs ++ ys`.
@@ -435,7 +442,7 @@ trait SeqLike[+A, +Repr] extends Any with IterableLike[A, Repr] with GenSeqLike[
     for (x <- this)
       if (occ(x) == 0) b += x
       else occ(x) -= 1
-    b.result
+    b.result()
   }
 
   /** Computes the multiset intersection between this $coll and another sequence.
@@ -466,7 +473,7 @@ trait SeqLike[+A, +Repr] extends Any with IterableLike[A, Repr] with GenSeqLike[
         b += x
         occ(x) -= 1
       }
-    b.result
+    b.result()
   }
 
   private def occCounts[B](sq: Seq[B]): mutable.Map[B, Int] = {
@@ -489,7 +496,7 @@ trait SeqLike[+A, +Repr] extends Any with IterableLike[A, Repr] with GenSeqLike[
         seen += x
       }
     }
-    b.result
+    b.result()
   }
 
   def patch[B >: A, That](from: Int, patch: GenSeq[B], replaced: Int)(implicit bf: CanBuildFrom[Repr, B, That]): That = {
@@ -498,7 +505,7 @@ trait SeqLike[+A, +Repr] extends Any with IterableLike[A, Repr] with GenSeqLike[
     b ++= toCollection(prefix)
     b ++= patch.seq
     b ++= toCollection(rest).view drop replaced
-    b.result
+    b.result()
   }
 
   def updated[B >: A, That](index: Int, elem: B)(implicit bf: CanBuildFrom[Repr, B, That]): That = {
@@ -507,21 +514,21 @@ trait SeqLike[+A, +Repr] extends Any with IterableLike[A, Repr] with GenSeqLike[
     b ++= toCollection(prefix)
     b += elem
     b ++= toCollection(rest).view.tail
-    b.result
+    b.result()
   }
 
   def +:[B >: A, That](elem: B)(implicit bf: CanBuildFrom[Repr, B, That]): That = {
     val b = bf(repr)
     b += elem
     b ++= thisCollection
-    b.result
+    b.result()
   }
 
   def :+[B >: A, That](elem: B)(implicit bf: CanBuildFrom[Repr, B, That]): That = {
     val b = bf(repr)
     b ++= thisCollection
     b += elem
-    b.result
+    b.result()
   }
 
   def padTo[B >: A, That](len: Int, elem: B)(implicit bf: CanBuildFrom[Repr, B, That]): That = {
@@ -533,14 +540,14 @@ trait SeqLike[+A, +Repr] extends Any with IterableLike[A, Repr] with GenSeqLike[
       b += elem
       diff -= 1
     }
-    b.result
+    b.result()
   }
 
   def corresponds[B](that: GenSeq[B])(p: (A,B) => Boolean): Boolean = {
     val i = this.iterator
     val j = that.iterator
     while (i.hasNext && j.hasNext)
-      if (!p(i.next, j.next))
+      if (!p(i.next(), j.next()))
         return false
 
     !i.hasNext && !j.hasNext
@@ -609,7 +616,7 @@ trait SeqLike[+A, +Repr] extends Any with IterableLike[A, Repr] with GenSeqLike[
     val b = newBuilder
     b.sizeHint(len)
     for (x <- arr) b += x
-    b.result
+    b.result()
   }
 
   /** Converts this $coll to a sequence.
@@ -675,7 +682,7 @@ object SeqLike {
         val wit = W.iterator.drop(n0)
         var i = if (forward) 0 else (n1-n0-1)
         while (i != done) {
-          Warr(i) = wit.next.asInstanceOf[AnyRef]
+          Warr(i) = wit.next().asInstanceOf[AnyRef]
           i += delta
         }
 
@@ -731,8 +738,8 @@ object SeqLike {
    */
   private def kmpSearch[B](S: Seq[B], m0: Int, m1: Int, W: Seq[B], n0: Int, n1: Int, forward: Boolean): Int = {
     // Check for redundant case when target has single valid element
-    @inline def clipR(x: Int, y: Int) = if (x<y) x else -1
-    @inline def clipL(x: Int, y: Int) = if (x>y) x else -1
+    def clipR(x: Int, y: Int) = if (x < y) x else -1
+    def clipL(x: Int, y: Int) = if (x > y) x else -1
 
     if (n1 == n0+1) {
       if (forward)
@@ -771,15 +778,15 @@ object SeqLike {
       case _ =>
         // We had better not index into S directly!
         val iter = S.iterator.drop(m0)
-        val Wopt = kmpOptimizeWord(W, n0, n1, true)
+        val Wopt = kmpOptimizeWord(W, n0, n1, forward = true)
         val T = kmpJumpTable(Wopt, n1-n0)
-        var cache = new Array[AnyRef](n1-n0)  // Ring buffer--need a quick way to do a look-behind
+        val cache = new Array[AnyRef](n1-n0)  // Ring buffer--need a quick way to do a look-behind
         var largest = 0
         var i, m = 0
         var answer = -1
         while (m+m0+n1-n0 <= m1) {
           while (i+m >= largest) {
-            cache(largest%(n1-n0)) = iter.next.asInstanceOf[AnyRef]
+            cache(largest%(n1-n0)) = iter.next().asInstanceOf[AnyRef]
             largest += 1
           }
           if (Wopt(i) == cache((i+m)%(n1-n0))) {
@@ -844,7 +851,7 @@ object SeqLike {
     else if (s1 - s0 < t1 - t0) -1            // Source is too short to find target
     else {
       // Nontrivial search
-      val ans = kmpSearch(source, s0, s1, target, t0, t1, true)
+      val ans = kmpSearch(source, s0, s1, target, t0, t1, forward = true)
       if (ans < 0) ans else ans - math.min(slen, sourceOffset)
     }
   }
@@ -852,7 +859,7 @@ object SeqLike {
   /** Finds a particular index at which one sequence occurs in another sequence.
    *  Like `indexOf`, but finds the latest occurrence rather than earliest.
    *
-   *  @see  [[scala.collection.SeqLike], method `indexOf`
+   *  @see  [[scala.collection.SeqLike]], method `indexOf`
    */
   def lastIndexOf[B](
     source: Seq[B], sourceOffset: Int, sourceCount: Int,
@@ -876,7 +883,7 @@ object SeqLike {
     else if (fixed_s1 - s0 < t1 - t0) -1      // Source is too short to find target
     else {
       // Nontrivial search
-      val ans = kmpSearch(source, s0, fixed_s1, target, t0, t1, false)
+      val ans = kmpSearch(source, s0, fixed_s1, target, t0, t1, forward = false)
       if (ans < 0) ans else ans - s0
     }
   }

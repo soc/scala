@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2002-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2002-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -35,7 +35,7 @@ trait Product extends Any with Equals {
   /** An iterator over all the elements of this product.
    *  @return     in the default implementation, an `Iterator[Any]`
    */
-  def productIterator: Iterator[Any] = new collection.AbstractIterator[Any] {
+  def productIterator: Iterator[Any] = new scala.collection.AbstractIterator[Any] {
     private var c: Int = 0
     private val cmax = productArity
     def hasNext = c < cmax

@@ -1,5 +1,5 @@
 /* NSC -- new Scala compiler
- * Copyright 2005-2011 LAMP/EPFL
+ * Copyright 2005-2013 LAMP/EPFL
  * @author  Martin Odersky
  */
 
@@ -7,7 +7,6 @@ package scala.tools.nsc
 
 import io.{ Directory, File, Path }
 import java.io.IOException
-import java.net.URL
 import scala.tools.nsc.reporters.{Reporter,ConsoleReporter}
 import util.Exceptional.unwrap
 
@@ -49,24 +48,11 @@ class ScriptRunner extends HasCompileSocket {
     case x  => x
   }
 
-  def isScript(settings: Settings) = settings.script.value != ""
-
   /** Choose a jar filename to hold the compiled version of a script. */
   private def jarFileFor(scriptFile: String)= File(
     if (scriptFile endsWith ".jar") scriptFile
     else scriptFile.stripSuffix(".scala") + ".jar"
   )
-
-  /** Read the entire contents of a file as a String. */
-  private def contentsOfFile(filename: String) = File(filename).slurp()
-
-  /** Split a fully qualified object name into a
-   *  package and an unqualified object name */
-  private def splitObjectName(fullname: String): (Option[String], String) =
-    (fullname lastIndexOf '.') match {
-      case -1   => (None, fullname)
-      case idx  => (Some(fullname take idx), fullname drop (idx + 1))
-    }
 
   /** Compile a script using the fsc compilation daemon.
    */
@@ -98,8 +84,8 @@ class ScriptRunner extends HasCompileSocket {
   {
     def mainClass = scriptMain(settings)
 
-    /** Compiles the script file, and returns the directory with the compiled
-     *  class files, if the compilation succeeded.
+    /* Compiles the script file, and returns the directory with the compiled
+     * class files, if the compilation succeeded.
      */
     def compile: Option[Directory] = {
       val compiledPath = Directory makeTemp "scalascript"
@@ -109,9 +95,9 @@ class ScriptRunner extends HasCompileSocket {
 
       settings.outdir.value = compiledPath.path
 
-      if (settings.nc.value) {
-        /** Setting settings.script.value informs the compiler this is not a
-         *  self contained compilation unit.
+      if (settings.nc) {
+        /* Setting settings.script.value informs the compiler this is not a
+         * self contained compilation unit.
          */
         settings.script.value = mainClass
         val reporter = new ConsoleReporter(settings)
@@ -124,11 +110,11 @@ class ScriptRunner extends HasCompileSocket {
       else None
     }
 
-    /** The script runner calls sys.exit to communicate a return value, but this must
-     *  not take place until there are no non-daemon threads running.  Tickets #1955, #2006.
+    /* The script runner calls sys.exit to communicate a return value, but this must
+     * not take place until there are no non-daemon threads running.  Tickets #1955, #2006.
      */
     util.waitingForThreads {
-      if (settings.save.value) {
+      if (settings.save) {
         val jarFile = jarFileFor(scriptFile)
         def jarOK   = jarFile.canRead && (jarFile isFresher File(scriptFile))
 
@@ -199,7 +185,7 @@ class ScriptRunner extends HasCompileSocket {
     scriptArgs: List[String]): Either[Throwable, Boolean] =
   {
     try Right(runScript(settings, scriptFile, scriptArgs))
-    catch { case e => Left(unwrap(e)) }
+    catch { case e: Throwable => Left(unwrap(e)) }
   }
 
   /** Run a command

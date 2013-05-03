@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2002-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2002-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -53,7 +53,7 @@ abstract class BasicTransformer extends Function1[Node,Node]
   def apply(n: Node): Node = {
     val seq = transform(n)
     if (seq.length > 1)
-      throw new UnsupportedOperationException("transform must return single node for root");
+      throw new UnsupportedOperationException("transform must return single node for root")
     else seq.head
   }
 }

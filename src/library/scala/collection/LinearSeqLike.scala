@@ -1,19 +1,15 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2003-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2003-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
 \*                                                                      */
 
-
 package scala.collection
 
-import generic._
-import mutable.ListBuffer
 import immutable.List
-import scala.util.control.Breaks._
-import annotation.tailrec
+import scala.annotation.tailrec
 
 /** A template trait for linear sequences of type `LinearSeq[A]`.
  *
@@ -50,7 +46,7 @@ trait LinearSeqLike[+A, +Repr <: LinearSeqLike[A, Repr]] extends SeqLike[A, Repr
 
   def seq: LinearSeq[A]
 
-  override def hashCode() = util.MurmurHash3.seqHash(seq) // TODO - can we get faster via "linearSeqHash" ?
+  override def hashCode()= scala.util.hashing.MurmurHash3.seqHash(seq) // TODO - can we get faster via "linearSeqHash" ?
 
   override /*IterableLike*/
   def iterator: Iterator[A] = new AbstractIterator[A] {
@@ -59,14 +55,14 @@ trait LinearSeqLike[+A, +Repr <: LinearSeqLike[A, Repr]] extends SeqLike[A, Repr
     def next(): A =
       if (hasNext) {
         val result = these.head; these = these.tail; result
-      } else Iterator.empty.next
+      } else Iterator.empty.next()
 
     /** Have to clear `these` so the iterator is exhausted like
      *  it would be without the optimization.
      */
     override def toList: List[A] = {
       val xs = these.toList
-      these = newBuilder.result
+      these = newBuilder.result()
       xs
     }
   }

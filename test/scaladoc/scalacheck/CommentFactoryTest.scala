@@ -3,12 +3,19 @@ import org.scalacheck.Prop._
 
 import scala.tools.nsc.Global
 import scala.tools.nsc.doc
+import scala.tools.nsc.doc.base.comment._
 import scala.tools.nsc.doc.model._
-import scala.tools.nsc.doc.model.comment._
+import scala.tools.nsc.doc.model.diagram._
 
 class Factory(val g: Global, val s: doc.Settings)
   extends doc.model.ModelFactory(g, s) {
-  thisFactory: Factory with ModelFactoryImplicitSupport with CommentFactory with doc.model.TreeFactory =>
+  thisFactory: Factory
+  with ModelFactoryImplicitSupport
+  with ModelFactoryTypeSupport
+  with DiagramFactory
+  with CommentFactory
+  with doc.model.TreeFactory
+  with MemberLookup =>
 
   def strip(c: Comment): Option[Inline] = {
     c.body match {
@@ -29,10 +36,16 @@ object Test extends Properties("CommentFactory") {
     val settings = new doc.Settings((str: String) => {})
     val reporter = new scala.tools.nsc.reporters.ConsoleReporter(settings)
     val g = new Global(settings, reporter)
-    (new Factory(g, settings) with ModelFactoryImplicitSupport with CommentFactory with doc.model.TreeFactory)
+    (new Factory(g, settings)
+      with ModelFactoryImplicitSupport
+      with ModelFactoryTypeSupport
+      with DiagramFactory
+      with CommentFactory
+      with doc.model.TreeFactory
+      with MemberLookup)
   }
 
-  def parse(src: String, dst: Inline) = {
+  def parse(src: String, dst: Inline): Boolean = {
     factory.parseComment(src) match {
         case Some(inline) =>
           inline == dst

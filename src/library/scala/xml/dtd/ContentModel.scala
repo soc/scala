@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2002-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2002-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -11,9 +11,8 @@
 package scala.xml
 package dtd
 
-import util.regexp.WordExp
-import util.automata._
-import Utility.sbToString
+import scala.xml.dtd.impl._
+import scala.xml.Utility.sbToString
 import PartialFunction._
 
 object ContentModel extends WordExp {

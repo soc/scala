@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2003-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2003-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |                                         **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -157,7 +157,7 @@ trait SynchronizedBuffer[A] extends Buffer[A] {
   /** Clears the buffer contents.
    */
   abstract override def clear(): Unit = synchronized {
-    super.clear
+    super.clear()
   }
 
   override def <<(cmd: Message[A]): Unit = synchronized {

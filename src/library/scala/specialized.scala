@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2003-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2003-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -24,9 +24,9 @@ import Specializable._
  *
  *  @since 2.8
  */
-// class tspecialized[T](group: Group[T]) extends annotation.StaticAnnotation {
+// class tspecialized[T](group: Group[T]) extends scala.annotation.StaticAnnotation {
 
-class specialized(group: SpecializedGroup) extends annotation.StaticAnnotation {
+class specialized(group: SpecializedGroup) extends scala.annotation.StaticAnnotation {
   def this(types: Specializable*) = this(new Group(types.toList))
-  def this() = this(Everything)
+  def this() = this(Primitives)
 }

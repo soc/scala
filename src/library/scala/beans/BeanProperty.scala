@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2002-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2002-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -23,4 +23,4 @@ package scala.beans
  *  use the `scala.beans.BooleanBeanProperty` annotation instead.
  */
 @scala.annotation.meta.field
-class BeanProperty extends annotation.StaticAnnotation
+class BeanProperty extends scala.annotation.StaticAnnotation

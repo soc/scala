@@ -2,29 +2,90 @@
 
 
 import scala.concurrent._
-import scala.concurrent.util.duration._
-import scala.concurrent.util.Duration.Inf
+import scala.concurrent.duration._
+import scala.concurrent.duration.Duration.Inf
 import scala.collection._
 import scala.runtime.NonLocalReturnControl
+import scala.util.{Try,Success,Failure}
 
 
 
 object FutureTests extends MinimalScalaTest {
-  
+
   /* some utils */
   
-  def testAsync(s: String): Future[String] = s match {
+  def testAsync(s: String)(implicit ec: ExecutionContext): Future[String] = s match {
     case "Hello"   => future { "World" }
-    case "Failure" => Promise.failed(new RuntimeException("Expected exception; to test fault-tolerance")).future
+    case "Failure" => Future.failed(new RuntimeException("Expected exception; to test fault-tolerance"))
     case "NoReply" => Promise[String]().future
   }
   
   val defaultTimeout = 5 seconds
   
   /* future specification */
-  
-  "A future" should {
-    
+
+  "A future with custom ExecutionContext" should {
+    "shouldHandleThrowables" in {
+      val ms = new mutable.HashSet[Throwable] with mutable.SynchronizedSet[Throwable]
+      implicit val ec = scala.concurrent.ExecutionContext.fromExecutor(new scala.concurrent.forkjoin.ForkJoinPool(), {
+        t =>
+        ms += t
+      })
+      
+      class ThrowableTest(m: String) extends Throwable(m)
+      
+      val f1 = future[Any] {
+        throw new ThrowableTest("test")
+      }
+      
+      intercept[ThrowableTest] {
+        Await.result(f1, defaultTimeout)
+      }
+      
+      val latch = new TestLatch
+      val f2 = future {
+        Await.ready(latch, 5 seconds)
+        "success"
+      }
+      val f3 = f2 map { s => s.toUpperCase }
+      
+      f2 foreach { _ => throw new ThrowableTest("dispatcher foreach") }
+      f2 onSuccess { case _ => throw new ThrowableTest("dispatcher receive") }
+      
+      latch.open()
+      
+      Await.result(f2, defaultTimeout) mustBe ("success")
+      
+      f2 foreach { _ => throw new ThrowableTest("current thread foreach") }
+      f2 onSuccess { case _ => throw new ThrowableTest("current thread receive") }
+      
+      Await.result(f3, defaultTimeout) mustBe ("SUCCESS")
+      
+      val waiting = future {
+        Thread.sleep(1000)
+      }
+      Await.ready(waiting, 2000 millis)
+      
+      ms.size mustBe (4)
+      //FIXME should check
+    }
+  }
+
+  "The default ExecutionContext" should {
+    "report uncaught exceptions" in {
+      val p = Promise[Throwable]()
+      val logThrowable: Throwable => Unit = p.trySuccess(_)
+      val ec: ExecutionContext = ExecutionContext.fromExecutor(null, logThrowable)
+
+      val t = new InterruptedException()
+      val f = Future(throw t)(ec)
+      Await.result(p.future, 2.seconds) mustBe t
+    }
+  }
+
+  "A future with global ExecutionContext" should {
+    import ExecutionContext.Implicits._
+
     "compose with for-comprehensions" in {
       def async(x: Int) = future { (x * 2).toString }
       val future0 = future[Any] {
@@ -122,20 +183,20 @@ object FutureTests extends MinimalScalaTest {
       val r = new IllegalStateException("recovered")
       
       intercept[IllegalStateException] {
-        val failed = Promise.failed[String](o).future recoverWith {
-          case _ if false == true => Promise.successful("yay!").future
+        val failed = Future.failed[String](o) recoverWith {
+          case _ if false == true => Future.successful("yay!")
         }
         Await.result(failed, defaultTimeout)
       } mustBe (o)
       
-      val recovered = Promise.failed[String](o).future recoverWith {
-        case _ => Promise.successful("yay!").future
+      val recovered = Future.failed[String](o) recoverWith {
+        case _ => Future.successful("yay!")
       }
       Await.result(recovered, defaultTimeout) mustBe ("yay!")
       
       intercept[IllegalStateException] {
-        val refailed = Promise.failed[String](o).future recoverWith {
-          case _ => Promise.failed[String](r).future
+        val refailed = Future.failed[String](o) recoverWith {
+          case _ => Future.failed[String](r)
         }
         Await.result(refailed, defaultTimeout)
       } mustBe (r)
@@ -149,7 +210,7 @@ object FutureTests extends MinimalScalaTest {
         } andThen {
           case _ => q.add(2)
         } andThen {
-          case Right(0) => q.add(Int.MaxValue)
+          case Success(0) => q.add(Int.MaxValue)
         } andThen {
           case _ => q.add(3);
         }
@@ -164,7 +225,7 @@ object FutureTests extends MinimalScalaTest {
     "firstCompletedOf" in {
       def futures = Vector.fill[Future[Int]](10) {
         Promise[Int]().future
-      } :+ Promise.successful[Int](5).future
+      } :+ Future.successful[Int](5)
       
       Await.result(Future.firstCompletedOf(futures), defaultTimeout) mustBe (5)
       Await.result(Future.firstCompletedOf(futures.iterator), defaultTimeout) mustBe (5)
@@ -186,21 +247,21 @@ object FutureTests extends MinimalScalaTest {
       val timeout = 10000 millis
       val f = new IllegalStateException("test")
       intercept[IllegalStateException] {
-        val failed = Promise.failed[String](f).future zip Promise.successful("foo").future
+        val failed = Future.failed[String](f) zip Future.successful("foo")
         Await.result(failed, timeout)
       } mustBe (f)
       
       intercept[IllegalStateException] {
-        val failed = Promise.successful("foo").future zip Promise.failed[String](f).future
+        val failed = Future.successful("foo") zip Future.failed[String](f)
         Await.result(failed, timeout)
       } mustBe (f)
       
       intercept[IllegalStateException] {
-        val failed = Promise.failed[String](f).future zip Promise.failed[String](f).future
+        val failed = Future.failed[String](f) zip Future.failed[String](f)
         Await.result(failed, timeout)
       } mustBe (f)
       
-      val successful = Promise.successful("foo").future zip Promise.successful("foo").future
+      val successful = Future.successful("foo") zip Future.successful("foo")
       Await.result(successful, timeout) mustBe (("foo", "foo"))
     }
     
@@ -212,13 +273,13 @@ object FutureTests extends MinimalScalaTest {
       }
       
       val futures = (0 to 9) map {
-        idx => async(idx, idx * 200)
+        idx => async(idx, idx * 20)
       }
       val folded = Future.fold(futures)(0)(_ + _)
       Await.result(folded, timeout) mustBe (45)
       
       val futuresit = (0 to 9) map {
-        idx => async(idx, idx * 200)
+        idx => async(idx, idx * 20)
       }
       val foldedit = Future.fold(futures)(0)(_ + _)
       Await.result(foldedit, timeout) mustBe (45)
@@ -231,7 +292,7 @@ object FutureTests extends MinimalScalaTest {
         add
       }
       def futures = (0 to 9) map { 
-        idx => async(idx, idx * 200)
+        idx => async(idx, idx * 20)
       }
       val folded = futures.foldLeft(Future(0)) {
         case (fr, fa) => for (r <- fr; a <- fa) yield (r + a)
@@ -247,7 +308,7 @@ object FutureTests extends MinimalScalaTest {
         add
       }
       def futures = (0 to 9) map {
-        idx => async(idx, idx * 100)
+        idx => async(idx, idx * 10)
       }
       val folded = Future.fold(futures)(0)(_ + _)
       intercept[IllegalArgumentException] {
@@ -278,7 +339,7 @@ object FutureTests extends MinimalScalaTest {
     
     "shouldReduceResults" in {
       def async(idx: Int) = future {
-        Thread.sleep(idx * 200)
+        Thread.sleep(idx * 20)
         idx
       }
       val timeout = 10000 millis
@@ -300,7 +361,7 @@ object FutureTests extends MinimalScalaTest {
       }
       val timeout = 10000 millis
       def futures = (1 to 10) map {
-        idx => async(idx, idx * 100)
+        idx => async(idx, idx * 10)
       }
       val failed = Future.reduce(futures)(_ + _)
       intercept[IllegalArgumentException] {
@@ -335,50 +396,6 @@ object FutureTests extends MinimalScalaTest {
       val iterator = (1 to 100).toList.iterator
       val traversedIterator = Future.traverse(iterator)(x => Future(x * 2 - 1))
       Await.result(traversedIterator, defaultTimeout).sum mustBe (10000)
-    }
-    
-    "shouldHandleThrowables" in {
-      val ms = new mutable.HashSet[Throwable] with mutable.SynchronizedSet[Throwable]
-      implicit val ec = scala.concurrent.ExecutionContext.fromExecutor(new scala.concurrent.forkjoin.ForkJoinPool(), {
-        t =>
-        ms += t
-      })
-      
-      class ThrowableTest(m: String) extends Throwable(m)
-      
-      val f1 = future[Any] {
-        throw new ThrowableTest("test")
-      }
-      
-      intercept[ThrowableTest] {
-        Await.result(f1, defaultTimeout)
-      }
-      
-      val latch = new TestLatch
-      val f2 = future {
-        Await.ready(latch, 5 seconds)
-        "success"
-      }
-      val f3 = f2 map { s => s.toUpperCase }
-      
-      f2 foreach { _ => throw new ThrowableTest("dispatcher foreach") }
-      f2 onSuccess { case _ => throw new ThrowableTest("dispatcher receive") }
-      
-      latch.open()
-      
-      Await.result(f2, defaultTimeout) mustBe ("success")
-      
-      f2 foreach { _ => throw new ThrowableTest("current thread foreach") }
-      f2 onSuccess { case _ => throw new ThrowableTest("current thread receive") }
-      
-      Await.result(f3, defaultTimeout) mustBe ("SUCCESS")
-      
-      val waiting = future {
-        Thread.sleep(1000)
-      }
-      Await.ready(waiting, 2000 millis)
-      
-      ms.size mustBe (4)
     }
     
     "shouldBlockUntilResult" in {
@@ -468,7 +485,7 @@ object FutureTests extends MinimalScalaTest {
       p1.future.isCompleted mustBe (false)
       f4.isCompleted mustBe (false)
       
-      p1 complete Right("Hello")
+      p1 complete Success("Hello")
       
       Await.ready(latch(7), TestLatch.DefaultTimeout)
       
@@ -502,6 +519,12 @@ object FutureTests extends MinimalScalaTest {
         }
       }
       Await.ready(complex, defaultTimeout).isCompleted mustBe (true)
+    }
+
+    "should not throw when Await.ready" in {
+      val expected = try Success(5 / 0) catch { case a: ArithmeticException => Failure(a) }
+      val f = future(5).map(_ / 0)
+      Await.ready(f, defaultTimeout).value.get.toString mustBe expected.toString
     }
     
   }

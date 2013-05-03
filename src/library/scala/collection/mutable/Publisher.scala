@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2003-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2003-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -45,7 +45,7 @@ trait Publisher[Evt] {
   def suspendSubscription(sub: Sub) { suspended += sub }
   def activateSubscription(sub: Sub) { suspended -= sub }
   def removeSubscription(sub: Sub) { filters -= sub }
-  def removeSubscriptions() { filters.clear }
+  def removeSubscriptions() { filters.clear() }
 
   protected def publish(event: Evt) {
     filters.keys.foreach(sub =>

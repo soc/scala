@@ -4,32 +4,32 @@ package phases
 trait Calculate {
   self: Reifier =>
 
-  import mirror._
-  import definitions._
-  import treeInfo._
+  import global._
 
-  implicit class RichSymbol(sym: Symbol) {
-    def metalevel: Int = { assert(sym != NoSymbol); localSymbols.getOrElse(sym, 0) }
-    def isLocalToReifee = (localSymbols contains sym) // [Eugene] how do I account for local skolems?
+  implicit class RichCalculateSymbol(sym: Symbol) {
+    def metalevel: Int = { assert(sym != null && sym != NoSymbol); localSymbols.getOrElse(sym, 0) }
+    def isLocalToReifee = (localSymbols contains sym) // todo. how do I account for local skolems?
   }
 
-  implicit class RichType(tpe: Type) {
+  implicit class RichCalculateType(tpe: Type) {
     def isLocalToReifee = tpe != null && (tpe exists (tp => (localSymbols contains tp.typeSymbol) || (localSymbols contains tp.termSymbol)))
   }
 
-  private var localSymbols = collection.mutable.Map[Symbol, Int]() // set of all symbols that are local to the tree to be reified
+  private def localSymbols: Map[Symbol, Int] = state.localSymbols // set of all symbols that are local to the tree to be reified
+  private def localSymbols_=(value: Map[Symbol, Int]): Unit = state.localSymbols = value
   private def registerLocalSymbol(sym: Symbol, metalevel: Int): Unit =
     if (sym != null && sym != NoSymbol) {
       if (localSymbols contains sym)
         assert(localSymbols(sym) == metalevel, "metalevel mismatch: expected %s, actual %s".format(localSymbols(sym), metalevel))
-      localSymbols(sym) = metalevel
+      else
+        localSymbols += (sym -> metalevel)
     }
 
   /**
    *  Merely traverses the reifiee and records local symbols along with their metalevels.
    */
   val calculate = new Traverser {
-    // see the explanation of metalevels in ``Metalevels''
+    // see the explanation of metalevels in `Metalevels`
     var currMetalevel = 1
 
     override def traverse(tree: Tree): Unit = tree match {
@@ -38,7 +38,7 @@ trait Calculate {
         try super.traverse(tree)
         finally currMetalevel += 1
       case tree if tree.isDef =>
-        if (reifyDebug) println("boundSym: %s of type %s".format(tree.symbol, (tree.productIterator.toList collect { case tt: TypeTree => tt } headOption).getOrElse(TypeTree(tree.tpe))))
+        if (reifyDebug) println("boundSym: %s of type %s".format(tree.symbol, (tree.productIterator.toList collect { case tt: TypeTree => tt }).headOption.getOrElse(TypeTree(tree.tpe))))
         registerLocalSymbol(tree.symbol, currMetalevel)
 
         bindRelatedSymbol(tree.symbol.sourceModule, "sourceModule")

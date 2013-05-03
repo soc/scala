@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2010-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2010-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -8,7 +8,7 @@
 
 package scala
 
-import annotation.meta._
+import scala.annotation.meta._
 
 /**
  * An annotation that designates the name of the parameter to which it is
@@ -29,4 +29,4 @@ import annotation.meta._
  * @since 2.8.1
  */
 @param
-class deprecatedName(name: Symbol) extends annotation.StaticAnnotation
+class deprecatedName(name: Symbol) extends scala.annotation.StaticAnnotation

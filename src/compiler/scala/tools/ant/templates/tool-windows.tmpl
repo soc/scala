@@ -1,7 +1,7 @@
 @@echo off
 
 rem ##########################################################################
-rem # Copyright 2002-2011, LAMP/EPFL
+rem # Copyright 2002-2013 LAMP/EPFL
 rem #
 rem # This is free software; see the distribution for copying conditions.
 rem # There is NO warranty; not even for MERCHANTABILITY or FITNESS FOR A
@@ -14,8 +14,9 @@ set _LINE_TOOLCP=
 
 :another_param
 
-if "%1%"=="-toolcp" (
-    set _LINE_TOOLCP=%2%
+rem Use "%~1" to handle spaces in paths. See http://ss64.com/nt/syntax-args.html
+if "%~1"=="-toolcp" (
+    set _LINE_TOOLCP=%~2
 	shift
 	shift
 	goto another_param

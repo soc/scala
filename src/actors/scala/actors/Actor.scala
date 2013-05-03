@@ -1,8 +1,6 @@
-
-
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2005-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2005-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -12,6 +10,7 @@ package scala.actors
 
 import scala.util.control.ControlThrowable
 import java.util.{Timer, TimerTask}
+import scala.language.implicitConversions
 
 /**
  * Provides functions for the definition of actors, as well as actor
@@ -19,6 +18,7 @@ import java.util.{Timer, TimerTask}
  *
  * @author Philipp Haller
  */
+@deprecated("Use the akka.actor package instead. For migration from the scala.actors package refer to the Actors Migration Guide.", "2.11.0")
 object Actor extends Combinators {
 
   /** State of an actor.
@@ -399,6 +399,7 @@ object Actor extends Combinators {
  *  @define channel actor's mailbox
  */
 @SerialVersionUID(-781154067877019505L)
+@deprecated("Use the akka.actor package instead. For migration from the scala.actors package refer to the Actors Migration Guide.", "2.11.0")
 trait Actor extends InternalActor with ReplyReactor {
 
   override def start(): Actor = synchronized {

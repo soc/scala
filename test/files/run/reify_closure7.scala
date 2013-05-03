@@ -1,4 +1,7 @@
-import scala.reflect.mirror._
+import scala.reflect.runtime.universe._
+import scala.reflect.runtime.{universe => ru}
+import scala.reflect.runtime.{currentMirror => cm}
+import scala.tools.reflect.ToolBox
 
 object Test extends App {
   var q = 0
@@ -15,8 +18,8 @@ object Test extends App {
     }}
 
     if (clo == null) {
-      val toolbox = mkToolBox()
-      val dyn = toolbox.runExpr(fun.tree)
+      val toolbox = cm.mkToolBox()
+      val dyn = toolbox.eval(fun.tree)
       clo = dyn.asInstanceOf[Int => Int]
     }
 

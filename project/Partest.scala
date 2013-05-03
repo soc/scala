@@ -33,11 +33,10 @@ object partest {
   // What's fun here is that we want "*.scala" files *and* directories in the base directory...
   def partestResources(base: File, testType: String): PathFinder = testType match {
     case "res"          => base ** "*.res"
-    case "buildmanager" => base * "*"
     // TODO - Only allow directories that have "*.scala" children...
     case _              => base * "*" filter { f => !f.getName.endsWith(".obj") && (f.isDirectory || f.getName.endsWith(".scala")) }
   }
-  lazy val partestTestTypes = Seq("run", "jvm", "pos", "neg", "buildmanager", "res", "shootout", "scalap", "specialized", "presentation", "scalacheck")
+  lazy val partestTestTypes = Seq("run", "jvm", "pos", "neg", "res", "shootout", "scalap", "specialized", "presentation", "scalacheck")
 
   // TODO - Figure out how to specify only a subset of resources...
   def partestTestsTask(testDirs: ScopedSetting[Map[String,File]]): Project.Initialize[Task[Map[String, Seq[File]]]] =
@@ -58,8 +57,8 @@ object partest {
     val results = runner run Array(testArgs ++ extraArgs ++ extras: _*) asScala
     // TODO - save results
     val failures = results collect {
-      case (path, 1) => path + " [FAILED]"
-      case (path, 2) => path + " [TIMEOUT]"
+      case (path, "FAIL") => path + " [FAILED]"
+      case (path, "TIMEOUT") => path + " [TIMEOUT]"
     }
 
     if (failures.isEmpty)
@@ -115,7 +114,7 @@ object partest {
     }
   }
 
-  def partestRunnerTask(classpath: ScopedTask[Classpath], javacOptions: SettingKey[Seq[String]]): Project.Initialize[Task[PartestRunner]] =
+  def partestRunnerTask(classpath: ScopedTask[Classpath], javacOptions: TaskKey[Seq[String]]): Project.Initialize[Task[PartestRunner]] =
    (classpath, javacOptions) map ((cp, opts) => new PartestRunner(Build.data(cp), opts mkString " "))
 }
 
@@ -128,11 +127,11 @@ class PartestRunner(classpath: Seq[File], javaOpts: String) {
     (c,m)
   }
   lazy val classPathArgs = Seq("-cp", classpath.map(_.getAbsoluteFile).mkString(java.io.File.pathSeparator))
-  def run(args: Array[String]): java.util.Map[String,Int] = try {
+  def run(args: Array[String]): java.util.Map[String,String] = try {
     // TODO - undo this settings after running.  Also globals are bad.
     System.setProperty("partest.java_opts", javaOpts)
     val allArgs = (classPathArgs ++ args).toArray
-    mainMethod.invoke(null, allArgs).asInstanceOf[java.util.Map[String,Int]]
+    mainMethod.invoke(null, allArgs).asInstanceOf[java.util.Map[String,String]]
   } catch {
     case e =>
     //error("Could not run Partest: " + e)

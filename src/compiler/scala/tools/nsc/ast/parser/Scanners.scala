@@ -1,16 +1,19 @@
 /* NSC -- new Scala compiler
- * Copyright 2005-2011 LAMP/EPFL
+ * Copyright 2005-2013 LAMP/EPFL
  * @author  Martin Odersky
  */
 package scala.tools.nsc
 package ast.parser
 
-import scala.tools.nsc.util._
+import scala.tools.nsc.util.CharArrayReader
+import scala.reflect.internal.util._
 import scala.reflect.internal.Chars._
 import Tokens._
-import scala.annotation.switch
-import scala.collection.mutable.{ ListBuffer, ArrayBuffer }
+import scala.annotation.{ switch, tailrec }
+import scala.collection.{ mutable, immutable }
+import mutable.{ ListBuffer, ArrayBuffer }
 import scala.xml.Utility.{ isNameStart }
+import scala.language.postfixOps
 
 /** See Parsers.scala / ParsersCommon for some explanation of ScannersCommon.
  */
@@ -25,7 +28,6 @@ trait ScannersCommon {
 
   trait ScannerCommon extends CommonTokenData {
     // things to fill in, in addition to buf, decodeUni which come from CharArrayReader
-    def warning(off: Int, msg: String): Unit
     def error  (off: Int, msg: String): Unit
     def incompleteInputError(off: Int, msg: String): Unit
     def deprecationWarning(off: Int, msg: String): Unit
@@ -48,9 +50,6 @@ trait Scanners extends ScannersCommon {
 
   /** Offset into source character array */
   type Offset = Int
-
-  /** An undefined offset */
-  val NoOffset: Offset = -1
 
   trait TokenData extends CommonTokenData {
 
@@ -85,9 +84,70 @@ trait Scanners extends ScannersCommon {
   abstract class Scanner extends CharArrayReader with TokenData with ScannerCommon {
     private def isDigit(c: Char) = java.lang.Character isDigit c
 
-    def isAtEnd = charOffset >= buf.length
+    private var openComments = 0
+    protected def putCommentChar(): Unit = nextChar()
 
-    def flush = { charOffset = offset; nextChar(); this }
+    @tailrec private def skipLineComment(): Unit = ch match {
+      case SU | CR | LF =>
+      case _            => nextChar() ; skipLineComment()
+    }
+    private def maybeOpen() {
+      putCommentChar()
+      if (ch == '*') {
+        putCommentChar()
+        openComments += 1
+      }
+    }
+    private def maybeClose(): Boolean = {
+      putCommentChar()
+      (ch == '/') && {
+        putCommentChar()
+        openComments -= 1
+        openComments == 0
+      }
+    }
+    @tailrec final def skipNestedComments(): Unit = ch match {
+      case '/' => maybeOpen() ; skipNestedComments()
+      case '*' => if (!maybeClose()) skipNestedComments()
+      case SU  => incompleteInputError("unclosed comment")
+      case _   => putCommentChar() ; skipNestedComments()
+    }
+    def skipDocComment(): Unit = skipNestedComments()
+    def skipBlockComment(): Unit = skipNestedComments()
+
+    private def skipToCommentEnd(isLineComment: Boolean) {
+      nextChar()
+      if (isLineComment) skipLineComment()
+      else {
+        openComments = 1
+        val isDocComment = (ch == '*') && { nextChar(); true }
+        if (isDocComment) {
+          // Check for the amazing corner case of /**/
+          if (ch == '/')
+            nextChar()
+          else
+            skipDocComment()
+        }
+        else skipBlockComment()
+      }
+    }
+
+    /** @pre ch == '/'
+     *  Returns true if a comment was skipped.
+     */
+    def skipComment(): Boolean = ch match {
+      case '/' | '*' => skipToCommentEnd(isLineComment = ch == '/') ; true
+      case _         => false
+    }
+    def flushDoc(): DocComment = null
+
+    /** To prevent doc comments attached to expressions from leaking out of scope
+     *  onto the next documentable entity, they are discarded upon passing a right
+     *  brace, bracket, or parenthesis.
+     */
+    def discardDocBuffer(): Unit = ()
+
+    def isAtEnd = charOffset >= buf.length
 
     def resume(lastCode: Int) = {
       token = lastCode
@@ -96,10 +156,6 @@ trait Scanners extends ScannersCommon {
 
       nextToken()
     }
-
-    /** the last error offset
-     */
-    var errOffset: Offset = NoOffset
 
     /** A character buffer for literals
      */
@@ -112,6 +168,11 @@ trait Scanners extends ScannersCommon {
       cbuf.append(c)
     }
 
+    /** Determines whether this scanner should emit identifier deprecation warnings,
+     *  e.g. when seeing `macro` or `then`, which are planned to become keywords in future versions of Scala.
+     */
+    protected def emitIdentifierDeprecationWarnings = true
+
     /** Clear buffer and set name and token */
     private def finishNamed(idtoken: Int = IDENTIFIER) {
       name = newTermName(cbuf.toString)
@@ -121,7 +182,7 @@ trait Scanners extends ScannersCommon {
         val idx = name.start - kwOffset
         if (idx >= 0 && idx < kwArray.length) {
           token = kwArray(idx)
-          if (token == IDENTIFIER && allowIdent != name)
+          if (token == IDENTIFIER && allowIdent != name && emitIdentifierDeprecationWarnings)
             deprecationWarning(name+" is now a reserved word; usage as an identifier is deprecated")
         }
       }
@@ -132,30 +193,6 @@ trait Scanners extends ScannersCommon {
       strVal = cbuf.toString
       cbuf.clear()
     }
-
-    /** Should doc comments be built? */
-    def buildDocs: Boolean = forScaladoc
-
-    /** buffer for the documentation comment
-     */
-    var docBuffer: StringBuilder = null
-    var docPos: Position = null
-
-    /** Return current docBuffer and set docBuffer to null */
-    def flushDoc: DocComment = {
-      val ret = if (docBuffer != null) DocComment(docBuffer.toString, docPos) else null
-      docBuffer = null
-      ret
-    }
-
-    /** add the given character to the documentation buffer
-     */
-    protected def putDocChar(c: Char) {
-      if (docBuffer ne null) docBuffer.append(c)
-    }
-
-    protected def foundComment(value: String, start: Int, end: Int) = ()
-    protected def foundDocComment(value: String, start: Int, end: Int) = ()
 
     private class TokenData0 extends TokenData
 
@@ -181,13 +218,13 @@ trait Scanners extends ScannersCommon {
 
     /** Are we directly in a string interpolation expression?
      */
-    @inline private def inStringInterpolation =
+    private def inStringInterpolation =
       sepRegions.nonEmpty && sepRegions.head == STRINGLIT
 
     /** Are we directly in a multiline string interpolation expression?
-     *  @pre: inStringInterpolation
+     *  @pre inStringInterpolation
      */
-    @inline private def inMultiLineInterpolation =
+    private def inMultiLineInterpolation =
       inStringInterpolation && sepRegions.tail.nonEmpty && sepRegions.tail.head == STRINGPART
 
     /** read next token and return last offset
@@ -229,12 +266,15 @@ trait Scanners extends ScannersCommon {
         case RBRACE =>
           while (!sepRegions.isEmpty && sepRegions.head != RBRACE)
             sepRegions = sepRegions.tail
-          if (!sepRegions.isEmpty) sepRegions = sepRegions.tail
-          docBuffer = null
+          if (!sepRegions.isEmpty)
+            sepRegions = sepRegions.tail
+
+          discardDocBuffer()
         case RBRACKET | RPAREN =>
           if (!sepRegions.isEmpty && sepRegions.head == lastToken)
             sepRegions = sepRegions.tail
-          docBuffer = null
+
+          discardDocBuffer()
         case ARROW =>
           if (!sepRegions.isEmpty && sepRegions.head == lastToken)
             sepRegions = sepRegions.tail
@@ -264,11 +304,11 @@ trait Scanners extends ScannersCommon {
         next.token = EMPTY
       }
 
-      /** Insert NEWLINE or NEWLINES if
-       *  - we are after a newline
-       *  - we are within a { ... } or on toplevel (wrt sepRegions)
-       *  - the current token can start a statement and the one before can end it
-       *  insert NEWLINES if we are past a blank line, NEWLINE otherwise
+      /* Insert NEWLINE or NEWLINES if
+       * - we are after a newline
+       * - we are within a { ... } or on toplevel (wrt sepRegions)
+       * - the current token can start a statement and the one before can end it
+       * insert NEWLINES if we are past a blank line, NEWLINE otherwise
        */
       if (!applyBracePatch() && afterLineEnd() && inLastOfStat(lastToken) && inFirstOfStat(token) &&
           (sepRegions.isEmpty || sepRegions.head == RBRACE)) {
@@ -282,10 +322,16 @@ trait Scanners extends ScannersCommon {
         prev copyFrom this
         val nextLastOffset = charOffset - 1
         fetchToken()
+        def resetOffset() {
+          offset = prev.offset
+          lastOffset = prev.lastOffset
+        }
         if (token == CLASS) {
           token = CASECLASS
+          resetOffset()
         } else if (token == OBJECT) {
           token = CASEOBJECT
+          resetOffset()
         } else {
           lastOffset = nextLastOffset
           next copyFrom this
@@ -359,16 +405,19 @@ trait Scanners extends ScannersCommon {
           if (ch == '"' && token == IDENTIFIER)
             token = INTERPOLATIONID
         case '<' => // is XMLSTART?
-          val last = if (charOffset >= 2) buf(charOffset - 2) else ' '
-          nextChar()
-          last match {
-            case ' '|'\t'|'\n'|'{'|'('|'>' if isNameStart(ch) || ch == '!' || ch == '?' =>
-              token = XMLSTART
-            case _ =>
-              // Console.println("found '<', but last is '"+in.last+"'"); // DEBUG
-              putChar('<')
-              getOperatorRest()
+          def fetchLT() = {
+            val last = if (charOffset >= 2) buf(charOffset - 2) else ' '
+            nextChar()
+            last match {
+              case ' ' | '\t' | '\n' | '{' | '(' | '>' if isNameStart(ch) || ch == '!' || ch == '?' =>
+                token = XMLSTART
+              case _ =>
+                // Console.println("found '<', but last is '"+in.last+"'"); // DEBUG
+                putChar('<')
+                getOperatorRest()
+            }
           }
+          fetchLT()
         case '~' | '!' | '@' | '#' | '%' |
              '^' | '*' | '+' | '-' | /*'<' | */
              '>' | '?' | ':' | '=' | '&' |
@@ -385,78 +434,87 @@ trait Scanners extends ScannersCommon {
             getOperatorRest()
           }
         case '0' =>
-          putChar(ch)
-          nextChar()
-          if (ch == 'x' || ch == 'X') {
+          def fetchZero() = {
+            putChar(ch)
             nextChar()
-            base = 16
-          }
-          else {
-            /** What should leading 0 be in the future? It is potentially dangerous
-             *  to let it be base-10 because of history.  Should it be an error? Is
-             *  there a realistic situation where one would need it?
-             */
-            if (isDigit(ch)) {
-              if (opt.future) syntaxError("Non-zero numbers may not have a leading zero.")
-              else deprecationWarning("Treating numbers with a leading zero as octal is deprecated.")
+            if (ch == 'x' || ch == 'X') {
+              nextChar()
+              base = 16
+            } else {
+              /*
+               * What should leading 0 be in the future? It is potentially dangerous
+               *  to let it be base-10 because of history.  Should it be an error? Is
+               *  there a realistic situation where one would need it?
+               */
+              if (isDigit(ch)) {
+                if (settings.future) syntaxError("Non-zero numbers may not have a leading zero.")
+                else deprecationWarning("Treating numbers with a leading zero as octal is deprecated.")
+              }
+              base = 8
             }
-            base = 8
+            getNumber()
           }
-          getNumber()
+          fetchZero()
         case '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' =>
           base = 10
           getNumber()
         case '`' =>
           getBackquotedIdent()
         case '\"' =>
-          if (token == INTERPOLATIONID) {
-            nextRawChar()
-            if (ch == '\"') {
+          def fetchDoubleQuote() = {
+            if (token == INTERPOLATIONID) {
               nextRawChar()
               if (ch == '\"') {
                 nextRawChar()
-                getStringPart(multiLine = true)
-                sepRegions = STRINGPART :: sepRegions // indicate string part
-                sepRegions = STRINGLIT :: sepRegions // once more to indicate multi line string part
+                if (ch == '\"') {
+                  nextRawChar()
+                  getStringPart(multiLine = true)
+                  sepRegions = STRINGPART :: sepRegions // indicate string part
+                  sepRegions = STRINGLIT :: sepRegions // once more to indicate multi line string part
+                } else {
+                  token = STRINGLIT
+                  strVal = ""
+                }
               } else {
-                token = STRINGLIT
-                strVal = ""
+                getStringPart(multiLine = false)
+                sepRegions = STRINGLIT :: sepRegions // indicate single line string part
               }
             } else {
-              getStringPart(multiLine = false)
-              sepRegions = STRINGLIT :: sepRegions // indicate single line string part
-            }
-          } else {
-            nextChar()
-            if (ch == '\"') {
               nextChar()
               if (ch == '\"') {
-                nextRawChar()
-                getRawStringLit()
+                nextChar()
+                if (ch == '\"') {
+                  nextRawChar()
+                  getRawStringLit()
+                } else {
+                  token = STRINGLIT
+                  strVal = ""
+                }
               } else {
-                token = STRINGLIT
-                strVal = ""
+                getStringLit()
               }
-            } else {
-              getStringLit()
             }
           }
+          fetchDoubleQuote()
         case '\'' =>
-          nextChar()
-          if (isIdentifierStart(ch))
-            charLitOr(getIdentRest)
-          else if (isOperatorPart(ch) && (ch != '\\'))
-            charLitOr(getOperatorRest)
-          else {
-            getLitChar()
-            if (ch == '\'') {
-              nextChar()
-              token = CHARLIT
-              setStrVal()
-            } else {
-              syntaxError("unclosed character literal")
+          def fetchSingleQuote() = {
+            nextChar()
+            if (isIdentifierStart(ch))
+              charLitOr(getIdentRest)
+            else if (isOperatorPart(ch) && (ch != '\\'))
+              charLitOr(getOperatorRest)
+            else {
+              getLitChar()
+              if (ch == '\'') {
+                nextChar()
+                token = CHARLIT
+                setStrVal()
+              } else {
+                syntaxError("unclosed character literal")
+              }
             }
           }
+          fetchSingleQuote()
         case '.' =>
           nextChar()
           if ('0' <= ch && ch <= '9') {
@@ -487,79 +545,25 @@ trait Scanners extends ScannersCommon {
             nextChar()
           }
         case _ =>
-          if (ch == '\u21D2') {
-            nextChar(); token = ARROW
-          } else if (ch == '\u2190') {
-            nextChar(); token = LARROW
-          } else if (Character.isUnicodeIdentifierStart(ch)) {
-            putChar(ch)
-            nextChar()
-            getIdentRest()
-          } else if (isSpecial(ch)) {
-            putChar(ch)
-            nextChar()
-            getOperatorRest()
-          } else {
-            syntaxError("illegal character '" + ("" + '\\' + 'u' + "%04x".format(ch: Int)) + "'")
-            nextChar()
+          def fetchOther() = {
+            if (ch == '\u21D2') {
+              nextChar(); token = ARROW
+            } else if (ch == '\u2190') {
+              nextChar(); token = LARROW
+            } else if (Character.isUnicodeIdentifierStart(ch)) {
+              putChar(ch)
+              nextChar()
+              getIdentRest()
+            } else if (isSpecial(ch)) {
+              putChar(ch)
+              nextChar()
+              getOperatorRest()
+            } else {
+              syntaxError("illegal character '" + ("" + '\\' + 'u' + "%04x".format(ch: Int)) + "'")
+              nextChar()
+            }
           }
-      }
-    }
-
-    private def skipComment(): Boolean = {
-
-      if (ch == '/' || ch == '*') {
-
-        val comment = new StringBuilder("/")
-        def appendToComment() = comment.append(ch)
-
-        if (ch == '/') {
-          do {
-        	appendToComment()
-            nextChar()
-          } while ((ch != CR) && (ch != LF) && (ch != SU))
-        } else {
-          docBuffer = null
-          var openComments = 1
-          appendToComment()
-          nextChar()
-          appendToComment()
-          var buildingDocComment = false
-          if (ch == '*' && buildDocs) {
-            buildingDocComment = true
-            docBuffer = new StringBuilder("/**")
-          }
-          while (openComments > 0) {
-            do {
-              do {
-                if (ch == '/') {
-                  nextChar(); putDocChar(ch); appendToComment()
-                  if (ch == '*') {
-                    nextChar(); putDocChar(ch); appendToComment()
-                    openComments += 1
-                  }
-                }
-                if (ch != '*' && ch != SU) {
-                  nextChar(); putDocChar(ch); appendToComment()
-                }
-              } while (ch != '*' && ch != SU)
-              while (ch == '*') {
-                nextChar(); putDocChar(ch); appendToComment()
-              }
-            } while (ch != '/' && ch != SU)
-            if (ch == '/') nextChar()
-            else incompleteInputError("unclosed comment")
-            openComments -= 1
-          }
-
-          if (buildingDocComment)
-            foundDocComment(comment.toString, offset, charOffset - 2)
-        }
-
-        foundComment(comment.toString, offset, charOffset - 2)
-        true
-      } else {
-        false
+          fetchOther()
       }
     }
 
@@ -591,7 +595,10 @@ trait Scanners extends ScannersCommon {
       if (ch == '`') {
         nextChar()
         finishNamed(BACKQUOTED_IDENT)
-        if (name.length == 0) syntaxError("empty quoted identifier")
+        if (name.length == 0)
+          syntaxError("empty quoted identifier")
+        else if (name == nme.WILDCARD)
+          syntaxError("wildcard invalid as backquoted identifier")
       }
       else syntaxError("unclosed quoted identifier")
     }
@@ -728,14 +735,22 @@ trait Scanners extends ScannersCommon {
           next.token = IDENTIFIER
           next.name = newTermName(cbuf.toString)
           cbuf.clear()
+          val idx = next.name.start - kwOffset
+          if (idx >= 0 && idx < kwArray.length) {
+            next.token = kwArray(idx)
+          }
         } else {
-          syntaxError("invalid string interpolation")
+          syntaxError("invalid string interpolation: `$$', `$'ident or `$'BlockExpr expected")
         }
       } else {
         val isUnclosedLiteral = !isUnicodeEscape && (ch == SU || (!multiLine && (ch == CR || ch == LF)))
         if (isUnclosedLiteral) {
-          syntaxError(if (!multiLine) "unclosed string literal" else "unclosed multi-line string literal")
-        } else {
+          if (multiLine)
+            incompleteInputError("unclosed multi-line string literal")
+          else
+            syntaxError("unclosed string literal")
+        }
+        else {
           putChar(ch)
           nextRawChar()
           getStringPart(multiLine)
@@ -895,7 +910,7 @@ trait Scanners extends ScannersCommon {
       }
     }
 
-    def intVal: Long = intVal(false)
+    def intVal: Long = intVal(negated = false)
 
     /** Convert current strVal, base to double value
     */
@@ -927,7 +942,7 @@ trait Scanners extends ScannersCommon {
       }
     }
 
-    def floatVal: Double = floatVal(false)
+    def floatVal: Double = floatVal(negated = false)
 
     def checkNoLetter() {
       if (isIdentifierPart(ch) && ch >= ' ')
@@ -945,7 +960,7 @@ trait Scanners extends ScannersCommon {
       }
       token = INTLIT
 
-      /** When we know for certain it's a number after using a touch of lookahead */
+      /* When we know for certain it's a number after using a touch of lookahead */
       def restOfNumber() = {
         putChar(ch)
         nextChar()
@@ -973,10 +988,10 @@ trait Scanners extends ScannersCommon {
         val lookahead = lookaheadReader
         val c = lookahead.getc()
 
-        /** As of scala 2.11, it isn't a number unless c here is a digit, so
-         *  opt.future excludes the rest of the logic.
+        /* As of scala 2.11, it isn't a number unless c here is a digit, so
+         * settings.future.value excludes the rest of the logic.
          */
-        if (opt.future && !isDigit(c))
+        if (settings.future && !isDigit(c))
           return setStrVal()
 
         val isDefinitelyNumber = (c: @switch) match {
@@ -984,16 +999,16 @@ trait Scanners extends ScannersCommon {
           case '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9'  =>
             true
 
-          /** Backquoted idents like 22.`foo`. */
+          /* Backquoted idents like 22.`foo`. */
           case '`' =>
             return setStrVal()  /** Note the early return */
 
-          /** These letters may be part of a literal, or a method invocation on an Int.
+          /* These letters may be part of a literal, or a method invocation on an Int.
            */
           case 'd' | 'D' | 'f' | 'F' =>
             !isIdentifierPart(lookahead.getc())
 
-          /** A little more special handling for e.g. 5e7 */
+          /* A little more special handling for e.g. 5e7 */
           case 'e' | 'E' =>
             val ch = lookahead.getc()
             !isIdentifierPart(ch) || (isDigit(ch) || ch == '+' || ch == '-')
@@ -1030,7 +1045,6 @@ trait Scanners extends ScannersCommon {
     def syntaxError(off: Offset, msg: String) {
       error(off, msg)
       token = ERROR
-      errOffset = off
     }
 
     /** generate an error at the current token offset
@@ -1043,7 +1057,6 @@ trait Scanners extends ScannersCommon {
     def incompleteInputError(msg: String) {
       incompleteInputError(offset, msg)
       token = EOF
-      errOffset = offset
     }
 
     override def toString() = token match {
@@ -1205,10 +1218,9 @@ trait Scanners extends ScannersCommon {
    */
   class SourceFileScanner(val source: SourceFile) extends Scanner {
     val buf = source.content
-    override val decodeUni: Boolean = !settings.nouescape.value
+    override val decodeUni: Boolean = !settings.nouescape
 
     // suppress warnings, throw exception on errors
-    def warning(off: Offset, msg: String): Unit = ()
     def deprecationWarning(off: Offset, msg: String): Unit = ()
     def error  (off: Offset, msg: String): Unit = throw new MalformedInput(off, msg)
     def incompleteInputError(off: Offset, msg: String): Unit = throw new MalformedInput(off, msg)
@@ -1216,10 +1228,9 @@ trait Scanners extends ScannersCommon {
 
   /** A scanner over a given compilation unit
    */
-  class UnitScanner(unit: CompilationUnit, patches: List[BracePatch]) extends SourceFileScanner(unit.source) {
+  class UnitScanner(val unit: CompilationUnit, patches: List[BracePatch]) extends SourceFileScanner(unit.source) {
     def this(unit: CompilationUnit) = this(unit, List())
 
-    override def warning(off: Offset, msg: String)              = unit.warning(unit.position(off), msg)
     override def deprecationWarning(off: Offset, msg: String)   = unit.deprecationWarning(unit.position(off), msg)
     override def error  (off: Offset, msg: String)              = unit.error(unit.position(off), msg)
     override def incompleteInputError(off: Offset, msg: String) = unit.incompleteInputError(unit.position(off), msg)
@@ -1265,22 +1276,21 @@ trait Scanners extends ScannersCommon {
         }
       }
     }
-
-    override def foundComment(value: String, start: Int, end: Int) {
-      val pos = new RangePosition(unit.source, start, start, end)
-      unit.comment(pos, value)
-    }
-
-    override def foundDocComment(value: String, start: Int, end: Int) {
-      docPos = new RangePosition(unit.source, start, start, end)
-      unit.comment(docPos, value)
-    }
   }
 
   class ParensAnalyzer(unit: CompilationUnit, patches: List[BracePatch]) extends UnitScanner(unit, patches) {
-    var balance = collection.mutable.Map(RPAREN -> 0, RBRACKET -> 0, RBRACE -> 0)
+    val balance = mutable.Map(RPAREN -> 0, RBRACKET -> 0, RBRACE -> 0)
+
+    /** The source code with braces and line starts annotated with [NN] showing the index */
+    private def markedSource = {
+      val code   = unit.source.content
+      val braces = code.indices filter (idx => "{}\n" contains code(idx)) toSet;
+      val mapped = code.indices map (idx => if (braces(idx)) s"${code(idx)}[$idx]" else "" + code(idx))
+      mapped.mkString("")
+    }
 
     init()
+    log(s"ParensAnalyzer for ${unit.source} of length ${unit.source.content.length}\n```\n$markedSource\n```")
 
     /** The offset of the first token on this line, or next following line if blank
      */
@@ -1293,7 +1303,7 @@ trait Scanners extends ScannersCommon {
       var lineCount = 1
       var lastOffset = 0
       var indent = 0
-      val oldBalance = collection.mutable.Map[Int, Int]()
+      val oldBalance = scala.collection.mutable.Map[Int, Int]()
       def markBalance() = for ((k, v) <- balance) oldBalance(k) = v
       markBalance()
 
@@ -1356,17 +1366,24 @@ trait Scanners extends ScannersCommon {
           bpbuf += current
         }
       }
+      def bracePairString(bp: BracePair, indent: Int): String = {
+        val rangeString = {
+          import bp._
+          val lline = line(loff)
+          val rline = line(roff)
+          val tokens = List(lline, lindent, rline, rindent) map (n => if (n < 0) "??" else "" + n)
+          "%s:%s to %s:%s".format(tokens: _*)
+        }
+        val outer  = (" " * indent) + rangeString
+        val inners = bp.nested map (bracePairString(_, indent + 2))
 
-      def printBP(bp: BracePair, indent: Int) {
-        println(" "*indent+line(bp.loff)+":"+bp.lindent+" to "+line(bp.roff)+":"+bp.rindent)
-        if (bp.nested.nonEmpty)
-          for (bp1 <- bp.nested) {
-            printBP(bp1, indent + 2)
-          }
+        if (inners.isEmpty) outer
+        else inners.mkString(outer + "\n", "\n", "")
       }
-//      println("lineStart = "+lineStart)//DEBUG
-//      println("bracepairs = ")
-//      for (bp <- bpbuf.toList) printBP(bp, 0)
+      def bpString    = bpbuf.toList map ("\n" + bracePairString(_, 0)) mkString ""
+      def startString = lineStart.mkString("line starts: [", ", ", "]")
+
+      log(s"\n$startString\n$bpString")
       bpbuf.toList
     }
 
@@ -1400,18 +1417,6 @@ trait Scanners extends ScannersCommon {
                         else bp :: insertPatch(bps, patch)
     }
 
-    def leftColumn(offset: Int) =
-      if (offset == -1) -1 else column(lineStart(line(offset)))
-
-    def rightColumn(offset: Int, default: Int) =
-      if (offset == -1) -1
-      else {
-        val rlin = line(offset)
-        if (lineStart(rlin) == offset) column(offset)
-        else if (rlin + 1 < lineStart.length) column(lineStart(rlin + 1))
-        else default
-      }
-
     def insertRBrace(): List[BracePatch] = {
       def insert(bps: List[BracePair]): List[BracePatch] = bps match {
         case List() => patches
@@ -1426,7 +1431,7 @@ trait Scanners extends ScannersCommon {
               while (lin < lineStart.length && column(lineStart(lin)) > lindent)
                 lin += 1
               if (lin < lineStart.length) {
-                val patches1 = insertPatch(patches, BracePatch(lineStart(lin), true))
+                val patches1 = insertPatch(patches, BracePatch(lineStart(lin), inserted = true))
                 //println("patch for "+bp+"/"+imbalanceMeasure+"/"+new ParensAnalyzer(unit, patches1).imbalanceMeasure)
                 /*if (improves(patches1))*/
                 patches1
@@ -1447,22 +1452,15 @@ trait Scanners extends ScannersCommon {
           else {
             val patches1 = delete(nested)
             if (patches1 ne patches) patches1
-            else insertPatch(patches, BracePatch(roff, false))
+            else insertPatch(patches, BracePatch(roff, inserted = false))
           }
       }
       delete(bracePairs)
     }
 
-    def imbalanceMeasure: Int = {
-      def measureList(bps: List[BracePair]): Int =
-        (bps map measure).sum
-      def measure(bp: BracePair): Int =
-        (if (bp.lindent != bp.rindent) 1 else 0) + measureList(bp.nested)
-      measureList(bracePairs)
-    }
-
-    def improves(patches1: List[BracePatch]): Boolean =
-      imbalanceMeasure > new ParensAnalyzer(unit, patches1).imbalanceMeasure
+    // don't emit deprecation warnings about identifiers like `macro` or `then`
+    // when skimming through the source file trying to heal braces
+    override def emitIdentifierDeprecationWarnings = false
 
     override def error(offset: Int, msg: String) {}
   }

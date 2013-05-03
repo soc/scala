@@ -2,8 +2,8 @@ package scala.tools.util
 
 import scala.tools.nsc.io._
 import java.net.URLClassLoader
-import collection.JavaConverters._
-
+import scala.collection.JavaConverters._
+import scala.language.postfixOps
 
 object VerifyClass {
 
@@ -13,7 +13,8 @@ object VerifyClass {
       Class.forName(name, true, cl)
       (name, None)
     } catch {
-      case x => (name, Some(x.toString))
+      case x: Throwable => // TODO: only catch VerifyError (and related) + ExceptionInInitializationError (for static objects that bomb on classload)
+        (name, Some(x.toString))
     }
   }
 

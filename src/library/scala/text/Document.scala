@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2003-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2003-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -80,7 +80,7 @@ abstract class Document {
         fmt(k, (i + ii, b, d) :: z)
       case (i, true, DocBreak) :: z =>
         writer write "\n"
-        spaces(i);
+        spaces(i)
         fmt(i, z)
       case (i, false, DocBreak) :: z =>
         writer write " "
@@ -88,6 +88,8 @@ abstract class Document {
       case (i, b, DocGroup(d)) :: z =>
         val fitsFlat = fits(width - k, (i, false, d) :: z)
         fmt(k, (i, !fitsFlat, d) :: z)
+      case _ =>
+        ()
     }
 
     fmt(0, (0, false, DocGroup(this)) :: Nil)

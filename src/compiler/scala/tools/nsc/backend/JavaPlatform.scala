@@ -1,5 +1,5 @@
 /* NSC -- new Scala compiler
- * Copyright 2005-2011 LAMP/EPFL
+ * Copyright 2005-2013 LAMP/EPFL
  * @author  Paul Phillips
  */
 
@@ -7,8 +7,7 @@ package scala.tools.nsc
 package backend
 
 import io.AbstractFile
-import util.{ClassPath,JavaClassPath}
-import util.ClassPath.{ JavaContext, DefaultJavaContext }
+import util.{ClassPath,MergedClassPath,DeltaClassPath}
 import scala.tools.util.PathResolver
 
 trait JavaPlatform extends Platform {
@@ -17,7 +16,17 @@ trait JavaPlatform extends Platform {
 
   type BinaryRepr = AbstractFile
 
-  lazy val classPath  = new PathResolver(settings).result
+  private var currentClassPath: Option[MergedClassPath[BinaryRepr]] = None
+
+  def classPath: ClassPath[BinaryRepr] = {
+    if (currentClassPath.isEmpty) currentClassPath = Some(new PathResolver(settings).result)
+    currentClassPath.get
+  }
+
+  /** Update classpath with a substituted subentry */
+  def updateClassPath(subst: Map[ClassPath[BinaryRepr], ClassPath[BinaryRepr]]) =
+    currentClassPath = Some(new DeltaClassPath(currentClassPath.get, subst))
+
   def rootLoader = new loaders.PackageLoader(classPath.asInstanceOf[ClassPath[platform.BinaryRepr]])
     // [Martin] Why do we need a cast here?
     // The problem is that we cannot specify at this point that global.platform should be of type JavaPlatform.
@@ -29,18 +38,10 @@ trait JavaPlatform extends Platform {
     // replaces the tighter abstract definition here. If we had DOT typing rules, the two
     // types would be conjoined and everything would work out. Yet another reason to push for DOT.
 
-  private def depAnalysisPhase =
-    if (settings.make.isDefault) Nil
-    else List(dependencyAnalysis)
-
-  private def classEmitPhase =
-    if (settings.target.value == "jvm-1.5") genJVM
-    else genASM
-
   def platformPhases = List(
     flatten,        // get rid of inner classes
-    classEmitPhase  // generate .class files
-  ) ++ depAnalysisPhase
+    genASM  // generate .class files
+  )
 
   lazy val externalEquals          = getDecl(BoxesRunTimeClass, nme.equals_)
   lazy val externalEqualsNumNum    = getDecl(BoxesRunTimeClass, nme.equalsNumNum)

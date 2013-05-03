@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2005-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2005-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -38,9 +38,10 @@ package remote
  *
  * @author Philipp Haller
  */
+@deprecated("Use the akka.actor package instead. For migration from the scala.actors package refer to the Actors Migration Guide.", "2.11.0")
 object RemoteActor {
 
-  private val kernels = new scala.collection.mutable.HashMap[Actor, NetKernel]
+  private val kernels = new scala.collection.mutable.HashMap[InternalActor, NetKernel]
 
   /* If set to <code>null</code> (default), the default class loader
    * of <code>java.io.ObjectInputStream</code> is used for deserializing
@@ -62,7 +63,7 @@ object RemoteActor {
   private def createNetKernelOnPort(port: Int): NetKernel = {
     val serv = TcpService(port, cl)
     val kern = serv.kernel
-    val s = Actor.self
+    val s = Actor.self(Scheduler)
     kernels += Pair(s, kern)
 
     s.onTerminate {
@@ -86,10 +87,10 @@ object RemoteActor {
    * node.
    */
   def register(name: Symbol, a: Actor): Unit = synchronized {
-    val kernel = kernels.get(Actor.self) match {
+    val kernel = kernels.get(Actor.self(Scheduler)) match {
       case None =>
         val serv = TcpService(TcpService.generatePort, cl)
-        kernels += Pair(Actor.self, serv.kernel)
+        kernels += Pair(Actor.self(Scheduler), serv.kernel)
         serv.kernel
       case Some(k) =>
         k
@@ -97,7 +98,7 @@ object RemoteActor {
     kernel.register(name, a)
   }
 
-  private def selfKernel = kernels.get(Actor.self) match {
+  private def selfKernel = kernels.get(Actor.self(Scheduler)) match {
     case None =>
       // establish remotely accessible
       // return path (sender)
@@ -127,4 +128,5 @@ object RemoteActor {
  *
  * @author Philipp Haller
  */
+@deprecated("Use the akka.actor package instead. For migration from the scala.actors package refer to the Actors Migration Guide.", "2.11.0")
 case class Node(address: String, port: Int)

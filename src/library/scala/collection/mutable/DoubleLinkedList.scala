@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2003-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2003-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -63,6 +63,13 @@ class DoubleLinkedList[A]() extends AbstractSeq[A]
   }
 
   override def companion: GenericCompanion[DoubleLinkedList] = DoubleLinkedList
+
+  // Accurately clone this collection.  See SI-6296
+  override def clone(): DoubleLinkedList[A] = {
+    val builder = newBuilder
+    builder ++= this
+    builder.result()
+  }
 }
 
 /** $factoryInfo

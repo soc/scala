@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2003-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2003-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -9,6 +9,7 @@
 
 /**
  * Core Scala types. They are always available without an explicit import.
+ * @contentDiagram hideNodes "scala.Serializable"
  */
 package object scala {
   type Throwable = java.lang.Throwable
@@ -32,9 +33,6 @@ package object scala {
   val AnyRef = new Specializable {
     override def toString = "object AnyRef"
   }
-
-  @deprecated("instead of `@serializable class C`, use `class C extends Serializable`", "2.9.0")
-  type serializable = annotation.serializable
 
   type TraversableOnce[+A] = scala.collection.TraversableOnce[A]
 
@@ -91,7 +89,10 @@ package object scala {
   val Equiv = scala.math.Equiv
 
   type Fractional[T] = scala.math.Fractional[T]
+  val Fractional = scala.math.Fractional
+
   type Integral[T] = scala.math.Integral[T]
+  val Integral = scala.math.Integral
 
   type Numeric[T] = scala.math.Numeric[T]
   val Numeric = scala.math.Numeric
@@ -105,17 +106,24 @@ package object scala {
   type PartialOrdering[T] = scala.math.PartialOrdering[T]
   type PartiallyOrdered[T] = scala.math.PartiallyOrdered[T]
 
+  type Either[+A, +B] = scala.util.Either[A, B]
+  val Either = scala.util.Either
+
+  type Left[+A, +B] = scala.util.Left[A, B]
+  val Left = scala.util.Left
+
+  type Right[+A, +B] = scala.util.Right[A, B]
+  val Right = scala.util.Right
+
   // Annotations which we might move to annotation.*
 /*
   type SerialVersionUID = annotation.SerialVersionUID
-  type cloneable = annotation.cloneable
   type deprecated = annotation.deprecated
   type deprecatedName = annotation.deprecatedName
   type inline = annotation.inline
   type native = annotation.native
-  type noinline = noannotation.inline
+  type noinline = annotation.noinline
   type remote = annotation.remote
-  type serializable = annotation.serializable
   type specialized = annotation.specialized
   type transient = annotation.transient
   type throws  = annotation.throws

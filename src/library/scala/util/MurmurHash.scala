@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2003-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2003-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -164,7 +164,7 @@ object MurmurHash {
     var k = hiddenMagicB
     var j = 0
     while (j+1 < s.length) {
-      val i = (s.charAt(j)<<16) + s.charAt(j+1);
+      val i = (s.charAt(j)<<16) + s.charAt(j+1)
       h = extendHash(h,i,c,k)
       c = nextMagicA(c)
       k = nextMagicB(k)
@@ -178,7 +178,7 @@ object MurmurHash {
    *  where the order of appearance of elements does not matter.
    *  This is useful for hashing sets, for example.
    */
-  def symmetricHash[T](xs: collection.TraversableOnce[T], seed: Int) = {
+  def symmetricHash[T](xs: scala.collection.TraversableOnce[T], seed: Int) = {
     var a,b,n = 0
     var c = 1
     xs.seq.foreach(i => {

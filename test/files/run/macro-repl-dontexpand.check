@@ -3,10 +3,10 @@ Type :help for more information.
 
 scala> 
 
-scala> def bar(c: scala.reflect.makro.Context) = ???
-bar: (c: scala.reflect.makro.Context)Nothing
+scala> def bar(c: scala.reflect.macros.Context) = ???
+bar: (c: scala.reflect.macros.Context)Nothing
 
 scala> def foo = macro bar
-foo: Any
+defined term macro foo: Any
 
 scala> 

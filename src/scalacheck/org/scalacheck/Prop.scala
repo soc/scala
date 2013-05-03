@@ -1,16 +1,17 @@
 /*-------------------------------------------------------------------------*\
 **  ScalaCheck                                                             **
-**  Copyright (c) 2007-2011 Rickard Nilsson. All rights reserved.          **
+**  Copyright (c) 2007-2013 Rickard Nilsson. All rights reserved.          **
 **  http://www.scalacheck.org                                              **
 **                                                                         **
 **  This software is released under the terms of the Revised BSD License.  **
 **  There is NO WARRANTY. See the file LICENSE for the full text.          **
-\*-------------------------------------------------------------------------*/
+\*------------------------------------------------------------------------ */
 
 package org.scalacheck
 
 import util.{FreqMap,Buildable}
 import scala.collection._
+import scala.annotation.tailrec
 
 /** A property is a generator that generates a property result */
 trait Prop {
@@ -30,16 +31,27 @@ trait Prop {
 
   /** Convenience method that checks this property with the given parameters
    *  and reports the result on the console. If you need to get the results
-   *  from the test use the <code>check</code> methods in <code>Test</code>
-   *  instead. */
+   *  from the test use the `check` methods in [[org.scalacheck.Test]]
+   *  instead.
+   *  @deprecated (in 1.10.0) Use `check(Test.Parameters)` instead.
+   */
+  @deprecated("Use 'check(Test.Parameters)' instead", "1.10.0")
   def check(prms: Test.Params): Unit = Test.check(
     prms copy (testCallback = ConsoleReporter(1) chain prms.testCallback), this
   )
 
+  /** Convenience method that checks this property with the given parameters
+   *  and reports the result on the console. If you need to get the results
+   *  from the test use the `check` methods in [[org.scalacheck.Test]]
+   *  instead. */
+  def check(prms: Test.Parameters): Unit = Test.check(
+    prms copy (_testCallback = ConsoleReporter(1) chain prms.testCallback), this
+  )
+
   /** Convenience method that checks this property and reports the
    *  result on the console. If you need to get the results from the test use
-   *  the <code>check</code> methods in <code>Test</code> instead. */
-  def check: Unit = check(Test.Params())
+   *  the `check` methods in [[org.scalacheck.Test]] instead. */
+  def check: Unit = check(Test.Parameters.default)
 
   /** The logic for main, separated out to make it easier to
    *  avoid System.exit calls.  Returns exit code.
@@ -59,7 +71,7 @@ trait Prop {
   /** Whether main should call System.exit with an exit code.
    *  Defaults to true; override to change.
    */
-  def mainCallsExit = false
+  def mainCallsExit = true
 
   /** Convenience method that makes it possible to use this property
    *  as an application that checks itself on execution */
@@ -101,15 +113,6 @@ trait Prop {
       Result.merge(r1, r2, if(r1.status == r2.status) True else False)
     }
   }
-
-  /** Returns a new property that holds if and only if both this
-   *  and the given property generates a result with the exact
-   *  same status. Note that this means that if one of the properties is
-   *  proved, and the other one passed, then the resulting property
-   *  will fail.
-   *  @deprecated Use <code>==</code> instead */
-  @deprecated("Use == instead.", "1.7")
-  def ===(p: Prop): Prop = this == p
 
   override def toString = "Prop"
 
@@ -201,7 +204,7 @@ object Prop {
       case (_,Undecided) => r
 
       case (_,Proof) => merge(this, r, this.status)
-      case (Proof,_) => merge(this, r, this.status)
+      case (Proof,_) => merge(this, r, r.status)
 
       case (True,True) => merge(this, r, True)
     }
@@ -282,20 +285,51 @@ object Prop {
 
   def apply(r: Result): Prop = Prop(prms => r)
 
+  def apply(b: Boolean): Prop = if(b) proved else falsified
 
-  // Implicit defs
 
+  // Implicits
+
+  /** A collection of property operators on [[Any]] values.
+   *  Import [[Prop.AnyOperators]] to make the operators available. */
   class ExtendedAny[T <% Pretty](x: => T) {
+    /** See [[Prop.imply]] */
     def imply(f: PartialFunction[T,Prop]) = Prop.imply(x,f)
+    /** See [[Prop.iff]] */
     def iff(f: PartialFunction[T,Prop]) = Prop.iff(x,f)
-    def throws[U <: Throwable](c: Class[U]) = Prop.throws(x, c)
+    @deprecated("Use 'Prop.throws' instead", "1.10.1")
+    def throws[U <: Throwable](c: Class[U]): Prop = Prop.throws(c)(x)
+    /** See [[Prop.?=]] */
     def ?=(y: T) = Prop.?=(x, y)
+    /** See [[Prop.=?]] */
     def =?(y: T) = Prop.=?(x, y)
   }
 
+  /** A collection of property operators on [[Boolean]] values.
+   *  Import [[Prop.BooleanOperators]] to make the operators available. */
+  class ExtendedBoolean(b: => Boolean) {
+    /** See [[Prop.==>]] */
+    def ==>(p: => Prop) = Prop(b) ==> p
+  }
+
+  /** Implicit method that makes a number of property operators on values of
+   * type [[Any]] available in the current scope. See [[Prop.ExtendedAny]] for
+   * documentation on the operators. */
+  @deprecated("Use 'Prop.AnyOperators' instead", "1.10.1")
   implicit def extendedAny[T <% Pretty](x: => T) = new ExtendedAny[T](x)
 
-  implicit def propBoolean(b: Boolean): Prop = if(b) proved else falsified
+  /** Implicit method that makes a number of property operators on values of
+   * type [[Any]] available in the current scope. See [[Prop.ExtendedAny]] for
+   * documentation on the operators. */
+  implicit def AnyOperators[T <% Pretty](x: => T) = new ExtendedAny[T](x)
+
+  /** Implicit method that makes a number of property operators on boolean
+   * values available in the current scope. See [[Prop.ExtendedBoolean]] for
+   * documentation on the operators. */
+  implicit def BooleanOperators(b: => Boolean) = new ExtendedBoolean(b)
+
+  /** Implicit conversion of Boolean values to Prop values. */
+  implicit def propBoolean(b: Boolean): Prop = Prop(b)
 
 
   // Private support functions
@@ -326,6 +360,9 @@ object Prop {
   /** A property that denotes an exception */
   lazy val exception: Prop = exception(null)
 
+  /** Create a property that compares to values. If the values aren't equal,
+   * the property will fail and report that first value doesn't match the
+   * expected (second) value. */
   def ?=[T](x: T, y: T)(implicit pp: T => Pretty): Prop =
     if(x == y) proved else falsified :| {
       val exp = Pretty.pretty[T](y, Pretty.Params(0))
@@ -333,25 +370,25 @@ object Prop {
       "Expected "+exp+" but got "+act
     }
 
+  /** Create a property that compares to values. If the values aren't equal,
+   * the property will fail and report that second value doesn't match the
+   * expected (first) value. */
   def =?[T](x: T, y: T)(implicit pp: T => Pretty): Prop = ?=(y, x)
 
   /** A property that depends on the generator size */
   def sizedProp(f: Int => Prop): Prop = Prop { prms =>
+    // provedToTrue since if the property is proved for
+    // one size, it shouldn't be regarded as proved for
+    // all sizes.
     provedToTrue(f(prms.genPrms.size)(prms))
   }
-
-  /** Implication
-   *  @deprecated Use the implication operator of the Prop class instead
-   */
-  @deprecated("Use the implication operator of the Prop class instead", "1.7")
-  def ==>(b: => Boolean, p: => Prop): Prop = (b: Prop) ==> p
 
   /** Implication with several conditions */
   def imply[T](x: T, f: PartialFunction[T,Prop]): Prop =
     secure(if(f.isDefinedAt(x)) f(x) else undecided)
 
   /** Property holds only if the given partial function is defined at
-   *  <code>x</code>, and returns a property that holds */
+   *  `x`, and returns a property that holds */
   def iff[T](x: T, f: PartialFunction[T,Prop]): Prop =
     secure(if(f.isDefinedAt(x)) f(x) else falsified)
 
@@ -376,9 +413,16 @@ object Prop {
   def noneFailing[T](gs: Seq[Gen[T]]) = all(gs.map(_ !== fail):_*)
 
   /** A property that holds if the given statement throws an exception
+   *  of the specified type
+   *  @deprecated (in 1.10.1) Use `throws(...): Boolean` instead.
+   */
+  @deprecated("Use 'throws(...): Boolean' instead", "1.10.1")
+  def throws[T <: Throwable](x: => Any, c: Class[T]): Prop = throws(c)(x)
+
+  /** Returns true if the given statement throws an exception
    *  of the specified type */
-  def throws[T <: Throwable](x: => Any, c: Class[T]) =
-    try { x; falsified } catch { case e if c.isInstance(e) => proved }
+  def throws[T <: Throwable](c: Class[T])(x: => Any): Boolean =
+    try { x; false } catch { case e if c.isInstance(e) => true }
 
   /** Collect data for presentation in test report */
   def collect[T, P <% Prop](f: T => P): T => Prop = t => Prop { prms =>
@@ -401,7 +445,7 @@ object Prop {
 
   /** Wraps and protects a property */
   def secure[P <% Prop](p: => P): Prop =
-    try { p: Prop } catch { case e => exception(e) }
+    try { p: Prop } catch { case e: Throwable => exception(e) }
 
   /** Existential quantifier for an explicit generator. */
   def exists[A,P](f: A => P)(implicit
@@ -758,4 +802,17 @@ object Prop {
     a8: Arbitrary[A8], s8: Shrink[A8], pp8: A8 => Pretty
   ): Prop = forAll((a: A1) => forAll(f(a, _:A2, _:A3, _:A4, _:A5, _:A6, _:A7, _:A8)))
 
+  /** Ensures that the property expression passed in completes within the given space of time. */
+  def within(maximumMs: Long)(wrappedProp: => Prop): Prop = new Prop {
+    @tailrec private def attempt(prms: Params, endTime: Long): Result = {
+      val result = wrappedProp.apply(prms)
+      if (System.currentTimeMillis > endTime) {
+        (if (result.failure) result else Result(False)).label("Timeout")
+      } else {
+        if (result.success) result
+        else attempt(prms, endTime)
+      }
+    }
+    def apply(prms: Params) = attempt(prms, System.currentTimeMillis + maximumMs)
+  }
 }

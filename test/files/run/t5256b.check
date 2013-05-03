@@ -1,2 +1,6 @@
+class A
 Test.A
-true
+AnyRef {
+  def <init>(): Test.A
+  def foo: Nothing
+}

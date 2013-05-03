@@ -2,6 +2,8 @@ import org.scalacheck._
 import org.scalacheck.Prop._
 
 import java.net.{URLClassLoader, URLDecoder}
+import scala.collection.mutable
+import scala.xml.NodeSeq
 
 object XMLUtil {
   import scala.xml._
@@ -34,21 +36,24 @@ object Test extends Properties("HtmlFactory") {
     // this test previously relied on the assumption that the current thread's classloader is an url classloader and contains all the classpaths
     // does partest actually guarantee this? to quote Leonard Nimoy: The answer, of course, is no.
     // this test _will_ fail again some time in the future.
-    val paths = Thread.currentThread.getContextClassLoader.asInstanceOf[URLClassLoader].getURLs.map(u => URLDecoder.decode(u.getPath))
-    val morepaths = Thread.currentThread.getContextClassLoader.getParent.asInstanceOf[URLClassLoader].getURLs.map(u => URLDecoder.decode(u.getPath))
-    (paths ++ morepaths).mkString(java.io.File.pathSeparator)
+    // Footnote: java.lang.ClassCastException: org.apache.tools.ant.loader.AntClassLoader5 cannot be cast to java.net.URLClassLoader
+    val loader = Thread.currentThread.getContextClassLoader.asInstanceOf[URLClassLoader]
+    val paths = loader.getURLs.map(u => URLDecoder.decode(u.getPath))
+    paths mkString java.io.File.pathSeparator
   }
 
   def createFactory = {
     val settings = new Settings({Console.err.println(_)})
+    settings.scaladocQuietRun = true
+    settings.nowarn.value = true
     settings.classpath.value = getClasspath
 
     val reporter = new scala.tools.nsc.reporters.ConsoleReporter(settings)
     new DocFactory(reporter, settings)
   }
 
-  def createTemplates(basename: String) = {
-    val result = scala.collection.mutable.Map[String, scala.xml.NodeSeq]()
+  def createTemplates(basename: String): collection.Map[String, NodeSeq] = {
+    val result = mutable.Map[String, NodeSeq]()
 
     createFactory.makeUniverse(Left(List(RESOURCES+basename))) match {
       case Some(universe) => {
@@ -57,7 +62,7 @@ object Test extends Properties("HtmlFactory") {
           result += (page.absoluteLinkTo(page.path) -> page.body)
         })
       }
-      case _ => ;
+      case _ =>
     }
 
     result
@@ -235,30 +240,6 @@ object Test extends Properties("HtmlFactory") {
     }
   }
 
-  property("Trac #3484") = {
-    val files = createTemplates("Trac3484.scala")
-
-    files("Collection.html") match {
-      case node: scala.xml.Node => {
-        val s = node.toString
-        s.contains("""<span class="result">: Traversable[B]</span>""")
-      }
-      case _ => false
-    }
-  }
-
-  property("Trac #3484 - SR704") = {
-    val files = createTemplates("Trac3484.scala")
-
-    files("SR704.html") match {
-      case node: scala.xml.Node => {
-        val s = node.toString
-        s.contains("Hello Mister John.")
-      }
-      case _ => false
-    }
-  }
-
   property("Trac #4325 - files") = {
     val files = createTemplates("Trac4325.scala")
 
@@ -303,7 +284,7 @@ object Test extends Properties("HtmlFactory") {
       case _ => false
     }
   }
-  // 
+  //
   // property("Trac #484 - refinements and existentials") = {
   //   val files = createTemplates("Trac484.scala")
   //   val lines = """
@@ -315,7 +296,7 @@ object Test extends Properties("HtmlFactory") {
   //       |def j(x: Int): Bar
   //       |def k(): AnyRef { type Dingus <: T forSome { type T <: String } }
   //     """.stripMargin.trim.lines map (_.trim)
-  // 
+  //
   //   files("RefinementAndExistentials.html") match {
   //     case node: scala.xml.Node => {
   //       val s = node.text.replaceAll("\\s+", " ")
@@ -397,26 +378,17 @@ object Test extends Properties("HtmlFactory") {
     }
   }
 
-  property("Should decode symbolic type alias name.") = {
+  property("SI-4714: Should decode symbolic type alias name.") = {
     createTemplate("SI_4715.scala") match {
       case node: scala.xml.Node => {
         val html = node.toString
-        html.contains(">: :+:[<")
+        html.contains(">:+:<")
       }
       case _ => false
     }
   }
 
-  property("Shouldn't drop type arguments to aliased tuple.") = {
-    createTemplate("SI_4676.scala") match {
-      case node: scala.xml.Node => {
-        node.toString.contains(">ss: (String, String)<")
-      }
-      case _ => false
-    }
-  }
-
-  property("Default arguments of synthesized constructor") = {
+  property("SI-4287: Default arguments of synthesized constructor") = {
     val files = createTemplates("SI_4287.scala")
 
     files("ClassWithSugar.html") match {
@@ -427,7 +399,7 @@ object Test extends Properties("HtmlFactory") {
     }
   }
 
-  property("Default arguments of synthesized constructor") = {
+  property("SI-4507: Default arguments of synthesized constructor") = {
     createTemplate("SI_4507.scala") match {
       case node: scala.xml.Node =>
         ! node.toString.contains("<li>returns silently when evaluating true and true</li>")
@@ -435,40 +407,40 @@ object Test extends Properties("HtmlFactory") {
     }
   }
 
-  property("Use cases and links should not crash scaladoc") = {
+  property("SI-4898: Use cases and links should not crash scaladoc") = {
     createTemplate("SI_4898.scala")
     true
   }
 
-  property("Use cases should override their original members") =
+  property("SI-5054: Use cases should override their original members") =
      checkText("SI_5054_q1.scala")(
        (None,"""def test(): Int""", true)
        //Disabled because the full signature is now displayed
        //(None,"""def test(implicit lost: Int): Int""", false)
      )
 
-  property("Use cases should keep their flags - final should not be lost") =
+  property("SI-5054: Use cases should keep their flags - final should not be lost") =
     checkText("SI_5054_q2.scala")((None, """final def test(): Int""", true))
 
-  property("Use cases should keep their flags - implicit should not be lost") =
+  property("SI-5054: Use cases should keep their flags - implicit should not be lost") =
     checkText("SI_5054_q3.scala")((None, """implicit def test(): Int""", true))
 
-  property("Use cases should keep their flags - real abstract should not be lost") =
+  property("SI-5054: Use cases should keep their flags - real abstract should not be lost") =
     checkText("SI_5054_q4.scala")((None, """abstract def test(): Int""", true))
 
-  property("Use cases should keep their flags - traits should not be affected") =
+  property("SI-5054: Use cases should keep their flags - traits should not be affected") =
     checkText("SI_5054_q5.scala")((None, """def test(): Int""", true))
 
-  property("Use cases should keep their flags - traits should not be affected") =
+  property("SI-5054: Use cases should keep their flags - traits should not be affected") =
     checkText("SI_5054_q6.scala")((None, """abstract def test(): Int""", true))
 
-  property("Use case individual signature test") =
+  property("SI-5054: Use case individual signature test") =
     checkText("SI_5054_q7.scala")(
       (None, """abstract def test2(explicit: Int): Int [use case] This takes the explicit value passed.""", true),
       (None, """abstract def test1(): Int [use case] This takes the implicit value in scope.""", true)
     )
 
-  property("Display correct \"Definition classes\"") =
+  property("SI-5287: Display correct \"Definition classes\"") =
     checkText("SI_5287.scala")(
       (None,
           """def method(): Int
@@ -477,7 +449,7 @@ object Test extends Properties("HtmlFactory") {
            Definition Classes SI_5287 SI_5287_B SI_5287_A""", true)
     )      // the explanation appears twice, as small comment and full comment
 
-  property("Correct comment inheritance for overriding") =
+  property("Comment inheritance: Correct comment inheritance for overriding") =
     checkText("implicit-inheritance-override.scala")(
       (Some("Base"),
        """def function[T](arg1: T, arg2: String): Double
@@ -521,7 +493,7 @@ object Test extends Properties("HtmlFactory") {
     )
 
   for (useCaseFile <- List("UseCaseInheritance", "UseCaseOverrideInheritance")) {
-    property("Correct comment inheritance for usecases") =
+    property("Comment inheritance: Correct comment inheritance for usecases") =
       checkText("implicit-inheritance-usecase.scala")(
         (Some(useCaseFile),
          """def missing_arg[T](arg1: T): Double
@@ -588,7 +560,7 @@ object Test extends Properties("HtmlFactory") {
       )
   }
 
-  property("Correct explicit inheritance for override") =
+  property("Comment inheritance: Correct explicit inheritance for override") =
   checkText("explicit-inheritance-override.scala")(
     (Some("InheritDocDerived"),
      """def function[T](arg1: T, arg2: String): Double
@@ -614,7 +586,7 @@ object Test extends Properties("HtmlFactory") {
         See also   StartSee The Manual EndSee
      """, true))
 
-  property("Correct explicit inheritance for usecase") =
+  property("Comment inheritance: Correct explicit inheritance for usecase") =
   checkText("explicit-inheritance-usecase.scala")(
     (Some("UseCaseInheritDoc"),
      """def function[T](arg1: T, arg2: String): Double
@@ -639,7 +611,7 @@ object Test extends Properties("HtmlFactory") {
         See also   StartSee The Manual EndSee
      """, true))
 
-  property("Correct explicit inheritance in corner cases") =
+  property("Comment inheritance: Correct explicit inheritance in corner cases") =
     checkText("inheritdoc-corner-cases.scala")(
       (Some("D"),
        """def hello1: Int
@@ -713,7 +685,7 @@ object Test extends Properties("HtmlFactory") {
 
     property("package object") = files("com/example/p1/package.html") match {
       case node: scala.xml.Node =>
-        node.toString contains "com.example.p1.package#packageObjectMethod"
+        node.toString contains "com.example.p1#packageObjectMethod"
       case _ => false
     }
 

@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2003-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2003-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -13,7 +13,7 @@ package scala.xml
  *  all the `xml` classes go through the `xml.Equality trait`.  There are two
  *  forms of `xml` comparison.
  *
- *  1. `'''def''' strict_==(other: xml.Equality)`
+ *  1. `'''def''' strict_==(other: scala.xml.Equality)`
  *
  *  This one tries to honor the little things like symmetry and hashCode
  *  contracts.  The `equals` method routes all comparisons through this.
@@ -86,8 +86,8 @@ trait Equality extends scala.Equals {
    *  to maintain a semblance of order.
    */
   override def hashCode()         = basisForHashCode.##
-  override def equals(other: Any) = doComparison(other, false)
-  final def xml_==(other: Any)    = doComparison(other, true)
+  override def equals(other: Any) = doComparison(other, blithe = false)
+  final def xml_==(other: Any)    = doComparison(other, blithe = true)
   final def xml_!=(other: Any)    = !xml_==(other)
 
   /** The "blithe" parameter expresses the caller's unconcerned attitude

@@ -1,15 +1,18 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2002-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2002-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
 \*                                                                      */
 
-package scala.runtime
+package scala
+package runtime
 
-final class RichFloat(val self: Float) extends FractionalProxy[Float] {
-  protected val integralNum = Numeric.FloatAsIfIntegral
+final class RichFloat(val self: Float) extends AnyVal with FractionalProxy[Float] {
+  protected def num         = scala.math.Numeric.FloatIsFractional
+  protected def ord         = scala.math.Ordering.Float
+  protected def integralNum = scala.math.Numeric.FloatAsIfIntegral
 
   def round: Int   = math.round(self)
   def ceil: Float  = math.ceil(self).toFloat

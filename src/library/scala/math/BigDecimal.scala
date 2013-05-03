@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2007-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2007-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -12,7 +12,7 @@ package scala.math
 import java.{ lang => jl }
 import java.math.{ MathContext, BigDecimal => BigDec }
 import scala.collection.immutable.NumericRange
-import language.implicitConversions
+import scala.language.implicitConversions
 
 
 /**
@@ -24,12 +24,6 @@ object BigDecimal {
   private val minCached = -512
   private val maxCached = 512
   val defaultMathContext = MathContext.DECIMAL128
-
-  @deprecated("Use Long.MinValue", "2.9.0")
-  val MinLong = new BigDecimal(BigDec valueOf Long.MinValue, defaultMathContext)
-
-  @deprecated("Use Long.MaxValue", "2.9.0")
-  val MaxLong = new BigDecimal(BigDec valueOf Long.MaxValue, defaultMathContext)
 
   /** Cache ony for defaultMathContext using BigDecimals in a small range. */
   private lazy val cache = new Array[BigDecimal](maxCached - minCached + 1)
@@ -159,6 +153,7 @@ object BigDecimal {
  *  @author  Stephane Micheloud
  *  @version 1.0
  */
+@deprecatedInheritance("This class will me made final.", "2.10.0")
 class BigDecimal(
   val bigDecimal: BigDec,
   val mc: MathContext)
@@ -176,7 +171,7 @@ extends ScalaNumber with ScalaNumericConversions with Serializable {
    *  with unequal hashCodes.
    */
   override def hashCode(): Int =
-    if (isWhole) unifiedPrimitiveHashcode
+    if (isWhole()) unifiedPrimitiveHashcode()
     else doubleValue.##
 
   /** Compares this BigDecimal with the specified value for equality.
@@ -211,7 +206,7 @@ extends ScalaNumber with ScalaNumericConversions with Serializable {
     catch { case _: ArithmeticException => false }
   }
 
-  protected[math] def isWhole = (this remainder 1) == BigDecimal(0)
+  def isWhole() = (this remainder 1) == BigDecimal(0)
   def underlying = bigDecimal
 
   /** Compares this BigDecimal with the specified BigDecimal for equality.
@@ -338,21 +333,21 @@ extends ScalaNumber with ScalaNumericConversions with Serializable {
   override def byteValue   = intValue.toByte
 
   /** Converts this BigDecimal to a Short.
-   *  If the BigDecimal is too big to fit in a Byte, only the low-order 16 bits are returned.
+   *  If the BigDecimal is too big to fit in a Short, only the low-order 16 bits are returned.
    *  Note that this conversion can lose information about the overall magnitude of the
    *  BigDecimal value as well as return a result with the opposite sign.
    */
   override def shortValue  = intValue.toShort
 
   /** Converts this BigDecimal to a Char.
-   *  If the BigDecimal is too big to fit in a char, only the low-order 16 bits are returned.
+   *  If the BigDecimal is too big to fit in a Char, only the low-order 16 bits are returned.
    *  Note that this conversion can lose information about the overall magnitude of the
    *  BigDecimal value and that it always returns a positive result.
    */
   def charValue   = intValue.toChar
 
   /** Converts this BigDecimal to an Int.
-   *  If the BigDecimal is too big to fit in a char, only the low-order 32 bits
+   *  If the BigDecimal is too big to fit in an Int, only the low-order 32 bits
    *  are returned. Note that this conversion can lose information about the
    *  overall magnitude of the BigDecimal value as well as return a result with
    *  the opposite sign.
@@ -360,7 +355,7 @@ extends ScalaNumber with ScalaNumericConversions with Serializable {
   def intValue    = this.bigDecimal.intValue
 
   /** Converts this BigDecimal to a Long.
-   *  If the BigDecimal is too big to fit in a char, only the low-order 64 bits
+   *  If the BigDecimal is too big to fit in a Long, only the low-order 64 bits
    *  are returned. Note that this conversion can lose information about the
    *  overall magnitude of the BigDecimal value as well as return a result with
    *  the opposite sign.

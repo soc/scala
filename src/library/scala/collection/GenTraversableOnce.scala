@@ -1,12 +1,17 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2003-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2003-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
 \*                                                                      */
 
 package scala.collection
+
+import scala.reflect.ClassTag
+import scala.collection.generic.CanBuildFrom
+import scala.annotation.unchecked.{ uncheckedVariance => uV }
+import scala.language.higherKinds
 
 /** A template trait for all traversable-once objects which may be
  *  traversed in parallel.
@@ -113,19 +118,6 @@ trait GenTraversableOnce[+A] extends Any {
    *  @return        the result of applying fold operator `op` between all the elements and `z`
    */
   def fold[A1 >: A](z: A1)(op: (A1, A1) => A1): A1
-
-  /** A syntactic sugar for out of order folding. See `fold`.
-   *
-   * Example:
-   * {{{
-   *      scala> val a = LinkedList(1,2,3,4)
-   *      a: scala.collection.mutable.LinkedList[Int] = LinkedList(1, 2, 3, 4)
-   *
-   *      scala> val b = (a /:\ 5)(_+_)
-   *      b: Int = 15
-   * }}}*/
-  @deprecated("use fold instead", "2.10.0")
-  def /:\[A1 >: A](z: A1)(op: (A1, A1) => A1): A1 = fold(z)(op)
 
   /** Applies a binary operator to a start value and all elements of this $coll,
    *  going left to right.
@@ -256,11 +248,12 @@ trait GenTraversableOnce[+A] extends Any {
    *  @tparam B        the type of accumulated results
    *  @param z         the initial value for the accumulated result of the partition - this
    *                   will typically be the neutral element for the `seqop` operator (e.g.
-   *                   `Nil` for list concatenation or `0` for summation)
+   *                   `Nil` for list concatenation or `0` for summation) and may be evaluated
+   *                   more than once
    *  @param seqop     an operator used to accumulate results within a partition
    *  @param combop    an associative operator used to combine results from different partitions
    */
-  def aggregate[B](z: B)(seqop: (B, A) => B, combop: (B, B) => B): B
+  def aggregate[B](z: =>B)(seqop: (B, A) => B, combop: (B, B) => B): B
 
   /** Applies a binary operator to all elements of this $coll, going right to left.
    *  $willNotTerminateInf
@@ -459,7 +452,7 @@ trait GenTraversableOnce[+A] extends Any {
 
   /** Converts this $coll to an array.
    *
-   *  @tparam A1 the type of the elements of the array. An `ArrayTag` for
+   *  @tparam A1 the type of the elements of the array. An `ClassTag` for
    *             this type must be available.
    *  @return    an array containing all elements of this $coll.
    *
@@ -469,9 +462,9 @@ trait GenTraversableOnce[+A] extends Any {
    *    $willNotTerminateInf
    *
    *    @return  an array containing all elements of this $coll.
-   *             An `ArrayTag` must be available for the element type of this $coll.
+   *             An `ClassTag` must be available for the element type of this $coll.
    */
-  def toArray[A1 >: A: ArrayTag]: Array[A1]
+  def toArray[A1 >: A: ClassTag]: Array[A1]
 
   /** Converts this $coll to a list.
    *  $willNotTerminateInf
@@ -502,7 +495,7 @@ trait GenTraversableOnce[+A] extends Any {
    *  $willNotTerminateInf
    *  @return a buffer containing all elements of this $coll.
    */
-  def toBuffer[A1 >: A]: collection.mutable.Buffer[A1]
+  def toBuffer[A1 >: A]: scala.collection.mutable.Buffer[A1]
 
   /** Converts this $coll to an unspecified Traversable.  Will return
    *  the same collection if this instance is already Traversable.
@@ -550,4 +543,21 @@ trait GenTraversableOnce[+A] extends Any {
    *               containing all key/value pairs of type `(T, U)` of this $coll.
    */
   def toMap[K, V](implicit ev: A <:< (K, V)): GenMap[K, V]
+
+  /** Converts this $coll to a Vector.
+   *  $willNotTerminateInf
+   *  @return a vector containing all elements of this $coll.
+   */
+  def toVector: Vector[A]
+
+  /** Converts this $coll into another by copying all elements.
+   *  @tparam Col  The collection type to build.
+   *  @return a new collection containing all elements of this $coll.
+   *
+   *  @usecase def to[Col[_]]: Col[A]
+   *    @inheritdoc
+   *    $willNotTerminateInf
+   *    @return a new collection containing all elements of this $coll.
+   */
+  def to[Col[_]](implicit cbf: CanBuildFrom[Nothing, A, Col[A @uV]]): Col[A @uV]
 }

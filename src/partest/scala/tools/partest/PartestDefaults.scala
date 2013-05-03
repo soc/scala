@@ -1,14 +1,11 @@
 package scala.tools
 package partest
 
-import nsc.io.{ File, Path, Directory }
-import util.{ PathResolver }
-import nsc.Properties.{ propOrElse, propOrNone, propOrEmpty }
+import scala.concurrent.duration.Duration
+import scala.tools.nsc.Properties.{ propOrElse, propOrNone, propOrEmpty }
+import java.lang.Runtime.{ getRuntime => runtime }
 
 object PartestDefaults {
-  import nsc.Properties._
-  private def wrapAccessControl[T](body: => Option[T]): Option[T] =
-    try body catch { case _: java.security.AccessControlException => None }
 
   def testRootName  = propOrNone("partest.root")
   def srcDirName    = propOrElse("partest.srcdir", "files")
@@ -20,12 +17,12 @@ object PartestDefaults {
   def javaCmd     = propOrElse("partest.javacmd", "java")
   def javacCmd    = propOrElse("partest.javac_cmd", "javac")
   def javaOpts    = propOrElse("partest.java_opts", "")
-  def scalacOpts  = propOrElse("partest.scalac_opts", "-deprecation")
+  def scalacOpts  = propOrElse("partest.scalac_opts", "")
 
-  def testBuild   = propOrNone("partest.build")
-  def errorCount  = propOrElse("partest.errors", "0").toInt
-  def numActors   = propOrElse("partest.actors", "6").toInt
-  def poolSize    = wrapAccessControl(propOrNone("actors.corePoolSize"))
+  def testBuild  = propOrNone("partest.build")
+  def errorCount = propOrElse("partest.errors", "0").toInt
+  def numThreads = propOrNone("partest.threads") map (_.toInt) getOrElse runtime.availableProcessors
+  def waitTime   = propOrNone("partest.timeout") map (Duration.apply) getOrElse Duration("4 hours")
 
-  def timeout     = "1200000"
+  //def timeout     = "1200000"   // per-test timeout
 }

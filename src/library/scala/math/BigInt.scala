@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2006-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2006-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -9,7 +9,7 @@
 package scala.math
 
 import java.math.BigInteger
-import language.implicitConversions
+import scala.language.implicitConversions
 
 /**
  *  @author  Martin Odersky
@@ -22,12 +22,6 @@ object BigInt {
   private val maxCached = 1024
   private val cache = new Array[BigInt](maxCached - minCached + 1)
   private val minusOne = BigInteger.valueOf(-1)
-
-  @deprecated("Use Long.MinValue", "2.9.0")
-  val MinLong = BigInt(Long.MinValue)
-
-  @deprecated("Use Long.MaxValue", "2.9.0")
-  val MaxLong = BigInt(Long.MaxValue)
 
   /** Constructs a `BigInt` whose value is equal to that of the
    *  specified integer value.
@@ -87,6 +81,11 @@ object BigInt {
   def apply(x: String, radix: Int): BigInt =
     new BigInt(new BigInteger(x, radix))
 
+  /** Translates a `java.math.BigInteger` into a BigInt.
+   */
+  def apply(x: BigInteger): BigInt =
+    new BigInt(x)
+
   /** Returns a positive BigInt that is probably prime, with the specified bitLength.
    */
   def probablePrime(bitLength: Int, rnd: scala.util.Random): BigInt =
@@ -96,19 +95,24 @@ object BigInt {
    */
   implicit def int2bigInt(i: Int): BigInt = apply(i)
 
-  /** Implicit conversion from long to BigInt
+  /** Implicit conversion from `Long` to `BigInt`.
    */
   implicit def long2bigInt(l: Long): BigInt = apply(l)
+
+  /** Implicit conversion from `java.math.BigInteger` to `scala.BigInt`.
+   */
+  implicit def javaBigInteger2bigInt(x: BigInteger): BigInt = apply(x)
 }
 
 /**
  *  @author  Martin Odersky
  *  @version 1.0, 15/07/2003
  */
+@deprecatedInheritance("This class will me made final.", "2.10.0")
 class BigInt(val bigInteger: BigInteger) extends ScalaNumber with ScalaNumericConversions with Serializable {
   /** Returns the hash code for this BigInt. */
   override def hashCode(): Int =
-    if (isValidLong) unifiedPrimitiveHashcode
+    if (isValidLong) unifiedPrimitiveHashcode()
     else bigInteger.##
 
   /** Compares this BigInt with the specified value for equality.
@@ -153,7 +157,7 @@ class BigInt(val bigInteger: BigInteger) extends ScalaNumber with ScalaNumericCo
   }
   /** Some implementations of java.math.BigInteger allow huge values with bit length greater than Int.MaxValue .
    * The BigInteger.bitLength method returns truncated bit length in this case .
-   * This method tests if result of bitLength is valid. 
+   * This method tests if result of bitLength is valid.
    * This method will become unnecessary if BigInt constructors reject huge BigIntegers.
    */
   private def bitLengthOverflow = {
@@ -161,7 +165,7 @@ class BigInt(val bigInteger: BigInteger) extends ScalaNumber with ScalaNumericCo
     (shifted.signum != 0) && !(shifted equals BigInt.minusOne)
   }
 
-  protected[math] def isWhole = true
+  def isWhole() = true
   def underlying = bigInteger
 
   /** Compares this BigInt with the specified BigInt for equality.
@@ -243,7 +247,7 @@ class BigInt(val bigInteger: BigInteger) extends ScalaNumber with ScalaNumericCo
    */
   def gcd (that: BigInt): BigInt = new BigInt(this.bigInteger.gcd(that.bigInteger))
 
-  /** Returns a BigInt whose value is (this mod m).
+  /** Returns a BigInt whose value is (this mod that).
    *  This method differs from `%` in that it always returns a non-negative BigInt.
    */
   def mod (that: BigInt): BigInt = new BigInt(this.bigInteger.mod(that.bigInteger))
@@ -284,9 +288,6 @@ class BigInt(val bigInteger: BigInteger) extends ScalaNumber with ScalaNumericCo
    *   0  if it is equal to 0
    */
   def signum: Int = this.bigInteger.signum()
-
-  @deprecated("Use ~bigInt (the unary_~ method) instead", "2.10.0")
-  def ~ : BigInt = ~this
 
   /** Returns the bitwise complement of this BigInt
    */
@@ -354,7 +355,7 @@ class BigInt(val bigInteger: BigInteger) extends ScalaNumber with ScalaNumericCo
   def charValue   = intValue.toChar
 
   /** Converts this BigInt to an <tt>int</tt>.
-   *  If the BigInt is too big to fit in a int, only the low-order 32 bits
+   *  If the BigInt is too big to fit in an int, only the low-order 32 bits
    *  are returned. Note that this conversion can lose information about the
    *  overall magnitude of the BigInt value as well as return a result with
    *  the opposite sign.

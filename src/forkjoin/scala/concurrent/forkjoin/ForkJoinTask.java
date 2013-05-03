@@ -595,6 +595,30 @@ public abstract class ForkJoinTask<V> implements Future<V>, Serializable {
             }
         }
     }
+    
+    /**
+     * A version of "sneaky throw" to relay exceptions
+     */
+    static void rethrow(final Throwable ex) {
+        if (ex != null) {
+            if (ex instanceof Error)
+                throw (Error)ex;
+            if (ex instanceof RuntimeException)
+                throw (RuntimeException)ex;
+            ForkJoinTask.<RuntimeException>uncheckedThrow(ex);
+        }
+    }
+
+    /**
+     * The sneaky part of sneaky throw, relying on generics
+     * limitations to evade compiler complaints about rethrowing
+     * unchecked exceptions
+     */
+    @SuppressWarnings("unchecked") static <T extends Throwable>
+        void uncheckedThrow(Throwable t) throws T {
+        if (t != null)
+            throw (T)t; // rely on vacuous cast
+    }
 
     /**
      * Throws exception, if any, associated with the given status.
@@ -604,7 +628,7 @@ public abstract class ForkJoinTask<V> implements Future<V>, Serializable {
                         (s == EXCEPTIONAL) ? getThrowableException() :
                         null);
         if (ex != null)
-            U.throwException(ex);
+            ForkJoinTask.rethrow(ex);
     }
 
     // public methods
@@ -742,7 +766,7 @@ public abstract class ForkJoinTask<V> implements Future<V>, Serializable {
             }
         }
         if (ex != null)
-            U.throwException(ex);
+            ForkJoinTask.rethrow(ex);
     }
 
     /**
@@ -799,7 +823,7 @@ public abstract class ForkJoinTask<V> implements Future<V>, Serializable {
             }
         }
         if (ex != null)
-            U.throwException(ex);
+            ForkJoinTask.rethrow(ex);
         return tasks;
     }
 
@@ -1537,23 +1561,6 @@ public abstract class ForkJoinTask<V> implements Future<V>, Serializable {
      * @return a sun.misc.Unsafe
      */
     private static sun.misc.Unsafe getUnsafe() {
-        try {
-            return sun.misc.Unsafe.getUnsafe();
-        } catch (SecurityException se) {
-            try {
-                return java.security.AccessController.doPrivileged
-                    (new java.security
-                     .PrivilegedExceptionAction<sun.misc.Unsafe>() {
-                        public sun.misc.Unsafe run() throws Exception {
-                            java.lang.reflect.Field f = sun.misc
-                                .Unsafe.class.getDeclaredField("theUnsafe");
-                            f.setAccessible(true);
-                            return (sun.misc.Unsafe) f.get(null);
-                        }});
-            } catch (java.security.PrivilegedActionException e) {
-                throw new RuntimeException("Could not initialize intrinsics",
-                                           e.getCause());
-            }
-        }
+        return scala.concurrent.util.Unsafe.instance;
     }
 }

@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2003-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2003-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -11,7 +11,7 @@ package scala.collection
 
 import generic._
 import mutable.{ Builder, SetBuilder }
-import annotation.{migration, bridge}
+import scala.annotation.{migration, bridge}
 import parallel.ParSet
 
 /** A template trait for sets.
@@ -78,7 +78,7 @@ self =>
 
   protected[this] override def parCombiner = ParSet.newCombiner[A]
 
-  /** Overridden for efficiency. */
+  /* Overridden for efficiency. */
   override def toSeq: Seq[A] = toBuffer[A]
   override def toBuffer[A1 >: A]: mutable.Buffer[A1] = {
     val result = new mutable.ArrayBuffer[A1](size)
@@ -180,14 +180,14 @@ self =>
     def hasNext = len <= elms.size || itr.hasNext
     def next = {
       if (!itr.hasNext) {
-        if (len > elms.size) Iterator.empty.next
+        if (len > elms.size) Iterator.empty.next()
         else {
           itr = new SubsetsItr(elms, len)
           len += 1
         }
       }
 
-      itr.next
+      itr.next()
     }
   }
 
@@ -205,11 +205,11 @@ self =>
 
     def hasNext = _hasNext
     def next(): This = {
-      if (!hasNext) Iterator.empty.next
+      if (!hasNext) Iterator.empty.next()
 
       val buf = self.newBuilder
       idxs.slice(0, len) foreach (idx => buf += elms(idx))
-      val result = buf.result
+      val result = buf.result()
 
       var i = len - 1
       while (i >= 0 && idxs(i) == idxs(i+1)-1) i -= 1

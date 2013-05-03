@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2002-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2002-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -10,6 +10,8 @@
 
 package scala
 
+import scala.language.implicitConversions
+
 /** `Boolean` (equivalent to Java's `boolean` primitive type) is a
  *  subtype of [[scala.AnyVal]]. Instances of `Boolean` are not
  *  represented by an object in the underlying runtime system.
@@ -17,7 +19,7 @@ package scala
  *  There is an implicit conversion from [[scala.Boolean]] => [[scala.runtime.RichBoolean]]
  *  which provides useful non-primitive operations.
  */
-final class Boolean private extends AnyVal {
+final abstract class Boolean private extends AnyVal {
   /**
    * Negates a Boolean expression.
    *
@@ -26,7 +28,7 @@ final class Boolean private extends AnyVal {
    *
    * @return the negated expression
    */
-  def unary_! : Boolean = sys.error("stub")
+  def unary_! : Boolean
 
   /**
     * Compares two Boolean expressions and returns `true` if they evaluate to the same value.
@@ -35,7 +37,7 @@ final class Boolean private extends AnyVal {
     *  - `a` and `b` are `true` or
     *  - `a` and `b` are `false`.
     */
-  def ==(x: Boolean): Boolean = sys.error("stub")
+  def ==(x: Boolean): Boolean
 
   /**
     * Compares two Boolean expressions and returns `true` if they evaluate to a different value.
@@ -44,7 +46,7 @@ final class Boolean private extends AnyVal {
     *  - `a` is `true` and `b` is `false` or
     *  - `a` is `false` and `b` is `true`.
     */
-  def !=(x: Boolean): Boolean = sys.error("stub")
+  def !=(x: Boolean): Boolean
 
   /**
     * Compares two Boolean expressions and returns `true` if one or both of them evaluate to true.
@@ -58,7 +60,7 @@ final class Boolean private extends AnyVal {
     *       behaves as if it was declared as `def ||(x: => Boolean): Boolean`.
     *       If `a` evaluates to `true`, `true` is returned without evaluating `b`.
     */
-  def ||(x: Boolean): Boolean = sys.error("stub")
+  def ||(x: Boolean): Boolean
 
   /**
     * Compares two Boolean expressions and returns `true` if both of them evaluate to true.
@@ -70,11 +72,11 @@ final class Boolean private extends AnyVal {
     *       behaves as if it was declared as `def &&(x: => Boolean): Boolean`.
     *       If `a` evaluates to `false`, `false` is returned without evaluating `b`.
     */
-  def &&(x: Boolean): Boolean = sys.error("stub")
+  def &&(x: Boolean): Boolean
 
   // Compiler won't build with these seemingly more accurate signatures
-  // def ||(x: => Boolean): Boolean = sys.error("stub")
-  // def &&(x: => Boolean): Boolean = sys.error("stub")
+  // def ||(x: => Boolean): Boolean
+  // def &&(x: => Boolean): Boolean
 
   /**
     * Compares two Boolean expressions and returns `true` if one or both of them evaluate to true.
@@ -86,7 +88,7 @@ final class Boolean private extends AnyVal {
     *
     * @note This method evaluates both `a` and `b`, even if the result is already determined after evaluating `a`.
     */
-  def |(x: Boolean): Boolean  = sys.error("stub")
+  def |(x: Boolean): Boolean
 
   /**
     * Compares two Boolean expressions and returns `true` if both of them evaluate to true.
@@ -96,7 +98,7 @@ final class Boolean private extends AnyVal {
     *
     * @note This method evaluates both `a` and `b`, even if the result is already determined after evaluating `a`.
     */
-  def &(x: Boolean): Boolean  = sys.error("stub")
+  def &(x: Boolean): Boolean
 
   /**
     * Compares two Boolean expressions and returns `true` if they evaluate to a different value.
@@ -105,14 +107,16 @@ final class Boolean private extends AnyVal {
     *  - `a` is `true` and `b` is `false` or
     *  - `a` is `false` and `b` is `true`.
     */
-  def ^(x: Boolean): Boolean  = sys.error("stub")
+  def ^(x: Boolean): Boolean
 
-  override def getClass(): Class[Boolean] = sys.error("stub")
+  override def getClass(): Class[Boolean] = null
 }
 
-object Boolean  extends AnyValCompanion {
+object Boolean extends AnyValCompanion {
 
   /** Transform a value type into a boxed reference type.
+   *
+   *  Runtime implementation determined by `scala.runtime.BoxesRunTime.boxToBoolean`. See [[https://github.com/scala/scala src/library/scala/runtime/BoxesRunTime.java]].
    *
    *  @param  x   the Boolean to be boxed
    *  @return     a java.lang.Boolean offering `x` as its underlying value.
@@ -123,6 +127,8 @@ object Boolean  extends AnyValCompanion {
    *  method is not typesafe: it accepts any Object, but will throw
    *  an exception if the argument is not a java.lang.Boolean.
    *
+   *  Runtime implementation determined by `scala.runtime.BoxesRunTime.unboxToBoolean`. See [[https://github.com/scala/scala src/library/scala/runtime/BoxesRunTime.java]].
+   *
    *  @param  x   the java.lang.Boolean to be unboxed.
    *  @throws     ClassCastException  if the argument is not a java.lang.Boolean
    *  @return     the Boolean resulting from calling booleanValue() on `x`
@@ -132,5 +138,6 @@ object Boolean  extends AnyValCompanion {
   /** The String representation of the scala.Boolean companion object.
    */
   override def toString = "object scala.Boolean"
+
 }
 

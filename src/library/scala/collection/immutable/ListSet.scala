@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2003-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2003-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -10,7 +10,7 @@ package scala.collection
 package immutable
 
 import generic._
-import annotation.{tailrec, bridge}
+import scala.annotation.{tailrec, bridge}
 import mutable.{ ListBuffer, Builder }
 
 /** $factoryInfo
@@ -75,7 +75,7 @@ class ListSet[A] extends AbstractSet[A]
    *  @return number of set elements.
    */
   override def size: Int = 0
-  override def isEmpty: Boolean = true;
+  override def isEmpty: Boolean = true
 
   /** Checks if this set contains element `elem`.
    *
@@ -100,7 +100,7 @@ class ListSet[A] extends AbstractSet[A]
    */
   override def ++(xs: GenTraversableOnce[A]): ListSet[A] =
     if (xs.isEmpty) this
-    else (new ListSet.ListSetBuilder(this) ++= xs.seq).result
+    else (new ListSet.ListSetBuilder(this) ++= xs.seq).result()
 
   private[ListSet] def unchecked_+(e: A): ListSet[A] = new Node(e)
   private[ListSet] def unchecked_outer: ListSet[A] =
@@ -116,28 +116,28 @@ class ListSet[A] extends AbstractSet[A]
     def hasNext = that.nonEmpty
     def next: A =
       if (hasNext) {
-        val res = that.elem
-        that = that.next
+        val res = that.head
+        that = that.tail
         res
       }
-      else Iterator.empty.next
+      else Iterator.empty.next()
   }
 
   /**
    *  @throws Predef.NoSuchElementException
    */
-  protected def elem: A = throw new NoSuchElementException("Set has no elements");
+  override def head: A = throw new NoSuchElementException("Set has no elements")
 
   /**
    *  @throws Predef.NoSuchElementException
    */
-  protected def next: ListSet[A] = throw new NoSuchElementException("Next of an empty set");
+  override def tail: ListSet[A] = throw new NoSuchElementException("Next of an empty set")
 
   override def stringPrefix = "ListSet"
 
   /** Represents an entry in the `ListSet`.
    */
-  protected class Node(override protected val elem: A) extends ListSet[A] with Serializable {
+  protected class Node(override val head: A) extends ListSet[A] with Serializable {
     override private[ListSet] def unchecked_outer = self
 
     /** Returns the number of elements in this set.
@@ -162,7 +162,7 @@ class ListSet[A] extends AbstractSet[A]
      */
     override def contains(e: A) = containsInternal(this, e)
     @tailrec private def containsInternal(n: ListSet[A], e: A): Boolean =
-      !n.isEmpty && (n.elem == e || containsInternal(n.unchecked_outer, e))
+      !n.isEmpty && (n.head == e || containsInternal(n.unchecked_outer, e))
 
     /** This method creates a new set with an additional element.
      */
@@ -170,10 +170,10 @@ class ListSet[A] extends AbstractSet[A]
 
     /** `-` can be used to remove a single element from a set.
      */
-    override def -(e: A): ListSet[A] = if (e == elem) self else {
-      val tail = self - e; new tail.Node(elem)
+    override def -(e: A): ListSet[A] = if (e == head) self else {
+      val tail = self - e; new tail.Node(head)
     }
 
-    override protected def next: ListSet[A] = self
+    override def tail: ListSet[A] = self
   }
 }

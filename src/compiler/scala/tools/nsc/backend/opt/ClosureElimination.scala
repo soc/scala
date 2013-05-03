@@ -1,5 +1,5 @@
  /* NSC -- new Scala compiler
- * Copyright 2005-2011 LAMP/EPFL
+ * Copyright 2005-2013 LAMP/EPFL
  * @author  Iulian Dragos
  */
 
@@ -7,7 +7,6 @@ package scala.tools.nsc
 package backend.opt
 
 import scala.tools.nsc.backend.icode.analysis.LubException
-import scala.tools.nsc.symtab._
 
 /**
  *  @author Iulian Dragos
@@ -35,7 +34,7 @@ abstract class ClosureElimination extends SubComponent {
       case (STORE_LOCAL(x), LOAD_LOCAL(y)) if (x == y) =>
         var liveOut = liveness.out(bb)
         if (!liveOut(x)) {
-          log("store/load to a dead local? " + x)
+          debuglog("store/load to a dead local? " + x)
           val instrs = bb.getArray
           var idx = instrs.length - 1
           while (idx > 0 && (instrs(idx) ne i2)) {
@@ -43,7 +42,7 @@ abstract class ClosureElimination extends SubComponent {
             idx -= 1
           }
           if (!liveOut(x)) {
-            log("removing dead store/load " + x)
+            log("Removing dead store/load of " + x.sym.initialize.defString)
             Some(Nil)
           } else None
         } else
@@ -83,7 +82,8 @@ abstract class ClosureElimination extends SubComponent {
    *
    */
   class ClosureElim {
-    def analyzeClass(cls: IClass): Unit = if (settings.Xcloselim.value) {
+    def analyzeClass(cls: IClass): Unit = if (settings.Xcloselim) {
+      log(s"Analyzing ${cls.methods.size} methods in $cls.")
       cls.methods foreach { m =>
         analyzeMethod(m)
         peephole(m)
@@ -95,9 +95,8 @@ abstract class ClosureElimination extends SubComponent {
 
     /* Some embryonic copy propagation. */
     def analyzeMethod(m: IMethod): Unit = try {if (m.hasCode) {
-      log("Analyzing " + m)
       cpp.init(m)
-      cpp.run
+      cpp.run()
 
       m.linearizedBlocks() foreach { bb =>
         var info = cpp.in(bb)
@@ -109,24 +108,21 @@ abstract class ClosureElimination extends SubComponent {
               val t = info.getBinding(l)
               t match {
               	case Deref(This) | Const(_) =>
-                  bb.replaceInstruction(i, valueToInstruction(t));
-                  log("replaced " + i + " with " + t)
+                  bb.replaceInstruction(i, valueToInstruction(t))
+                  debuglog(s"replaced $i with $t")
 
                 case _ =>
-                  bb.replaceInstruction(i, LOAD_LOCAL(info.getAlias(l)))
-                  log("replaced " + i + " with " + info.getAlias(l))
-
+                  val t = info.getAlias(l)
+                  bb.replaceInstruction(i, LOAD_LOCAL(t))
+                  debuglog(s"replaced $i with $t")
               }
 
             case LOAD_FIELD(f, false) /* if accessible(f, m.symbol) */ =>
               def replaceFieldAccess(r: Record) {
-                val Record(cls, bindings) = r
-                info.getFieldNonRecordValue(r, f) match {
-                	case Some(v) =>
-                		bb.replaceInstruction(i,
-                				DROP(REFERENCE(cls)) :: valueToInstruction(v) :: Nil);
-                		log("Replaced " + i + " with " + info.getFieldNonRecordValue(r, f));
-                	case None =>
+                val Record(cls, _) = r
+                info.getFieldNonRecordValue(r, f) foreach { v =>
+                        bb.replaceInstruction(i, DROP(REFERENCE(cls)) :: valueToInstruction(v) :: Nil)
+                        debuglog(s"replaced $i with $v")
                 }
               }
 
@@ -150,21 +146,21 @@ abstract class ClosureElimination extends SubComponent {
                 case _ =>
               }
 
-            case UNBOX(_) =>
+            case UNBOX(boxType) =>
               info.stack match {
                 case Deref(LocalVar(loc1)) :: _ if info.bindings isDefinedAt LocalVar(loc1) =>
                   val value = info.getBinding(loc1)
                   value match {
-                    case Boxed(LocalVar(loc2)) =>
+                    case Boxed(LocalVar(loc2)) if loc2.kind == boxType =>
                       bb.replaceInstruction(i, DROP(icodes.ObjectReference) :: valueToInstruction(info.getBinding(loc2)) :: Nil)
-                      log("replaced " + i + " with " + info.getBinding(loc2))
+                      debuglog("replaced " + i + " with " + info.getBinding(loc2))
                     case _ =>
                       ()
                   }
-                case Boxed(LocalVar(loc1)) :: _ =>
+                case Boxed(LocalVar(loc1)) :: _ if loc1.kind == boxType =>
                   val loc2 = info.getAlias(loc1)
                   bb.replaceInstruction(i, DROP(icodes.ObjectReference) :: valueToInstruction(Deref(LocalVar(loc2))) :: Nil)
-                  log("replaced " + i + " with " + LocalVar(loc2))
+                  debuglog("replaced " + i + " with " + LocalVar(loc2))
                 case _ =>
               }
 
@@ -191,28 +187,20 @@ abstract class ClosureElimination extends SubComponent {
       case Boxed(LocalVar(v)) =>
         LOAD_LOCAL(v)
     }
-
-    /** is field 'f' accessible from method 'm'? */
-    def accessible(f: Symbol, m: Symbol): Boolean =
-      f.isPublic || (f.isProtected && (f.enclosingPackageClass == m.enclosingPackageClass))
   } /* class ClosureElim */
 
 
   /** Peephole optimization. */
   abstract class PeepholeOpt {
-
-    private var method: IMethod = NoIMethod
-
     /** Concrete implementations will perform their optimizations here */
     def peep(bb: BasicBlock, i1: Instruction, i2: Instruction): Option[List[Instruction]]
 
     var liveness: global.icodes.liveness.LivenessAnalysis = null
 
     def apply(m: IMethod): Unit = if (m.hasCode) {
-      method = m
       liveness = new global.icodes.liveness.LivenessAnalysis
       liveness.init(m)
-      liveness.run
+      liveness.run()
       m foreachBlock transformBlock
     }
 
@@ -238,7 +226,7 @@ abstract class ClosureElimination extends SubComponent {
           h = t.head
           t = t.tail
         }
-      } while (redo);
+      } while (redo)
       b fromList newInstructions
     }
   }

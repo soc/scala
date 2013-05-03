@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2006-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2006-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -8,7 +8,7 @@
 
 package scala.util.parsing.input
 
-import collection.mutable.ArrayBuffer
+import scala.collection.mutable.ArrayBuffer
 
 /** `OffsetPosition` is a standard class for positions
  *   represented as offsets into a source ``document''.
@@ -22,7 +22,7 @@ case class OffsetPosition(source: java.lang.CharSequence, offset: Int) extends P
 
   /** An index that contains all line starts, including first line, and eof. */
   private lazy val index: Array[Int] = {
-    var lineStarts = new ArrayBuffer[Int]
+    val lineStarts = new ArrayBuffer[Int]
     lineStarts += 0
     for (i <- 0 until source.length)
       if (source.charAt(i) == '\n') lineStarts += (i + 1)

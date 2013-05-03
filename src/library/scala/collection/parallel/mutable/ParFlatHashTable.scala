@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2003-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2003-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -9,7 +9,7 @@
 package scala.collection
 package parallel.mutable
 
-import collection.parallel.IterableSplitter
+import scala.collection.parallel.IterableSplitter
 
 /** Parallel flat hash table.
  *
@@ -19,13 +19,13 @@ import collection.parallel.IterableSplitter
  *
  *  @author Aleksandar Prokopec
  */
-trait ParFlatHashTable[T] extends collection.mutable.FlatHashTable[T] {
+trait ParFlatHashTable[T] extends scala.collection.mutable.FlatHashTable[T] {
 
   override def alwaysInitSizeMap = true
 
   abstract class ParFlatHashTableIterator(var idx: Int, val until: Int, val totalsize: Int)
   extends IterableSplitter[T] with SizeMapUtils {
-    import collection.DebugUtils._
+    import scala.collection.DebugUtils._
 
     private var traversed = 0
     private val itertable = table
@@ -38,10 +38,6 @@ trait ParFlatHashTable[T] extends collection.mutable.FlatHashTable[T] {
       }
     }
 
-    private def checkbounds() = if (idx >= itertable.length) {
-      throw new IndexOutOfBoundsException(idx.toString)
-    }
-
     def newIterator(index: Int, until: Int, totalsize: Int): IterableSplitter[T]
 
     def remaining = totalsize - traversed
@@ -52,7 +48,7 @@ trait ParFlatHashTable[T] extends collection.mutable.FlatHashTable[T] {
       idx += 1
       if (hasNext) scan()
       r
-    } else Iterator.empty.next
+    } else Iterator.empty.next()
     def dup = newIterator(idx, until, totalsize)
     def split = if (remaining > 1) {
       val divpt = (until + idx) / 2
@@ -102,11 +98,5 @@ trait ParFlatHashTable[T] extends collection.mutable.FlatHashTable[T] {
       }
       count
     }
-
-    private def check() = if (table.slice(idx, until).count(_ != null) != remaining) {
-      println("Invariant broken: " + debugInformation)
-      assert(false)
-    }
   }
-
 }

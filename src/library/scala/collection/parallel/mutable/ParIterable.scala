@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2003-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2003-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -12,8 +12,6 @@ package scala.collection.parallel.mutable
 import scala.collection.generic._
 import scala.collection.parallel.ParIterableLike
 import scala.collection.parallel.Combiner
-import scala.collection.GenIterable
-
 
 /** A template trait for mutable parallel iterable collections.
  *
@@ -26,10 +24,11 @@ import scala.collection.GenIterable
  *  @author Aleksandar Prokopec
  *  @since 2.9
  */
-trait ParIterable[T] extends collection/*.mutable*/.GenIterable[T]
-                        with collection.parallel.ParIterable[T]
+trait ParIterable[T] extends scala.collection/*.mutable*/.GenIterable[T]
+                        with scala.collection.parallel.ParIterable[T]
                         with GenericParTemplate[T, ParIterable]
-                        with ParIterableLike[T, ParIterable[T], Iterable[T]] {
+                        with ParIterableLike[T, ParIterable[T], Iterable[T]]
+                        with Mutable {
   override def companion: GenericCompanion[ParIterable] with GenericParCompanion[ParIterable] = ParIterable
   //protected[this] override def newBuilder = ParIterable.newBuilder[T]
 
@@ -38,7 +37,7 @@ trait ParIterable[T] extends collection/*.mutable*/.GenIterable[T]
 
   override def toSeq: ParSeq[T] = toParCollection[T, ParSeq[T]](() => ParSeq.newCombiner[T])
 
-  def seq: collection.mutable.Iterable[T]
+  def seq: scala.collection.mutable.Iterable[T]
 }
 
 /** $factoryInfo

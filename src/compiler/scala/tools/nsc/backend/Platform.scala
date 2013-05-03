@@ -1,5 +1,5 @@
 /* NSC -- new Scala compiler
- * Copyright 2005-2011 LAMP/EPFL
+ * Copyright 2005-2013 LAMP/EPFL
  * @author  Paul Phillips
  */
 
@@ -23,6 +23,9 @@ trait Platform {
 
   /** The root symbol loader. */
   def rootLoader: LazyType
+
+  /** Update classpath with a substitution that maps entries to entries */
+  def updateClassPath(subst: Map[ClassPath[BinaryRepr], ClassPath[BinaryRepr]])
 
   /** Any platform-specific phases. */
   def platformPhases: List[SubComponent]

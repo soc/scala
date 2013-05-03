@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2007-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2007-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -8,46 +8,61 @@
 
 package scala.math
 
-import java.{ lang => jl }
+/** A slightly more specific conversion trait for classes which
+ *  extend ScalaNumber (which excludes value classes.)
+ */
+trait ScalaNumericConversions extends ScalaNumber with ScalaNumericAnyConversions {
+  def underlying(): Object
+}
 
 /** Conversions which present a consistent conversion interface
- *  across all the numeric types.
+ *  across all the numeric types, suitable for use in value classes.
  */
-trait ScalaNumericConversions extends ScalaNumber {
+trait ScalaNumericAnyConversions extends Any {
+  def isWhole(): Boolean
+  def underlying(): Any
+
+  def byteValue(): Byte
+  def shortValue(): Short
+  def intValue(): Int
+  def longValue(): Long
+  def floatValue(): Float
+  def doubleValue(): Double
+
   /** Returns the value of this as a [[scala.Char]]. This may involve
     * rounding or truncation.
     */
-  def toChar = intValue.toChar
+  def toChar = intValue().toChar
 
   /** Returns the value of this as a [[scala.Byte]]. This may involve
     * rounding or truncation.
     */
-  def toByte = byteValue
+  def toByte = byteValue()
 
   /** Returns the value of this as a [[scala.Short]]. This may involve
     * rounding or truncation.
     */
-  def toShort = shortValue
+  def toShort = shortValue()
 
   /** Returns the value of this as an [[scala.Int]]. This may involve
     * rounding or truncation.
     */
-  def toInt = intValue
+  def toInt = intValue()
 
   /** Returns the value of this as a [[scala.Long]]. This may involve
     * rounding or truncation.
     */
-  def toLong = longValue
+  def toLong = longValue()
 
   /** Returns the value of this as a [[scala.Float]]. This may involve
     * rounding or truncation.
     */
-  def toFloat = floatValue
+  def toFloat = floatValue()
 
   /** Returns the value of this as a [[scala.Double]]. This may involve
     * rounding or truncation.
     */
-  def toDouble = doubleValue
+  def toDouble = doubleValue()
 
   /** Returns `true` iff this has a zero fractional part, and is within the
     * range of [[scala.Byte]] MinValue and MaxValue; otherwise returns `false`.

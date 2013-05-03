@@ -1,12 +1,12 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2002-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2002-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
 \*                                                                      */
 // GENERATED CODE: DO NOT EDIT.
-// genprod generated these sources at: Mon Apr 30 07:46:11 PDT 2012
+// genprod generated these sources at: Sun Mar 24 14:14:12 CET 2013
 
 package scala
 
@@ -33,7 +33,7 @@ package scala
  *  latter can specify inputs which it will not handle.
 
  */
-trait Function0[@specialized +R] extends AnyRef { self =>
+trait Function0[@specialized(Specializable.Primitives) +R] extends AnyRef { self =>
   /** Apply the body of this function to the arguments.
    *  @return   the result of function application.
    */

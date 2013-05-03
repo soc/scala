@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2003-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2003-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -87,6 +87,13 @@ extends AbstractSeq[A]
   override def copyToArray[B >: A](xs: Array[B], start: Int, len: Int) {
     val len1 = len min (xs.length - start) min length
     Array.copy(array, 0, xs, start, len1)
+  }
+
+  override def clone(): ArraySeq[A] = {
+    val cloned = array.clone().asInstanceOf[Array[AnyRef]]
+    new ArraySeq[A](length) {
+      override val array = cloned
+    }
   }
 
 }

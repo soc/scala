@@ -1,18 +1,17 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2007-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2007-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
 \*                                                                      */
-
-
 
 package scala.swing
 
 import event._
 import javax.swing.{JList, JComponent, JComboBox, JTextField, ComboBoxModel, AbstractListModel, ListCellRenderer}
 import java.awt.event.ActionListener
+import scala.language.implicitConversions
 
 object ComboBox {
   /**
@@ -184,7 +183,7 @@ class ComboBox[A](items: Seq[A]) extends Component with Publisher {
    * of the component to its own defaults _after_ the renderer has been
    * configured. That's Swing's principle of most suprise.
    */
-  def renderer: ListView.Renderer[A] = ListView.Renderer.wrap(peer.getRenderer)
+  def renderer: ListView.Renderer[A] = ListView.Renderer.wrap[A](peer.getRenderer)
   def renderer_=(r: ListView.Renderer[A]) { peer.setRenderer(r.peer) }
 
   /* XXX: currently not safe to expose:
@@ -205,6 +204,6 @@ class ComboBox[A](items: Seq[A]) extends Component with Publisher {
 
   def prototypeDisplayValue: Option[A] = toOption[A](peer.getPrototypeDisplayValue)
   def prototypeDisplayValue_=(v: Option[A]) {
-    peer.setPrototypeDisplayValue(v map toAnyRef orNull)
+    peer.setPrototypeDisplayValue((v map toAnyRef).orNull)
   }
 }

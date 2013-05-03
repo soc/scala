@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2003-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2003-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -24,7 +24,7 @@ import scala.xml.parsing.{ ExternalSources, MarkupHandler, MarkupParser }
  *  @author Paul Phillips
  */
 class XMLEventReader(src: Source)
-extends collection.AbstractIterator[XMLEvent]
+extends scala.collection.AbstractIterator[XMLEvent]
    with ProducerConsumerIterator[XMLEvent] {
 
   // We implement a pull parser as an iterator, but since we may be operating on
@@ -139,10 +139,10 @@ trait ProducerConsumerIterator[T >: Null] extends Iterator[T] {
   def hasNext = !eos && (buffer != null || fillBuffer)
 
   def next() = {
-    if (eos) throw new NoSuchElementException("ProducerConsumerIterator")
-    if (buffer == null) fillBuffer
+    if (eos()) throw new NoSuchElementException("ProducerConsumerIterator")
+    if (buffer == null) fillBuffer()
 
-    drainBuffer
+    drainBuffer()
   }
 
   def available() = isElement(buffer) || isElement(queue.peek)

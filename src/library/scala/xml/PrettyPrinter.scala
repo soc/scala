@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2003-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2003-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -47,7 +47,6 @@ class PrettyPrinter(width: Int, step: Int) {
     val tmp = width - cur
     if (s.length <= tmp)
       return List(Box(ind, s))
-    val sb = new StringBuilder()
     var i = s indexOf ' '
     if (i > tmp || i == -1) throw new BrokenException() // cannot break
 
@@ -142,13 +141,13 @@ class PrettyPrinter(width: Int, step: Int) {
       case Text(s) if s.trim() == "" =>
         ;
       case _:Atom[_] | _:Comment | _:EntityRef | _:ProcInstr =>
-        makeBox( ind, node.toString.trim() )
+        makeBox( ind, node.toString().trim() )
       case g @ Group(xs) =>
         traverse(xs.iterator, pscope, ind)
       case _ =>
         val test = {
           val sb = new StringBuilder()
-          Utility.serialize(node, pscope, sb, false)
+          Utility.serialize(node, pscope, sb, stripComments = false)
           if (doPreserve(node)) sb.toString
           else TextBuffer.fromString(sb.toString).toText(0).data
         }

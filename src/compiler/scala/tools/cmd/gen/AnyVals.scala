@@ -1,5 +1,5 @@
 /* NSC -- new Scala compiler
- * Copyright 2007-2011 LAMP/EPFL
+ * Copyright 2007-2013 LAMP/EPFL
  * @author  Paul Phillips
  */
 
@@ -13,8 +13,8 @@ trait AnyValReps {
 
   sealed abstract class AnyValNum(name: String, repr: Option[String], javaEquiv: String) extends AnyValRep(name,repr,javaEquiv) {
 
-    case class Op(val op : String, val doc : String)
-    
+    case class Op(op : String, doc : String)
+
     private def companionCoercions(tos: AnyValRep*) = {
       tos.toList map (to =>
         """implicit def @javaequiv@2%s(x: @name@): %s = x.to%s""".format(to.javaEquiv, to.name, to.name)
@@ -22,9 +22,9 @@ trait AnyValReps {
     }
     def coercionCommentExtra = ""
     def coercionComment = """
-  /** Language mandated coercions from @name@ to "wider" types.%s
-   */""".format(coercionCommentExtra)
-    
+/** Language mandated coercions from @name@ to "wider" types.%s
+ */""".format(coercionCommentExtra)
+
     def implicitCoercions: List[String] = {
       val coercions = this match {
         case B     => companionCoercions(S, I, L, F, D)
@@ -35,7 +35,7 @@ trait AnyValReps {
         case _     => Nil
       }
       if (coercions.isEmpty) Nil
-      else coercionComment :: coercions
+      else coercionComment.lines.toList ++ coercions
     }
 
     def isCardinal: Boolean = isIntegerType(this)
@@ -177,13 +177,13 @@ trait AnyValReps {
       case (res, lines) =>
         val xs = lines map {
           case ""   => ""
-          case s    => interpolate(s) + " = " + stub
+          case s    => interpolate(s)
         }
         res ++ xs
     }
     def objectLines = {
       val comp = if (isCardinal) cardinalCompanion else floatingCompanion
-      (comp + allCompanions + "\n" + nonUnitCompanions).trim.lines.toList ++ implicitCoercions map interpolate
+      interpolate(comp + allCompanions + "\n" + nonUnitCompanions).trim.lines.toList ++ (implicitCoercions map interpolate)
     }
 
     /** Makes a set of binary operations based on the given set of ops, args, and resultFn.
@@ -205,15 +205,18 @@ trait AnyValReps {
     def classLines: List[String]
     def objectLines: List[String]
     def commonClassLines = List(
-      "override def getClass(): Class[@name@]"
+      "override def getClass(): Class[@name@] = null"
     )
 
     def lcname = name.toLowerCase
+    def boxedSimpleName = this match {
+      case C => "Character"
+      case I => "Integer"
+      case _ => name
+    }
     def boxedName = this match {
       case U => "scala.runtime.BoxedUnit"
-      case C => "java.lang.Character"
-      case I => "java.lang.Integer"
-      case _ => "java.lang." + name
+      case _ => "java.lang." + boxedSimpleName
     }
     def zeroRep = this match {
       case L => "0L"
@@ -228,7 +231,13 @@ trait AnyValReps {
     def indentN(s: String) = s.lines map indent mkString "\n"
 
     def boxUnboxImpls = Map(
+      "@boxRunTimeDoc@" -> """
+ *  Runtime implementation determined by `scala.runtime.BoxesRunTime.boxTo%s`. See [[https://github.com/scala/scala src/library/scala/runtime/BoxesRunTime.java]].
+ *""".format(boxedSimpleName),
       "@boxImpl@"   -> "%s.valueOf(x)".format(boxedName),
+      "@unboxRunTimeDoc@" -> """
+ *  Runtime implementation determined by `scala.runtime.BoxesRunTime.unboxTo%s`. See [[https://github.com/scala/scala src/library/scala/runtime/BoxesRunTime.java]].
+ *""".format(name),
       "@unboxImpl@" -> "x.asInstanceOf[%s].%sValue()".format(boxedName, lcname),
       "@unboxDoc@"  -> "the %s resulting from calling %sValue() on `x`".format(name, lcname)
     )
@@ -247,8 +256,8 @@ trait AnyValReps {
     def classDoc  = interpolate(classDocTemplate)
     def objectDoc = ""
     def mkImports = ""
-    
-    def mkClass       = assemble("final class " + name + " private extends AnyVal", classLines)
+
+    def mkClass       = assemble("final abstract class " + name + " private extends AnyVal", classLines)
     def mkObject      = assemble("object " + name + " extends AnyValCompanion", objectLines)
     def make()    = List[String](
       headerTemplate,
@@ -272,7 +281,7 @@ trait AnyValTemplates {
   def headerTemplate = ("""
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2002-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2002-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -280,6 +289,8 @@ trait AnyValTemplates {
 
 %s
 package scala
+
+import scala.language.implicitConversions
 
 """.trim.format(timestampString) + "\n\n")
 
@@ -294,11 +305,10 @@ package scala
 """.trim + "\n")
 
   def timestampString = "// DO NOT EDIT, CHANGES WILL BE LOST.\n"
-  def stub            = """sys.error("stub")"""
 
   def allCompanions = """
 /** Transform a value type into a boxed reference type.
- *
+ *@boxRunTimeDoc@
  *  @param  x   the @name@ to be boxed
  *  @return     a @boxed@ offering `x` as its underlying value.
  */
@@ -307,7 +317,7 @@ def box(x: @name@): @boxed@ = @boxImpl@
 /** Transform a boxed type into a value type.  Note that this
  *  method is not typesafe: it accepts any Object, but will throw
  *  an exception if the argument is not a @boxed@.
- *
+ *@unboxRunTimeDoc@
  *  @param  x   the @boxed@ to be unboxed.
  *  @throws     ClassCastException  if the argument is not a @boxed@
  *  @return     @unboxDoc@
@@ -340,9 +350,6 @@ final val NaN              = @boxed@.NaN
 final val PositiveInfinity = @boxed@.POSITIVE_INFINITY
 final val NegativeInfinity = @boxed@.NEGATIVE_INFINITY
 
-@deprecated("use @name@.MinPositiveValue instead", "2.9.0")
-final val Epsilon  = MinPositiveValue
-
 /** The negative number with the greatest (finite) absolute value which is representable
  *  by a @name@.  Note that it differs from [[java.lang.@name@.MIN_VALUE]], which
  *  is the smallest positive value representable by a @name@.  In Scala that number
@@ -373,7 +380,7 @@ class AnyVals extends AnyValReps with AnyValTemplates {
  *
  * @return the negated expression
  */
-def unary_! : Boolean = sys.error("stub")
+def unary_! : Boolean
 
 /**
   * Compares two Boolean expressions and returns `true` if they evaluate to the same value.
@@ -382,7 +389,7 @@ def unary_! : Boolean = sys.error("stub")
   *  - `a` and `b` are `true` or
   *  - `a` and `b` are `false`.
   */
-def ==(x: Boolean): Boolean = sys.error("stub")
+def ==(x: Boolean): Boolean
 
 /**
   * Compares two Boolean expressions and returns `true` if they evaluate to a different value.
@@ -391,7 +398,7 @@ def ==(x: Boolean): Boolean = sys.error("stub")
   *  - `a` is `true` and `b` is `false` or
   *  - `a` is `false` and `b` is `true`.
   */
-def !=(x: Boolean): Boolean = sys.error("stub")
+def !=(x: Boolean): Boolean
 
 /**
   * Compares two Boolean expressions and returns `true` if one or both of them evaluate to true.
@@ -405,7 +412,7 @@ def !=(x: Boolean): Boolean = sys.error("stub")
   *       behaves as if it was declared as `def ||(x: => Boolean): Boolean`.
   *       If `a` evaluates to `true`, `true` is returned without evaluating `b`.
   */
-def ||(x: Boolean): Boolean = sys.error("stub")
+def ||(x: Boolean): Boolean
 
 /**
   * Compares two Boolean expressions and returns `true` if both of them evaluate to true.
@@ -417,11 +424,11 @@ def ||(x: Boolean): Boolean = sys.error("stub")
   *       behaves as if it was declared as `def &&(x: => Boolean): Boolean`.
   *       If `a` evaluates to `false`, `false` is returned without evaluating `b`.
   */
-def &&(x: Boolean): Boolean = sys.error("stub")
+def &&(x: Boolean): Boolean
 
 // Compiler won't build with these seemingly more accurate signatures
-// def ||(x: => Boolean): Boolean = sys.error("stub")
-// def &&(x: => Boolean): Boolean = sys.error("stub")
+// def ||(x: => Boolean): Boolean
+// def &&(x: => Boolean): Boolean
 
 /**
   * Compares two Boolean expressions and returns `true` if one or both of them evaluate to true.
@@ -433,7 +440,7 @@ def &&(x: Boolean): Boolean = sys.error("stub")
   *
   * @note This method evaluates both `a` and `b`, even if the result is already determined after evaluating `a`.
   */
-def |(x: Boolean): Boolean  = sys.error("stub")
+def |(x: Boolean): Boolean
 
 /**
   * Compares two Boolean expressions and returns `true` if both of them evaluate to true.
@@ -443,7 +450,7 @@ def |(x: Boolean): Boolean  = sys.error("stub")
   *
   * @note This method evaluates both `a` and `b`, even if the result is already determined after evaluating `a`.
   */
-def &(x: Boolean): Boolean  = sys.error("stub")
+def &(x: Boolean): Boolean
 
 /**
   * Compares two Boolean expressions and returns `true` if they evaluate to a different value.
@@ -452,9 +459,9 @@ def &(x: Boolean): Boolean  = sys.error("stub")
   *  - `a` is `true` and `b` is `false` or
   *  - `a` is `false` and `b` is `true`.
   */
-def ^(x: Boolean): Boolean  = sys.error("stub")
+def ^(x: Boolean): Boolean
 
-override def getClass(): Class[Boolean] = sys.error("stub")
+override def getClass(): Class[Boolean] = null
     """.trim.lines.toList
 
     def objectLines = interpolate(allCompanions + "\n" + nonUnitCompanions).lines.toList
@@ -468,12 +475,14 @@ override def getClass(): Class[Boolean] = sys.error("stub")
  */
 """
     def classLines  = List(
-      """override def getClass(): Class[Unit] = sys.error("stub")"""
+      """override def getClass(): Class[Unit] = null"""
     )
     def objectLines = interpolate(allCompanions).lines.toList
 
     override def boxUnboxImpls = Map(
+      "@boxRunTimeDoc@" -> "",
       "@boxImpl@"   -> "scala.runtime.BoxedUnit.UNIT",
+      "@unboxRunTimeDoc@" -> "",
       "@unboxImpl@" -> "()",
       "@unboxDoc@"  -> "the Unit value ()"
     )

@@ -1,9 +1,9 @@
-import scala.reflect.makro.{Context => Ctx}
+import scala.reflect.macros.{Context => Ctx}
 
 object Impls {
   def foo(c: Ctx)(xs: c.Expr[Int]*) = {
-    import c.mirror._
-    val body = Apply(Select(Ident(definitions.PredefModule), newTermName("println")), xs.map(_.tree).toList)
-    Expr[Unit](body)
+    import c.universe._
+    val body = Apply(Select(Ident(definitions.PredefModule), TermName("println")), xs.map(_.tree).toList)
+    c.Expr[Unit](body)
   }
 }

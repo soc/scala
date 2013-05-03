@@ -1,17 +1,14 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2003-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2003-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
 \*                                                                      */
 
-
-
 package scala.collection
 package mutable
 
-import generic._
 import script._
 
 /** This is a simple proxy class for <a href="Buffer.html"
@@ -127,7 +124,7 @@ trait BufferProxy[A] extends Buffer[A] with Proxy {
 
   /** Clears the buffer contents.
    */
-  def clear() { self.clear }
+  def clear() { self.clear() }
 
   /** Send a message to this scriptable object.
    *

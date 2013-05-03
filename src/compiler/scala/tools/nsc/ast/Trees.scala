@@ -1,5 +1,5 @@
 /* NSC -- new Scala compiler
- * Copyright 2005-2011 LAMP/EPFL
+ * Copyright 2005-2013 LAMP/EPFL
  * @author  Martin Odersky
  */
 
@@ -15,25 +15,7 @@ import scala.reflect.internal.Flags.PRESUPER
 import scala.reflect.internal.Flags.TRAIT
 import scala.compat.Platform.EOL
 
-trait Trees extends reflect.internal.Trees { self: Global =>
-
-  def treeLine(t: Tree): String =
-    if (t.pos.isDefined && t.pos.isRange) t.pos.lineContent.drop(t.pos.column - 1).take(t.pos.end - t.pos.start + 1)
-    else t.summaryString
-
-  def treeStatus(t: Tree, enclosingTree: Tree = null) = {
-    val parent = if (enclosingTree eq null) "        " else " P#%5s".format(enclosingTree.id)
-
-    "[L%4s%8s] #%-6s %-15s %-10s // %s".format(t.pos.safeLine, parent, t.id, t.pos.show, t.shortClass, treeLine(t))
-  }
-  def treeSymStatus(t: Tree) = {
-    val line = if (t.pos.isDefined) "line %-4s".format(t.pos.safeLine) else "         "
-    "#%-5s %s %-10s // %s".format(t.id, line, t.shortClass,
-      if (t.symbol ne NoSymbol) "(" + t.symbol.fullLocationString + ")"
-      else treeLine(t)
-    )
-  }
-
+trait Trees extends scala.reflect.internal.Trees { self: Global =>
   // --- additional cases --------------------------------------------------------
   /** Only used during parsing */
   case class Parens(args: List[Tree]) extends Tree
@@ -48,15 +30,15 @@ trait Trees extends reflect.internal.Trees { self: Global =>
     override def isType = definition.isType
   }
 
- /** Array selection <qualifier> . <name> only used during erasure */
+ /** Array selection `<qualifier> . <name>` only used during erasure */
   case class SelectFromArray(qualifier: Tree, name: Name, erasure: Type)
-       extends TermTree with RefTree
+       extends RefTree with TermTree
 
-  /** Derived value class injection (equivalent to: new C(arg) after easure); only used during erasure
-   *  The class C is stored as the symbol of the tree node.
+  /** Derived value class injection (equivalent to: `new C(arg)` after erasure); only used during erasure.
+   *  The class `C` is stored as a tree attachment.
    */
   case class InjectDerivedValue(arg: Tree)
-       extends SymTree
+       extends SymTree with TermTree
 
   class PostfixSelect(qual: Tree, name: Name) extends Select(qual, name)
 
@@ -64,6 +46,13 @@ trait Trees extends reflect.internal.Trees { self: Global =>
   case class TypeTreeWithDeferredRefCheck()(val check: () => TypeTree) extends TypTree
 
   // --- factory methods ----------------------------------------------------------
+
+  /** Factory method for a primary constructor super call `super.<init>(args_1)...(args_n)`
+   */
+  def PrimarySuperCall(argss: List[List[Tree]]): Tree = argss match {
+    case Nil        => Apply(gen.mkSuperInitCall, Nil)
+    case xs :: rest => rest.foldLeft(Apply(gen.mkSuperInitCall, xs): Tree)(Apply.apply)
+  }
 
     /** Generates a template with constructor corresponding to
    *
@@ -82,7 +71,7 @@ trait Trees extends reflect.internal.Trees { self: Global =>
    *    body
    *  }
    */
-  def Template(parents: List[Tree], self: ValDef, constrMods: Modifiers, vparamss: List[List[ValDef]], argss: List[List[Tree]], body: List[Tree], superPos: Position): Template = {
+  def Template(parents: List[Tree], self: ValDef, constrMods: Modifiers, vparamss: List[List[ValDef]], body: List[Tree], superPos: Position): Template = {
     /* Add constructor to template */
 
     // create parameters for <init> as synthetic trees.
@@ -95,36 +84,41 @@ trait Trees extends reflect.internal.Trees { self: Global =>
     val (edefs, rest) = body span treeInfo.isEarlyDef
     val (evdefs, etdefs) = edefs partition treeInfo.isEarlyValDef
     val gvdefs = evdefs map {
-      case vdef @ ValDef(_, _, tpt, _) => copyValDef(vdef)(
-        // !!! I know "atPos in case" wasn't intentionally planted to
-        // add an air of mystery to this file, but it is the sort of
-        // comment which only its author could love.
-        tpt = atPos(vdef.pos.focus)(TypeTree() setOriginal tpt setPos tpt.pos.focus), // atPos in case
+      case vdef @ ValDef(_, _, tpt, _) =>
+        copyValDef(vdef)(
+        // atPos for the new tpt is necessary, since the original tpt might have no position
+        // (when missing type annotation for ValDef for example), so even though setOriginal modifies the
+        // position of TypeTree, it would still be NoPosition. That's what the author meant.
+        tpt = atPos(vdef.pos.focus)(TypeTree() setOriginal tpt setPos tpt.pos.focus),
         rhs = EmptyTree
       )
     }
-    val lvdefs = evdefs collect { case vdef: ValDef => copyValDef(vdef)(mods = Modifiers(PRESUPER)) }
+    val lvdefs = evdefs collect { case vdef: ValDef => copyValDef(vdef)(mods = vdef.mods | PRESUPER) }
 
     val constrs = {
       if (constrMods hasFlag TRAIT) {
         if (body forall treeInfo.isInterfaceMember) List()
         else List(
           atPos(wrappingPos(superPos, lvdefs)) (
-            DefDef(NoMods, nme.MIXIN_CONSTRUCTOR, List(), List(List()), TypeTree(), Block(lvdefs, Literal(Constant())))))
+            DefDef(NoMods, nme.MIXIN_CONSTRUCTOR, List(), ListOfNil, TypeTree(), Block(lvdefs, Literal(Constant(()))))))
       } else {
         // convert (implicit ... ) to ()(implicit ... ) if its the only parameter section
         if (vparamss1.isEmpty || !vparamss1.head.isEmpty && vparamss1.head.head.mods.isImplicit)
-          vparamss1 = List() :: vparamss1;
-        val superRef: Tree = atPos(superPos) {
-          Select(Super(This(tpnme.EMPTY), tpnme.EMPTY), nme.CONSTRUCTOR)
-        }
-        val superCall = (superRef /: argss) (Apply)
+          vparamss1 = List() :: vparamss1
+        val superCall = pendingSuperCall // we can't know in advance which of the parents will end up as a superclass
+                                         // this requires knowing which of the parents is a type macro and which is not
+                                         // and that's something that cannot be found out before typer
+                                         // (the type macros aren't in the trunk yet, but there is a plan for them to land there soon)
+                                         // this means that we don't know what will be the arguments of the super call
+                                         // therefore here we emit a dummy which gets populated when the template is named and typechecked
         List(
-          atPos(wrappingPos(superPos, lvdefs ::: argss.flatten)) (
-            DefDef(constrMods, nme.CONSTRUCTOR, List(), vparamss1, TypeTree(), Block(lvdefs ::: List(superCall), Literal(Constant())))))
+          // TODO: previously this was `wrappingPos(superPos, lvdefs ::: argss.flatten)`
+          // is it going to be a problem that we can no longer include the `argss`?
+          atPos(wrappingPos(superPos, lvdefs)) (
+            DefDef(constrMods, nme.CONSTRUCTOR, List(), vparamss1, TypeTree(), Block(lvdefs ::: List(superCall), Literal(Constant(()))))))
       }
     }
-    constrs foreach (ensureNonOverlapping(_, parents ::: gvdefs))
+    constrs foreach (ensureNonOverlapping(_, parents ::: gvdefs, focus=false))
     // Field definitions for the class - remove defaults.
     val fieldDefs = vparamss.flatten map (vd => copyValDef(vd)(mods = vd.mods &~ DEFAULTPARAM, rhs = EmptyTree))
 
@@ -138,11 +132,10 @@ trait Trees extends reflect.internal.Trees { self: Global =>
    *  @param constrMods the modifiers for the class constructor, i.e. as in `class C private (...)`
    *  @param vparamss   the value parameters -- if they have symbols they
    *                    should be owned by `sym`
-   *  @param argss      the supercall arguments
    *  @param body       the template statements without primary constructor
    *                    and value parameter fields.
    */
-  def ClassDef(sym: Symbol, constrMods: Modifiers, vparamss: List[List[ValDef]], argss: List[List[Tree]], body: List[Tree], superPos: Position): ClassDef = {
+  def ClassDef(sym: Symbol, constrMods: Modifiers, vparamss: List[List[ValDef]], body: List[Tree], superPos: Position): ClassDef = {
     // "if they have symbols they should be owned by `sym`"
     assert(
       mforall(vparamss)(p => (p.symbol eq NoSymbol) || (p.symbol.owner == sym)),
@@ -152,7 +145,7 @@ trait Trees extends reflect.internal.Trees { self: Global =>
     ClassDef(sym,
       Template(sym.info.parents map TypeTree,
                if (sym.thisSym == sym || phase.erasedTypes) emptyValDef else ValDef(sym.thisSym),
-               constrMods, vparamss, argss, body, superPos))
+               constrMods, vparamss, body, superPos))
   }
 
  // --- subcomponents --------------------------------------------------
@@ -179,7 +172,7 @@ trait Trees extends reflect.internal.Trees { self: Global =>
     case _ => super.xtraverse(traverser, tree)
   }
 
-  trait TreeCopier extends super.TreeCopierOps {
+  trait TreeCopier extends super.InternalTreeCopierOps {
     def DocDef(tree: Tree, comment: DocComment, definition: Tree): DocDef
     def SelectFromArray(tree: Tree, qualifier: Tree, selector: Name, erasure: Type): SelectFromArray
     def InjectDerivedValue(tree: Tree, arg: Tree): InjectDerivedValue
@@ -282,7 +275,7 @@ trait Trees extends reflect.internal.Trees { self: Global =>
     val trace = scala.tools.nsc.util.trace when debug
 
     val locals = util.HashSet[Symbol](8)
-    val orderedLocals = collection.mutable.ListBuffer[Symbol]()
+    val orderedLocals = scala.collection.mutable.ListBuffer[Symbol]()
     def registerLocal(sym: Symbol) {
       if (sym != null && sym != NoSymbol) {
         if (debug && !(locals contains sym)) orderedLocals append sym
@@ -325,27 +318,65 @@ trait Trees extends reflect.internal.Trees { self: Global =>
         else
           super.transform {
             tree match {
+              case tree if !tree.canHaveAttrs =>
+                tree
               case tpt: TypeTree =>
                 if (tpt.original != null)
                   transform(tpt.original)
-                else if (tpt.tpe != null && (tpt.wasEmpty || (tpt.tpe exists (tp => locals contains tp.typeSymbol)))) {
-                  val dupl = tpt.duplicate
-                  dupl.tpe = null
-                  dupl
+                else {
+                  val refersToLocalSymbols = tpt.tpe != null && (tpt.tpe exists (tp => locals contains tp.typeSymbol))
+                  val isInferred = tpt.wasEmpty
+                  if (refersToLocalSymbols || isInferred) {
+                    tpt.duplicate.clearType()
+                  } else {
+                    tpt
+                  }
                 }
-                else tree
+              // If one of the type arguments of a TypeApply gets reset to an empty TypeTree, then this means that:
+              // 1) It isn't empty now (tpt.tpe != null), but it was empty before (tpt.wasEmpty).
+              // 2) Thus, its argument got inferred during a preceding typecheck.
+              // 3) Thus, all its arguments were inferred (because scalac can only infer all or nothing).
+              // Therefore, we can safely erase the TypeApply altogether and have it inferred once again in a subsequent typecheck.
+              // UPD: Actually there's another reason for erasing a type behind the TypeTree
+              // is when this type refers to symbols defined in the tree being processed.
+              // These symbols will be erased, because we can't leave alive a type referring to them.
+              // Here we can only hope that everything will work fine afterwards.
               case TypeApply(fn, args) if args map transform exists (_.isEmpty) =>
                 transform(fn)
-              case This(_) if tree.symbol != null && tree.symbol.isPackageClass =>
-                tree
               case EmptyTree =>
                 tree
               case _ =>
                 val dupl = tree.duplicate
-                if (tree.hasSymbol && (!localOnly || (locals contains tree.symbol)) && !(keepLabels && tree.symbol.isLabel))
-                  dupl.symbol = NoSymbol
-                dupl.tpe = null
-                dupl
+                // Typically the resetAttrs transformer cleans both symbols and types.
+                // However there are exceptions when we cannot erase symbols due to idiosyncrasies of the typer.
+                // vetoXXX local variables declared below describe the conditions under which we cannot erase symbols.
+                //
+                // The first reason to not erase symbols is the threat of non-idempotency (SI-5464).
+                // Here we take care of labels (SI-5562) and references to package classes (SI-5705).
+                // There are other non-idempotencies, but they are not worked around yet.
+                //
+                // The second reason has to do with the fact that resetAttrs itself has limited usefulness.
+                //
+                // First of all, why do we need resetAttrs? Gor one, it's absolutely required to move trees around.
+                // One cannot just take a typed tree from one lexical context and transplant it somewhere else.
+                // Most likely symbols defined by those trees will become borked and the compiler will blow up (SI-5797).
+                // To work around we just erase all symbols and types and then hope that we'll be able to correctly retypecheck.
+                // For ones who're not affected by scalac Stockholm syndrome, this might seem to be an extremely naive fix, but well...
+                //
+                // Of course, sometimes erasing everything won't work, because if a given identifier got resolved to something
+                // in one lexical scope, it can get resolved to something else.
+                //
+                // What do we do in these cases? Enter the workaround for the workaround: resetLocalAttrs, which only destroys
+                // locally defined symbols, but doesn't touch references to stuff declared outside of a given tree.
+                // That's what localOnly and vetoScope are for.
+                if (dupl.hasSymbol) {
+                  val sym = dupl.symbol
+                  val vetoScope = localOnly && !(locals contains sym)
+                  val vetoLabel = keepLabels && sym.isLabel
+                  val vetoThis = dupl.isInstanceOf[This] && sym.isPackageClass
+                  if (!(vetoScope || vetoLabel || vetoThis)) dupl.symbol = NoSymbol
+                }
+                dupl.clearType()
             }
           }
       }

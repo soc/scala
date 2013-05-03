@@ -111,6 +111,7 @@
         <deploy-local name="scala-library" version="@{version}" repository="@{repository}" />
         <deploy-local name="scala-compiler" version="@{version}" repository="@{repository}" />
         <deploy-local-plugin name="continuations" version="@{version}" repository="@{repository}"/>
+        <deploy-local name="scala-reflect" version="@{version}" repository="@{repository}" />
         <deploy-local name="scala-actors" version="@{version}" repository="@{repository}" />
         <deploy-local name="scala-swing" version="@{version}" repository="@{repository}"/>
         <deploy-local name="scalap" version="@{version}" repository="@{repository}"/>
@@ -163,12 +164,9 @@
       <attribute name="repository" />
       <attribute name="version" />
       <sequential>
-        <deploy-remote name="scala-library" version="@{version}" repository="@{repository}">
-          <extra-attachments>
-            <artifact:attach type="jar" file="scala-library/scala-library-docs.jar" classifier="javadoc" />
-          </extra-attachments>
-        </deploy-remote>
+        <deploy-remote name="scala-library" version="@{version}" repository="@{repository}"/>
         <deploy-remote name="jline" version="@{version}" repository="@{repository}"/>
+        <deploy-remote name="scala-reflect" version="@{version}" repository="@{repository}"/>
         <deploy-remote name="scala-compiler" version="@{version}" repository="@{repository}" />
         <deploy-remote name="scala-swing" version="@{version}" repository="@{repository}"/>
         <deploy-remote name="scala-actors" version="@{version}" repository="@{repository}"/>
@@ -236,6 +234,7 @@
         <deploy-remote-plugin-signed name="continuations" version="@{version}" repository="@{repository}"/> 
         <deploy-remote-signed name="scala-library" version="@{version}" repository="@{repository}"/>
         <deploy-remote-signed name="jline" version="@{version}" repository="@{repository}"/>
+        <deploy-remote-signed name="scala-reflect" version="@{version}" repository="@{repository}"/>
         <deploy-remote-signed name="scala-compiler" version="@{version}" repository="@{repository}" />
         <deploy-remote-signed name="scala-swing" version="@{version}" repository="@{repository}"/>
         <deploy-remote-signed name="scala-actors" version="@{version}" repository="@{repository}"/>

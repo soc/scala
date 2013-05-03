@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala Ant Tasks                      **
-**    / __/ __// _ | / /  / _ |    (c) 2005-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2005-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -32,7 +32,7 @@ import org.apache.tools.ant.types.Mapper
  *
  * @author  Gilles Dubochet
  * @version 1.0 */
-class Same extends ScalaMatchingTask {
+@deprecated("Use diff", "2.11.0") class Same extends ScalaMatchingTask {
 /*============================================================================*\
 **                             Ant user-properties                            **
 \*============================================================================*/
@@ -110,7 +110,7 @@ class Same extends ScalaMatchingTask {
 \*============================================================================*/
 
   override def execute() = {
-    validateAttributes
+    validateAttributes()
     val mapper = getMapper
     allEqualNow = true
     val originNames: Array[String] = getDirectoryScanner(origin.get).getIncludedFiles

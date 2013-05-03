@@ -3,15 +3,11 @@
 package scala.tools.selectivecps
 
 import scala.tools.nsc
-import scala.tools.nsc.typechecker._
 import nsc.Global
-import nsc.Phase
 import nsc.plugins.Plugin
 import nsc.plugins.PluginComponent
 
 class SelectiveCPSPlugin(val global: Global) extends Plugin {
-  import global._
-
   val name = "continuations"
   val description = "applies selective cps conversion"
 
@@ -26,13 +22,13 @@ class SelectiveCPSPlugin(val global: Global) extends Plugin {
     override val runsBefore = List("uncurry")
   }
 
-
   val components = List[PluginComponent](anfPhase, cpsPhase)
 
   val checker = new CPSAnnotationChecker {
     val global: SelectiveCPSPlugin.this.global.type = SelectiveCPSPlugin.this.global
   }
   global.addAnnotationChecker(checker.checker)
+  global.analyzer.addAnalyzerPlugin(checker.plugin)
 
   global.log("instantiated cps plugin: " + this)
 

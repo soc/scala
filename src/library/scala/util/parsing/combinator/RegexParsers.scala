@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2006-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2006-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -13,7 +13,7 @@ import java.util.regex.Pattern
 import scala.util.matching.Regex
 import scala.util.parsing.input._
 import scala.collection.immutable.PagedSeq
-import language.implicitConversions
+import scala.language.implicitConversions
 
 /** The ''most important'' differences between `RegexParsers` and
  *  [[scala.util.parsing.combinator.Parsers]] are:

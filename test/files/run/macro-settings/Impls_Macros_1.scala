@@ -1,8 +1,8 @@
-import scala.reflect.makro.Context
+import scala.reflect.macros.Context
 
 object Impls {
-  def impl(c: Context) = c.reify {
-    println(c.literal(c.settings.toString).eval)
+  def impl(c: Context) = c.universe.reify {
+    println(c.literal(c.settings.toString).splice)
   }
 }
 

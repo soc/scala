@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2003-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2003-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -18,7 +18,7 @@ import scala.collection.GenSeq
 import scala.collection.generic.{ CanBuildFrom, SliceInterval }
 import scala.collection.generic.CanCombineFrom
 import scala.collection.parallel.immutable.ParRange
-import language.implicitConversions
+import scala.language.implicitConversions
 
 
 
@@ -50,7 +50,8 @@ extends GenIterableView[T, Coll]
 self =>
 
   override def foreach[U](f: T => U): Unit = super[ParIterableLike].foreach(f)
-  override protected[this] def newCombiner: Combiner[T, This] = throw new UnsupportedOperationException(this + ".newCombiner");
+  override protected[this] def newCombiner: Combiner[T, This] = throw new UnsupportedOperationException(this + ".newCombiner")
+
   protected[this] def viewIdentifier: String
   protected[this] def viewIdString: String
 
@@ -130,7 +131,7 @@ self =>
 
   override def zip[U >: T, S, That](that: GenIterable[S])(implicit bf: CanBuildFrom[This, (U, S), That]): That = newZippedTryParSeq(that).asInstanceOf[That]
   override def zipWithIndex[U >: T, That](implicit bf: CanBuildFrom[This, (U, Int), That]): That =
-    newZipped(ParRange(0, splitter.remaining, 1, false)).asInstanceOf[That]
+    newZipped(ParRange(0, splitter.remaining, 1, inclusive = false)).asInstanceOf[That]
   override def zipAll[S, U >: T, That](that: GenIterable[S], thisElem: U, thatElem: S)(implicit bf: CanBuildFrom[This, (U, S), That]): That =
     newZippedAllTryParSeq(that, thisElem, thatElem).asInstanceOf[That]
 
@@ -139,7 +140,7 @@ self =>
   } otherwise {
     val b = bf(underlying)
     b ++= this.iterator
-    b.result
+    b.result()
   }
 
   /* wrapper virtual ctors */

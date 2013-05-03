@@ -1,5 +1,5 @@
 /* NSC -- new Scala compiler
- * Copyright 2007 LAMP/EPFL
+ * Copyright 2007-2013 LAMP/EPFL
  * @author  Lex Spoon
  */
 
@@ -26,7 +26,7 @@ extends CompilerCommand(args, settings) {
   // change CompilerCommand behavior
   override def shouldProcessArguments: Boolean = false
 
-  private lazy val (_ok, targetAndArguments) = settings.processArguments(args, false)
+  private lazy val (_ok, targetAndArguments) = settings.processArguments(args, processAll = false)
   override def ok = _ok
   private def guessHowToRun(target: String): GenericRunnerCommand.HowToRun = {
     if (!ok) Error

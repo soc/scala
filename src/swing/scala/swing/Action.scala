@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2007-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2007-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -35,7 +35,12 @@ object Action {
       // TODO: we need an action cache
       private var _action: Action = Action.NoAction
       def action: Action = _action
-      def action_=(a: Action) { _action = a; peer.setAction(a.peer) }
+      def action_=(a: Action) {
+        _action = a;
+
+        import scala.language.reflectiveCalls
+        peer.setAction(a.peer)
+      }
 
       //1.6: def hideActionText: Boolean = peer.getHideActionText
       //def hideActionText_=(b: Boolean) = peer.setHideActionText(b)
@@ -135,7 +140,7 @@ abstract class Action(title0: String) {
   def accelerator: Option[KeyStroke] =
     toOption(peer.getValue(javax.swing.Action.ACCELERATOR_KEY))
   def accelerator_=(k: Option[KeyStroke]) {
-    peer.putValue(javax.swing.Action.ACCELERATOR_KEY, k orNull)
+    peer.putValue(javax.swing.Action.ACCELERATOR_KEY, k.orNull)
   }
 
   /**

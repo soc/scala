@@ -57,8 +57,4 @@ abstract class ScalaRunTimeInterface {
   def checkInitialized[T <: AnyRef](x: T): T
   def ensureAccessible(m: JMethod): JMethod
   def inlinedEquals(x: Object, y: Object): Boolean
-
-  // Misc
-  def Try[A](block: => A): ScalaRuntimeTry[A]
-  private[scala] def checkZip(what: String, coll1: TraversableOnce[_], coll2: TraversableOnce[_]): Unit
 }

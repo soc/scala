@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2003-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2003-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |                                         **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -67,13 +67,13 @@ class SynchronizedStack[A] extends Stack[A] {
 
   /** Removes the top element from the stack.
    */
-  override def pop(): A = synchronized { super.pop }
+  override def pop(): A = synchronized { super.pop() }
 
   /**
    * Removes all elements from the stack. After this operation completed,
    * the stack will be empty.
    */
-  override def clear(): Unit = synchronized { super.clear }
+  override def clear(): Unit = synchronized { super.clear() }
 
   /** Returns an iterator over all elements on the stack. This iterator
    *  is stable with respect to state changes in the stack object; i.e.

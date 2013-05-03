@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2006-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2006-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -10,7 +10,7 @@ package scala.collection
 package mutable
 
 import java.lang.{ StringBuilder => JavaStringBuilder }
-import annotation.migration
+import scala.annotation.migration
 import immutable.StringLike
 
 /** A builder for mutable sequence of characters.  This class provides an API

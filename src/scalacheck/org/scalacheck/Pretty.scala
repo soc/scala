@@ -1,11 +1,11 @@
 /*-------------------------------------------------------------------------*\
 **  ScalaCheck                                                             **
-**  Copyright (c) 2007-2011 Rickard Nilsson. All rights reserved.          **
+**  Copyright (c) 2007-2013 Rickard Nilsson. All rights reserved.          **
 **  http://www.scalacheck.org                                              **
 **                                                                         **
 **  This software is released under the terms of the Revised BSD License.  **
 **  There is NO WARRANTY. See the file LICENSE for the full text.          **
-\*-------------------------------------------------------------------------*/
+\*------------------------------------------------------------------------ */
 
 package org.scalacheck
 
@@ -48,6 +48,8 @@ object Pretty {
     s.lines.map(l => break(lead+l+trail, "  ", width)).mkString("\n")
 
   implicit def prettyAny(t: Any) = Pretty { p => t.toString }
+
+  implicit def prettyString(t: String) = Pretty { p => "\""++t++"\"" }
 
   implicit def prettyList(l: List[Any]) = Pretty { p =>
     l.map("\""+_+"\"").mkString("List(", ", ", ")")

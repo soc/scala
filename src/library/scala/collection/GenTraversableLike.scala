@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2003-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2003-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -10,7 +10,7 @@ package scala.collection
 
 
 import generic._
-import annotation.migration
+import scala.annotation.migration
 
 
 /** A template trait for all traversable collections upon which operations
@@ -65,14 +65,14 @@ trait GenTraversableLike[+A, +Repr] extends Any with GenTraversableOnce[A] with 
    *  @throws `NoSuchElementException` if the $coll is empty.
    */
   def head: A
-  
+
   /** Optionally selects the first element.
    *  $orderDependent
    *  @return  the first element of this $coll if it is nonempty,
    *           `None` if it is empty.
    */
   def headOption: Option[A]
-  
+
   /** Tests whether this $coll can be repeatedly traversed.
    *  @return   `true`
    */
@@ -92,14 +92,14 @@ trait GenTraversableLike[+A, +Repr] extends Any with GenTraversableOnce[A] with 
     * @throws NoSuchElementException If the $coll is empty.
     */
   def last: A
-  
+
   /** Optionally selects the last element.
    *  $orderDependent
    *  @return  the last element of this $coll$ if it is nonempty,
    *           `None` if it is empty.
    */
   def lastOption: Option[A]
-  
+
   /** Selects all elements except the last.
    *  $orderDependent
    *  @return  a $coll consisting of all elements of this $coll
@@ -107,7 +107,7 @@ trait GenTraversableLike[+A, +Repr] extends Any with GenTraversableOnce[A] with 
    *  @throws `UnsupportedOperationException` if the $coll is empty.
    */
   def init: Repr
-  
+
   /** Computes a prefix scan of the elements of the collection.
    *
    *  Note: The neutral element `z` may be applied more than once.
@@ -210,7 +210,7 @@ trait GenTraversableLike[+A, +Repr] extends Any with GenTraversableOnce[A] with 
   def collect[B, That](pf: PartialFunction[A, B])(implicit bf: CanBuildFrom[Repr, B, That]): That
 
   /** Builds a new collection by applying a function to all elements of this $coll
-   *  and using the elements of the resulting collections. 
+   *  and using the elements of the resulting collections.
    *
    *  @param f      the function to apply to each element.
    *  @tparam B     the element type of the returned collection.
@@ -238,7 +238,7 @@ trait GenTraversableLike[+A, +Repr] extends Any with GenTraversableOnce[A] with 
    *      // lettersOf will return a Set[Char], not a Seq
    *      def lettersOf(words: Seq[String]) = words.toSet flatMap (word => word.toSeq)
    *
-   *      // xs will be a an Iterable[Int]
+   *      // xs will be an Iterable[Int]
    *      val xs = Map("a" -> List(11,111), "b" -> List(22,222)).flatMap(_._2)
    *
    *      // ys will be a Map[Int, Int]
@@ -333,7 +333,7 @@ trait GenTraversableLike[+A, +Repr] extends Any with GenTraversableOnce[A] with 
 
   /** Selects first ''n'' elements.
    *  $orderDependent
-   *  @param  n    Tt number of elements to take from this $coll.
+   *  @param  n    the number of elements to take from this $coll.
    *  @return a $coll consisting only of the first `n` elements of this $coll,
    *          or else the whole $coll, if it has less than `n` elements.
    */
@@ -410,13 +410,4 @@ trait GenTraversableLike[+A, +Repr] extends Any with GenTraversableOnce[A] with 
    */
   def stringPrefix: String
 
-}
-
-object GenTraversableLike {
-  /** Manufacture a conversion from collection representation type `Repr` to
-   *  its corresponding `GenTraversableLike` given an implicitly available
-   *  instance of `FromRepr[Repr]`.
-   *  @see [[scala.collection.generic.FromRepr]]
-   */
-  implicit def fromRepr[Repr](implicit fr : FromRepr[Repr]) = fr.hasElem
 }

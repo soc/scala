@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2005-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2005-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -19,6 +19,7 @@ import scala.concurrent.ThreadPoolRunner
  *
  * @author Philipp Haller
  */
+@deprecated("Use the akka.actor package instead. For migration from the scala.actors package refer to the Actors Migration Guide.", "2.11.0")
 object ExecutorScheduler {
 
   private def start(sched: ExecutorScheduler): ExecutorScheduler = {
@@ -58,6 +59,7 @@ object ExecutorScheduler {
  *
  * @author Philipp Haller
  */
+@deprecated("Use the akka.actor package instead. For migration from the scala.actors package refer to the Actors Migration Guide.", "2.11.0")
 trait ExecutorScheduler extends Thread
                         with IScheduler with TerminationService
                         with ThreadPoolRunner {

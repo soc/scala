@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2003-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2003-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -10,7 +10,7 @@ package scala.collection
 package generic
 
 import mutable.Builder
-import language.higherKinds
+import scala.language.higherKinds
 
 /** A template class for companion objects of "regular" collection classes
  *  represent an unconstrained higher-kinded type. Typically
@@ -24,7 +24,7 @@ import language.higherKinds
  */
 abstract class GenericCompanion[+CC[X] <: GenTraversable[X]] {
   /** The underlying collection type with unknown element type */
-  type Coll = CC[_]
+  protected[this] type Coll = CC[_]
 
   /** The default builder for `$Coll` objects.
    *  @tparam A      the type of the ${coll}'s elements
@@ -34,7 +34,7 @@ abstract class GenericCompanion[+CC[X] <: GenTraversable[X]] {
   /** An empty collection of type `$Coll[A]`
    *  @tparam A      the type of the ${coll}'s elements
    */
-  def empty[A]: CC[A] = newBuilder[A].result
+  def empty[A]: CC[A] = newBuilder[A].result()
 
   /** Creates a $coll with the specified elements.
    *  @tparam A      the type of the ${coll}'s elements
@@ -46,7 +46,7 @@ abstract class GenericCompanion[+CC[X] <: GenTraversable[X]] {
     else {
       val b = newBuilder[A]
       b ++= elems
-      b.result
+      b.result()
     }
   }
 }

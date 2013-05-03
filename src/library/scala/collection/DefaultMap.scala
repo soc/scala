@@ -1,16 +1,12 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2003-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2003-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
 \*                                                                      */
 
-
-
 package scala.collection
-
-import generic._
 
 /** A default map which implements the `+` and `-` methods of maps.
  *
@@ -34,14 +30,14 @@ trait DefaultMap[A, +B] extends Map[A, B] { self =>
     val b = Map.newBuilder[A, B1]
     b ++= this
     b += ((kv._1, kv._2))
-    b.result
+    b.result()
   }
 
   /** A default implementation which creates a new immutable map.
    */
   override def - (key: A): Map[A, B] = {
     val b = newBuilder
-    b ++= this filter (key != _)
-    b.result
+    b ++= this filter (key != _._1)
+    b.result()
   }
 }

@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2003-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2003-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -10,7 +10,7 @@ package scala.xml
 
 import scala.collection.mutable
 import parsing.XhtmlEntities
-import language.implicitConversions
+import scala.language.implicitConversions
 
 /**
  * The `Utility` object provides utility functions for processing instances
@@ -64,7 +64,7 @@ object Utility extends AnyRef with parsing.TokenTests {
     val key = md.key
     val smaller = sort(md.filter { m => m.key < key })
     val greater = sort(md.filter { m => m.key > key })
-    smaller.copy(md.copy ( greater ))
+    smaller.foldRight (md copy greater) ((x, xs) => x copy xs)
   }
 
   /** Return the node with its attribute list sorted alphabetically
@@ -175,7 +175,7 @@ object Utility extends AnyRef with parsing.TokenTests {
    * Note that calling this source-compatible method will result in the same old, arguably almost universally unwanted,
    * behaviour.
    */
-  @deprecated("Please use `serialize` instead and specify a `minimizeTags` parameter", "2.10")
+  @deprecated("Please use `serialize` instead and specify a `minimizeTags` parameter", "2.10.0")
   def toXML(
     x: Node,
     pscope: NamespaceBinding = TopScope,
@@ -245,10 +245,10 @@ object Utility extends AnyRef with parsing.TokenTests {
     if (children.isEmpty) return
     else if (children forall isAtomAndNotText) { // add space
       val it = children.iterator
-      val f = it.next
+      val f = it.next()
       serialize(f, pscope, sb, stripComments, decodeEntities, preserveWhitespace, minimizeTags)
       while (it.hasNext) {
-        val x = it.next
+        val x = it.next()
         sb.append(' ')
         serialize(x, pscope, sb, stripComments, decodeEntities, preserveWhitespace, minimizeTags)
       }
@@ -268,7 +268,7 @@ object Utility extends AnyRef with parsing.TokenTests {
    * Returns a hashcode for the given constituents of a node
    */
   def hashCode(pre: String, label: String, attribHashCode: Int, scpeHash: Int, children: Seq[Node]) =
-    scala.util.MurmurHash3.orderedHash(label +: attribHashCode +: scpeHash +: children, pre.##)
+    scala.util.hashing.MurmurHash3.orderedHash(label +: attribHashCode +: scpeHash +: children, pre.##)
 
   def appendQuoted(s: String): String = sbToString(appendQuoted(s, _))
 
@@ -311,14 +311,14 @@ object Utility extends AnyRef with parsing.TokenTests {
     while (i < value.length) {
       value.charAt(i) match {
         case '<' =>
-          return "< not allowed in attribute value";
+          return "< not allowed in attribute value"
         case '&' =>
           val n = getName(value, i+1)
           if (n eq null)
-            return "malformed entity reference in attribute value ["+value+"]";
+            return "malformed entity reference in attribute value ["+value+"]"
           i = i + n.length + 1
           if (i >= value.length || value.charAt(i) != ';')
-            return "malformed entity reference in attribute value ["+value+"]";
+            return "malformed entity reference in attribute value ["+value+"]"
         case _   =>
       }
       i = i + 1
@@ -333,22 +333,22 @@ object Utility extends AnyRef with parsing.TokenTests {
 
     val it = value.iterator
     while (it.hasNext) {
-      var c = it.next
+      var c = it.next()
       // entity! flush buffer into text node
       if (c == '&') {
-        c = it.next
+        c = it.next()
         if (c == '#') {
-          c = it.next
-          val theChar = parseCharRef ({ ()=> c },{ () => c = it.next },{s => throw new RuntimeException(s)}, {s => throw new RuntimeException(s)})
+          c = it.next()
+          val theChar = parseCharRef ({ ()=> c },{ () => c = it.next() },{s => throw new RuntimeException(s)}, {s => throw new RuntimeException(s)})
           sb.append(theChar)
         }
         else {
           if (rfb eq null) rfb = new StringBuilder()
           rfb append c
-          c = it.next
+          c = it.next()
           while (c != ';') {
             rfb.append(c)
-            c = it.next
+            c = it.next()
           }
           val ref = rfb.toString()
           rfb.clear()

@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2003-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2003-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -61,8 +61,8 @@ abstract trait Attribute extends MetaData {
     else copy(next remove key)
 
   def remove(namespace: String, scope: NamespaceBinding, key: String) =
-    if (isPrefixed && this.key == key && (scope getURI pre) == namespace) next
-    else next.remove(namespace, scope, key)
+    if (this.key == key && (scope getURI pre) == namespace) next
+    else copy(next.remove(namespace, scope, key))
 
   def isPrefixed: Boolean = pre != null
 
@@ -94,7 +94,7 @@ abstract trait Attribute extends MetaData {
 
     sb append key append '='
     val sb2 = new StringBuilder()
-    Utility.sequenceToXML(value, TopScope, sb2, true)
+    Utility.sequenceToXML(value, TopScope, sb2, stripComments = true)
     Utility.appendQuoted(sb2.toString, sb)
   }
 }

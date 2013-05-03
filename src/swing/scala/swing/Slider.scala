@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2007-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2007-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -53,7 +53,7 @@ class Slider extends Component with Orientable.Wrapper with Publisher {
 
   def labels: scala.collection.Map[Int, Label] = {
     val labelTable = peer.getLabelTable.asInstanceOf[java.util.Hashtable[Int, JLabel]]
-    new scala.collection.JavaConversions.JMapWrapper(labelTable)
+    new scala.collection.convert.Wrappers.JMapWrapper(labelTable)
       .mapValues(v => UIElement.cachedWrapper[Label](v))
   }
   def labels_=(l: scala.collection.Map[Int, Label]) {

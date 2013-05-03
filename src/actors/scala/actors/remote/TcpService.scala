@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2005-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2005-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -24,6 +24,7 @@ import scala.util.Random
  * @version 0.9.9
  * @author Philipp Haller
  */
+@deprecated("Use the akka.actor package instead. For migration from the scala.actors package refer to the Actors Migration Guide.", "2.11.0")
 object TcpService {
   private val random = new Random
   private val ports = new mutable.HashMap[Int, TcpService]
@@ -67,6 +68,7 @@ object TcpService {
  * @version 0.9.10
  * @author Philipp Haller
  */
+@deprecated("Use the akka.actor package instead. For migration from the scala.actors package refer to the Actors Migration Guide.", "2.11.0")
 class TcpService(port: Int, cl: ClassLoader) extends Thread with Service {
   val serializer: JavaSerializer = new JavaSerializer(this, cl)
 

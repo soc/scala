@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2003-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2003-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -49,7 +49,8 @@ class LinkedHashMap[A, B] extends AbstractMap[A, B]
                              with Map[A, B]
                              with MapLike[A, B, LinkedHashMap[A, B]]
                              with HashTable[A, LinkedEntry[A, B]]
-                             with Serializable {
+                             with Serializable
+{
 
   override def empty = LinkedHashMap.empty[A, B]
   override def size = tableSize
@@ -66,23 +67,9 @@ class LinkedHashMap[A, B] extends AbstractMap[A, B]
   }
 
   override def put(key: A, value: B): Option[B] = {
-    val e = findEntry(key)
-    if (e == null) {
-      val e = new Entry(key, value)
-      addEntry(e)
-      updateLinkedEntries(e)
-      None
-    } else {
-      val v = e.value
-      e.value = value
-      Some(v)
-    }
-  }
-
-  private def updateLinkedEntries(e: Entry) {
-    if (firstEntry == null) firstEntry = e
-    else { lastEntry.later = e; e.earlier = lastEntry }
-    lastEntry = e
+    val e = findOrAddEntry(key, value)
+    if (e eq null) None
+    else { val v = e.value; e.value = value; Some(v) }
   }
 
   override def remove(key: A): Option[B] = {
@@ -105,15 +92,33 @@ class LinkedHashMap[A, B] extends AbstractMap[A, B]
     def hasNext = cur ne null
     def next =
       if (hasNext) { val res = (cur.key, cur.value); cur = cur.later; res }
-      else Iterator.empty.next
+      else Iterator.empty.next()
   }
+  
+  protected class FilteredKeys(p: A => Boolean) extends super.FilteredKeys(p) {
+    override def empty = LinkedHashMap.empty
+  }
+  
+  override def filterKeys(p: A => Boolean): scala.collection.Map[A, B] = new FilteredKeys(p)
 
+  protected class MappedValues[C](f: B => C) extends super.MappedValues[C](f) {
+    override def empty = LinkedHashMap.empty
+  }
+  
+  override def mapValues[C](f: B => C): scala.collection.Map[A, C] = new MappedValues(f)
+  
+  protected class DefaultKeySet extends super.DefaultKeySet {
+    override def empty = LinkedHashSet.empty
+  }
+  
+  override def keySet: scala.collection.Set[A] = new DefaultKeySet
+  
   override def keysIterator: Iterator[A] = new AbstractIterator[A] {
     private var cur = firstEntry
     def hasNext = cur ne null
     def next =
       if (hasNext) { val res = cur.key; cur = cur.later; res }
-      else Iterator.empty.next
+      else Iterator.empty.next()
   }
 
   override def valuesIterator: Iterator[B] = new AbstractIterator[B] {
@@ -121,10 +126,10 @@ class LinkedHashMap[A, B] extends AbstractMap[A, B]
     def hasNext = cur ne null
     def next =
       if (hasNext) { val res = cur.value; cur = cur.later; res }
-      else Iterator.empty.next
+      else Iterator.empty.next()
   }
 
-  override def foreach[U](f: ((A, B)) => U) = {
+  override def foreach[U](f: ((A, B)) => U) {
     var cur = firstEntry
     while (cur ne null) {
       f((cur.key, cur.value))
@@ -132,12 +137,20 @@ class LinkedHashMap[A, B] extends AbstractMap[A, B]
     }
   }
 
-  protected override def foreachEntry[C](f: Entry => C) {
+  protected override def foreachEntry[U](f: Entry => U) {
     var cur = firstEntry
     while (cur ne null) {
       f(cur)
       cur = cur.later
     }
+  }
+
+  protected def createNewEntry[B1](key: A, value: B1): Entry = {
+    val e = new Entry(key, value.asInstanceOf[B])
+    if (firstEntry eq null) firstEntry = e
+    else { lastEntry.later = e; e.earlier = lastEntry }
+    lastEntry = e
+    e
   }
 
   override def clear() {
@@ -146,16 +159,15 @@ class LinkedHashMap[A, B] extends AbstractMap[A, B]
   }
 
   private def writeObject(out: java.io.ObjectOutputStream) {
-    serializeTo(out, _.value)
+    serializeTo(out, { entry =>
+      out.writeObject(entry.key)
+      out.writeObject(entry.value)
+    })
   }
 
   private def readObject(in: java.io.ObjectInputStream) {
     firstEntry = null
     lastEntry = null
-    init[B](in, { (key, value) =>
-      val entry = new Entry(key, value)
-      updateLinkedEntries(entry)
-      entry
-    })
+    init(in, createNewEntry(in.readObject().asInstanceOf[A], in.readObject()))
   }
 }

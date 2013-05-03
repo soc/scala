@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2002-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2002-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -12,7 +12,9 @@ import scala.collection.immutable.Range
 
 // Note that this does not implement IntegralProxy[Int] so that it can return
 // the Int-specific Range class from until/to.
-final class RichInt(val self: Int) extends ScalaNumberProxy[Int] with RangedProxy[Int] {
+final class RichInt(val self: Int) extends AnyVal with ScalaNumberProxy[Int] with RangedProxy[Int] {
+  protected def num = scala.math.Numeric.IntIsIntegral
+  protected def ord = scala.math.Ordering.Int
   type ResultWithoutStep = Range
 
   /**

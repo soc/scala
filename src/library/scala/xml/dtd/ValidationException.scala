@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2002-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2002-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://www.scala-lang.org/           **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -33,7 +33,7 @@ object MakeValidationException {
 
   def fromMissingAttribute(allKeys: Set[String]) = {
     val sb = new StringBuilder("missing value for REQUIRED attribute")
-    if (allKeys.size > 1) sb.append('s');
+    if (allKeys.size > 1) sb.append('s')
     allKeys foreach (k => sb append "'%s'".format(k))
     new ValidationException(sb.toString())
   }

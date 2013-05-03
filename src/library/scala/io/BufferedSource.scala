@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2003-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2003-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -73,7 +73,7 @@ class BufferedSource(inputStream: InputStream, bufferSize: Int)(implicit val cod
         if (nextLine == null) lineReader.readLine
         else try nextLine finally nextLine = null
       }
-      if (result == null) Iterator.empty.next
+      if (result == null) Iterator.empty.next()
       else result
     }
   }

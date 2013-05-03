@@ -29,10 +29,15 @@ MAIN DISTRIBUTION PACKAGING
       <tarfileset dir="${dist.dir}" prefix="${dist.name}" excludes="bin/**"/>
     </tar>
     <gzip src="${dists.dir}/archives/${dist.name}.tar" destfile="${dists.dir}/archives/${dist.name}.tgz"/>
-    <exec executable="xz" failifexecutionfails="false">
-      <arg line="-k -9e -S .xz ${dists.dir}/archives/${dist.name}.tar"/>
-    </exec> 
-    <move file="${dists.dir}/archives/${dist.name}.tar.xz" tofile="${dists.dir}/archives/${dist.name}.txz" failonerror="false"/>
+    <if>
+      <not><equals arg1="${archives.skipxz}" arg2="true" /></not>
+      <then>
+        <exec executable="xz" failifexecutionfails="false">
+          <arg line="-k -9e -S .xz ${dists.dir}/archives/${dist.name}.tar"/>
+        </exec>
+        <move file="${dists.dir}/archives/${dist.name}.tar.xz" tofile="${dists.dir}/archives/${dist.name}.txz" failonerror="false"/>
+      </then>
+    </if>
     <delete file="${dists.dir}/archives/${dist.name}.tar" />
     <checksum fileext=".md5">
       <fileset dir="${dists.dir}/archives">
@@ -54,10 +59,15 @@ MAIN DISTRIBUTION PACKAGING
       <tarfileset dir="${dist.dir}/doc/scala-devel-docs" prefix="${dist.name}-devel-docs"/>
     </tar>
     <gzip src="${dists.dir}/archives/${dist.name}-devel-docs.tar" destfile="${dists.dir}/archives/${dist.name}-devel-docs.tgz"/>
-    <exec executable="xz" failifexecutionfails="false">
-      <arg line="-k -9e -S .xz ${dists.dir}/archives/${dist.name}-devel-docs.tar"/>
-    </exec> 
-    <move file="${dists.dir}/archives/${dist.name}-devel-docs.tar.xz" tofile="${dists.dir}/archives/${dist.name}-devel-docs.txz" failonerror="false"/>
+    <if>
+      <not><equals arg1="${archives.skipxz}" arg2="true" /></not>
+      <then>
+        <exec executable="xz" failifexecutionfails="false">
+          <arg line="-k -9e -S .xz ${dists.dir}/archives/${dist.name}-devel-docs.tar"/>
+        </exec>
+        <move file="${dists.dir}/archives/${dist.name}-devel-docs.tar.xz" tofile="${dists.dir}/archives/${dist.name}-devel-docs.txz" failonerror="false"/>
+      </then>
+    </if>
     <delete file="${dists.dir}/archives/${dist.name}-devel-docs.tar" />
     <checksum fileext=".md5">
       <fileset dir="${dists.dir}/archives">
@@ -84,10 +94,15 @@ MAIN DISTRIBUTION PACKAGING
       </tarfileset>
     </tar>
     <gzip src="${dists.dir}/archives/${dist.name}-sources.tar" destfile="${dists.dir}/archives/${dist.name}-sources.tgz"/>
-    <exec executable="xz" failifexecutionfails="false">
-      <arg line="-k -9e -S .xz ${dists.dir}/archives/${dist.name}-sources.tar"/>
-    </exec>
-    <move file="${dists.dir}/archives/${dist.name}-sources.tar.xz" tofile="${dists.dir}/archives/${dist.name}-sources.txz" failonerror="false"/>
+    <if>
+      <not><equals arg1="${archives.skipxz}" arg2="true" /></not>
+      <then>
+        <exec executable="xz" failifexecutionfails="false">
+          <arg line="-k -9e -S .xz ${dists.dir}/archives/${dist.name}-sources.tar"/>
+        </exec>
+        <move file="${dists.dir}/archives/${dist.name}-sources.tar.xz" tofile="${dists.dir}/archives/${dist.name}-sources.txz" failonerror="false"/>
+      </then>
+    </if>
     <delete file="${dists.dir}/archives/${dist.name}-sources.tar" />
     <checksum fileext=".md5">
       <fileset dir="${dists.dir}/archives">
@@ -97,8 +112,10 @@ MAIN DISTRIBUTION PACKAGING
   </target>
 
   <target name="pack-archives.latest.unix" depends="pack-archives.src" unless="os.win">
+    <!-- be sure to use a relative symlink to make the distribution portable,
+        `resource` is relative to directory of `link` -->
     <symlink link="${dists.dir}/archives/scala-latest-sources.tgz"
-             resource="${dists.dir}/archives/scala-${version.number}-sources.tgz"
+             resource="scala-${version.number}-sources.tgz"
              overwrite="yes"/>
   </target>
 
@@ -136,6 +153,7 @@ MAIN DISTRIBUTION PACKAGING
     </macrodef>
     <mvn-copy-lib mvn.artifact.name="jline"/>
     <mvn-copy-lib mvn.artifact.name="scala-library"/>
+    <mvn-copy-lib mvn.artifact.name="scala-reflect"/>
     <mvn-copy-lib mvn.artifact.name="scala-compiler"/>
     <mvn-copy-lib mvn.artifact.name="scala-swing"/>
     <mvn-copy-lib mvn.artifact.name="scala-actors"/>
@@ -163,48 +181,51 @@ MAIN DISTRIBUTION PACKAGING
 
   <target name="pack-maven.srcs" depends="pack-maven.libs">
     <!-- Add missing src jars. -->
-    <jar destfile="${dists.dir}/maven/${version.number}/jline/jline-src.jar"
+    <jar whenmanifestonly="fail" destfile="${dists.dir}/maven/${version.number}/jline/jline-src.jar"
          basedir="${src.dir}/jline/src/main/java">
       <include name="**/*"/>
     </jar>
 
 
     <!-- Continuations plugin -->
-    <jar destfile="${dists.dir}/maven/${version.number}/plugins/continuations/continuations-src.jar"
+    <jar whenmanifestonly="fail" destfile="${dists.dir}/maven/${version.number}/plugins/continuations/continuations-src.jar"
          basedir="${src.dir}/continuations/plugin">
       <include name="**/*"/>
     </jar>
   </target>
 
   <target name="pack-maven.docs" depends="pack-maven.libs, pack-maven.plugins">
-    <jar destfile="${dists.dir}/maven/${version.number}/jline/jline-docs.jar"
+    <jar whenmanifestonly="fail" destfile="${dists.dir}/maven/${version.number}/jline/jline-docs.jar"
          basedir="${build-docs.dir}/jline">
       <include name="**/*"/>
     </jar>
-    <jar destfile="${dists.dir}/maven/${version.number}/scala-library/scala-library-docs.jar"
+    <jar whenmanifestonly="fail" destfile="${dists.dir}/maven/${version.number}/scala-library/scala-library-docs.jar"
          basedir="${build-docs.dir}/library">
       <include name="**/*"/>
     </jar>
-    <jar destfile="${dists.dir}/maven/${version.number}/scala-compiler/scala-compiler-docs.jar"
+    <jar whenmanifestonly="fail" destfile="${dists.dir}/maven/${version.number}/scala-compiler/scala-compiler-docs.jar"
          basedir="${build-docs.dir}/compiler">
       <include name="**/*"/>
     </jar>
-    <jar destfile="${dists.dir}/maven/${version.number}/scalap/scalap-docs.jar"
+    <jar whenmanifestonly="fail" destfile="${dists.dir}/maven/${version.number}/scalap/scalap-docs.jar"
          basedir="${build-docs.dir}/scalap">
       <include name="**/*"/>
     </jar>
-    <jar destfile="${dists.dir}/maven/${version.number}/scala-partest/scala-partest-docs.jar"
-         basedir="${build-docs.dir}/scala-partest">
+    <jar whenmanifestonly="fail" destfile="${dists.dir}/maven/${version.number}/scala-partest/scala-partest-docs.jar"
+         basedir="${build-docs.dir}/partest">
       <include name="**/*"/>
     </jar>
-    <jar destfile="${dists.dir}/maven/${version.number}/plugins/continuations/continuations-docs.jar"
+    <jar whenmanifestonly="fail" destfile="${dists.dir}/maven/${version.number}/plugins/continuations/continuations-docs.jar"
          basedir="${build-docs.dir}/continuations-plugin">
       <include name="**/*"/>
     </jar>
+
     <!-- TODO - Scala swing and actors should maybe have thier own jar, but creating it is SLOW. -->
     <copy tofile="${dists.dir}/maven/${version.number}/scala-swing/scala-swing-docs.jar"
           file="${dists.dir}/maven/${version.number}/scala-library/scala-library-docs.jar"/>
     <copy tofile="${dists.dir}/maven/${version.number}/scala-actors/scala-actors-docs.jar"
+          file="${dists.dir}/maven/${version.number}/scala-library/scala-library-docs.jar"/>
+    <copy tofile="${dists.dir}/maven/${version.number}/scala-reflect/scala-reflect-docs.jar"
           file="${dists.dir}/maven/${version.number}/scala-library/scala-library-docs.jar"/>
   </target>
 

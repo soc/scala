@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2003-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2003-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |                                         **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -25,8 +25,6 @@ package mutable
  *  @define coll synchronized queue
  */
 class SynchronizedQueue[A] extends Queue[A] {
-  import scala.collection.Traversable
-
   /** Checks if the queue is empty.
    *
    *  @return true, iff there is no element in the queue.
@@ -58,7 +56,7 @@ class SynchronizedQueue[A] extends Queue[A] {
    *
    *  @return the first element of the queue.
    */
-  override def dequeue(): A = synchronized { super.dequeue }
+  override def dequeue(): A = synchronized { super.dequeue() }
 
   /** Returns the first element in the queue which satisfies the
    *  given predicate, and removes this element from the queue.
@@ -87,7 +85,7 @@ class SynchronizedQueue[A] extends Queue[A] {
   /** Removes all elements from the queue. After this operation is completed,
    *  the queue will be empty.
    */
-  override def clear(): Unit = synchronized { super.clear }
+  override def clear(): Unit = synchronized { super.clear() }
 
   /** Checks if two queues are structurally identical.
    *

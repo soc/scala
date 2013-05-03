@@ -1,11 +1,11 @@
 /* NSC -- new Scala compiler
- * Copyright 2005-2011 LAMP/EPFL
+ * Copyright 2005-2013 LAMP/EPFL
  * @author  Martin Odersky
  */
 
 package scala.tools.nsc
 
-import annotation.tailrec
+import scala.annotation.tailrec
 import java.io.EOFException
 
 trait EvalLoop {
@@ -14,7 +14,7 @@ trait EvalLoop {
   def loop(action: (String) => Unit) {
     @tailrec def inner() {
       Console.print(prompt)
-      val line = try Console.readLine catch { case _: EOFException => null }
+      val line = try Console.readLine() catch { case _: EOFException => null }
       if (line != null && line != "") {
         action(line)
         inner()

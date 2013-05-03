@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2003-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2003-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -8,10 +8,9 @@
 
 package scala.collection
 
-import generic._
 import mutable.ListBuffer
 import immutable.List
-import scala.util.control.Breaks._
+import scala.annotation.tailrec
 
 /** A template trait for linear sequences of type `LinearSeq[A]`  which optimizes
  *  the implementation of several methods under the assumption of fast linear access.
@@ -82,17 +81,16 @@ trait LinearSeqOptimized[+A, +Repr <: LinearSeqOptimized[A, Repr]] extends Linea
     false
   }
 
-  override /*TraversableLike*/
-  def count(p: A => Boolean): Int = {
+  override /*SeqLike*/
+  def contains[A1 >: A](elem: A1): Boolean = {
     var these = this
-    var cnt = 0
     while (!these.isEmpty) {
-      if (p(these.head)) cnt += 1
+      if (these.head == elem) return true
       these = these.tail
     }
-    cnt
+    false
   }
-
+  
   override /*IterableLike*/
   def find(p: A => Boolean): Option[A] = {
     var these = this
@@ -113,7 +111,7 @@ trait LinearSeqOptimized[+A, +Repr <: LinearSeqOptimized[A, Repr]] extends Linea
     }
     acc
   }
-
+  
   override /*IterableLike*/
   def foldRight[B](z: B)(f: (A, B) => B): B =
     if (this.isEmpty) z
@@ -152,7 +150,7 @@ trait LinearSeqOptimized[+A, +Repr <: LinearSeqOptimized[A, Repr]] extends Linea
       b += these.head
       these = these.tail
     }
-    b.result
+    b.result()
   }
 
   override /*TraversableLike*/
@@ -187,7 +185,7 @@ trait LinearSeqOptimized[+A, +Repr <: LinearSeqOptimized[A, Repr]] extends Linea
       these = these.tail
       lead = lead.tail
     }
-    b.result
+    b.result()
   }
 
   override /*IterableLike*/
@@ -195,7 +193,7 @@ trait LinearSeqOptimized[+A, +Repr <: LinearSeqOptimized[A, Repr]] extends Linea
     var these: Repr = repr
     var count = from max 0
     if (until <= count)
-      return newBuilder.result
+      return newBuilder.result()
 
     val b = newBuilder
     var sliceElems = until - count
@@ -208,7 +206,7 @@ trait LinearSeqOptimized[+A, +Repr <: LinearSeqOptimized[A, Repr]] extends Linea
       b += these.head
       these = these.tail
     }
-    b.result
+    b.result()
   }
 
   override /*IterableLike*/
@@ -219,7 +217,7 @@ trait LinearSeqOptimized[+A, +Repr <: LinearSeqOptimized[A, Repr]] extends Linea
       b += these.head
       these = these.tail
     }
-    b.result
+    b.result()
   }
 
   override /*TraversableLike*/
@@ -230,7 +228,7 @@ trait LinearSeqOptimized[+A, +Repr <: LinearSeqOptimized[A, Repr]] extends Linea
       b += these.head
       these = these.tail
     }
-    (b.result, these)
+    (b.result(), these)
   }
 
   override /*IterableLike*/
@@ -248,14 +246,17 @@ trait LinearSeqOptimized[+A, +Repr <: LinearSeqOptimized[A, Repr]] extends Linea
   }
 
   override /*SeqLike*/
-  def lengthCompare(len: Int): Int =  {
-    var i = 0
-    var these = self
-    while (!these.isEmpty && i <= len) {
-      i += 1
-      these = these.tail
+  def lengthCompare(len: Int): Int = {
+    @tailrec def loop(i: Int, xs: Repr): Int = {
+      if (i == len)
+        if (xs.isEmpty) 0 else 1
+      else if (xs.isEmpty)
+        -1
+      else
+        loop(i + 1, xs.tail)
     }
-    i - len
+    if (len < 0) 1
+    else loop(0, this)
   }
 
   override /*SeqLike*/

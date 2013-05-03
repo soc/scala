@@ -3,7 +3,8 @@
 # Library to push and pull binary artifacts from a remote repository using CURL.
 
 
-remote_urlbase="http://typesafe.artifactoryonline.com/typesafe/scala-sha-bootstrap/org/scala-lang/bootstrap"
+remote_urlget="http://repo.typesafe.com/typesafe/scala-sha-bootstrap/org/scala-lang/bootstrap"
+remote_urlpush="http://typesafe.artifactoryonline.com/typesafe/scala-sha-bootstrap/org/scala-lang/bootstrap"
 libraryJar="$(pwd)/lib/scala-library.jar"
 desired_ext=".desired.sha1"
 push_jar="$(pwd)/tools/push.jar"
@@ -35,8 +36,8 @@ curlUpload() {
   local data=$2
   local user=$3
   local password=$4
-  local url="${remote_urlbase}/${remote_location}"
-  java -jar $push_jar "$data" "$remote_location" "$user" "$password"
+  local url="${remote_urlpush}/${remote_location}"
+  java -jar $push_jar "$data" "$url" "$user" "$password"
   if (( $? != 0 )); then
     echo "Error uploading $data to $url"
     echo "$url"
@@ -75,24 +76,21 @@ pushJarFile() {
   local jar_dir=$(dirname $jar)
   local jar_name=${jar#$jar_dir/}
   pushd $jar_dir >/dev/null
-  local jar_sha1=$(shasum -p $jar_name)
-  local version=${jar_sha1% ?$jar_name}
+  local version=$(makeJarSha $jar_name)
   local remote_uri=${version}${jar#$basedir}
-  echo "  Pushing to ${remote_urlbase}/${remote_uri} ..."
+  echo "  Pushing to ${remote_urlpush}/${remote_uri} ..."
   echo "	$curl"
   curlUpload $remote_uri $jar_name $user $pw
   echo "  Making new sha1 file ...."
-  echo "$jar_sha1" > "${jar_name}${desired_ext}"
+  echo "$version ?$jar_name" > "${jar_name}${desired_ext}"
   popd >/dev/null
   # TODO - Git remove jar and git add jar.desired.sha1
   # rm $jar
 }
 
-getJarSha() {
+makeJarSha() {
   local jar=$1
-  if [[ ! -f "$jar" ]]; then
-    echo ""
-  elif which sha1sum 2>/dev/null >/dev/null; then
+  if which sha1sum 2>/dev/null >/dev/null; then
     shastring=$(sha1sum "$jar")
     echo "$shastring" | sed 's/ .*//'
   elif which shasum 2>/dev/null >/dev/null; then
@@ -101,6 +99,15 @@ getJarSha() {
   else
     shastring=$(openssl sha1 "$jar")
     echo "$shastring" | sed 's/^.*= //'
+  fi
+}
+
+getJarSha() {
+  local jar=$1
+  if [[ ! -f "$jar" ]]; then
+    echo ""
+  else
+    echo $(makeJarSha $jar)
   fi
 }
 
@@ -130,7 +137,7 @@ pushJarFiles() {
   local user=$2
   local password=$3
   # TODO - ignore target/ and build/
-  local jarFiles="$(find ${basedir}/lib -name "*.jar") $(find ${basedir}/test/files -name "*.jar")"
+  local jarFiles="$(find ${basedir}/lib -name "*.jar") $(find ${basedir}/test/files -name "*.jar") $(find ${basedir}/tools -name "*.jar")"
   local changed="no"
   for jar in $jarFiles; do
     local valid=$(isJarFileValid $jar)
@@ -182,7 +189,9 @@ pullJarFileToCache() {
     rm -f "$cache_loc"
   fi
   if [[ ! -f "$cache_loc" ]]; then
-    curlDownload $cache_loc ${remote_urlbase}/${uri}
+    # Note: After we follow up with JFrog, we should check the more stable raw file server first
+    # before hitting the more flaky artifactory.
+    curlDownload $cache_loc ${remote_urlget}/${uri}
     if test "$(checkJarSha "$cache_loc" "$sha")" != "OK"; then
       echo "Trouble downloading $uri.  Please try pull-binary-libs again when your internet connection is stable."
       exit 2
@@ -199,7 +208,7 @@ pullJarFile() {
   local sha1=$(cat ${jar}${desired_ext})
   local jar_dir=$(dirname $jar)
   local jar_name=${jar#$jar_dir/}
-  local version=${sha1% ?$jar_name}
+  local version=${sha1%% *}
   local remote_uri=${version}/${jar#$basedir/}
   echo "Resolving [${remote_uri}]"
   pullJarFileToCache $remote_uri $version

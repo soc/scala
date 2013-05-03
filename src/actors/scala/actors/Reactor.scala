@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2005-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2005-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -12,6 +12,7 @@ package scala.actors
 import scala.actors.scheduler.{DelegatingScheduler, ExecutorScheduler,
                                ForkJoinScheduler, ThreadPoolConfig}
 import java.util.concurrent.{ThreadPoolExecutor, TimeUnit, LinkedBlockingQueue}
+import scala.language.implicitConversions
 
 private[actors] object Reactor {
 
@@ -51,6 +52,7 @@ private[actors] object Reactor {
  *
  * @define actor reactor
  */
+@deprecated("Use the akka.actor package instead. For migration from the scala.actors package refer to the Actors Migration Guide.", "2.11.0")
 trait Reactor[Msg >: Null] extends OutputChannel[Msg] with Combinators {
 
   /* The $actor's mailbox. */
@@ -214,11 +216,16 @@ trait Reactor[Msg >: Null] extends OutputChannel[Msg] with Combinators {
     scheduler executeFromActor makeReaction(null, handler, msg)
   }
 
+  private[actors] def preAct() = {}
+
   // guarded by this
   private[actors] def dostart() {
     _state = Actor.State.Runnable
     scheduler newActor this
-    scheduler execute makeReaction(() => act(), null, null)
+    scheduler execute makeReaction(() => {
+      preAct()
+      act()
+    }, null, null)
   }
 
   /**
@@ -285,12 +292,15 @@ trait Reactor[Msg >: Null] extends OutputChannel[Msg] with Combinators {
     throw Actor.suspendException
   }
 
+  private[actors] def internalPostStop() = {}
+
   private[actors] def terminated() {
     synchronized {
       _state = Actor.State.Terminated
       // reset waitingFor, otherwise getState returns Suspended
       waitingFor = Reactor.waitingForNone
     }
+    internalPostStop()
     scheduler.terminated(this)
   }
 

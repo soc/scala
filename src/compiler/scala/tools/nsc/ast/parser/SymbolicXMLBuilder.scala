@@ -1,5 +1,5 @@
 /* NSC -- new Scala compiler
- * Copyright 2005-2011 LAMP/EPFL
+ * Copyright 2005-2013 LAMP/EPFL
  * @author Burak Emir
  */
 
@@ -7,11 +7,10 @@ package scala.tools.nsc
 package ast.parser
 
 import scala.collection.{ mutable, immutable }
-import xml.{ EntityRef, Text }
-import xml.XML.{ xmlns }
+import scala.xml.{ EntityRef, Text }
+import scala.xml.XML.{ xmlns }
 import symtab.Flags.MUTABLE
-import scala.tools.util.StringOps.splitWhere
-import language.implicitConversions
+import scala.reflect.internal.util.StringOps.splitWhere
 
 /** This class builds instance of `Tree` that represent XML.
  *
@@ -133,7 +132,7 @@ abstract class SymbolicXMLBuilder(p: Parsers#Parser, preserveWS: Boolean) {
       case (Some(pre), rest)  => (const(pre), const(rest))
       case _                  => (wild, const(n))
     }
-    mkXML(pos, true, prepat, labpat, null, null, false, args)
+    mkXML(pos, isPattern = true, prepat, labpat, null, null, empty = false, args)
   }
 
   protected def convertToTextPat(t: Tree): Tree = t match {
@@ -144,7 +143,7 @@ abstract class SymbolicXMLBuilder(p: Parsers#Parser, preserveWS: Boolean) {
     (buf map convertToTextPat).toList
 
   def parseAttribute(pos: Position, s: String): Tree = {
-    val ts = xml.Utility.parseAttributeValue(s) map {
+    val ts = scala.xml.Utility.parseAttributeValue(s) map {
       case Text(s)      => text(pos, s)
       case EntityRef(s) => entityRef(pos, s)
     }
@@ -162,14 +161,14 @@ abstract class SymbolicXMLBuilder(p: Parsers#Parser, preserveWS: Boolean) {
 
   /** could optimize if args.length == 0, args.length == 1 AND args(0) is <: Node. */
   def makeXMLseq(pos: Position, args: Seq[Tree]) = {
-    val buffer = ValDef(NoMods, _buf, TypeTree(), New(_scala_xml_NodeBuffer, List(Nil)))
+    val buffer = ValDef(NoMods, _buf, TypeTree(), New(_scala_xml_NodeBuffer, ListOfNil))
     val applies = args filterNot isEmptyText map (t => Apply(Select(Ident(_buf), _plus), List(t)))
 
     atPos(pos)( Block(buffer :: applies.toList, Ident(_buf)) )
   }
 
   /** Returns (Some(prefix) | None, rest) based on position of ':' */
-  def splitPrefix(name: String): (Option[String], String) = splitWhere(name, _ == ':', true) match {
+  def splitPrefix(name: String): (Option[String], String) = splitWhere(name, _ == ':', doDropIndex = true) match {
     case Some((pre, rest))  => (Some(pre), rest)
     case _                  => (None, name)
   }
@@ -197,7 +196,7 @@ abstract class SymbolicXMLBuilder(p: Parsers#Parser, preserveWS: Boolean) {
       uri1
     }
 
-    /** Extract all the namespaces from the attribute map. */
+    /* Extract all the namespaces from the attribute map. */
     val namespaces: List[Tree] =
       for (z <- attrMap.keys.toList ; if z startsWith xmlns) yield {
         val ns = splitPrefix(z) match {
@@ -247,7 +246,7 @@ abstract class SymbolicXMLBuilder(p: Parsers#Parser, preserveWS: Boolean) {
 
     val body = mkXML(
       pos.makeTransparent,
-      false,
+      isPattern = false,
       const(pre),
       const(newlabel),
       makeSymbolicAttrs,

@@ -1,15 +1,17 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2003-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2003-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
 \*                                                                      */
 
-package scala.collection
+package scala
+package collection
 package mutable
 
 import generic._
+import scala.reflect.ClassTag
 
 /** Factory object for the `ArrayStack` class.
  *
@@ -21,7 +23,7 @@ object ArrayStack extends SeqFactory[ArrayStack] {
   implicit def canBuildFrom[A]: CanBuildFrom[Coll, A, ArrayStack[A]] = ReusableCBF.asInstanceOf[GenericCanBuildFrom[A]]
   def newBuilder[A]: Builder[A, ArrayStack[A]] = new ArrayStack[A]
   def empty: ArrayStack[Nothing] = new ArrayStack()
-  def apply[A: ArrayTag](elems: A*): ArrayStack[A] = {
+  def apply[A: ClassTag](elems: A*): ArrayStack[A] = {
     val els: Array[AnyRef] = elems.reverseMap(_.asInstanceOf[AnyRef])(breakOut)
     if (els.length == 0) new ArrayStack()
     else new ArrayStack[A](els, els.length)
@@ -58,7 +60,7 @@ object ArrayStack extends SeqFactory[ArrayStack] {
  *  @define mayNotTerminateInf
  *  @define willNotTerminateInf
  */
-@cloneable @SerialVersionUID(8565219180626620510L)
+@SerialVersionUID(8565219180626620510L)
 class ArrayStack[T] private(private var table : Array[AnyRef],
                             private var index : Int)
 extends AbstractSeq[T]
@@ -148,7 +150,7 @@ extends AbstractSeq[T]
    *
    *  @param f The function to drain to.
    */
-  def drain(f: T => Unit) = while (!isEmpty) f(pop)
+  def drain(f: T => Unit) = while (!isEmpty) f(pop())
 
   /** Pushes all the provided elements in the traversable object onto the stack.
    *
@@ -188,7 +190,7 @@ extends AbstractSeq[T]
    *
    *  @param f   The function to apply to the top two elements.
    */
-  def combine(f: (T, T) => T): Unit = push(f(pop, pop))
+  def combine(f: (T, T) => T): Unit = push(f(pop(), pop()))
 
   /** Repeatedly combine the top elements of the stack until the stack contains only
    *  one element.

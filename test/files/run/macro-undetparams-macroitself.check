@@ -1,2 +1,2 @@
-ConcreteTypeTag[Int]
-ConcreteTypeTag[String]
+WeakTypeTag[Int]
+WeakTypeTag[String]

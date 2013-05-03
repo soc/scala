@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2003-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2003-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |                                         **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -65,13 +65,13 @@ trait ObservableBuffer[A] extends Buffer[A] with Publisher[Message[A] with Undoa
   }
 
   abstract override def clear(): Unit = {
-    super.clear
+    super.clear()
     publish(new Reset with Undoable {
       def undo() { throw new UnsupportedOperationException("cannot undo") }
     })
   }
-  
-  abstract override def insertAll(n: Int, elems: collection.Traversable[A]) {
+
+  abstract override def insertAll(n: Int, elems: scala.collection.Traversable[A]) {
     super.insertAll(n, elems)
     var curr = n - 1
     val msg = elems.foldLeft(new Script[A]() with Undoable {
@@ -83,5 +83,5 @@ trait ObservableBuffer[A] extends Buffer[A] with Publisher[Message[A] with Undoa
     }
     publish(msg)
   }
-  
+
 }

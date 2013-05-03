@@ -1,5 +1,5 @@
 /* NSC -- new Scala compiler
- * Copyright 2005-2011 LAMP/EPFL
+ * Copyright 2005-2013 LAMP/EPFL
  * @author  Martin Odersky
  */
 
@@ -74,10 +74,10 @@ abstract class Liveness {
 
     override def run() {
       backwardAnalysis(blockTransfer)
-      if (settings.debug.value) {
+      if (settings.debug) {
         linearizer.linearize(method).foreach(b => if (b != method.startBlock)
           assert(lattice.bottom != in(b),
-            "Block " + b + " in " + this.method + " has input equal to bottom -- not visited?"));
+            "Block " + b + " in " + this.method + " has input equal to bottom -- not visited?"))
       }
     }
 

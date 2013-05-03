@@ -1,5 +1,5 @@
 /* NSC -- new Scala compiler
- * Copyright 2005-2011 LAMP/EPFL
+ * Copyright 2005-2013 LAMP/EPFL
  * @author  Martin Odersky
  */
 
@@ -30,16 +30,7 @@ trait DataFlowAnalysis[L <: SemiLattice] {
   /* Implement this function to initialize the worklist.  */
   def init(f: => Unit): Unit = {
     iterations = 0
-    in.clear; out.clear; worklist.clear; visited.clear;
-    f
-  }
-
-  /** Reinitialize, but keep the old solutions. Should be used when reanalyzing the
-   *  same method, after some code transformation.
-   */
-  def reinit(f: => Unit): Unit = {
-    iterations = 0
-    worklist.clear; visited.clear;
+    in.clear(); out.clear(); worklist.clear(); visited.clear()
     f
   }
 
@@ -55,7 +46,7 @@ trait DataFlowAnalysis[L <: SemiLattice] {
     while (!worklist.isEmpty) {
       if (stat) iterations += 1
       //Console.println("worklist in: " + worklist);
-      val point = worklist.iterator.next; worklist -= point; visited += point;
+      val point = worklist.iterator.next(); worklist -= point; visited += point
       //Console.println("taking out point: " + point + " worklist out: " + worklist);
       val output = f(point, in(point))
 
@@ -82,17 +73,13 @@ trait DataFlowAnalysis[L <: SemiLattice] {
       sys.error("Could not find element " + e.getMessage)
   }
 
-  /** ...
-   *
-   *  @param f ...
-   */
   def backwardAnalysis(f: (P, lattice.Elem) => lattice.Elem): Unit =
     while (worklist.nonEmpty) {
       if (stat) iterations += 1
       val point = worklist.head
       worklist -= point
 
-      out(point) = lattice.lub(point.successors map in.apply, false) // TODO check for exception handlers
+      out(point) = lattice.lub(point.successors map in.apply, exceptional = false) // TODO check for exception handlers
       val input = f(point, out(point))
 
       if ((lattice.bottom == in(point)) || input != in(point)) {

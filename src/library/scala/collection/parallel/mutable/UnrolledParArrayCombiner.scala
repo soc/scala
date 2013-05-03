@@ -1,16 +1,12 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2003-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2003-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
 \*                                                                      */
 
 package scala.collection.parallel.mutable
-
-
-
-
 
 import scala.collection.generic.Sizing
 import scala.collection.mutable.ArraySeq
@@ -21,16 +17,12 @@ import scala.collection.parallel.TaskSupport
 import scala.collection.parallel.unsupportedop
 import scala.collection.parallel.Combiner
 import scala.collection.parallel.Task
+import scala.reflect.ClassTag
 
-
-
-
-
-private[mutable] class DoublingUnrolledBuffer[T](implicit t: ArrayTag[T]) extends UnrolledBuffer[T]()(t) {
+private[mutable] class DoublingUnrolledBuffer[T](implicit t: ClassTag[T]) extends UnrolledBuffer[T]()(t) {
   override def calcNextLength(sz: Int) = if (sz < 10000) sz * 2 else sz
   protected override def newUnrolled = new Unrolled[T](0, new Array[T](4), null, this)
 }
-
 
 
 /** An array combiner that uses doubling unrolled buffers to store elements. */
@@ -55,7 +47,7 @@ extends Combiner[T, ParArray[T]] {
   }
 
   def clear() {
-    buff.clear
+    buff.clear()
   }
 
   override def sizeHint(sz: Int) = {
@@ -77,7 +69,8 @@ extends Combiner[T, ParArray[T]] {
 
   class CopyUnrolledToArray(array: Array[Any], offset: Int, howmany: Int)
   extends Task[Unit, CopyUnrolledToArray] {
-    var result = ();
+    var result = ()
+
     def leaf(prev: Option[Unit]) = if (howmany > 0) {
       var totalleft = howmany
       val (startnode, startpos) = findStart(offset)
@@ -85,7 +78,7 @@ extends Combiner[T, ParArray[T]] {
       var pos = startpos
       var arroffset = offset
       while (totalleft > 0) {
-        val lefthere = math.min(totalleft, curr.size - pos)
+        val lefthere = scala.math.min(totalleft, curr.size - pos)
         Array.copy(curr.array, pos, array, arroffset, lefthere)
         // println("from: " + arroffset + " elems " + lefthere + " - " + pos + ", " + curr + " -> " + array.toList + " by " + this + " !! " + buff.headPtr)
         totalleft -= lefthere
@@ -107,12 +100,10 @@ extends Combiner[T, ParArray[T]] {
       val fp = howmany / 2
       List(new CopyUnrolledToArray(array, offset, fp), new CopyUnrolledToArray(array, offset + fp, howmany - fp))
     }
-    def shouldSplitFurther = howmany > collection.parallel.thresholdFromSize(size, combinerTaskSupport.parallelismLevel)
+    def shouldSplitFurther = howmany > scala.collection.parallel.thresholdFromSize(size, combinerTaskSupport.parallelismLevel)
     override def toString = "CopyUnrolledToArray(" + offset + ", " + howmany + ")"
   }
 }
-
-
 
 object UnrolledParArrayCombiner {
   def apply[T](): UnrolledParArrayCombiner[T] = new UnrolledParArrayCombiner[T] {} // was: with EnvironmentPassingCombiner[T, ParArray[T]]

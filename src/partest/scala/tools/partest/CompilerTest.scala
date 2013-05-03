@@ -1,11 +1,11 @@
 /* NSC -- new Scala compiler
- * Copyright 2005-2011 LAMP/EPFL
+ * Copyright 2005-2013 LAMP/EPFL
  * @author Paul Phillips
  */
 
 package scala.tools.partest
 
-import scala.reflect.{mirror => rm}
+import scala.reflect.runtime.{universe => ru}
 import scala.tools.nsc._
 
 /** For testing compiler internals directly.
@@ -21,7 +21,7 @@ abstract class CompilerTest extends DirectTest {
   lazy val global: Global = newCompiler()
   lazy val units = compilationUnits(global)(sources: _ *)
   import global._
-  import definitions._
+  import definitions.{ compilerTypeFromTag }
 
   override def extraSettings = "-usejavacp -d " + testOutput.path
 
@@ -32,9 +32,8 @@ abstract class CompilerTest extends DirectTest {
   def sources: List[String] = List(code)
 
   // Utility functions
-
   class MkType(sym: Symbol) {
-    def apply[M](implicit t: rm.TypeTag[M]): Type =
+    def apply[M](implicit t: ru.TypeTag[M]): Type =
       if (sym eq NoSymbol) NoType
       else appliedType(sym, compilerTypeFromTag(t))
   }
@@ -50,7 +49,7 @@ abstract class CompilerTest extends DirectTest {
   }
 
   class SymsInPackage(pkgName: String) {
-    def pkg     = getRequiredModule(pkgName)
+    def pkg     = rootMirror.getPackage(pkgName)
     def classes = allMembers(pkg) filter (_.isClass)
     def modules = allMembers(pkg) filter (_.isModule)
     def symbols = classes ++ terms filterNot (_ eq NoSymbol)

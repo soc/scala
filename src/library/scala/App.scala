@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2010-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2010-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -21,6 +21,16 @@ import scala.collection.mutable.ListBuffer
  *  Here, object `Main` inherits the `main` method of `App`.
  *
  *  `args` returns the current command line arguments as an array.
+ *
+ *  ==Caveats==
+ *
+ *  '''''It should be noted that this trait is implemented using the [[DelayedInit]]
+ *  functionality, which means that fields of the object will not have been initialized
+ *  before the main method has been executed.'''''
+ *
+ *  It should also be noted that the `main` method will not normally need to be overridden:
+ *  the purpose is to turn the whole class body into the “main method”. You should only
+ *  chose to override it if you know what you are doing.
  *
  *  @author  Martin Odersky
  *  @version 2.1, 15/02/2011

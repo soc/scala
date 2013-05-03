@@ -1,5 +1,5 @@
 /* NSC -- new Scala compiler
- * Copyright 2005-2011 LAMP/EPFL
+ * Copyright 2005-2013 LAMP/EPFL
  * @author  Martin Odersky
  */
 
@@ -68,7 +68,6 @@ abstract class TypeFlowAnalysis {
    *  names to types and a type stack.
    */
   object typeFlowLattice extends SemiLattice {
-    import icodes._
     type Elem = IState[VarBinding, icodes.TypeStack]
 
     val top    = new Elem(new VarBinding, typeStackLattice.top)
@@ -132,15 +131,15 @@ abstract class TypeFlowAnalysis {
       init(m)
     }
 
-    def run = {
-      timer.start
+    def run() = {
+      timer.start()
       // icodes.lubs0 = 0
       forwardAnalysis(blockTransfer)
-      val t = timer.stop
-      if (settings.debug.value) {
+      timer.stop
+      if (settings.debug) {
         linearizer.linearize(method).foreach(b => if (b != method.startBlock)
           assert(visited.contains(b),
-            "Block " + b + " in " + this.method + " has input equal to bottom -- not visited? .." + visited));
+            "Block " + b + " in " + this.method + " has input equal to bottom -- not visited? .." + visited))
       }
       // log("" + method.symbol.fullName + " ["  + method.code.blocks.size + " blocks] "
       //     + "\n\t" + iterations + " iterations: " + t + " ms."
@@ -168,17 +167,14 @@ abstract class TypeFlowAnalysis {
       val bindings = out.vars
       val stack = out.stack
 
-      if (settings.debug.value) {
+      if (settings.debug) {
         // Console.println("[before] Stack: " + stack);
         // Console.println(i);
       }
       i match {
 
-        case THIS(clasz) =>
-          stack push toTypeKind(clasz.tpe)
-
-        case CONSTANT(const) =>
-          stack push toTypeKind(const.tpe)
+        case THIS(clasz)     => stack push toTypeKind(clasz.tpe)
+        case CONSTANT(const) => stack push toTypeKind(const.tpe)
 
         case LOAD_ARRAY_ITEM(kind) =>
           stack.pop2 match {
@@ -194,139 +190,73 @@ abstract class TypeFlowAnalysis {
           stack push (if (t == typeLattice.bottom) local.kind  else t)
 
         case LOAD_FIELD(field, isStatic) =>
-          if (!isStatic)
-            stack.pop
+          if (!isStatic) { stack.pop }
           stack push toTypeKind(field.tpe)
 
-        case LOAD_MODULE(module) =>
-          stack push toTypeKind(module.tpe)
+        case LOAD_MODULE(module)    => stack push toTypeKind(module.tpe)
+        case STORE_ARRAY_ITEM(kind) => stack.pop3
+        case STORE_LOCAL(local)     => val t = stack.pop; bindings += (local -> t)
+        case STORE_THIS(_)          => stack.pop
 
-        case STORE_ARRAY_ITEM(kind) =>
-          stack.pop3
-
-        case STORE_LOCAL(local) =>
-          val t = stack.pop
-          bindings += (local -> t)
-
-        case STORE_THIS(_) =>
-          stack.pop
-
-        case STORE_FIELD(field, isStatic) =>
-          if (isStatic)
-            stack.pop
-          else
-            stack.pop2
+        case STORE_FIELD(field, isStatic) => if (isStatic) stack.pop else stack.pop2
 
         case CALL_PRIMITIVE(primitive) =>
           primitive match {
-            case Negation(kind) =>
-              stack.pop; stack.push(kind)
+            case Negation(kind) => stack.pop; stack.push(kind)
+
             case Test(_, kind, zero) =>
               stack.pop
-              if (!zero) stack.pop
-              stack push BOOL;
-            case Comparison(_, _) =>
-              stack.pop2
-              stack push INT
+              if (!zero) { stack.pop }
+              stack push BOOL
+
+            case Comparison(_, _) => stack.pop2; stack push INT
 
             case Arithmetic(op, kind) =>
               stack.pop
-              if (op != NOT)
-                stack.pop
+              if (op != NOT) { stack.pop }
               val k = kind match {
                 case BYTE | SHORT | CHAR => INT
                 case _ => kind
               }
               stack push k
 
-            case Logical(op, kind) =>
-              stack.pop2
-              stack push kind
-
-            case Shift(op, kind) =>
-              stack.pop2
-              stack push kind
-
-            case Conversion(src, dst) =>
-              stack.pop
-              stack push dst
-
-            case ArrayLength(kind) =>
-              stack.pop
-              stack push INT
-
-            case StartConcat =>
-              stack.push(ConcatClass)
-
-            case EndConcat =>
-              stack.pop
-              stack.push(STRING)
-
-            case StringConcat(el) =>
-              stack.pop2
-              stack push ConcatClass
+            case Logical(op, kind)    => stack.pop2; stack push kind
+            case Shift(op, kind)      => stack.pop2; stack push kind
+            case Conversion(src, dst) => stack.pop;  stack push dst
+            case ArrayLength(kind)    => stack.pop;  stack push INT
+            case StartConcat          => stack.push(ConcatClass)
+            case EndConcat            => stack.pop;  stack.push(STRING)
+            case StringConcat(el)     => stack.pop2; stack push ConcatClass
           }
 
         case cm @ CALL_METHOD(_, _) =>
           stack pop cm.consumed
           cm.producedTypes foreach (stack push _)
 
-        case BOX(kind) =>
-          stack.pop
-          stack.push(BOXED(kind))
+        case BOX(kind)   => stack.pop; stack.push(BOXED(kind))
+        case UNBOX(kind) => stack.pop; stack.push(kind)
 
-        case UNBOX(kind) =>
-          stack.pop
-          stack.push(kind)
+        case NEW(kind) => stack.push(kind)
 
-        case NEW(kind) =>
-          stack.push(kind)
+        case CREATE_ARRAY(elem, dims) => stack.pop(dims); stack.push(ARRAY(elem))
 
-        case CREATE_ARRAY(elem, dims) =>
-          stack.pop(dims)
-          stack.push(ARRAY(elem))
+        case IS_INSTANCE(tpe) => stack.pop; stack.push(BOOL)
+        case CHECK_CAST(tpe)  => stack.pop; stack.push(tpe)
 
-        case IS_INSTANCE(tpe) =>
-          stack.pop
-          stack.push(BOOL)
+        case _: SWITCH => stack.pop
+        case _: JUMP   => ()
+        case _: CJUMP  => stack.pop2
+        case _: CZJUMP => stack.pop
 
-        case CHECK_CAST(tpe) =>
-          stack.pop
-          stack.push(tpe)
+        case RETURN(kind) => if (kind != UNIT) { stack.pop }
+        case THROW(_)     => stack.pop
 
-        case SWITCH(tags, labels) =>
-          stack.pop
+        case DROP(kind) => stack.pop
+        case DUP(kind)  => stack.push(stack.head)
 
-        case JUMP(whereto) =>
-          ()
+        case MONITOR_ENTER() | MONITOR_EXIT()  => stack.pop
 
-        case CJUMP(success, failure, cond, kind) =>
-          stack.pop2
-
-        case CZJUMP(success, failure, cond, kind) =>
-          stack.pop
-
-        case RETURN(kind) =>
-          if (kind != UNIT)
-            stack.pop;
-
-        case THROW(_) =>
-          stack.pop
-
-        case DROP(kind) =>
-          stack.pop
-
-        case DUP(kind) =>
-          stack.push(stack.head)
-
-        case MONITOR_ENTER() =>
-          stack.pop
-
-        case MONITOR_EXIT() =>
-          stack.pop
-
-        case SCOPE_ENTER(_) | SCOPE_EXIT(_) =>
-          ()
+        case SCOPE_ENTER(_)  | SCOPE_EXIT(_) => ()
 
         case LOAD_EXCEPTION(clasz) =>
           stack.pop(stack.length)
@@ -337,36 +267,6 @@ abstract class TypeFlowAnalysis {
       }
       out
     } // interpret
-
-
-    class SimulatedStack {
-      private var types: List[InferredType] = Nil
-      private var depth = 0
-
-      /** Remove and return the topmost element on the stack. If the
-       *  stack is empty, return a reference to a negative index on the
-       *  stack, meaning it refers to elements pushed by a predecessor block.
-       */
-      def pop: InferredType = types match {
-        case head :: rest =>
-          types = rest
-          head
-        case _ =>
-          depth -= 1
-          TypeOfStackPos(depth)
-      }
-
-      def pop2: (InferredType, InferredType) = {
-        (pop, pop)
-      }
-
-      def push(t: InferredType) {
-        depth += 1
-        types = types ::: List(t)
-      }
-
-      def push(k: TypeKind) { push(Const(k)) }
-    }
 
 	abstract class InferredType {
       /** Return the type kind pointed by this inferred type. */
@@ -395,7 +295,6 @@ abstract class TypeFlowAnalysis {
 	class TransferFunction(consumed: Int, gens: List[Gen]) extends (lattice.Elem => lattice.Elem) {
 	  def apply(in: lattice.Elem): lattice.Elem = {
         val out = lattice.IState(new VarBinding(in.vars), new TypeStack(in.stack))
-        val bindings = out.vars
         val stack = out.stack
 
         out.stack.pop(consumed)
@@ -456,9 +355,9 @@ abstract class TypeFlowAnalysis {
 
     override def run {
 
-      timer.start
+      timer.start()
       forwardAnalysis(blockTransfer)
-      val t = timer.stop
+      timer.stop
 
       /* Now that `forwardAnalysis(blockTransfer)` has finished, all inlining candidates can be found in `remainingCALLs`,
          whose keys are callsites and whose values are pieces of information about the typestack just before the callsite in question.
@@ -468,7 +367,7 @@ abstract class TypeFlowAnalysis {
         preCandidates += rc._2.bb
       }
 
-      if (settings.debug.value) {
+      if (settings.debug) {
         for(b <- callerLin; if (b != method.startBlock) && preCandidates(b)) {
           assert(visited.contains(b),
                  "Block " + b + " in " + this.method + " has input equal to bottom -- not visited? .." + visited)
@@ -497,7 +396,7 @@ abstract class TypeFlowAnalysis {
     override def blockTransfer(b: BasicBlock, in: lattice.Elem): lattice.Elem = {
       var result = lattice.IState(new VarBinding(in.vars), new TypeStack(in.stack))
 
-      val stopAt = if(isOnPerimeter(b)) lastInstruction(b) else null;
+      val stopAt = if(isOnPerimeter(b)) lastInstruction(b) else null
       var isPastLast = false
 
       var instrs = b.toList
@@ -539,6 +438,8 @@ abstract class TypeFlowAnalysis {
 
     val isOnWatchlist = mutable.Set.empty[Instruction]
 
+    val warnIfInlineFails = mutable.Set.empty[opcodes.CALL_METHOD] // cache for a given IMethod (ie cleared on Inliner.analyzeMethod).
+
     /* Each time CallerCalleeInfo.isSafeToInline determines a concrete callee is unsafe to inline in the current caller,
        the fact is recorded in this TFA instance for the purpose of avoiding devoting processing to that callsite next time.
        The condition of "being unsafe to inline in the current caller" sticks across inlinings and TFA re-inits
@@ -547,18 +448,28 @@ abstract class TypeFlowAnalysis {
     val knownUnsafe = mutable.Set.empty[Symbol]
     val knownSafe   = mutable.Set.empty[Symbol]
     val knownNever  = mutable.Set.empty[Symbol] // `knownNever` needs be cleared only at the very end of the inlining phase (unlike `knownUnsafe` and `knownSafe`)
-    @inline final def blackballed(msym: Symbol): Boolean = { knownUnsafe(msym) || knownNever(msym) }
+    final def blackballed(msym: Symbol): Boolean = { knownUnsafe(msym) || knownNever(msym) }
 
     val relevantBBs   = mutable.Set.empty[BasicBlock]
 
+    /*
+     * Rationale to prevent some methods from ever being inlined:
+     *
+     *   (1) inlining getters and setters results in exposing a private field,
+     *       which may itself prevent inlining of the caller (at best) or
+     *       lead to situations like SI-5442 ("IllegalAccessError when mixing optimized and unoptimized bytecode")
+     *
+     *   (2) only invocations having a receiver object are considered (ie no static-methods are ever inlined).
+     *       This is taken care of by checking `isDynamic` (ie virtual method dispatch) and `Static(true)` (ie calls to private members)
+     */
     private def isPreCandidate(cm: opcodes.CALL_METHOD): Boolean = {
       val msym  = cm.method
       val style = cm.style
-      // Dynamic == normal invocations
-      // Static(true) == calls to private members
-      !msym.isConstructor && !blackballed(msym) &&
-      (style.isDynamic || (style.hasInstance && style.isStatic))
-      // && !(msym hasAnnotation definitions.ScalaNoInlineClass)
+
+      !blackballed(msym)  &&
+      !msym.isConstructor &&
+      (!msym.isAccessor || inliner.isClosureClass(msym.owner)) &&
+      (style.isDynamic  || (style.hasInstance && style.isStatic))
     }
 
     override def init(m: icodes.IMethod) {
@@ -569,13 +480,14 @@ abstract class TypeFlowAnalysis {
       // initially populate the watchlist with all callsites standing a chance of being inlined
       isOnWatchlist.clear()
       relevantBBs.clear()
+      warnIfInlineFails.clear()
         /* TODO Do we want to perform inlining in non-finally exception handlers?
          * Seems counterproductive (the larger the method the less likely it will be JITed.
          * It's not that putting on radar only `linearizer linearizeAt (m, m.startBlock)` makes for much shorter inlining times (a minor speedup nonetheless)
          * but the effect on method size could be explored.  */
       putOnRadar(m.linearizedBlocks(linearizer))
       populatePerimeter()
-      assert(relevantBBs.isEmpty || relevantBBs.contains(m.startBlock), "you gave me dead code")
+      // usually but not always true (counterexample in SI-6015) `(relevantBBs.isEmpty || relevantBBs.contains(m.startBlock))`
     }
 
     def conclusives(b: BasicBlock): List[opcodes.CALL_METHOD] = {
@@ -592,18 +504,15 @@ abstract class TypeFlowAnalysis {
 
     private def putOnRadar(blocks: Traversable[BasicBlock]) {
       for(bb <- blocks) {
-        val preCands = bb.toList collect {
-          case cm : opcodes.CALL_METHOD
-            if isPreCandidate(cm) /* && !isReceiverKnown(cm) */
-          => cm
+        val calls = bb.toList collect { case cm : opcodes.CALL_METHOD => cm }
+        for(c <- calls; if(inliner.hasInline(c.method))) {
+           warnIfInlineFails += c
         }
+        val preCands = calls filter isPreCandidate
         isOnWatchlist ++= preCands
       }
       relevantBBs ++= blocks
     }
-
-    /* the argument is also included in the result */
-    private def transitivePreds(b: BasicBlock): Set[BasicBlock] = { transitivePreds(List(b)) }
 
     /* those BBs in the argument are also included in the result */
     private def transitivePreds(starters: Traversable[BasicBlock]): Set[BasicBlock] = {
@@ -614,19 +523,6 @@ abstract class TypeFlowAnalysis {
         toVisit = toVisit.tail
         result += h
         for(p <- h.predecessors; if !result(p) && !toVisit.contains(p)) { toVisit = p :: toVisit }
-      }
-      result.toSet
-    }
-
-    /* those BBs in the argument are also included in the result */
-    private def transitiveSuccs(starters: Traversable[BasicBlock]): Set[BasicBlock] = {
-      val result = mutable.Set.empty[BasicBlock]
-      var toVisit: List[BasicBlock] = starters.toList.distinct
-      while(toVisit.nonEmpty) {
-        val h   = toVisit.head
-        toVisit = toVisit.tail
-        result += h
-        for(p <- h.successors; if !result(p) && !toVisit.contains(p)) { toVisit = p :: toVisit }
       }
       result.toSet
     }
@@ -696,16 +592,16 @@ abstract class TypeFlowAnalysis {
             For each of them, its `lastInstruction` (after which no more typeflows are needed) is found.
 
      */
-    def reinit(m: icodes.IMethod, staleOut: List[BasicBlock], inlined: collection.Set[BasicBlock], staleIn: collection.Set[BasicBlock]) {
+    def reinit(m: icodes.IMethod, staleOut: List[BasicBlock], inlined: scala.collection.Set[BasicBlock], staleIn: scala.collection.Set[BasicBlock]) {
       if (this.method == null || this.method.symbol != m.symbol) {
         init(m)
         return
       } else if(staleOut.isEmpty && inlined.isEmpty && staleIn.isEmpty) {
         // this promotes invoking reinit if in doubt, no performance degradation will ensue!
-        return;
+        return
       }
 
-      worklist.clear // calling reinit(f: => Unit) would also clear visited, thus forgetting about blocks visited before reinit.
+      worklist.clear() // calling reinit(f: => Unit) would also clear visited, thus forgetting about blocks visited before reinit.
 
       // asserts conveying an idea what CFG shapes arrive here:
       //   staleIn foreach (p => assert( !in.isDefinedAt(p), p))
@@ -741,13 +637,7 @@ abstract class TypeFlowAnalysis {
       if(!worklist.contains(b)) { worklist += b }
     }
 
-    /* this is not a general purpose method to add to the worklist,
-     * because the assert is expected to hold only when called from MTFAGrowable.reinit() */
-    private def enqueue(bs: Traversable[BasicBlock]) {
-      bs foreach enqueue
-    }
-
-    private def blankOut(blocks: collection.Set[BasicBlock]) {
+    private def blankOut(blocks: scala.collection.Set[BasicBlock]) {
       blocks foreach { b =>
         in(b)  = typeFlowLattice.bottom
         out(b) = typeFlowLattice.bottom
@@ -775,14 +665,14 @@ abstract class TypeFlowAnalysis {
     override def forwardAnalysis(f: (P, lattice.Elem) => lattice.Elem): Unit = {
       while (!worklist.isEmpty && relevantBBs.nonEmpty) {
         if (stat) iterations += 1
-        val point = worklist.iterator.next; worklist -= point;
+        val point = worklist.iterator.next(); worklist -= point
         if(relevantBBs(point)) {
           shrinkedWatchlist = false
           val output = f(point, in(point))
-          visited += point;
+          visited += point
           if(isOnPerimeter(point)) {
             if(shrinkedWatchlist && !isWatching(point)) {
-              relevantBBs -= point;
+              relevantBBs -= point
               populatePerimeter()
             }
           } else {
@@ -792,7 +682,13 @@ abstract class TypeFlowAnalysis {
               val succs = point.successors filter relevantBBs
               succs foreach { p =>
                 assert((p.predecessors filter isOnPerimeter).isEmpty)
-                val updated = lattice.lub(List(output, in(p)), p.exceptionHandlerStart)
+                val existing = in(p)
+                // TODO move the following assertion to typeFlowLattice.lub2 for wider applicability (ie MethodTFA in addition to MTFAGrowable).
+                assert(existing == lattice.bottom ||
+                       p.exceptionHandlerStart    ||
+                       (output.stack.length == existing.stack.length),
+                       "Trying to merge non-bottom type-stacks with different stack heights. For a possible cause see SI-6157.")
+                val updated = lattice.lub(List(output, existing), p.exceptionHandlerStart)
                 if(updated != in(p)) {
                   in(p) = updated
                   enqueue(p)
@@ -810,10 +706,6 @@ abstract class TypeFlowAnalysis {
     var millis = 0L
 
     private var lastStart = 0L
-
-    def reset() {
-      millis = 0L
-    }
 
     def start() {
       lastStart = System.currentTimeMillis

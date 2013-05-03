@@ -1,6 +1,6 @@
 /*                     __                                               *\
  **     ________ ___   / /  ___     Scala API                            **
- **    / __/ __// _ | / /  / _ |    (c) 2003-2011, LAMP/EPFL             **
+ **    / __/ __// _ | / /  / _ |    (c) 2003-2013, LAMP/EPFL             **
  **  __\ \/ /__/ __ |/ /__/ __ |    http://www.scala-lang.org/           **
  ** /____/\___/_/ |_/____/_/ | |                                         **
  **                          |/                                          **
@@ -123,7 +123,7 @@ case class ExtDef(extID:ExternalID) extends EntityDef {
 /** a parsed entity reference */
 case class PEReference(ent:String) extends MarkupDecl {
   if( !Utility.isName( ent ))
-    throw new IllegalArgumentException("ent must be an XML Name");
+    throw new IllegalArgumentException("ent must be an XML Name")
 
   override def buildString(sb: StringBuilder): StringBuilder =
     sb append '%' append ent append ';'

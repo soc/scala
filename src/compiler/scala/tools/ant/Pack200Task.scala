@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala Ant Tasks                      **
-**    / __/ __// _ | / /  / _ |    (c) 2005-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2005-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -65,7 +65,7 @@ class Pack200Task extends ScalaMatchingTask {
 
   /** Set the flag to specify if file reordering should be performed. Reordering
     * is used to remove empty packages and improve pack200 optimization.
-    * @param keep
+    * @param x
     *         `'''true'''` to retain file ordering.
     *         `'''false'''` to optimize directory structure (DEFAULT).  */
   def setKeepFileOrder(x: Boolean) { keepFileOrder = x }
@@ -99,8 +99,8 @@ class Pack200Task extends ScalaMatchingTask {
   private def getFileList: List[File] = {
     var files: List[File] = Nil
     val fs = getImplicitFileSet
-    var ds = fs.getDirectoryScanner(getProject())
-    var dir = fs.getDir(getProject())
+    val ds = fs.getDirectoryScanner(getProject())
+    val dir = fs.getDir(getProject())
     for (filename <- ds.getIncludedFiles()
          if filename.toLowerCase.endsWith(".jar")) {
       val file = new File(dir, filename)

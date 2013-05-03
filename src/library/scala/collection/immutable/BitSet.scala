@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2003-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2003-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -30,9 +30,6 @@ abstract class BitSet extends scala.collection.AbstractSet[Int]
                          with BitSetLike[BitSet]
                          with Serializable {
   override def empty = BitSet.empty
-
-  @deprecated("Use BitSet.fromBitMask[NoCopy] instead of fromArray", "2.10")
-  def fromArray(elems: Array[Long]): BitSet = fromBitMaskNoCopy(elems)
 
   protected def fromBitMaskNoCopy(elems: Array[Long]): BitSet = BitSet.fromBitMaskNoCopy(elems)
 
@@ -74,16 +71,12 @@ object BitSet extends BitSetFactory[BitSet] {
   def newBuilder: Builder[Int, BitSet] = new Builder[Int, BitSet] {
     private[this] val b = new mutable.BitSet
     def += (x: Int) = { b += x; this }
-    def clear() = b.clear
+    def clear() = b.clear()
     def result() = b.toImmutable
   }
 
   /** $bitsetCanBuildFrom */
   implicit def canBuildFrom: CanBuildFrom[BitSet, Int, BitSet] = bitsetCanBuildFrom
-
-  /** A bitset containing all the bits in an array */
-  @deprecated("Use fromBitMask[NoCopy] instead of fromArray", "2.10")
-  def fromArray(elems: Array[Long]): BitSet = fromBitMaskNoCopy(elems)
 
   /** A bitset containing all the bits in an array */
   def fromBitMask(elems: Array[Long]): BitSet = {

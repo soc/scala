@@ -1,33 +1,17 @@
 /* NSC -- new Scala compiler
- * Copyright 2005-2011 LAMP/EPFL
+ * Copyright 2005-2013 LAMP/EPFL
  * @author  Martin Odersky
  */
 
 package scala.tools.nsc
 package typechecker
 
-import scala.tools.nsc.symtab.Flags._
 import scala.collection.mutable
 import mutable.ListBuffer
 import util.returning
 
 abstract class TreeCheckers extends Analyzer {
   import global._
-
-  private val everything   = ListBuffer[(Phase, Map[Tree, (Symbol, Type)])]()
-  private val currentTrees = mutable.Map[Tree, (Symbol, Type)]()
-  private val tpeOfTree    = mutable.HashMap[Tree, Type]()
-
-  if (settings.debug.value) {
-    sys addShutdownHook {
-      for ((ph, map) <- everything.toList) {
-        println("\n>>>> " + ph + "\n")
-        for ((tree, (sym, tpe)) <- map.toList.sortBy(_._1.summaryString)) {
-          println("%20s %20s %s".format(sym, tpe, ("" + tree) take 50))
-        }
-      }
-    }
-  }
 
   private def classstr(x: AnyRef) = (x.getClass.getName split """\\.|\\$""").last
   private def typestr(x: Type)    = " (tpe = " + x + ")"
@@ -50,14 +34,13 @@ abstract class TreeCheckers extends Analyzer {
   object SymbolTracker extends Traverser {
     type PhaseMap = mutable.HashMap[Symbol, List[Tree]]
 
-    val defSyms       = mutable.HashMap[Symbol, List[DefTree]]() withDefaultValue Nil
-    val newSyms       = mutable.HashSet[Symbol]()
     val maps          = ListBuffer[(Phase, PhaseMap)]()
-    val movedMsgs     = ListBuffer[String]()
-
     def prev          = maps.init.last._2
     def latest        = maps.last._2
-    def sortedNewSyms = newSyms.toList.distinct sortBy (_.name)
+    val defSyms       = mutable.HashMap[Symbol, List[DefTree]]()
+    val newSyms       = mutable.HashSet[Symbol]()
+    val movedMsgs     = new ListBuffer[String]
+    def sortedNewSyms = newSyms.toList.distinct sortBy (_.name.toString)
 
     def inPrev(sym: Symbol) = {
       (maps.size >= 2) && (prev contains sym)
@@ -86,7 +69,7 @@ abstract class TreeCheckers extends Analyzer {
       // new symbols
       if (newSyms.nonEmpty) {
         informFn(newSyms.size + " new symbols.")
-        val toPrint = if (settings.debug.value) sortedNewSyms mkString " " else ""
+        val toPrint = if (settings.debug) sortedNewSyms mkString " " else ""
 
         newSyms.clear()
         if (toPrint != "")
@@ -108,21 +91,18 @@ abstract class TreeCheckers extends Analyzer {
       if (maps.isEmpty || maps.last._1 != ph)
         maps += ((ph, new PhaseMap))
 
-      currentTrees.clear()
       traverse(unit.body)
-      everything += ((ph, currentTrees.toMap))
-
       reportChanges()
     }
     override def traverse(tree: Tree): Unit = {
       val sym    = tree.symbol
-      currentTrees(tree) = ((sym, tree.tpe))
-
       if (sym != null && sym != NoSymbol) {
         record(sym, tree)
         tree match {
-          case x: DefTree => defSyms(sym) :+= x
-          case _          => ()
+          case x: DefTree =>
+            if (defSyms contains sym) defSyms(sym) = defSyms(sym) :+ x
+            else defSyms(sym) = List(x)
+          case _ => ()
         }
       }
 
@@ -130,37 +110,45 @@ abstract class TreeCheckers extends Analyzer {
     }
   }
 
+  lazy val tpeOfTree = mutable.HashMap[Tree, Type]()
+
   def posstr(p: Position) =
     try p.source.path + ":" + p.line
     catch { case _: UnsupportedOperationException => p.toString }
 
-  def errorFn(msg: Any): Unit                = println("[check: %s] %s".format(phase.prev, msg))
+  private var hasError: Boolean = false
+  def errorFn(msg: Any): Unit                = {hasError = true; println("[check: %s] %s".format(phase.prev, msg))}
   def errorFn(pos: Position, msg: Any): Unit = errorFn(posstr(pos) + ": " + msg)
   def informFn(msg: Any) {
-    if (settings.verbose.value || settings.debug.value)
+    if (settings.verbose || settings.debug)
       println("[check: %s] %s".format(phase.prev, msg))
   }
 
   def assertFn(cond: Boolean, msg: => Any) =
     if (!cond) errorFn(msg)
 
-  def checkTrees() {
-    informFn("[consistency check at the beginning of phase " + phase + "]")
-    currentRun.units foreach check
+  private def wrap[T](msg: => Any)(body: => Unit) {
+    try body
+    catch { case x: Throwable =>
+      Console.println("Caught " + x)
+      Console.println(msg)
+      x.printStackTrace
+    }
   }
 
-  def printingTypings[T](body: => T): T = {
-    val saved = global.printTypings
-    global.printTypings = true
-    val result = body
-    global.printTypings = saved
-    result
+  def checkTrees() {
+    if (settings.verbose)
+      Console.println("[consistency check at the beginning of phase " + phase + "]")
+
+    currentRun.units foreach (x => wrap(x)(check(x)))
   }
+
   def runWithUnit[T](unit: CompilationUnit)(body: => Unit): Unit = {
+    hasError = false
     val unit0 = currentUnit
     currentRun.currentUnit = unit
     body
-    currentRun.advanceUnit
+    currentRun.advanceUnit()
     assertFn(currentUnit == unit, "currentUnit is " + currentUnit + ", but unit is " + unit)
     currentRun.currentUnit = unit0
   }
@@ -175,6 +163,7 @@ abstract class TreeCheckers extends Analyzer {
       checker.precheck.traverse(unit.body)
       checker.typed(unit.body)
       checker.postcheck.traverse(unit.body)
+      if (hasError) unit.warning(NoPosition, "TreeCheckers detected non-compliant trees in " + unit)
     }
   }
 
@@ -192,10 +181,6 @@ abstract class TreeCheckers extends Analyzer {
       errorFn(t1.pos, "trees differ\n old: " + treestr(t1) + "\n new: " + treestr(t2))
     private def typesDiffer(tree: Tree, tp1: Type, tp2: Type) =
       errorFn(tree.pos, "types differ\n old: " + tp1 + "\n new: " + tp2 + "\n tree: " + tree)
-    private def ownersDiffer(tree: Tree, shouldBe: Symbol) = {
-      val sym = tree.symbol
-      errorFn(tree.pos, sym + " has wrong owner: " + ownerstr(sym.owner) + ", should be: " + ownerstr(shouldBe))
-    }
 
     /** XXX Disabled reporting of position errors until there is less noise. */
     private def noPos(t: Tree) =
@@ -207,24 +192,24 @@ abstract class TreeCheckers extends Analyzer {
       if (t.symbol == NoSymbol)
         errorFn(t.pos, "no symbol: " + treestr(t))
 
-    override def typed(tree: Tree, mode: Int, pt: Type): Tree = returning(tree) {
+    override def typed(tree: Tree, mode: Mode, pt: Type): Tree = returning(tree) {
       case EmptyTree | TypeTree() => ()
       case _ if tree.tpe != null  =>
-        tpeOfTree.getOrElseUpdate(tree, {
-          val saved = tree.tpe
-          tree.tpe = null
-          saved
-        })
-        super.typed(tree, mode, pt) match {
+        tpeOfTree.getOrElseUpdate(tree, try tree.tpe finally tree.clearType())
+
+        wrap(tree)(super.typed(tree, mode, pt) match {
           case _: Literal     => ()
           case x if x ne tree => treesDiffer(tree, x)
           case _              => ()
-        }
+        })
       case _ => ()
     }
 
-    object precheck extends Traverser {
+    object precheck extends TreeStackTraverser {
       override def traverse(tree: Tree) {
+        checkSymbolRefsRespectScope(tree)
+        checkReturnReferencesDirectlyEnclosingDef(tree)
+
         val sym = tree.symbol
         def accessed = sym.accessed
         def fail(msg: String) = errorFn(tree.pos, msg + classstr(tree) + " / " + tree)
@@ -236,7 +221,7 @@ abstract class TreeCheckers extends Analyzer {
                 case _: ConstantType  => ()
                 case _                =>
                   checkSym(tree)
-                  /** XXX: lots of syms show up here with accessed == NoSymbol. */
+                  /* XXX: lots of syms show up here with accessed == NoSymbol. */
                   if (accessed != NoSymbol) {
                     val agetter = accessed.getter(sym.owner)
                     val asetter = accessed.setter(sym.owner)
@@ -248,7 +233,7 @@ abstract class TreeCheckers extends Analyzer {
               }
             }
           case ValDef(_, _, _, _) =>
-            if (sym.hasGetter && !sym.isOuterField) {
+            if (sym.hasGetter && !sym.isOuterField && !sym.isOuterAccessor) {
               assertFn(sym.getter(sym.owner) != NoSymbol, ownerstr(sym) + " has getter but cannot be found. " + sym.ownerChain)
             }
           case Apply(fn, args) =>
@@ -263,7 +248,7 @@ abstract class TreeCheckers extends Analyzer {
             else if (currentOwner.ownerChain takeWhile (_ != sym) exists (_ == NoSymbol))
               return fail("tree symbol "+sym+" does not point to enclosing class; tree = ")
 
-          /** XXX: temporary while Import nodes are arriving untyped. */
+          /* XXX: temporary while Import nodes are arriving untyped. */
           case Import(_, _) =>
             return
           case _ =>
@@ -278,19 +263,59 @@ abstract class TreeCheckers extends Analyzer {
 
           tree match {
             case x: PackageDef    =>
-              if ((sym.ownerChain contains currentOwner) || currentOwner == definitions.EmptyPackageClass) ()
+              if ((sym.ownerChain contains currentOwner) || currentOwner.isEmptyPackageClass) ()
               else fail(sym + " owner chain does not contain currentOwner " + currentOwner + sym.ownerChain)
             case _ =>
               def cond(s: Symbol) = !s.isTerm || s.isMethod || s == sym.owner
 
               if (sym.owner != currentOwner) {
-                val expected = currentOwner.ownerChain find (x => cond(x)) getOrElse fail("DefTree can't find owner: ")
+                val expected = currentOwner.ownerChain find (x => cond(x)) getOrElse { fail("DefTree can't find owner: ") ; NoSymbol }
                 if (sym.owner != expected)
-                  fail("Expected owner %s (out of %s), found %s: ".format(expected, currentOwner.ownerChain, sym.owner))
+                  fail(sm"""|
+                            | currentOwner chain: ${currentOwner.ownerChain take 3 mkString " -> "}
+                            |       symbol chain: ${sym.ownerChain mkString " -> "}"""
+                      )
               }
           }
         }
         super.traverse(tree)
+      }
+
+      private def checkSymbolRefsRespectScope(tree: Tree) {
+        def symbolOf(t: Tree): Symbol = Option(tree.symbol).getOrElse(NoSymbol)
+        val info = Option(symbolOf(tree).info).getOrElse(NoType)
+        val referencedSymbols: List[Symbol] = {
+          val directRef = tree match {
+            case _: RefTree => symbolOf(tree).toOption
+            case _          => None
+          }
+          def referencedSyms(tp: Type) = (tp collect {
+            case TypeRef(_, sym, _) => sym
+          }).toList
+          val indirectRefs = referencedSyms(info)
+          (indirectRefs ++ directRef).distinct
+        }
+        for {
+          sym <- referencedSymbols
+          // Accessors are known to steal the type of the underlying field without cloning existential symbols at the new owner.
+          // This happens in Namer#accessorTypeCompleter. We just look the other way here.
+          if !tree.symbol.isAccessor
+          if (sym.isTypeParameter || sym.isLocal) && !(tree.symbol hasTransOwner sym.owner)
+        } errorFn(s"The symbol, tpe or info of tree `(${tree}) : ${info}` refers to a out-of-scope symbol, ${sym.fullLocationString}. tree.symbol.ownerChain: ${tree.symbol.ownerChain.mkString(", ")}")
+      }
+
+      private def checkReturnReferencesDirectlyEnclosingDef(tree: Tree) {
+        tree match {
+          case _: Return =>
+            path.collectFirst {
+              case dd: DefDef => dd
+            } match {
+              case None => errorFn(s"Return node ($tree) must be enclosed in a DefDef")
+              case Some(dd) =>
+                if (tree.symbol != dd.symbol) errorFn(s"Return symbol (${tree.symbol}} does not reference directly enclosing DefDef (${dd.symbol})")
+            }
+          case _ =>
+        }
       }
     }
 
@@ -303,7 +328,7 @@ abstract class TreeCheckers extends Analyzer {
               if (oldtpe =:= tree.tpe) ()
               else typesDiffer(tree, oldtpe, tree.tpe)
 
-              tree.tpe = oldtpe
+              tree setType oldtpe
               super.traverse(tree)
             }
         }

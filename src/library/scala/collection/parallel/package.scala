@@ -1,19 +1,20 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2003-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2003-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
 \*                                                                      */
 
-package scala.collection
+package scala
+package collection
 
 import scala.collection.generic.CanBuildFrom
 import scala.collection.generic.CanCombineFrom
 import scala.collection.parallel.mutable.ParArray
 import scala.collection.mutable.UnrolledBuffer
-import annotation.unchecked.uncheckedVariance
-import language.implicitConversions
+import scala.annotation.unchecked.uncheckedVariance
+import scala.language.implicitConversions
 
 /** Package object for parallel collections.
  */
@@ -40,15 +41,10 @@ package object parallel {
 
   private[parallel] def outofbounds(idx: Int) = throw new IndexOutOfBoundsException(idx.toString)
 
-  private[parallel] def getTaskSupport: TaskSupport =
-    if (util.Properties.isJavaAtLeast("1.6")) {
-      val vendor = util.Properties.javaVmVendor
-      if ((vendor contains "Oracle") || (vendor contains "Sun") || (vendor contains "Apple")) new ForkJoinTaskSupport
-      else new ThreadPoolTaskSupport
-    } else new ThreadPoolTaskSupport
+  private[parallel] def getTaskSupport: TaskSupport = new ForkJoinTaskSupport
 
   val defaultTaskSupport: TaskSupport = getTaskSupport
-  
+
   def setTaskSupport[Coll](c: Coll, t: TaskSupport): Coll = {
     c match {
       case pc: ParIterableLike[_, _, _] => pc.tasksupport = t
@@ -56,7 +52,7 @@ package object parallel {
     }
     c
   }
-  
+
   /* implicit conversions */
 
   implicit def factory2ops[From, Elem, To](bf: CanBuildFrom[From, Elem, To]) = new FactoryOps[From, Elem, To] {
@@ -66,7 +62,7 @@ package object parallel {
       def otherwise(notbody: => R) = if (isParallel) isbody(asParallel) else notbody
     }
   }
-  implicit def traversable2ops[T](t: collection.GenTraversableOnce[T]) = new TraversableOps[T] {
+  implicit def traversable2ops[T](t: scala.collection.GenTraversableOnce[T]) = new TraversableOps[T] {
     def isParallel = t.isInstanceOf[Parallel]
     def isParIterable = t.isInstanceOf[ParIterable[_]]
     def asParIterable = t.asInstanceOf[ParIterable[T]]
@@ -138,7 +134,7 @@ package parallel {
 
   /** Composite throwable - thrown when multiple exceptions are thrown at the same time. */
   final case class CompositeThrowable(
-    val throwables: Set[Throwable]
+                                       throwables: Set[Throwable]
   ) extends Exception(
     "Multiple exceptions thrown during a parallel computation: " +
       throwables.map(t => t + "\n" + t.getStackTrace.take(10).++("...").mkString("\n")).mkString("\n\n")
@@ -149,7 +145,7 @@ package parallel {
    *  Automatically forwards the signal delegate when splitting.
    */
   private[parallel] class BufferSplitter[T]
-  (private val buffer: collection.mutable.ArrayBuffer[T], private var index: Int, private val until: Int, _sigdel: collection.generic.Signalling)
+  (private val buffer: scala.collection.mutable.ArrayBuffer[T], private var index: Int, private val until: Int, _sigdel: scala.collection.generic.Signalling)
   extends IterableSplitter[T] {
     signalDelegate = _sigdel
     def hasNext = index < until

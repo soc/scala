@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2006-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2006-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -10,7 +10,7 @@
 package scala.collection
 package generic
 
-import language.higherKinds
+import scala.language.higherKinds
 
 /** A template for companion objects of `Traversable` and subclasses thereof.
  *  This class provides a set of operations to create `$Coll` objects.
@@ -36,15 +36,12 @@ import language.higherKinds
  *    @see GenericCanBuildFrom
  */
 abstract class GenTraversableFactory[CC[X] <: GenTraversable[X] with GenericTraversableTemplate[X, CC]]
-  extends GenericCompanion[CC] {
+extends GenericCompanion[CC] {
 
-  // A default implementation of GenericCanBuildFrom which can be cast
-  // to whatever is desired.
-  private class ReusableCBF extends GenericCanBuildFrom[Nothing] {
+  private[this] val ReusableCBFInstance: GenericCanBuildFrom[Nothing] = new GenericCanBuildFrom[Nothing] {
     override def apply() = newBuilder[Nothing]
   }
-  // Working around SI-4789 by using a lazy val instead of an object.
-  lazy val ReusableCBF: GenericCanBuildFrom[Nothing] = new ReusableCBF
+  def ReusableCBF: GenericCanBuildFrom[Nothing] = ReusableCBFInstance
 
   /** A generic implementation of the `CanBuildFrom` trait, which forwards
    *  all calls to `apply(from)` to the `genericBuilder` method of
@@ -76,7 +73,7 @@ abstract class GenTraversableFactory[CC[X] <: GenTraversable[X] with GenericTrav
       b.sizeHint(xss.map(_.size).sum)
 
     for (xs <- xss.seq) b ++= xs
-    b.result
+    b.result()
   }
 
   /** Produces a $coll containing the results of some element computation a number of times.
@@ -92,7 +89,7 @@ abstract class GenTraversableFactory[CC[X] <: GenTraversable[X] with GenericTrav
       b += elem
       i += 1
     }
-    b.result
+    b.result()
   }
 
   /** Produces a two-dimensional $coll containing the results of some element computation a number of times.
@@ -150,7 +147,7 @@ abstract class GenTraversableFactory[CC[X] <: GenTraversable[X] with GenericTrav
       b += f(i)
       i += 1
     }
-    b.result
+    b.result()
   }
 
   /** Produces a two-dimensional $coll containing values of a given function over ranges of integer values starting from 0.
@@ -219,13 +216,13 @@ abstract class GenTraversableFactory[CC[X] <: GenTraversable[X] with GenericTrav
 
     if (step == zero) throw new IllegalArgumentException("zero step")
     val b = newBuilder[T]
-    b sizeHint immutable.NumericRange.count(start, end, step, false)
+    b sizeHint immutable.NumericRange.count(start, end, step, isInclusive = false)
     var i = start
     while (if (step < zero) end < i else i < end) {
       b += i
       i += step
     }
-    b.result
+    b.result()
   }
 
   /** Produces a $coll containing repeated applications of a function to a start value.
@@ -249,7 +246,6 @@ abstract class GenTraversableFactory[CC[X] <: GenTraversable[X] with GenericTrav
         b += acc
       }
     }
-    b.result
+    b.result()
   }
 }
-

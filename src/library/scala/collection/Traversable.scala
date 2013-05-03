@@ -1,17 +1,15 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2003-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2003-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
 \*                                                                      */
 
-
-
 package scala.collection
 
 import generic._
-import mutable.{Builder, Buffer, ArrayBuffer, ListBuffer}
+import mutable.Builder
 import scala.util.control.Breaks
 
 /** A trait for traversable collections.
@@ -68,7 +66,7 @@ trait Traversable[+A] extends TraversableLike[A, Traversable[A]]
   override def copyToBuffer[B >: A](dest: Buffer[B])
   override def copyToArray[B >: A](xs: Array[B], start: Int, len: Int)
   override def copyToArray[B >: A](xs: Array[B], start: Int)
-  override def toArray[B >: A : ArrayTag]: Array[B]
+  override def toArray[B >: A : ClassTag]: Array[B]
   override def toList: List[A]
   override def toIterable: Iterable[A]
   override def toSeq: Seq[A]

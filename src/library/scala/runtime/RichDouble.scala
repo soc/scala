@@ -1,15 +1,18 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2002-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2002-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
 \*                                                                      */
 
-package scala.runtime
+package scala
+package runtime
 
-final class RichDouble(val self: Double) extends FractionalProxy[Double] {
-  protected val integralNum = Numeric.DoubleAsIfIntegral
+final class RichDouble(val self: Double) extends AnyVal with FractionalProxy[Double] {
+  protected def num = scala.math.Numeric.DoubleIsFractional
+  protected def ord = scala.math.Ordering.Double
+  protected def integralNum = scala.math.Numeric.DoubleAsIfIntegral
 
   def round: Long   = math.round(self)
   def ceil: Double  = math.ceil(self)

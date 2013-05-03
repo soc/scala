@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2002-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2002-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -10,17 +10,19 @@
 
 package scala
 
+import scala.language.implicitConversions
+
 
 /** `Unit` is a subtype of [[scala.AnyVal]]. There is only one value of type
  *  `Unit`, `()`, and it is not represented by any object in the underlying
  *  runtime system. A method with return type `Unit` is analogous to a Java
  *  method which is declared `void`.
  */
-final class Unit private extends AnyVal {
-  override def getClass(): Class[Unit] = sys.error("stub")
+final abstract class Unit private extends AnyVal {
+  override def getClass(): Class[Unit] = null
 }
 
-object Unit  extends AnyValCompanion {
+object Unit extends AnyValCompanion {
 
   /** Transform a value type into a boxed reference type.
    *

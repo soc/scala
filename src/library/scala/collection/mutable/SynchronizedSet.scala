@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2003-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2003-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -24,8 +24,6 @@ import script._
  *  @define coll synchronized set
  */
 trait SynchronizedSet[A] extends Set[A] {
-  import scala.collection.Traversable
-
   abstract override def size: Int = synchronized {
     super.size
   }
@@ -71,7 +69,7 @@ trait SynchronizedSet[A] extends Set[A] {
   }
 
   abstract override def clear(): Unit = synchronized {
-    super.clear
+    super.clear()
   }
 
   override def subsetOf(that: scala.collection.GenSet[A]) = synchronized {

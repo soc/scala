@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2002-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2002-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -9,21 +9,20 @@
 package scala.collection
 package immutable
 
-import generic._
 import mutable.Builder
 import scala.util.matching.Regex
 import scala.math.ScalaNumber
+import scala.reflect.ClassTag
 
 /** A companion object for the `StringLike` containing some constants.
  *  @since 2.8
  */
 object StringLike {
-
   // just statics for companion class.
-  private final val LF: Char = 0x0A
-  private final val FF: Char = 0x0C
-  private final val CR: Char = 0x0D
-  private final val SU: Char = 0x1A
+  private final val LF = 0x0A
+  private final val FF = 0x0C
+  private final val CR = 0x0D
+  private final val SU = 0x1A
 }
 
 import StringLike._
@@ -40,7 +39,7 @@ import StringLike._
  *  @define mayNotTerminateInf
  *  @define willNotTerminateInf
  */
-trait StringLike[+Repr] extends Any with collection.IndexedSeqOptimized[Char, Repr] with Ordered[String] {
+trait StringLike[+Repr] extends Any with scala.collection.IndexedSeqOptimized[Char, Repr] with Ordered[String] {
 self =>
 
   /** Creates a string builder buffer as builder for this class */
@@ -59,8 +58,8 @@ self =>
     val start = from max 0
     val end   = until min length
 
-    if (start >= end) newBuilder.result
-    else (newBuilder ++= toString.substring(start, end)).result
+    if (start >= end) newBuilder.result()
+    else (newBuilder ++= toString.substring(start, end)).result()
   }
 
   /** Return the current string concatenated `n` times.
@@ -239,7 +238,7 @@ self =>
     else
       throw new IllegalArgumentException("For input string: \"null\"")
 
-  override def toArray[B >: Char : ArrayTag]: Array[B] =
+  override def toArray[B >: Char : ClassTag]: Array[B] =
     toString.toCharArray.asInstanceOf[Array[B]]
 
   private def unwrapArg(arg: Any): AnyRef = arg match {

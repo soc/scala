@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2003-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2003-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -13,7 +13,7 @@ package mutable
 
 import generic._
 import script._
-import annotation.{migration, bridge}
+import scala.annotation.{migration, bridge}
 
 /** A template trait for buffers of type `Buffer[A]`.
  *
@@ -58,13 +58,13 @@ import annotation.{migration, bridge}
  *  mutates the collection in place, unlike similar but
  *  undeprecated methods throughout the collections hierarchy.
  */
-@cloneable
 trait BufferLike[A, +This <: BufferLike[A, This] with Buffer[A]]
                 extends Growable[A]
                    with Shrinkable[A]
                    with Scriptable[A]
                    with Subtractable[A, This]
                    with SeqLike[A, This]
+                   with scala.Cloneable
 { self : This =>
 
   // Abstract methods from Seq:
@@ -93,7 +93,7 @@ trait BufferLike[A, +This <: BufferLike[A, This] with Buffer[A]]
    *  @throws   IndexOutOfBoundsException if the index `n` is not in the valid range
    *            `0 <= n <= length`.
    */
-  def insertAll(n: Int, elems: collection.Traversable[A])
+  def insertAll(n: Int, elems: scala.collection.Traversable[A])
 
    /** Removes the element at a given index from this buffer.
     *
@@ -198,7 +198,7 @@ trait BufferLike[A, +This <: BufferLike[A, This] with Buffer[A]]
     case Remove(Index(n), x)    => if (this(n) == x) remove(n)
     case Remove(NoLo, x)        => this -= x
 
-    case Reset()                => clear
+    case Reset()                => clear()
     case s: Script[_]           => s.iterator foreach <<
     case _                      => throw new UnsupportedOperationException("message " + cmd + " not understood")
   }
@@ -252,4 +252,14 @@ trait BufferLike[A, +This <: BufferLike[A, This] with Buffer[A]]
    */
   @migration("`--` creates a new buffer. Use `--=` to remove an element from this buffer and return that buffer itself.", "2.8.0")
   override def --(xs: GenTraversableOnce[A]): This = clone() --= xs.seq
+
+  /** Return a clone of this buffer.
+   *
+   *  @return a `Buffer` with the same elements.
+   */
+  override def clone(): This = {
+    val bf = newBuilder
+    bf ++= this
+    bf.result().asInstanceOf[This]
+  }
 }

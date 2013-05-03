@@ -1,10 +1,12 @@
 /* NEST (New Scala Test)
- * Copyright 2007-2011 LAMP/EPFL
+ * Copyright 2007-2013 LAMP/EPFL
  * @author  Paul Phillips
  */
 
 package scala.tools.cmd
 package gen
+
+import scala.language.postfixOps
 
 class Codegen(args: List[String]) extends {
   val parsed = CodegenSpec(args: _*)
@@ -21,7 +23,7 @@ object Codegen {
       return println (CodegenSpec.helpMsg)
 
     val out = outDir getOrElse { return println("--out is required.") }
-    val all = genall || (!anyvals && !products)
+    val all = genall || !anyvals
 
     echo("Generating sources into " + out)
 

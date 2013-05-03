@@ -1,5 +1,5 @@
 /* NSC -- new Scala compiler
- * Copyright 2005-2011 LAMP/EPFL
+ * Copyright 2005-2013 LAMP/EPFL
  * @author  Paul Phillips
  */
 
@@ -15,7 +15,7 @@ trait AbsSettings extends scala.reflect.internal.settings.AbsSettings {
   type Setting <: AbsSetting      // Fix to the concrete Setting type
   type ResultOfTryToSet           // List[String] in mutable, (Settings, List[String]) in immutable
   def errorFn: String => Unit
-  protected def allSettings: collection.Set[Setting]
+  protected def allSettings: scala.collection.Set[Setting]
 
   // settings minus internal usage settings
   def visibleSettings = allSettings filterNot (_.isInternalOnly)
@@ -46,8 +46,6 @@ trait AbsSettings extends scala.reflect.internal.settings.AbsSettings {
           false
         }
     })
-
-  implicit lazy val SettingOrdering: Ordering[Setting] = Ordering.ordered
 
   trait AbsSetting extends Ordered[Setting] with AbsSettingValue {
     def name: String
@@ -83,14 +81,6 @@ trait AbsSettings extends scala.reflect.internal.settings.AbsSettings {
       this
     }
 
-    /** If the appearance of the setting should halt argument processing. */
-    private var isTerminatorSetting = false
-    def shouldStopProcessing = isTerminatorSetting
-    def stopProcessing(): this.type = {
-      isTerminatorSetting = true
-      this
-    }
-
     /** Issue error and return */
     def errorAndValue[T](msg: String, x: T): T = { errorFn(msg) ; x }
 
@@ -110,6 +100,7 @@ trait AbsSettings extends scala.reflect.internal.settings.AbsSettings {
 
     /** Attempt to set from a properties file style property value.
      *  Currently used by Eclipse SDT only.
+     *  !!! Needs test.
      */
     def tryToSetFromPropertyValue(s: String): Unit = tryToSet(s :: Nil)
 
@@ -133,7 +124,7 @@ trait AbsSettings extends scala.reflect.internal.settings.AbsSettings {
       case _                          => false
     }
     override def hashCode() = name.hashCode + value.hashCode
-    override def toString() = name + " = " + value
+    override def toString() = name + " = " + (if (value == "") "\"\"" else value)
   }
 
   trait InternalSetting extends AbsSetting {

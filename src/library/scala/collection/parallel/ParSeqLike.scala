@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2003-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2003-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -44,8 +44,8 @@ trait ParSeqLike[+T, +Repr <: ParSeq[T], +Sequential <: Seq[T] with SeqLike[T, S
 extends scala.collection.GenSeqLike[T, Repr]
    with ParIterableLike[T, Repr, Sequential] {
 self =>
-  
-  type SuperParIterator = IterableSplitter[T]
+
+  protected[this] type SuperParIterator = IterableSplitter[T]
 
   /** A more refined version of the iterator found in the `ParallelIterable` trait,
    *  this iterator can be split into arbitrary subsets of iterators.
@@ -68,7 +68,7 @@ self =>
       val x = self(i)
       i += 1
       x
-    } else Iterator.empty.next
+    } else Iterator.empty.next()
 
     def head = self(i)
 
@@ -228,7 +228,7 @@ self =>
     b ++= pits(0)
     b ++= patch
     b ++= pits(2)
-    setTaskSupport(b.result, tasksupport)
+    setTaskSupport(b.result(), tasksupport)
   }
 
   def updated[U >: T, That](index: Int, elem: U)(implicit bf: CanBuildFrom[Repr, U, That]): That = if (bf(repr).isCombiner) {
@@ -252,7 +252,7 @@ self =>
 
   def padTo[U >: T, That](len: Int, elem: U)(implicit bf: CanBuildFrom[Repr, U, That]): That = if (length < len) {
     patch(length, new immutable.Repetition(elem, len - length), 0)
-  } else patch(length, Nil, 0);
+  } else patch(length, Nil, 0)
 
   override def zip[U >: T, S, That](that: GenIterable[S])(implicit bf: CanBuildFrom[Repr, (U, S), That]): That = if (bf(repr).isCombiner && that.isParSeq) {
     val thatseq = that.asParSeq
@@ -260,7 +260,7 @@ self =>
       new Zip(length min thatseq.length, combinerFactory(() => bf(repr).asCombiner), splitter, thatseq.splitter) mapResult {
         _.resultWithTaskSupport
       }
-    );
+    )
   } else super.zip(that)(bf)
 
   /** Tests whether every element of this $coll relates to the
@@ -423,7 +423,7 @@ self =>
     @volatile var result: Boolean = true
     def leaf(prev: Option[Boolean]) = if (!pit.isAborted) {
       result = pit.sameElements(otherpit)
-      if (!result) pit.abort
+      if (!result) pit.abort()
     }
     protected[this] def newSubtask(p: SuperParIterator) = unsupported
     override def split = {
@@ -471,7 +471,7 @@ self =>
     @volatile var result: Boolean = true
     def leaf(prev: Option[Boolean]) = if (!pit.isAborted) {
       result = pit.corresponds(corr)(otherpit)
-      if (!result) pit.abort
+      if (!result) pit.abort()
     }
     protected[this] def newSubtask(p: SuperParIterator) = unsupported
     override def split = {

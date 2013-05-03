@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2003-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2003-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -12,7 +12,7 @@ package scala.collection
 package generic
 
 import mutable.{Builder, MapBuilder}
-import language.higherKinds
+import scala.language.higherKinds
 
 /** A template for companion objects of mutable.Map and subclasses thereof.
  *
@@ -24,7 +24,7 @@ abstract class SortedMapFactory[CC[A, B] <: SortedMap[A, B] with SortedMapLike[A
 
   def empty[A, B](implicit ord: Ordering[A]): CC[A, B]
 
-  def apply[A, B](elems: (A, B)*)(implicit ord: Ordering[A]): CC[A, B] = (newBuilder[A, B](ord) ++= elems).result
+  def apply[A, B](elems: (A, B)*)(implicit ord: Ordering[A]): CC[A, B] = (newBuilder[A, B](ord) ++= elems).result()
 
   def newBuilder[A, B](implicit ord: Ordering[A]): Builder[(A, B), CC[A, B]] =
     new MapBuilder[A, B, CC[A, B]](empty(ord))

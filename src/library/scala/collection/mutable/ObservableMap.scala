@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2003-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2003-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |                                         **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -60,7 +60,7 @@ trait ObservableMap[A, B] extends Map[A, B] with Publisher[Message[(A, B)] with 
   }
 
   abstract override def clear(): Unit = {
-    super.clear
+    super.clear()
     publish(new Reset with Undoable {
       def undo(): Unit = throw new UnsupportedOperationException("cannot undo")
     })

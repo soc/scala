@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2003-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2003-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -11,7 +11,7 @@ package mutable
 
 import generic._
 import script._
-import annotation.{ migration, bridge }
+import scala.annotation.migration
 import parallel.mutable.ParSet
 
 /** A template trait for mutable sets of type `mutable.Set[A]`.
@@ -210,7 +210,7 @@ trait SetLike[A, +This <: SetLike[A, This] with Set[A]]
    def <<(cmd: Message[A]): Unit = cmd match {
      case Include(_, x)     => this += x
      case Remove(_, x)      => this -= x
-     case Reset()           => clear
+     case Reset()           => clear()
      case s: Script[_]      => s.iterator foreach <<
      case _                 => throw new UnsupportedOperationException("message " + cmd + " not understood")
    }

@@ -1,5 +1,4 @@
-import reflect.api.Modifier
-import reflect.makro.Context
+import reflect.macros.Context
 
 object Impls {
   def foreach(c: Context)(f: c.Expr[Int => Unit]): c.Expr[Unit] = {
@@ -7,20 +6,21 @@ object Impls {
     //println("macro-expand, _this = "+ _this)
     object utils extends Utils { val context: c.type = c }
     import utils._
-    import c.mirror._
+    import c.universe._
+    import Flag._
 
-    val initName = newTermName("<init>")
+    val initName = nme.CONSTRUCTOR
     // Either:
     //   scala"{ var i = $low; val h = $hi; while (i < h) { $f(i); i = i + 1 } }
     // or:
     //   scala"($_this: RangeDefault).foreach($f)"
-    Expr(c.prefix.tree match {
+    c.Expr(c.prefix.tree match {
       case Apply(Select(New(tpt), initName), List(lo, hi)) if tpt.symbol.fullName == "Range" =>
-        val iname = newTermName("$i")
-        val hname = newTermName("$h")
+        val iname = TermName("$i")
+        val hname = TermName("$h")
         def iref = Ident(iname)
         def href = Ident(hname)
-        val labelname = newTermName("$while")
+        val labelname = TermName("$while")
         val cond = makeBinop(iref, "$less", href)
         val body = Block(
             List(makeApply(f.tree, List(iref))),
@@ -28,7 +28,7 @@ object Impls {
         val generated =
         Block(
           List(
-            ValDef(Modifiers(Set(Modifier.mutable)), iname, TypeTree(), lo),
+            ValDef(Modifiers(MUTABLE), iname, TypeTree(), lo),
             ValDef(Modifiers(), hname, TypeTree(), hi)),
           makeWhile(labelname, cond, body))
         // todo. read the compiler config and print if -Ydebug is set
@@ -37,8 +37,8 @@ object Impls {
       case _ =>
         Apply(
           Select(
-            Typed(c.prefix.tree, Ident(newTypeName("RangeDefault"))),
-            newTermName("foreach")),
+            Typed(c.prefix.tree, Ident(TypeName("RangeDefault"))),
+            TermName("foreach")),
           List(f.tree))
     })
   }

@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2006-2011, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2006-2013, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -8,13 +8,13 @@
 
 package scala.util.parsing.input
 
-/** `Position` is the base trait for objects describing a position in a ``document''.
+/** `Position` is the base trait for objects describing a position in a `document`.
  *
  *  It provides functionality for:
  *   - generating a visual representation of this position (`longString`);
  *   - comparing two positions (`<`).
  *
- *  To use this class for a concrete kind of ``document'', implement the `lineContents` method.
+ *  To use this class for a concrete kind of `document`, implement the `lineContents` method.
  *
  * @author Martin Odersky
  * @author Adriaan Moors
