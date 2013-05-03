@@ -5173,8 +5173,8 @@ trait Typers extends Adaptations with Tags {
       }
 
       def typedTypeBoundsTree(tree: TypeBoundsTree) = {
-        val lo1 = if (tree.lo.isEmpty) TypeTree(NothingTpe) else typedType(tree.lo, mode)
-        val hi1 = if (tree.hi.isEmpty) TypeTree(AnyTpe) else typedType(tree.hi, mode)
+        val lo1 = typedType(if (tree.lo.isEmpty) atPos(tree.pos.focus)(TypeTree(NothingTpe)) else tree.lo, mode)
+        val hi1 = typedType(if (tree.hi.isEmpty) atPos(tree.pos.focus)(TypeTree(AnyTpe)) else tree.hi, mode)
         treeCopy.TypeBoundsTree(tree, lo1, hi1) setType TypeBounds(lo1.tpe, hi1.tpe)
       }
 
