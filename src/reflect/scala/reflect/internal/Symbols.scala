@@ -134,6 +134,8 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
     type AccessBoundaryType = Symbol
     type AnnotationType     = AnnotationInfo
 
+    countThing(this)
+
     // TODO - don't allow names to be renamed in this unstructured a fashion.
     // Rename as little as possible.  Enforce invariants on all renames.
     type TypeOfClonedSymbol >: Null <: Symbol { type NameType = Symbol.this.NameType }

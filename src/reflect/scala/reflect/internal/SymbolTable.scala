@@ -45,6 +45,26 @@ abstract class SymbolTable extends macros.Universe
   val gen = new TreeGen { val global: SymbolTable.this.type = SymbolTable.this }
   lazy val treeBuild = gen
 
+  private def mapStats(map: Map[String, Int]) {
+    if (map.isEmpty) return
+
+    val xs    = map.toList sortBy (-_._2)
+    val width = math.min(50, map.keys map (_.length) max)
+    val fmt   = "%" + width + "s"
+
+    println("\n")
+    for ((k, v) <- xs)
+      println(fmt.format(k) + " -> " + v)
+  }
+  val createdThings = mutable.Map[String, Int]() withDefaultValue 0
+  if (isCompilerUniverse)
+    scala.sys addShutdownHook mapStats(createdThings.toMap)
+
+  def countThing(x: Any) {
+    if (isCompilerUniverse)
+      createdThings(x.getClass.getName.split('.').last) += 1
+  }
+
   def log(msg: => AnyRef): Unit
   def warning(msg: String): Unit     = Console.err.println(msg)
   def inform(msg: String): Unit      = Console.err.println(msg)

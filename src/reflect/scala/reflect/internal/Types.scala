@@ -253,6 +253,8 @@ trait Types
 
   /** The base class for all types */
   abstract class Type extends TypeApiImpl with Annotatable[Type] {
+    countThing(this)
+
     /** Types for which asSeenFrom always is the identity, no matter what
      *  prefix or owner.
      */

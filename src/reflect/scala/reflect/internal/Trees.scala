@@ -32,6 +32,8 @@ trait Trees extends api.Trees { self: SymbolTable =>
   }
 
   abstract class Tree extends TreeContextApiImpl with Attachable with Product {
+    countThing(this)
+
     val id = nodeCount // TODO: add to attachment?
     nodeCount += 1
 
