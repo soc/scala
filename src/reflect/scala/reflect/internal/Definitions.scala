@@ -600,11 +600,14 @@ trait Definitions extends api.StandardDefinitions {
     def isProductNClass(sym: Symbol) = ProductClass contains sym
 
     def unspecializedSymbol(sym: Symbol): Symbol = {
-      if (sym hasFlag SPECIALIZED) {
+      if (sym.isSpecialized) {
         // add initialization from its generic class constructor
         val genericName = nme.unspecializedName(sym.name)
-        val member = sym.owner.info.decl(genericName.toTypeName)
-        member
+        // This happens for some reason with synthetic copy methods
+        if (!sym.owner.hasRawInfo)
+          sym
+        else
+          sym.owner.info.decl(genericName.toTypeName)
       }
       else sym
     }

@@ -849,6 +849,8 @@ abstract class Erasure extends AddInterfaces
      */
     private def checkNoDoubleDefs(root: Symbol) {
       def doubleDefError(sym1: Symbol, sym2: Symbol) {
+        // log(s"doubleDefError(${sym1.fullLocationString}, ${sym2.fullLocationString}")
+
         // the .toString must also be computed at the earlier phase
         val tpe1 = exitingRefchecks(root.thisType.memberType(sym1))
         val tpe2 = exitingRefchecks(root.thisType.memberType(sym2))
@@ -881,23 +883,16 @@ abstract class Erasure extends AddInterfaces
       }
 
       val opc = new overridingPairs.Cursor(root) {
-        override def exclude(sym: Symbol): Boolean = (
-             !sym.isTerm || sym.isPrivate || super.exclude(sym)
-          // specialized members have no type history before 'specialize', causing double def errors for curried defs
-          || !sym.hasTypeAt(currentRun.refchecksPhase.id)
-        )
-
-        override def matches(sym1: Symbol, sym2: Symbol): Boolean =
-          exitingPostErasure(sym1.tpe =:= sym2.tpe)
+        override def exclude(sym: Symbol) = !sym.isTerm || sym.isPrivate || sym.isSpecialized || super.exclude(sym)
+        override def matches(sym1: Symbol, sym2: Symbol) = exitingPostErasure(sym1.info =:= sym2.info)
       }
       while (opc.hasNext) {
         if (!exitingRefchecks(
               root.thisType.memberType(opc.overriding) matches
               root.thisType.memberType(opc.overridden))) {
-          debuglog("" + opc.overriding.locationString + " " +
-                     opc.overriding.infosString +
-                     opc.overridden.locationString + " " +
-                     opc.overridden.infosString)
+          log("root.thisType: " + root.thisType + " " + root.thisType)
+          log("" + opc.overriding.infoHistoryString(root.thisType))
+          log("" + opc.overridden.infoHistoryString(root.thisType))
           doubleDefError(opc.overriding, opc.overridden)
         }
         opc.next()
@@ -1190,9 +1185,11 @@ abstract class Erasure extends AddInterfaces
             }
           } else tree
         case Template(parents, self, body) =>
-          assert(!currentOwner.isImplClass)
-          //Console.println("checking no dble defs " + tree)//DEBUG
-          checkNoDoubleDefs(tree.symbol.owner)
+          assert(!currentOwner.isImplClass, currentOwner)
+          // Save the work on a specialized class, which won't be introducing new
+          // double definitions which didn't exist in the unspecialized class.
+          if (!tree.symbol.owner.isSpecialized)
+            checkNoDoubleDefs(tree.symbol.owner)
           treeCopy.Template(tree, parents, emptyValDef, addBridges(body, currentOwner))
 
         case Match(selector, cases) =>

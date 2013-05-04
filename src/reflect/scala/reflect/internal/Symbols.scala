@@ -37,6 +37,16 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
     newTypeName("_" + nextexid + suffix)
   }
 
+  /** A map view of a symbol's phase->info history.
+   */
+  class InfoHistoryMap(val symbol: Symbol) extends immutable.Map[Phase, Type] {
+    def get(ph: Phase) = iterator collectFirst { case (k, v) if k.id <= ph.id => v }
+    override def default(key: Phase) = NoType
+    def +[B1 >: Type](kv: (Phase, B1)) = this
+    def -(key: Phase) = this
+    def iterator = symbol.infoHistory.iterator map { case (pid, info) => (phaseOf(pid), info) }
+  }
+
   // Set the fields which point companions at one another.  Returns the module.
   def connectModuleToClass(m: ModuleSymbol, moduleClass: ClassSymbol): ModuleSymbol = {
     moduleClass.sourceModule = m
@@ -221,8 +231,12 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
     /** Create local dummy for template (owner of local blocks) */
     final def newLocalDummy(pos: Position): TermSymbol =
       newTermSymbol(nme.localDummyName(this), pos) setInfo NoType
-    final def newMethod(name: TermName, pos: Position = NoPosition, newFlags: Long = 0L): MethodSymbol =
+    final def newMethod(name: TermName, pos: Position = NoPosition, newFlags: Long = 0L): MethodSymbol = {
+      // if (isPastTyper)
+      //   printCaller(s"$this.newMethod($name, newFlags = ${calculateFlagString(newFlags)}")(())
+
       createMethodSymbol(name, pos, METHOD | newFlags)
+    }
     final def newMethodSymbol(name: TermName, pos: Position = NoPosition, newFlags: Long = 0L): MethodSymbol =
       createMethodSymbol(name, pos, METHOD | newFlags)
     final def newLabel(name: TermName, pos: Position = NoPosition): MethodSymbol =
@@ -792,7 +806,7 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
 
     /** Does this symbol denote the primary constructor of its enclosing class? */
     final def isPrimaryConstructor =
-      isConstructor && owner.primaryConstructor == this
+      isConstructor && enclClass.primaryConstructor == this
 
     /** Does this symbol denote an auxiliary constructor of its enclosing class? */
     final def isAuxiliaryConstructor =
@@ -1209,6 +1223,8 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
 // ------ info and type -------------------------------------------------------------------
 
     private[Symbols] var infos: TypeHistory = null
+    def infosString = infoHistoryString(enclClass.thisType)
+
     def originalInfo = {
       if (infos eq null) null
       else {
@@ -1334,6 +1350,8 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
       if (syms0.isEmpty) this
       else modifyInfo(_.substSym(syms0, syms1))
 
+    def modifyName(f: Name => Name): this.type = { name_=(f(name)) ; this }
+
     def setInfoOwnerAdjusted(info: Type): this.type = setInfo(info atOwner this)
 
     /** Set the info and enter this symbol into the owner's scope. */
@@ -1343,7 +1361,10 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
       this
     }
 
-    /** Set new info valid from start of this phase. */
+    /** Set new info valid from start of this phase.
+     *  Note: the key difference between this and setInfo is that
+     *  this drops the current info from the history.
+     */
     def updateInfo(info: Type): Symbol = {
       val pid = phaseId(infos.validFrom)
       assert(pid <= phase.id, (pid, phase.id))
@@ -1353,7 +1374,8 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
       this
     }
 
-    def hasRawInfo: Boolean = infos ne null
+    def hasInfoHistory  = (infos ne null) && (infos.prev ne null)
+    def hasRawInfo      = (infos ne null)
     def hasCompleteInfo = hasRawInfo && rawInfo.isComplete
 
     /** Return info without checking for initialization or completing */
@@ -1780,17 +1802,50 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
       val clone = cloneSymbolImpl(newOwner, newFlags)
       ( clone
           setPrivateWithin privateWithin
-          setInfo (this.info cloneInfo clone)
           setAnnotations this.annotations
+          modifyName(n => if (newName eq null) n else newName)
       )
       this.attachments.all.foreach(clone.updateAttachment)
       if (clone.thisSym != clone)
         clone.typeOfThis = (clone.typeOfThis cloneInfo clone)
 
-      if (newName ne null)
-        clone setName asNameType(newName)
-
+      cloneInfoHistory(clone)
       clone
+    }
+
+    def hasCloneableHistory = (
+         (isMethod || isClass)
+      && hasInfoHistory
+    )
+
+    private def cloneInfoHistory(clone: Symbol) {
+      if (hasCloneableHistory) {
+        log(s"Cloning ${infoHistory.size}-info type history from ${this.fullLocationString} into new owner ${clone.owner}")
+        log(infosString)
+        for ((pid, phinfo) <- infoHistory)
+          atPhase(phaseOf(pid))(clone setInfo (phinfo cloneInfo clone))
+
+        val (pid, pinfo) = clone.infoHistory.head
+        val ph = phaseWithId(pid)
+        log(f"$ph%15s: ${clone.defStringSeenAs(pinfo)}")
+      }
+      else clone setInfo (this.info cloneInfo clone)
+    }
+
+    /** The known infos associated with this symbol and the phase
+     *  from which each is valid, from earliest phase to latest.
+     */
+    def infoHistory = infos.toList reverseMap {
+      case TypeHistory(validFrom, info, _) => ((phaseId(validFrom), info))
+    }
+    def infoHistoryFromPrefix(prefix: Type) =
+      infoHistory map { case (pid, info) => (pid, info.asSeenFrom(prefix, this.enclClass)) }
+
+    def infoHistoryString(prefix: Type) = {
+      val xs = infoHistoryFromPrefix(prefix) map {
+        case (pid, info) => f"${phaseWithId(pid)}%15s: $info%s"
+      }
+      xs mkString (s"Info History of $fullLocationString, seen from ${prefix.widen}) {\n  ", "\n  ", "\n}")
     }
 
     /** Internal method to clone a symbol's implementation with the given flags and no info. */
@@ -2493,7 +2548,6 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
       }
     }
 
-    def infosString = infos.toString
     def debugLocationString = fullLocationString + " (flags: " + debugFlagString + ")"
 
     private def defStringCompose(infoString: String) = compose(
@@ -3414,9 +3468,15 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
     assert((prev eq null) || phaseId(validFrom) > phaseId(prev.validFrom), this)
     assert(validFrom != NoPeriod, this)
 
-    override def toString() =
-      "TypeHistory(" + phaseOf(validFrom)+":"+runId(validFrom) + "," + info + "," + prev + ")"
+    override def toString = {
+      val elems = toList.reverse map (th => s"  ${phaseOf(th.validFrom)}:${runId(th.validFrom)} ${th.info}")
+      elems.mkString("TypeHistory(\n  ", "\n  ", "\n)")
+    }
 
+    def cloneHistory(owner: Symbol): TypeHistory = {
+      val newPrev = if (prev eq null) null else prev.cloneHistory(owner)
+      atPhase(phaseOf(validFrom))(TypeHistory(validFrom, info cloneInfo owner, newPrev))
+    }
     def toList: List[TypeHistory] = this :: ( if (prev eq null) Nil else prev.toList )
   }
 
