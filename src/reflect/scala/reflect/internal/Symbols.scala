@@ -3152,6 +3152,7 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
 
     override def isModuleClass = true
     override def linkedClassOfClass = companionClass
+    override def tpe = typeOfThis
 
     /** the self type of an object foo is foo.type, not class<foo>.this.type
      */
