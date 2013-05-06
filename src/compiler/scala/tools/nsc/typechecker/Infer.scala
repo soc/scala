@@ -38,10 +38,7 @@ trait Infer extends Checkable {
    *  @param removeRepeated allows keeping repeated parameter (if there's one argument). Used in NamesDefaults.
    */
   def formalTypes(formals: List[Type], nargs: Int, removeByName: Boolean = true, removeRepeated: Boolean = true): List[Type] = {
-    val formals1 = if (removeByName) formals mapConserve {
-      case TypeRef(_, ByNameParamClass, List(arg)) => arg
-      case formal => formal
-    } else formals
+    val formals1 = if (removeByName) formals mapConserve dropByName else formals
     if (isVarArgTypes(formals1) && (removeRepeated || formals.length != nargs)) {
       val ft = formals1.last.dealiasWiden.typeArgs.head
       formals1.init ::: (for (i <- List.range(formals1.length - 1, nargs)) yield ft)
@@ -72,6 +69,10 @@ trait Infer extends Checkable {
    *
    * `formals` are the formal types before expanding a potential repeated parameter (must come last in `formals`, if at all)
    *
+   * @param nbSubPats          The number of arguments to the extractor pattern
+   * @param effectiveNbSubPats `nbSubPats`, unless there is one sub-pattern which, after unwrapping
+   *                           bind patterns, is a Tuple pattern, in which case it is the number of
+   *                           elements. Used to issue warnings about binding a `TupleN` to a single value.
    * @throws TypeError when the unapply[Seq] definition is ill-typed
    * @returns (null, null) when the expected number of sub-patterns cannot be satisfied by the given extractor
    *
@@ -101,7 +102,8 @@ trait Infer extends Checkable {
    *   `T_1, ..., T_m, U, ..., U`. Here, `U` is repeated `n-m` times.
    *
    */
-  def extractorFormalTypes(pos: Position, resTp: Type, nbSubPats: Int, unappSym: Symbol): (List[Type], List[Type]) = {
+  def extractorFormalTypes(pos: Position, resTp: Type, nbSubPats: Int,
+                           unappSym: Symbol, effectiveNbSubPats: Int): (List[Type], List[Type]) = {
     val isUnapplySeq     = unappSym.name == nme.unapplySeq
     val booleanExtractor = resTp.typeSymbolDirect == BooleanClass
 
@@ -131,8 +133,9 @@ trait Infer extends Checkable {
         else if (optionArgs.nonEmpty)
           if (nbSubPats == 1) {
             val productArity = productArgs.size
-            if (productArity > 1 && settings.lint)
-              global.currentUnit.warning(pos, s"extractor pattern binds a single value to a Product${productArity} of type ${optionArgs.head}")
+            if (productArity > 1 && productArity != effectiveNbSubPats && settings.lint)
+              global.currentUnit.warning(pos,
+                s"extractor pattern binds a single value to a Product${productArity} of type ${optionArgs.head}")
             optionArgs
           }
           // TODO: update spec to reflect we allow any ProductN, not just TupleN
@@ -412,10 +415,9 @@ trait Infer extends Checkable {
      *  since that induces a tie between m(=>A) and m(=>A,B*) [SI-3761]
      */
     private def isCompatible(tp: Type, pt: Type): Boolean = {
-      def isCompatibleByName(tp: Type, pt: Type): Boolean = pt match {
-        case TypeRef(_, ByNameParamClass, List(res)) if !isByNameParamType(tp) => isCompatible(tp, res)
-        case _ => false
-      }
+      def isCompatibleByName(tp: Type, pt: Type): Boolean = (
+        isByNameParamType(pt) && !isByNameParamType(tp) && isCompatible(tp, dropByName(pt))
+      )
       val tp1 = normalize(tp)
       (tp1 weak_<:< pt) || isCoercible(tp1, pt) || isCompatibleByName(tp, pt)
     }

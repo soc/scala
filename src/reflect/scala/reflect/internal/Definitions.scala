@@ -323,7 +323,9 @@ trait Definitions extends api.StandardDefinitions {
     lazy val ThrowableClass                 = getClassByName(sn.Throwable)
     lazy val UninitializedErrorClass        = requiredClass[UninitializedFieldError]
 
+    @deprecated("Same effect but more compact: `throw null`. Details in JVM spec, `athrow` instruction.", "2.11.0")
     lazy val NPEConstructor                = getMemberMethod(NullPointerExceptionClass, nme.CONSTRUCTOR) suchThat (_.paramss.flatten.isEmpty)
+
     lazy val UninitializedFieldConstructor = UninitializedErrorClass.primaryConstructor
 
     // fundamental reference classes
@@ -404,6 +406,10 @@ trait Definitions extends api.StandardDefinitions {
     lazy val JavaRepeatedParamClass = specialPolyClass(tpnme.JAVA_REPEATED_PARAM_CLASS_NAME, COVARIANT)(tparam => arrayType(tparam.tpe))
     lazy val RepeatedParamClass     = specialPolyClass(tpnme.REPEATED_PARAM_CLASS_NAME, COVARIANT)(tparam => seqType(tparam.tpe))
 
+    def dropByName(tp: Type): Type = tp match {
+      case TypeRef(_, ByNameParamClass, arg :: Nil) => arg
+      case _                                        => tp
+    }
     def isByNameParamType(tp: Type)        = tp.typeSymbol == ByNameParamClass
     def isScalaRepeatedParamType(tp: Type) = tp.typeSymbol == RepeatedParamClass
     def isJavaRepeatedParamType(tp: Type)  = tp.typeSymbol == JavaRepeatedParamClass

@@ -51,6 +51,22 @@ abstract class GenASM extends SubComponent with BytecodeWriters with GenJVMASM {
     override def erasedTypes = true
     def apply(cls: IClass) = sys.error("no implementation")
 
+    // An AsmPhase starts and ends within a Run, thus the caches in question will get populated and cleared within a Run, too), SI-7422
+    javaNameCache.clear()
+    javaNameCache ++= List(
+      NothingClass        -> binarynme.RuntimeNothing,
+      RuntimeNothingClass -> binarynme.RuntimeNothing,
+      NullClass           -> binarynme.RuntimeNull,
+      RuntimeNullClass    -> binarynme.RuntimeNull
+    )
+
+    // unlike javaNameCache, reverseJavaName contains entries only for class symbols and their internal names.
+    reverseJavaName.clear()
+    reverseJavaName ++= List(
+      binarynme.RuntimeNothing.toString() -> RuntimeNothingClass, // RuntimeNothingClass is the bytecode-level return type of Scala methods with Nothing return-type.
+      binarynme.RuntimeNull.toString()    -> RuntimeNullClass
+    )
+
     // Lazy val; can't have eager vals in Phase constructors which may
     // cause cycles before Global has finished initialization.
     lazy val BeanInfoAttr = rootMirror.getRequiredClass("scala.beans.BeanInfo")
@@ -75,16 +91,7 @@ abstract class GenASM extends SubComponent with BytecodeWriters with GenJVMASM {
 
           new DirectToJarfileWriter(f.file)
 
-        case _                               =>
-          if (settings.Ydumpclasses.isDefault)
-            new ClassBytecodeWriter { }
-          else
-            new ClassBytecodeWriter with DumpBytecodeWriter { }
-          // TODO A ScalapBytecodeWriter could take asm.util.Textifier as starting point.
-          //      Three areas where javap ouput is less than ideal (e.g. when comparing versions of the same classfile) are:
-          //        (a) unreadable pickle;
-          //        (b) two constant pools, while having identical contents, are displayed differently due to physical layout.
-          //        (c) stack maps (classfile version 50 and up) are displayed in encoded form by javap, their expansion makes more sense instead.
+        case _ => factoryNonJarBytecodeWriter()
       }
     }
 
@@ -111,9 +118,10 @@ abstract class GenASM extends SubComponent with BytecodeWriters with GenJVMASM {
 
       debuglog(s"Created new bytecode generator for ${classes.size} classes.")
       val bytecodeWriter  = initBytecodeWriter(sortedClasses filter isJavaEntryPoint)
-      val plainCodeGen    = new JPlainBuilder(bytecodeWriter)
-      val mirrorCodeGen   = new JMirrorBuilder(bytecodeWriter)
-      val beanInfoCodeGen = new JBeanInfoBuilder(bytecodeWriter)
+      val needsOutfile    = bytecodeWriter.isInstanceOf[ClassBytecodeWriter]
+      val plainCodeGen    = new JPlainBuilder(   bytecodeWriter, needsOutfile)
+      val mirrorCodeGen   = new JMirrorBuilder(  bytecodeWriter, needsOutfile)
+      val beanInfoCodeGen = new JBeanInfoBuilder(bytecodeWriter, needsOutfile)
 
       def emitFor(c: IClass) {
         if (isStaticModule(c.symbol) && isTopLevelModule(c.symbol)) {
@@ -138,8 +146,6 @@ abstract class GenASM extends SubComponent with BytecodeWriters with GenJVMASM {
       }
 
       bytecodeWriter.close()
-      classes.clear()
-      reverseJavaName.clear()
 
       /* don't javaNameCache.clear() because that causes the following tests to fail:
        *   test/files/run/macro-repl-dontexpand.scala
@@ -163,19 +169,10 @@ abstract class GenASM extends SubComponent with BytecodeWriters with GenJVMASM {
 
   var pickledBytes = 0 // statistics
 
-  // Don't put this in per run caches. Contains entries for classes as well as members.
-  val javaNameCache = new mutable.WeakHashMap[Symbol, Name]() ++= List(
-    NothingClass        -> binarynme.RuntimeNothing,
-    RuntimeNothingClass -> binarynme.RuntimeNothing,
-    NullClass           -> binarynme.RuntimeNull,
-    RuntimeNullClass    -> binarynme.RuntimeNull
-  )
+  val javaNameCache = perRunCaches.newMap[Symbol, Name]()
 
   // unlike javaNameCache, reverseJavaName contains entries only for class symbols and their internal names.
-  val reverseJavaName = mutable.Map.empty[String, Symbol] ++= List(
-    binarynme.RuntimeNothing.toString() -> RuntimeNothingClass, // RuntimeNothingClass is the bytecode-level return type of Scala methods with Nothing return-type.
-    binarynme.RuntimeNull.toString()    -> RuntimeNullClass
-  )
+  val reverseJavaName = perRunCaches.newMap[String, Symbol]()
 
   private def mkFlags(args: Int*)         = args.foldLeft(0)(_ | _)
   private def hasPublicBitSet(flags: Int) = (flags & asm.Opcodes.ACC_PUBLIC) != 0
@@ -379,7 +376,6 @@ abstract class GenASM extends SubComponent with BytecodeWriters with GenJVMASM {
 
   private val classfileVersion: Int = settings.target.value match {
     case "jvm-1.5"     => asm.Opcodes.V1_5
-    case "jvm-1.5-asm" => asm.Opcodes.V1_5
     case "jvm-1.6"     => asm.Opcodes.V1_6
     case "jvm-1.7"     => asm.Opcodes.V1_7
   }
@@ -407,7 +403,7 @@ abstract class GenASM extends SubComponent with BytecodeWriters with GenJVMASM {
   }
 
   /** basic functionality for class file building */
-  abstract class JBuilder(bytecodeWriter: BytecodeWriter) {
+  abstract class JBuilder(bytecodeWriter: BytecodeWriter, needsOutfile: Boolean) {
 
     val EMPTY_STRING_ARRAY = Array.empty[String]
 
@@ -465,7 +461,10 @@ abstract class GenASM extends SubComponent with BytecodeWriters with GenJVMASM {
     def writeIfNotTooBig(label: String, jclassName: String, jclass: asm.ClassWriter, sym: Symbol) {
       try {
         val arr = jclass.toByteArray()
-        bytecodeWriter.writeClass(label, jclassName, arr, sym)
+        val outF: scala.tools.nsc.io.AbstractFile = {
+          if(needsOutfile) getFile(sym, jclassName, ".class") else null
+        }
+        bytecodeWriter.writeClass(label, jclassName, arr, outF)
       } catch {
         case e: java.lang.RuntimeException if(e.getMessage() == "Class file too large!") =>
           // TODO check where ASM throws the equivalent of CodeSizeTooBigException
@@ -540,7 +539,7 @@ abstract class GenASM extends SubComponent with BytecodeWriters with GenJVMASM {
 
       collectInnerClass(sym)
 
-      val hasInternalName = (sym.isClass || (sym.isModule && !sym.isMethod))
+      val hasInternalName = sym.isClass || sym.isModuleNotMethod
       val cachedJN = javaNameCache.getOrElseUpdate(sym, {
         if (hasInternalName) { sym.javaBinaryName }
         else                 { sym.javaSimpleName }
@@ -696,7 +695,7 @@ abstract class GenASM extends SubComponent with BytecodeWriters with GenJVMASM {
 
 
   /** functionality for building plain and mirror classes */
-  abstract class JCommonBuilder(bytecodeWriter: BytecodeWriter) extends JBuilder(bytecodeWriter) {
+  abstract class JCommonBuilder(bytecodeWriter: BytecodeWriter, needsOutfile: Boolean) extends JBuilder(bytecodeWriter, needsOutfile) {
 
     def debugLevel = settings.debuginfo.indexOfChoice
 
@@ -1246,8 +1245,8 @@ abstract class GenASM extends SubComponent with BytecodeWriters with GenJVMASM {
   case class BlockInteval(start: BasicBlock, end: BasicBlock)
 
   /** builder of plain classes */
-  class JPlainBuilder(bytecodeWriter: BytecodeWriter)
-    extends JCommonBuilder(bytecodeWriter)
+  class JPlainBuilder(bytecodeWriter: BytecodeWriter, needsOutfile: Boolean)
+    extends JCommonBuilder(bytecodeWriter, needsOutfile)
     with    JAndroidBuilder {
 
     val MIN_SWITCH_DENSITY = 0.7
@@ -1625,6 +1624,7 @@ abstract class GenASM extends SubComponent with BytecodeWriters with GenJVMASM {
        	  jmethod = clinitMethod
           jMethodName = CLASS_CONSTRUCTOR_NAME
           jmethod.visitCode()
+          computeLocalVarsIndex(m)
           genCode(m, emitVars = false, isStatic = true)
           jmethod.visitMaxs(0, 0) // just to follow protocol, dummy arguments
           jmethod.visitEnd()
@@ -2880,7 +2880,7 @@ abstract class GenASM extends SubComponent with BytecodeWriters with GenJVMASM {
 
 
   /** builder of mirror classes */
-  class JMirrorBuilder(bytecodeWriter: BytecodeWriter) extends JCommonBuilder(bytecodeWriter) {
+  class JMirrorBuilder(bytecodeWriter: BytecodeWriter, needsOutfile: Boolean) extends JCommonBuilder(bytecodeWriter, needsOutfile) {
 
     private var cunit: CompilationUnit = _
     def getCurrentCUnit(): CompilationUnit = cunit
@@ -2932,7 +2932,7 @@ abstract class GenASM extends SubComponent with BytecodeWriters with GenJVMASM {
 
 
   /** builder of bean info classes */
-  class JBeanInfoBuilder(bytecodeWriter: BytecodeWriter) extends JBuilder(bytecodeWriter) {
+  class JBeanInfoBuilder(bytecodeWriter: BytecodeWriter, needsOutfile: Boolean) extends JBuilder(bytecodeWriter, needsOutfile) {
 
     /**
      * Generate a bean info class that describes the given class.

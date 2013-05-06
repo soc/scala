@@ -150,15 +150,19 @@ trait Typers extends Adaptations with Tags {
           } else {
             mkArg = gen.mkNamedArg // don't pass the default argument (if any) here, but start emitting named arguments for the following args
             if (!param.hasDefault && !paramFailed) {
-              context.reportBuffer.errors.find(_.kind == ErrorKinds.Divergent) match {
-                case Some(divergentImplicit) =>
+              context.reportBuffer.errors.collectFirst {
+                case dte: DivergentImplicitTypeError => dte
+              } match {
+                case Some(divergent) =>
                   // DivergentImplicit error has higher priority than "no implicit found"
                   // no need to issue the problem again if we are still in silent mode
                   if (context.reportErrors) {
-                    context.issue(divergentImplicit)
-                    context.reportBuffer.clearErrors(ErrorKinds.Divergent)
+                    context.issue(divergent.withPt(paramTp))
+                    context.reportBuffer.clearErrors {
+                      case dte: DivergentImplicitTypeError => true
+                    }
                   }
-                case None =>
+                case _ =>
                   NoImplicitFoundError(fun, param)
               }
               paramFailed = true
@@ -599,7 +603,7 @@ trait Typers extends Adaptations with Tags {
         if (sym.isValue) {
           val tree1 = checkStable(tree)
           // A module reference in a pattern has type Foo.type, not "object Foo"
-          if (sym.isModule && !sym.isMethod) tree1 setType singleType(pre, sym)
+          if (sym.isModuleNotMethod) tree1 setType singleType(pre, sym)
           else tree1
         }
         else fail()
@@ -607,7 +611,7 @@ trait Typers extends Adaptations with Tags {
         fail()
       } else {
         if (sym.isStable && pre.isStable && !isByNameParamType(tree.tpe) &&
-            (isStableContext(tree, mode, pt) || sym.isModule && !sym.isMethod))
+            (isStableContext(tree, mode, pt) || sym.isModuleNotMethod))
           tree.setType(singleType(pre, sym))
         // To fully benefit from special casing the return type of
         // getClass, we have to catch it immediately so expressions
@@ -1627,22 +1631,27 @@ trait Typers extends Adaptations with Tags {
 
     /** Makes sure that the first type tree in the list of parent types is always a class.
      *  If the first parent is a trait, prepend its supertype to the list until it's a class.
-*/
-    private def normalizeFirstParent(parents: List[Tree]): List[Tree] = parents match {
-      case first :: rest if treeInfo.isTraitRef(first) =>
-        def explode(supertpt: Tree, acc: List[Tree]): List[Tree] = {
-          if (treeInfo.isTraitRef(supertpt)) {
-            val supertpt1 = typedType(supertpt)
-            if (!supertpt1.isErrorTyped) {
-              val supersupertpt = TypeTree(supertpt1.tpe.firstParent) setPos supertpt.pos.focus
-              return explode(supersupertpt, supertpt1 :: acc)
-            }
-          }
-          if (supertpt.tpe.typeSymbol == AnyClass) supertpt setType AnyRefClass.tpe
-          supertpt :: acc
-        }
-        explode(first, Nil) ++ rest
-      case _ => parents
+     */
+    private def normalizeFirstParent(parents: List[Tree]): List[Tree] = {
+      @annotation.tailrec
+      def explode0(parents: List[Tree]): List[Tree] = {
+        val supertpt :: rest = parents // parents is always non-empty here - it only grows
+        if (supertpt.tpe.typeSymbol == AnyClass) {
+          supertpt setType AnyRefTpe
+          parents
+        } else if (treeInfo isTraitRef supertpt) {
+          val supertpt1  = typedType(supertpt)
+          def supersuper = TypeTree(supertpt1.tpe.firstParent) setPos supertpt.pos.focus
+          if (supertpt1.isErrorTyped) rest
+          else explode0(supersuper :: supertpt1 :: rest)
+        } else parents
+      }
+
+      def explode(parents: List[Tree]) =
+        if (treeInfo isTraitRef parents.head) explode0(parents)
+        else parents
+
+      if (parents.isEmpty) Nil else explode(parents)
     }
 
     /** Certain parents are added in the parser before it is known whether
@@ -3402,8 +3411,8 @@ trait Typers extends Adaptations with Tags {
       else {
         val resTp     = fun1.tpe.finalResultType.dealiasWiden
         val nbSubPats = args.length
-
-        val (formals, formalsExpanded) = extractorFormalTypes(fun0.pos, resTp, nbSubPats, fun1.symbol)
+        val (formals, formalsExpanded) =
+          extractorFormalTypes(fun0.pos, resTp, nbSubPats, fun1.symbol, treeInfo.effectivePatternArity(args))
         if (formals == null) duplErrorTree(WrongNumberOfArgsError(tree, fun))
         else {
           val args1 = typedArgs(args, mode, formals, formalsExpanded)
@@ -4683,12 +4692,11 @@ trait Typers extends Adaptations with Tags {
             case SelectFromTypeTree(_, _) => treeCopy.SelectFromTypeTree(tree, qual, name)
           }
           val (result, accessibleError) = silent(_.makeAccessible(tree1, sym, qual.tpe, qual)) match {
+            case SilentTypeError(err: AccessTypeError) =>
+              (tree1, Some(err))
             case SilentTypeError(err) =>
-              if (err.kind != ErrorKinds.Access) {
-                context issue err
-                return setError(tree)
-              }
-              else (tree1, Some(err))
+              context issue err
+              return setError(tree)
             case SilentResultValue(treeAndPre) =>
               (stabilize(treeAndPre._1, treeAndPre._2, mode, pt), None)
           }
@@ -4944,7 +4952,7 @@ trait Typers extends Adaptations with Tags {
 
       def typedUnApply(tree: UnApply) = {
         val fun1 = typed(tree.fun)
-        val tpes = formalTypes(unapplyTypeList(tree.fun.pos, tree.fun.symbol, fun1.tpe, tree.args.length), tree.args.length)
+        val tpes = formalTypes(unapplyTypeList(tree.fun.pos, tree.fun.symbol, fun1.tpe, tree.args), tree.args.length)
         val args1 = map2(tree.args, tpes)(typedPattern)
         treeCopy.UnApply(tree, fun1, args1) setType pt
       }
@@ -5388,7 +5396,10 @@ trait Typers extends Adaptations with Tags {
       // as a compromise, context.enrichmentEnabled tells adaptToMember to go ahead and enrich,
       // but arbitrary conversions (in adapt) are disabled
       // TODO: can we achieve the pattern matching bit of the string interpolation SIP without this?
-      typingInPattern(context.withImplicitsDisabledAllowEnrichment(typed(tree, PATTERNmode, pt)))
+      typingInPattern(context.withImplicitsDisabledAllowEnrichment(typed(tree, PATTERNmode, pt))) match {
+        case tpt if tpt.isType => PatternMustBeValue(tpt, pt); tpt
+        case pat => pat
+      }
     }
 
     /** Types a (fully parameterized) type tree */
