@@ -1015,7 +1015,7 @@ trait Types extends api.Types { self: SymbolTable =>
      *  after `maxTostringRecursions` recursion levels. Uses `safeToString`
      *  to produce a string on each level.
      */
-    override def toString: String = typeToString(this)
+    override final def toString: String = typeToString(this)
 
     /** Method to be implemented in subclasses.
      *  Converts this type to a string in calling toString for its parts.
@@ -1657,10 +1657,10 @@ trait Types extends api.Types { self: SymbolTable =>
     // override def isNullable: Boolean =
     // parents forall (p => p.isNullable && !p.typeSymbol.isAbstractType);
 
-    override def safeToString: String = parentsString(parents) + (
-      (if (settings.debug.value || parents.isEmpty || (decls.elems ne null))
-        fullyInitializeScope(decls).mkString("{", "; ", "}") else "")
-    )
+    protected def shouldForceScope = settings.debug.value || parents.isEmpty || !decls.isEmpty
+    protected def initDecls        = fullyInitializeScope(decls)
+    protected def scopeString      = if (shouldForceScope) initDecls.mkString("{", "; ", "}") else ""
+    override def safeToString      = parentsString(parents) + scopeString
   }
 
   protected def defineBaseTypeSeqOfCompoundType(tpe: CompoundType) = {
@@ -2022,20 +2022,13 @@ trait Types extends api.Types { self: SymbolTable =>
     // override def isNonNull: Boolean = symbol == NonNullClass || super.isNonNull;
     override def kind = "ClassInfoType"
 
-    override def safeToString =
-      if (settings.debug.value || decls.size > 1)
-        formattedToString
-      else
-        super.safeToString
+    override protected def shouldForceScope = settings.debug.value || decls.size > 1
+    override protected def scopeString      = initDecls.mkString(" {\n  ", "\n  ", "\n}")
+    override def safeToString               = if (shouldForceScope) formattedToString else super.safeToString
 
     /** A nicely formatted string with newlines and such.
      */
-    def formattedToString: String =
-      parents.mkString("\n        with ") + (
-        if (settings.debug.value || parents.isEmpty || (decls.elems ne null))
-         fullyInitializeScope(decls).mkString(" {\n  ", "\n  ", "\n}")
-        else ""
-      )
+    def formattedToString = parents.mkString("\n        with ") + scopeString
   }
 
   object ClassInfoType extends ClassInfoTypeExtractor
@@ -2432,7 +2425,6 @@ trait Types extends api.Types { self: SymbolTable =>
       }
       thisInfo.decls
     }
-
     protected[Types] def baseTypeSeqImpl: BaseTypeSeq = sym.info.baseTypeSeq map transform
 
     override def baseTypeSeq: BaseTypeSeq = {
@@ -2457,15 +2449,12 @@ trait Types extends api.Types { self: SymbolTable =>
     private def preString  = if (needsPreString) pre.prefixString else ""
     private def argsString = if (args.isEmpty) "" else args.mkString("[", ",", "]")
 
-    def refinementString = (
-      if (sym.isStructuralRefinement) (
-        fullyInitializeScope(decls) filter (sym => sym.isPossibleInRefinement && sym.isPublic)
-          map (_.defString)
-          mkString("{", "; ", "}")
-      )
+    private def refinementDecls = fullyInitializeScope(decls) filter (sym => sym.isPossibleInRefinement && sym.isPublic)
+    private def refinementString = (
+      if (sym.isStructuralRefinement)
+        refinementDecls map (_.defString) mkString("{", "; ", "}")
       else ""
     )
-
     protected def finishPrefix(rest: String) = (
       if (sym.isInitialized && sym.isAnonymousClass && !phase.erasedTypes)
         parentsString(thisInfo.parents) + refinementString
@@ -2495,7 +2484,7 @@ trait Types extends api.Types { self: SymbolTable =>
         }
         else if (isTupleType(this))
           targs.mkString("(", ", ", if (hasLength(targs, 1)) ",)" else ")")
-        else if (sym.isAliasType && prefixChain.exists(_.termSymbol.isSynthetic) && (this ne this.normalize))
+        else if (sym.isAliasType && prefixChain.exists(_.termSymbol.isSynthetic) && (this ne normalize))
           "" + normalize
         else
           ""
@@ -4044,18 +4033,27 @@ trait Types extends api.Types { self: SymbolTable =>
       tc
     }
 
-    override def toString = {
-      val boundsStr = {
-        val lo    = loBounds filterNot typeIsNothing
-        val hi    = hiBounds filterNot typeIsAny
-        val lostr = if (lo.isEmpty) Nil else List(lo.mkString(" >: (", ", ", ")"))
-        val histr = if (hi.isEmpty) Nil else List(hi.mkString(" <: (", ", ", ")"))
-
-        lostr ++ histr mkString ("[", " | ", "]")
+    private def boundsStr = {
+      val lo    = loBounds filterNot typeIsNothing
+      val hi    = hiBounds filterNot typeIsAny
+      val lostr = lo match {
+        case Nil      => ""
+        case x :: Nil => " >: " + x
+        case xs       => xs.mkString(" >: (", ", ", ")")
       }
-      if (inst eq NoType) boundsStr
-      else boundsStr + " _= " + inst.safeToString
+      val histr = hi match {
+        case Nil      => ""
+        case x :: Nil => " <: " + x
+        case xs       => xs.mkString(" <: (", ", ", ")")
+      }
+      if (lostr == "") (
+        if (histr == "") ""
+        else s"[$histr]"
+      )
+      else if (histr == "") s"[$lostr]"
+      else s"[$lostr | $histr]"
     }
+    override def toString = boundsStr + ( if (instValid) " _= " + inst.safeToString else "" )
   }
 
   class TypeUnwrapper(poly: Boolean, existential: Boolean, annotated: Boolean, nullary: Boolean) extends (Type => Type) {
