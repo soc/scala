@@ -21,41 +21,41 @@ trait ContextErrors {
   import global._
   import definitions._
 
-  abstract class AbsTypeError extends Throwable {
+  abstract class AbsTypeError(errMsgFn: => String) extends Throwable {
     def errPos: Position
-    def errMsg: String
+    lazy val errMsg: String = errMsgFn
     override def toString() = "[Type error at:" + errPos + "] " + errMsg
   }
 
-  abstract class TreeTypeError extends AbsTypeError {
+  abstract class TreeTypeError(errMsgFn: => String) extends AbsTypeError(errMsgFn) {
     def underlyingTree: Tree
     def errPos = underlyingTree.pos
   }
 
-  case class NormalTypeError(underlyingTree: Tree, errMsg: String)
-    extends TreeTypeError
+  class NormalTypeError(val underlyingTree: Tree, errMsgFn: => String) extends TreeTypeError(errMsgFn)
+  class AccessTypeError(val underlyingTree: Tree, errMsgFn: => String) extends TreeTypeError(errMsgFn)
 
-  case class AccessTypeError(underlyingTree: Tree, errMsg: String)
-    extends TreeTypeError
+  object NormalTypeError {
+    def apply(underlyingTree: Tree, errMsgFn: => String) = new NormalTypeError(underlyingTree, errMsgFn)
+  }
+  object AccessTypeError {
+    def apply(underlyingTree: Tree, errMsgFn: => String) = new AccessTypeError(underlyingTree, errMsgFn)
+  }
+  object AmbiguousTypeError {
+    def apply(errPos: Position, errMsgFn: => String) = new AmbiguousTypeError(errPos, errMsgFn)
+  }
+  object SymbolTypeError {
+    def apply(underlyingSym: Symbol, errMsgFn: => String) = new SymbolTypeError(underlyingSym, errMsgFn)
+  }
 
-  case class AmbiguousTypeError(errPos: Position, errMsg: String)
-    extends AbsTypeError
-
-  case class SymbolTypeError(underlyingSym: Symbol, errMsg: String)
-    extends AbsTypeError {
-
+  class AmbiguousTypeError(val errPos: Position, errMsgFn: => String) extends AbsTypeError(errMsgFn)
+  class SymbolTypeError(val underlyingSym: Symbol, errMsgFn: => String) extends AbsTypeError(errMsgFn) {
     def errPos = underlyingSym.pos
   }
-
-  case class TypeErrorWrapper(ex: TypeError)
-    extends AbsTypeError {
-    def errMsg = ex.msg
+  case class TypeErrorWrapper(ex: TypeError) extends AbsTypeError(ex.msg) {
     def errPos = ex.pos
   }
-
-  case class TypeErrorWithUnderlyingTree(tree: Tree, ex: TypeError)
-    extends AbsTypeError {
-    def errMsg = ex.msg
+  case class TypeErrorWithUnderlyingTree(tree: Tree, ex: TypeError) extends AbsTypeError(ex.msg) {
     def errPos = tree.pos
   }
 
@@ -67,26 +67,21 @@ trait ContextErrors {
   //    (pt at the point of divergence gives less information to the user)
   // Note: it is safe to delay error message generation in this case
   // becasue we don't modify implicits' infos.
-  case class DivergentImplicitTypeError(underlyingTree: Tree, pt0: Type, sym: Symbol)
-    extends TreeTypeError {
-    def errMsg: String   = errMsgForPt(pt0)
-    def withPt(pt: Type): AbsTypeError = this.copy(pt0 = pt)
-    private def errMsgForPt(pt: Type) = 
-      s"diverging implicit expansion for type ${pt}\nstarting with ${sym.fullLocationString}"
+  class DivergentImplicitTypeError(val underlyingTree: Tree, pt0: Type, val sym: Symbol) extends TreeTypeError(divergentErrorMessage(pt0, sym)) {
+    def withPt(pt: Type): AbsTypeError = new DivergentImplicitTypeError(underlyingTree, pt, sym)
   }
+  private def divergentErrorMessage(pt: Type, sym: Symbol) =
+    s"diverging implicit expansion for type ${pt}\nstarting with ${sym.fullLocationString}"
 
-  case class AmbiguousImplicitTypeError(underlyingTree: Tree, errMsg: String)
-    extends TreeTypeError
-
-  case class PosAndMsgTypeError(errPos: Position, errMsg: String)
-    extends AbsTypeError
+  class AmbiguousImplicitTypeError(val underlyingTree: Tree, errMsgFn: => String) extends TreeTypeError(errMsgFn)
+  class PosAndMsgTypeError(val errPos: Position, errMsgFn: => String) extends AbsTypeError(errMsgFn)
 
   object ErrorUtils {
-    def issueNormalTypeError(tree: Tree, msg: String)(implicit context: Context) {
+    def issueNormalTypeError(tree: Tree, msg: => String)(implicit context: Context) {
       issueTypeError(NormalTypeError(tree, msg))
     }
 
-    def issueSymbolTypeError(sym: Symbol, msg: String)(implicit context: Context) {
+    def issueSymbolTypeError(sym: Symbol, msg: => String)(implicit context: Context) {
       issueTypeError(SymbolTypeError(sym, msg))
     }
 
@@ -532,7 +527,7 @@ trait ContextErrors {
         issueNormalTypeError(tree, name+ " does not support passing a vararg parameter")
 
       def DynamicRewriteError(tree: Tree, err: AbsTypeError) = {
-        issueTypeError(PosAndMsgTypeError(err.errPos, err.errMsg +
+        issueTypeError(new PosAndMsgTypeError(err.errPos, err.errMsg +
             s"\nerror after rewriting to $tree\npossible cause: maybe a wrong Dynamic method signature?"))
         setError(tree)
       }
@@ -676,10 +671,10 @@ trait ContextErrors {
 
       // cyclic errors
       def CyclicAliasingOrSubtypingError(errPos: Position, sym0: Symbol) =
-        issueTypeError(PosAndMsgTypeError(errPos, "cyclic aliasing or subtyping involving "+sym0))
+        issueTypeError(new PosAndMsgTypeError(errPos, "cyclic aliasing or subtyping involving "+sym0))
 
       def CyclicReferenceError(errPos: Position, tp: Type, lockedSym: Symbol) =
-        issueTypeError(PosAndMsgTypeError(errPos, s"illegal cyclic reference involving $tp and $lockedSym"))
+        issueTypeError(new PosAndMsgTypeError(errPos, s"illegal cyclic reference involving $tp and $lockedSym"))
 
       // macro-related errors (also see MacroErrors below)
 
@@ -1169,7 +1164,7 @@ trait ContextErrors {
             if (explanation == "") "" else "\n" + explanation
           )
         }
-        context.issueAmbiguousError(AmbiguousImplicitTypeError(tree,
+        context.issueAmbiguousError(new AmbiguousImplicitTypeError(tree,
           if (isView) viewMsg
           else s"ambiguous implicit values:\n${coreMsg}match expected type $pt")
         )
@@ -1177,7 +1172,7 @@ trait ContextErrors {
     }
 
     def DivergingImplicitExpansionError(tree: Tree, pt: Type, sym: Symbol)(implicit context0: Context) =
-      issueTypeError(DivergentImplicitTypeError(tree, pt, sym))
+      issueTypeError(new DivergentImplicitTypeError(tree, pt, sym))
   }
 
   object NamesDefaultsErrorsGen {
