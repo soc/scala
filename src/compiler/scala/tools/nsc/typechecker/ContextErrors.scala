@@ -25,6 +25,8 @@ trait ContextErrors {
     def errPos: Position
     lazy val errMsg: String = errMsgFn
     override def toString() = "[Type error at:" + errPos + "] " + errMsg
+
+    printCaller("Created " + getClass + " with errMsgFn " + errMsgFn)("")
   }
 
   abstract class TreeTypeError(errMsgFn: => String) extends AbsTypeError(errMsgFn) {
@@ -871,8 +873,10 @@ trait ContextErrors {
       private def setErrorOnLastTry(lastTry: Boolean, tree: Tree) = if (lastTry) setError(tree)
 
       def NoBestMethodAlternativeError(tree: Tree, argtpes: List[Type], pt: Type, lastTry: Boolean) = {
-        issueNormalTypeError(tree,
-          applyErrorMsg(tree, " cannot be applied to ", argtpes, pt))
+        def msg = applyErrorMsg(tree, " cannot be applied to ", argtpes, pt)
+        val msg1 = if (lastTry) msg else null
+
+        issueNormalTypeError(tree, if (lastTry) msg1 else msg)
         // since inferMethodAlternative modifies the state of the tree
         // we have to set the type of tree to ErrorType only in the very last
         // fallback action that is done in the inference.
