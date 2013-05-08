@@ -80,6 +80,7 @@ trait ContextErrors {
 
   object ErrorUtils {
     def issueNormalTypeError(tree: Tree, msg: => String)(implicit context: Context) {
+
       issueTypeError(NormalTypeError(tree, msg))
     }
 
@@ -128,6 +129,22 @@ trait ContextErrors {
     self: Typer =>
 
     import infer.setError
+
+    def forceIfCondition(cond: Boolean)(msg: => String): () => String = {
+      if (context.reportErrors) {
+        val m = msg
+        () => m
+      }
+      else () => msg
+    }
+    def forceIfReporting(msg: => String): () => String = forceIfCondition(context.reportErrors)
+
+    val msg1 = if (context.reportErrors)
+
+    def msg0 = forceIfCondition(applyErrorMsg(tree, " cannot be applied to ", argtpes, pt))
+    val msg1 = if (lastTry) msg else null
+
+    issueNormalTypeError(tree, if (lastTry) msg1 else msg)
 
     object TyperErrorGen {
       implicit val contextTyperErrorGen: Context = infer.getContext
@@ -873,10 +890,7 @@ trait ContextErrors {
       private def setErrorOnLastTry(lastTry: Boolean, tree: Tree) = if (lastTry) setError(tree)
 
       def NoBestMethodAlternativeError(tree: Tree, argtpes: List[Type], pt: Type, lastTry: Boolean) = {
-        def msg = applyErrorMsg(tree, " cannot be applied to ", argtpes, pt)
-        val msg1 = if (lastTry) msg else null
-
-        issueNormalTypeError(tree, if (lastTry) msg1 else msg)
+        issueNormalTypeError(tree, forceIfCondition(lastTry)(applyErrorMsg(tree, " cannot be applied to ", argtpes, pt)))
         // since inferMethodAlternative modifies the state of the tree
         // we have to set the type of tree to ErrorType only in the very last
         // fallback action that is done in the inference.
@@ -888,9 +902,10 @@ trait ContextErrors {
             firstCompeting: Symbol, argtpes: List[Type], pt: Type, lastTry: Boolean) = {
 
         if (!(argtpes exists (_.isErroneous)) && !pt.isErroneous) {
-          val msg0 =
+          def msg0 = (
             "argument types " + argtpes.mkString("(", ",", ")") +
-           (if (pt == WildcardType) "" else " and expected result type " + pt)
+            (if (pt == WildcardType) "" else " and expected result type " + pt)
+          )
           val (pos, msg) = ambiguousErrorMsgPos(tree.pos, pre, best, firstCompeting, msg0)
           issueAmbiguousTypeError(pre, best, firstCompeting, AmbiguousTypeError(pos, msg))
           setErrorOnLastTry(lastTry, tree)
