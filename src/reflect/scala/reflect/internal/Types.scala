@@ -918,7 +918,7 @@ trait Types
      *  after `maxTostringRecursions` recursion levels. Uses `safeToString`
      *  to produce a string on each level.
      */
-    override def toString: String = util.Origins("Type#toString", 10)(typeToString(this))
+    override def toString: String = typeToString(this)
 
     /** Method to be implemented in subclasses.
      *  Converts this type to a string in calling toString for its parts.
