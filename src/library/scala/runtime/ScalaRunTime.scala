@@ -135,11 +135,11 @@ object ScalaRunTime {
    *  Needed to deal with vararg arguments of primitive types that are passed
    *  to a generic Java vararg parameter T ...
    */
-  def toObjectArray(src: AnyRef): Array[Object] = src match {
+  def toObjectArray(src: AnyRef): Array[java.lang.Object] = src match {
     case x: Array[AnyRef] => x
     case _ =>
       val length = array_length(src)
-      val dest = new Array[Object](length)
+      val dest = new Array[java.lang.Object](length)
       for (i <- 0 until length)
         array_update(dest, i, array_apply(src, i))
       dest
@@ -183,7 +183,7 @@ object ScalaRunTime {
 
   /** Fast path equality method for inlining; used when -optimise is set.
    */
-  @inline def inlinedEquals(x: Object, y: Object): Boolean =
+  @inline def inlinedEquals(x: java.lang.Object, y: java.lang.Object): Boolean =
     if (x eq y) true
     else if (x eq null) false
     else if (x.isInstanceOf[java.lang.Number]) BoxesRunTime.equalsNumObject(x.asInstanceOf[java.lang.Number], y)
@@ -229,7 +229,7 @@ object ScalaRunTime {
     val high = (lv >>> 32).toInt
     low ^ (high + lowSign)
   }
-  def hash(x: Number): Int  = runtime.BoxesRunTime.hashFromNumber(x)
+  def hash(x: java.lang.Number): Int  = runtime.BoxesRunTime.hashFromNumber(x)
 
   // The remaining overloads are here for completeness, but the compiler
   // inlines these definitions directly so they're not generally used.
@@ -324,7 +324,7 @@ object ScalaRunTime {
     // to be iterated, such as some scala.tools.nsc.io.AbstractFile derived classes.
     try inner(arg)
     catch {
-      case _: StackOverflowError | _: UnsupportedOperationException | _: AssertionError => "" + arg
+      case _: java.lang.StackOverflowError | _: UnsupportedOperationException | _: java.lang.AssertionError => "" + arg
     }
   }
 

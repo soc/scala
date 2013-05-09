@@ -52,7 +52,7 @@ trait Macros extends FastTrack with MacroRuntimes with Traces with Helpers {
 
   def globalSettings = global.settings
 
-  protected def findMacroClassLoader(): ClassLoader = {
+  protected def findMacroClassLoader(): java.lang.ClassLoader = {
     val classpath = global.classPath.asURLs
     macroLogVerbose("macro classloader: initializing from -cp: %s".format(classpath))
     ScalaClassLoader.fromURLs(classpath, self.getClass.getClassLoader)

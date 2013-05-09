@@ -29,7 +29,7 @@ object TcpService {
   private val random = new Random
   private val ports = new mutable.HashMap[Int, TcpService]
 
-  def apply(port: Int, cl: ClassLoader): TcpService =
+  def apply(port: Int, cl: java.lang.ClassLoader): TcpService =
     ports.get(port) match {
       case Some(service) =>
         service
@@ -86,7 +86,7 @@ object TcpService {
  * @author Philipp Haller
  */
 @deprecated("Use the akka.actor package instead. For migration from the scala.actors package refer to the Actors Migration Guide.", "2.11.0")
-class TcpService(port: Int, cl: ClassLoader) extends Thread with Service {
+class TcpService(port: Int, cl: java.lang.ClassLoader) extends Thread with Service {
   val serializer: JavaSerializer = new JavaSerializer(this, cl)
 
   private val internalNode = new Node(InetAddress.getLocalHost().getHostAddress(), port)
@@ -196,12 +196,12 @@ class TcpService(port: Int, cl: ClassLoader) extends Thread with Service {
 
   def connect(n: Node): TcpServiceWorker = synchronized {
     val socket = new Socket()
-    val start = System.nanoTime
+    val start = java.lang.System.nanoTime
     try {
       socket.connect(new InetSocketAddress(n.address, n.port), TcpService.connectTimeoutMillis)
     } catch {
       case e: SocketTimeoutException =>
-        Debug.warning(f"Timed out connecting to $n after ${(System.nanoTime - start) / math.pow(10, 9)}%.3f seconds")
+        Debug.warning(f"Timed out connecting to $n after ${(java.lang.System.nanoTime - start) / math.pow(10, 9)}%.3f seconds")
         throw e
     }
     val worker = new TcpServiceWorker(this, socket)

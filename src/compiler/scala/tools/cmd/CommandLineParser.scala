@@ -52,7 +52,7 @@ object CommandLineParser {
     if (trimmed.isEmpty) Right(accum.reverse, "")
     else argument(trimmed) match {
       case Right((arg, next)) =>
-        (next span Character.isWhitespace) match {
+        (next span java.lang.Character.isWhitespace) match {
           case("", rest) if rest.nonEmpty => Left("Arguments should be separated by whitespace.") // TODO: can this happen?
           case(ws, rest)                  => commandLine(rest, arg :: accum)
         }

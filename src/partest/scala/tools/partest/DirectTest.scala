@@ -106,7 +106,7 @@ abstract class DirectTest extends App {
   def testUnderJavaAtLeast[A](version: String)(yesRun: =>A) = new TestUnderJavaAtLeast(version, { yesRun })
 
   class TestUnderJavaAtLeast[A](version: String, yesRun: => A) {
-    val javaVersion = System.getProperty("java.specification.version")
+    val javaVersion = java.lang.System.getProperty("java.specification.version")
 
     // the "ScalaVersion" class parses Java specification versions just fine
     val requiredJavaVersion = ScalaVersion(version)
@@ -115,10 +115,10 @@ abstract class DirectTest extends App {
     val preamble = if (shouldRun) "Attempting" else "Doing fallback for"
 
     def logInfo() = log(s"$preamble java $version specific test under java version $javaVersion")
- 
+
    /*
     * If the current java version is at least 'version' then 'yesRun' is evaluated
-    * otherwise 'fallback' is 
+    * otherwise 'fallback' is
     */
     def otherwise(fallback: =>A): A = {
       logInfo()

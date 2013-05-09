@@ -583,7 +583,7 @@ object Future {
   // doesn't need to create defaultExecutionContext as
   // a side effect.
   private[concurrent] object InternalCallbackExecutor extends ExecutionContext with BatchingExecutor {
-    override protected def unbatchedExecute(r: Runnable): Unit =
+    override protected def unbatchedExecute(r: java.lang.Runnable): Unit =
       r.run()
     override def reportFailure(t: Throwable): Unit =
       throw new IllegalStateException("problem in scala.concurrent internal callback", t)
@@ -596,6 +596,6 @@ object Future {
  * `ExecutionContext` to special-case callbacks that were executed by `Future` if desired.
  */
 trait OnCompleteRunnable {
-  self: Runnable =>
+  self: java.lang.Runnable =>
 }
 

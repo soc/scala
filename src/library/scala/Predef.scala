@@ -8,6 +8,8 @@
 
 package scala
 
+import java.lang.CharSequence
+
 import scala.collection.{ mutable, immutable, generic }
 import immutable.StringOps
 import mutable.ArrayOps

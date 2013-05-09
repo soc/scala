@@ -12,8 +12,8 @@ trait JavaReflectionRuntimes {
 
     import global._
 
-    def resolveJavaReflectionRuntime(classLoader: ClassLoader): MacroRuntime = {
-      val implClass = Class.forName(className, true, classLoader)
+    def resolveJavaReflectionRuntime(classLoader: java.lang.ClassLoader): MacroRuntime = {
+      val implClass = java.lang.Class.forName(className, true, classLoader)
       val implMeths = implClass.getDeclaredMethods.find(_.getName == methName)
       // relies on the fact that macro impls cannot be overloaded
       // so every methName can resolve to at maximum one method

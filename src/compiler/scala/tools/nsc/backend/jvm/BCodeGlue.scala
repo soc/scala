@@ -251,7 +251,7 @@ abstract class BCodeGlue extends SubComponent {
         returnType: BType,
         argumentTypes: Array[BType]): String =
     {
-      val buf = new StringBuffer()
+      val buf = new java.lang.StringBuffer()
       buf.append('(')
       var i = 0
       while (i < argumentTypes.length) {
@@ -562,7 +562,7 @@ abstract class BCodeGlue extends SubComponent {
      * can-multi-thread
      */
     def getDescriptor: String = {
-      val buf = new StringBuffer()
+      val buf = new java.lang.StringBuffer()
       getDescriptor(buf)
       buf.toString()
     }
@@ -574,7 +574,7 @@ abstract class BCodeGlue extends SubComponent {
      *
      * can-multi-thread
      */
-    private def getDescriptor(buf: StringBuffer) {
+    private def getDescriptor(buf: java.lang.StringBuffer) {
       if (isPrimitiveOrVoid) {
         // descriptor is in byte 3 of 'off' for primitive types (buf == null)
         buf.append(((off & 0xFF000000) >>> 24).asInstanceOf[Char])

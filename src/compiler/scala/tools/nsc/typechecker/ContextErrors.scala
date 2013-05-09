@@ -745,7 +745,7 @@ trait ContextErrors {
             if (relevancyThreshold == -1) None
             else {
               var relevantElements = realex.getStackTrace().take(relevancyThreshold + 1)
-              def isMacroInvoker(este: StackTraceElement) = este.isNativeMethod || (este.getClassName != null && (este.getClassName contains "fastTrack"))
+              def isMacroInvoker(este: java.lang.StackTraceElement) = este.isNativeMethod || (este.getClassName != null && (este.getClassName contains "fastTrack"))
               var threshold = relevantElements.reverse.indexWhere(isMacroInvoker) + 1
               while (threshold != relevantElements.length && isMacroInvoker(relevantElements(relevantElements.length - threshold - 1))) threshold += 1
               relevantElements = relevantElements dropRight threshold

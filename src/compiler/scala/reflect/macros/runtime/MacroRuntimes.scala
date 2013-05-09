@@ -41,7 +41,7 @@ trait MacroRuntimes extends JavaReflectionRuntimes with ScalaReflectionRuntimes 
    *  which compiles implementations into a virtual directory (very much like REPL does) and then conjures
    *  a classloader mapped to that virtual directory.
    */
-  lazy val defaultMacroClassloader: ClassLoader = findMacroClassLoader()
+  lazy val defaultMacroClassloader: java.lang.ClassLoader = findMacroClassLoader()
 
   /** Abstracts away resolution of macro runtimes.
    */

@@ -91,9 +91,8 @@ object Plugin {
 
   type AnyClass = Class[_]
 
-  /** Use a class loader to load the plugin class.
-   */
-  def load(classname: String, loader: ClassLoader): Try[AnyClass] = {
+  /** Use a class loader to load the plugin class. */
+  def load(classname: String, loader: java.lang.ClassLoader): Try[AnyClass] = {
     Try[AnyClass] {
       loader loadClass classname
     } recoverWith {

@@ -315,7 +315,7 @@ abstract class BCodeHelpers extends BCodeTypes with BytecodeWriters {
      */
     def createJAttribute(name: String, b: Array[Byte], offset: Int, len: Int): asm.Attribute = {
       val dest = new Array[Byte](len);
-      System.arraycopy(b, offset, dest, 0, len);
+      scala.compat.Platform.arraycopy(b, offset, dest, 0, len);
       new asm.CustomAttr(name, dest)
     }
 

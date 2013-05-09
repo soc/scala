@@ -396,7 +396,7 @@ abstract class BCodeIdiomatic extends BCodeGlue {
       } else if (cst >= java.lang.Short.MIN_VALUE && cst <= java.lang.Short.MAX_VALUE) {
         jmethod.visitIntInsn(Opcodes.SIPUSH, cst)
       } else {
-        jmethod.visitLdcInsn(new Integer(cst))
+        jmethod.visitLdcInsn(new java.lang.Integer(cst))
       }
     }
 

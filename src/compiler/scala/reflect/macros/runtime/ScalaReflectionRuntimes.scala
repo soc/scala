@@ -11,9 +11,9 @@ trait ScalaReflectionRuntimes {
 
     import global._
 
-    def resolveScalaReflectionRuntime(classLoader: ClassLoader): MacroRuntime = {
+    def resolveScalaReflectionRuntime(classLoader: java.lang.ClassLoader): MacroRuntime = {
       val macroMirror: ru.JavaMirror = ru.runtimeMirror(classLoader)
-      val implContainerSym = macroMirror.classSymbol(Class.forName(className, true, classLoader))
+      val implContainerSym = macroMirror.classSymbol(java.lang.Class.forName(className, true, classLoader))
       val implMethSym = implContainerSym.typeSignature.member(ru.TermName(methName)).asMethod
       macroLogVerbose(s"successfully loaded macro impl as ($implContainerSym, $implMethSym)")
       args => {
