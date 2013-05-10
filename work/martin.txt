@@ -1,0 +1,48 @@
+Hi Paul,
+
+I think before we ship a @elidable we should try to come up with the best
+possible solution. Manuel's talk has convinced me that it will be a hugely
+important addition in the future.
+
+A linear range will never scale. People will try to embed more and more
+distinctions in it, and will inevitably run into conflicts.
+
+The C# solution of just using strings also has a nasty problem in that one has
+to mention each and every option on the command line; no aggregation is
+possible.
+
+But we could use the power of Scala's type system. First, I think instead of
+@elidable the .NET version of @conditional works better. It's always better to
+state things in the positive. Second, we could specify the level of
+conditional inclusion as a type parameter.
+
+So I'm thinking of something like
+
+@conditional[Debug] def log(x: T) { ... }
+
+The idea would be that calls to `log' are included if there is a current
+conditonal inclusion type specified which is a supertype of Debug. In any
+compilation run, a number of conditional inclusion types may be specified. The
+default might be just the inclusion type scala.annotations.Assertion. You can
+include or exclude a conditional inclusion type with a command line option
+
+-Xinclude fullname -Xexclude fullname
+
+The beauty of this scheme is that it gives you an extremely flexible way to
+define new levels. Something like
+
+object mylevel { type DebugAndVerify >: Debug <: Assertion }
+
+If (what I expect) some future version of Scala will allow union types this
+means you can define every possible ordering of inclusion levels with types,
+in any order you desire.
+
+The last question is how to name included and excluded types on the command
+line. The simplest answer would be: by their full name. We can think about
+whether we want to also allow abbreviations.
+
+What do you think about this?
+
+Cheers
+
+ -- Martin
