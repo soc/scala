@@ -27,10 +27,9 @@ class SyncVar[A] {
    *  went backward, it will return 0, so it never returns negative results.
    */
   private def waitMeasuringElapsed(timeout: Long): Long = if (timeout <= 0) 0 else {
-    val start = System.currentTimeMillis
+    val start = System.nanoTime
     wait(timeout)
-    val elapsed = System.currentTimeMillis - start
-    if (elapsed < 0) 0 else elapsed
+    (System.nanoTime - start) / 1000000L
   }
 
   /** Waits for this SyncVar to become defined at least for

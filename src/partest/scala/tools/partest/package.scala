@@ -123,11 +123,8 @@ package object partest {
   def words(s: String): List[String] = (s.trim split "\\s+").toList
 
   def timed[T](body: => T): (T, Long) = {
-    val t1 = System.currentTimeMillis
-    val result = body
-    val t2 = System.currentTimeMillis
-
-    (result, t2 - t1)
+    val start = System.nanoTime
+    (body, System.nanoTime - t1)
   }
 
   def callable[T](body: => T): Callable[T] = new Callable[T] { override def call() = body }

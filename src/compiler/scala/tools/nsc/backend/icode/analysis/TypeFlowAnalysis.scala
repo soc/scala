@@ -93,8 +93,6 @@ abstract class TypeFlowAnalysis {
     }
   }
 
-  val timer = new Timer
-
   class MethodTFA extends DataFlowAnalysis[typeFlowLattice.type] {
     import icodes._
     import icodes.opcodes._
@@ -133,18 +131,12 @@ abstract class TypeFlowAnalysis {
     }
 
     def run() = {
-      timer.start()
-      // icodes.lubs0 = 0
       forwardAnalysis(blockTransfer)
-      timer.stop
       if (settings.debug) {
         linearizer.linearize(method).foreach(b => if (b != method.startBlock)
           assert(visited.contains(b),
             "Block " + b + " in " + this.method + " has input equal to bottom -- not visited? .." + visited))
       }
-      // log("" + method.symbol.fullName + " ["  + method.code.blocks.size + " blocks] "
-      //     + "\n\t" + iterations + " iterations: " + t + " ms."
-      //     + "\n\tlubs: " + typeFlowLattice.lubs + " out of which " + icodes.lubs0 + " typer lubs")
     }
 
     def blockTransfer(b: BasicBlock, in: lattice.Elem): lattice.Elem = {
@@ -355,10 +347,7 @@ abstract class TypeFlowAnalysis {
     var callerLin: Traversable[BasicBlock] = null
 
     override def run {
-
-      timer.start()
       forwardAnalysis(blockTransfer)
-      timer.stop
 
       /* Now that `forwardAnalysis(blockTransfer)` has finished, all inlining candidates can be found in `remainingCALLs`,
          whose keys are callsites and whose values are pieces of information about the typestack just before the callsite in question.
@@ -699,26 +688,6 @@ abstract class TypeFlowAnalysis {
           }
         }
       }
-    }
-
-  }
-
-  class Timer {
-    var millis = 0L
-
-    private var lastStart = 0L
-
-    def start() {
-      lastStart = System.currentTimeMillis
-    }
-
-    /** Stop the timer and return the number of milliseconds since the last
-     * call to start. The 'millis' field is increased by the elapsed time.
-     */
-    def stop: Long = {
-      val elapsed = System.currentTimeMillis - lastStart
-      millis += elapsed
-      elapsed
     }
   }
 }

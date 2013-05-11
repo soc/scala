@@ -89,13 +89,9 @@ abstract class InlineExceptionHandlers extends SubComponent {
     /** Apply exception handler inlining to a class */
     override def apply(c: IClass): Unit =
       if (settings.inlineHandlers) {
-        val startTime = System.currentTimeMillis
         currentClass = c
-
-        debuglog("Starting InlineExceptionHandlers on " + c)
-        c.methods foreach applyMethod
-        debuglog("Finished InlineExceptionHandlers on " + c + "... " + (System.currentTimeMillis - startTime) + "ms")
-        currentClass = null
+        try c.methods foreach applyMethod
+        finally currentClass = null
       }
 
     /**
