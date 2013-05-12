@@ -94,7 +94,7 @@ private[reflect] trait JavaMirrors extends internal.SymbolTable with api.JavaUni
     private val methodCache      = new TwoWayCache[jMethod, MethodSymbol]
     private val constructorCache = new TwoWayCache[jConstructor[_], MethodSymbol]
     private val fieldCache       = new TwoWayCache[jField, TermSymbol]
-    private val tparamCache      = new TwoWayCache[jTypeVariable[_ <: GenericDeclaration], TypeSymbol]
+    private val tparamCache      = new TwoWayCache[jTypeVariable[_], TypeSymbol]
 
     private[runtime] def toScala[J: HasJavaClass, S](cache: TwoWayCache[J, S], key: J)(body: (JavaMirror, J) => S): S =
       cache.toScala(key){
@@ -106,8 +106,8 @@ private[reflect] trait JavaMirrors extends internal.SymbolTable with api.JavaUni
     private implicit val methHasJavaClass: HasJavaClass[jMethod]           = new HasJavaClass(_.getDeclaringClass)
     private implicit val fieldHasJavaClass: HasJavaClass[jField]           = new HasJavaClass(_.getDeclaringClass)
     private implicit val constrHasJavaClass: HasJavaClass[jConstructor[_]] = new HasJavaClass(_.getDeclaringClass)
-    private implicit val tparamHasJavaClass: HasJavaClass[jTypeVariable[_ <: GenericDeclaration]] =
-      new HasJavaClass ( (tparam: jTypeVariable[_ <: GenericDeclaration]) => {
+    private implicit val tparamHasJavaClass: HasJavaClass[jTypeVariable[_]] =
+      new HasJavaClass ( (tparam: jTypeVariable[_]) => {
         tparam.getGenericDeclaration match {
           case jclazz: jClass[_]        => jclazz
           case jmeth: jMethod           => jmeth.getDeclaringClass
@@ -609,7 +609,7 @@ private[reflect] trait JavaMirrors extends internal.SymbolTable with api.JavaUni
     *  The association between Scala type parameter and Java type variable is entered in the cache.
     *  @param   jtvar   The Java type variable
     */
-    private def createTypeParameter(jtvar: jTypeVariable[_ <: GenericDeclaration]): TypeSymbol = {
+    private def createTypeParameter(jtvar: jTypeVariable[_]): TypeSymbol = {
       val tparam = sOwner(jtvar).newTypeParameter(newTypeName(jtvar.getName))
         .setInfo(new TypeParamCompleter(jtvar))
       tparamCache enter (jtvar, tparam)
@@ -620,7 +620,7 @@ private[reflect] trait JavaMirrors extends internal.SymbolTable with api.JavaUni
      * A completer that fills in the type of a Scala type parameter from the bounds of a Java type variable.
      *  @param   jtvar   The Java type variable
      */
-    private class TypeParamCompleter(jtvar: jTypeVariable[_ <: GenericDeclaration]) extends LazyType with FlagAgnosticCompleter {
+    private class TypeParamCompleter(jtvar: jTypeVariable[_]) extends LazyType with FlagAgnosticCompleter {
       override def load(sym: Symbol) = complete(sym)
       override def complete(sym: Symbol) = {
         sym setInfo TypeBounds.upper(glb(jtvar.getBounds.toList map typeToScala map objToAny))
@@ -815,7 +815,7 @@ private[reflect] trait JavaMirrors extends internal.SymbolTable with api.JavaUni
     /**
      * The Scala owner of the Scala type parameter corresponding to the Java type variable `jtvar`
      */
-    private def sOwner(jtvar: jTypeVariable[_ <: GenericDeclaration]): Symbol =
+    private def sOwner(jtvar: jTypeVariable[_]): Symbol =
       genericDeclarationToScala(jtvar.getGenericDeclaration)
 
     /**
@@ -984,10 +984,10 @@ private[reflect] trait JavaMirrors extends internal.SymbolTable with api.JavaUni
      *  @param jparam  The Java type parameter
      *  @return A Scala type parameter symbol that has the same owner and name as the Java type parameter
      */
-    def typeParamToScala(jparam: jTypeVariable[_ <: GenericDeclaration]): TypeSymbol =
+    def typeParamToScala(jparam: jTypeVariable[_]): TypeSymbol =
       toScala(tparamCache, jparam)(_ typeParamToScala1 _)
 
-    private def typeParamToScala1(jparam: jTypeVariable[_ <: GenericDeclaration]): TypeSymbol = {
+    private def typeParamToScala1(jparam: jTypeVariable[_]): TypeSymbol = {
       val owner = genericDeclarationToScala(jparam.getGenericDeclaration)
       owner.info match {
         case PolyType(tparams, _) => tparams.find(_.name string_== jparam.getName).get.asType
