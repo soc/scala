@@ -1,2 +1,31 @@
+Testing if/else lubs
+Caught: java.lang.ClassCastException: [Ljava.lang.Object; cannot be cast to [Ljava.lang.String;
 1
-[Ljava.lang.Object; cannot be cast to [Ljava.lang.String;
+Caught: java.lang.ClassCastException: [Ljava.lang.Object; cannot be cast to [Ljava.lang.String;
+1
+0
+1
+0
+1
+2
+2
+Testing list lubs
+Caught: java.lang.ClassCastException: [Ljava.lang.Object; cannot be cast to [Ljava.lang.String;
+Caught: java.lang.ClassCastException: [Ljava.lang.Object; cannot be cast to [Ljava.lang.String;
+Caught: java.lang.ClassCastException: [Ljava.lang.Object; cannot be cast to [Ljava.lang.String;
+Caught: java.lang.ClassCastException: [Ljava.lang.Object; cannot be cast to [Ljava.lang.String;
+1
+0
+1
+0
+2
+2
+Testing declared types
+0
+0
+0
+0
+0
+0
+0
+0

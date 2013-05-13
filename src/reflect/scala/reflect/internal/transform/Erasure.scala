@@ -300,7 +300,7 @@ trait Erasure {
    *    not Object, the dominator is Tc.                                        <--- @PP: "which is not Object" not in spec.
    *  - Otherwise, the dominator is the first element of the span.
    */
-  def intersectionDominator(parents: List[Type]): Type = {
+  def intersectionDominator(parents: List[Type]): Type = printResult(s"intersectionDominator($parents)") {
     if (parents.isEmpty) ObjectClass.tpe
     else {
       val psyms = parents map (_.typeSymbol)
