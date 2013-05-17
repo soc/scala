@@ -1329,7 +1329,11 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
     /** Set initial info. */
     def setInfo(info: Type): this.type  = { info_=(info); this }
     /** Modifies this symbol's info in place. */
-    def modifyInfo(f: Type => Type): this.type = setInfo(f(info))
+    def modifyInfo(f: Type => Type): this.type = {
+      val newInfo = f(info)
+      // Don't eliminate the type history if the info is unchanged.
+      if (info eq newInfo) this else this updateInfo newInfo
+    }
     /** Substitute second list of symbols for first in current info. */
     def substInfo(syms0: List[Symbol], syms1: List[Symbol]): this.type =
       if (syms0.isEmpty) this
@@ -1345,7 +1349,7 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
     }
 
     /** Set new info valid from start of this phase. */
-    def updateInfo(info: Type): Symbol = {
+    def updateInfo(info: Type): this.type = {
       val pid = phaseId(infos.validFrom)
       assert(pid <= phase.id, (pid, phase.id))
       if (pid == phase.id) infos = infos.prev

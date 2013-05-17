@@ -42,7 +42,7 @@ private[reflect] trait SynchronizedSymbols extends internal.Symbols { self: Symb
 
     override def info = synchronized { super.info }
     override def info_=(info: Type) = synchronized { super.info_=(info) }
-    override def updateInfo(info: Type): Symbol = synchronized { super.updateInfo(info) }
+    override def updateInfo(info: Type): this.type = synchronized { super.updateInfo(info) }
     override def rawInfo: Type = synchronized { super.rawInfo }
 
     override def typeParams: List[Symbol] = synchronized { super.typeParams }
