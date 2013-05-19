@@ -23,12 +23,7 @@ abstract class GenICode extends SubComponent  {
   import global._
   import icodes._
   import icodes.opcodes._
-  import definitions.{
-    ArrayClass, ObjectClass, ThrowableClass, StringClass, StringModule, AnyRefClass,
-    Object_equals, Object_isInstanceOf, Object_asInstanceOf, ScalaRunTimeModule,
-    BoxedNumberClass, BoxedCharacterClass,
-    getMember
-  }
+  import definitions._
   import scalaPrimitives.{
     isArrayOp, isComparisonOp, isLogicalOp,
     isUniversalEqualityOp, isReferenceEqualityOp
@@ -117,7 +112,7 @@ abstract class GenICode extends SubComponent  {
 
         var ctx1 = ctx.enterMethod(m, tree.asInstanceOf[DefDef])
         addMethodParams(ctx1, vparamss)
-        m.native = m.symbol.hasAnnotation(definitions.NativeAttr)
+        m.native = m.symbol.hasAnnotation(NativeAttr)
 
         if (!m.isAbstractMethod && !m.native) {
           ctx1 = genLoad(rhs, ctx1, m.returnType)
@@ -154,6 +149,23 @@ abstract class GenICode extends SubComponent  {
     private def genStat(trees: List[Tree], ctx: Context): Context =
       trees.foldLeft(ctx)((currentCtx, t) => genStat(t, currentCtx))
 
+    object AssignIinc {
+      def unapply(t: Tree) = t match {
+        case Assign(lhs1, Apply(Select(lhs2, op @ (nme.PLUS | nme.MINUS)), Literal(Constant(inc: Int)) :: Nil)) =>
+          val isMaybeIinc = (
+               (Short.MinValue <= inc && inc <= Short.MaxValue)
+            && lhs1.symbol == lhs2.symbol
+            && isNumericSubClass(IntClass, lhs1.tpe.typeSymbol)
+            // && lhs1.tpe.typeSymbol == definitions.IntClass
+          )
+          if (!isMaybeIinc) None
+          else if (op == nme.PLUS) Some((lhs1.symbol, inc))
+          else Some((lhs1.symbol, -inc))
+        case _ =>
+          None
+      }
+    }
+
     /**
      * Generate code for the given tree. The trees should contain statements
      * and not produce any value. Use genLoad for expressions which leave
@@ -162,23 +174,33 @@ abstract class GenICode extends SubComponent  {
      * @return a new context. This is necessary for control flow instructions
      *         which may change the current basic block.
      */
-    private def genStat(tree: Tree, ctx: Context): Context = tree match {
-      case Assign(lhs @ Select(_, _), rhs) =>
-        val isStatic = lhs.symbol.isStaticMember
-        var ctx1 = if (isStatic) ctx else genLoadQualifier(lhs, ctx)
+    private def genStat(tree: Tree, ctx: Context): Context = {
+      tree match {
+        case AssignIinc(sym, inc) =>
+          ctx.method lookupLocal sym map { lv =>
+            ctx.bb.emit(IINC_LOCAL(lv, inc), tree.pos)
+            return ctx
+          }
+        case _ =>
+      }
+      tree match {
+        case Assign(lhs @ Select(_, _), rhs) =>
+          val isStatic = lhs.symbol.isStaticMember
+          var ctx1 = if (isStatic) ctx else genLoadQualifier(lhs, ctx)
 
-        ctx1 = genLoad(rhs, ctx1, toTypeKind(lhs.symbol.info))
-        ctx1.bb.emit(STORE_FIELD(lhs.symbol, isStatic), tree.pos)
-        ctx1
+          ctx1 = genLoad(rhs, ctx1, toTypeKind(lhs.symbol.info))
+          ctx1.bb.emit(STORE_FIELD(lhs.symbol, isStatic), tree.pos)
+          ctx1
 
-      case Assign(lhs, rhs) =>
-        val ctx1 = genLoad(rhs, ctx, toTypeKind(lhs.symbol.info))
-        val Some(l) = ctx.method.lookupLocal(lhs.symbol)
-        ctx1.bb.emit(STORE_LOCAL(l), tree.pos)
-        ctx1
+        case Assign(lhs, rhs) =>
+          val ctx1 = genLoad(rhs, ctx, toTypeKind(lhs.symbol.info))
+          val Some(l) = ctx.method.lookupLocal(lhs.symbol)
+          ctx1.bb.emit(STORE_LOCAL(l), tree.pos)
+          ctx1
 
-      case _ =>
-        genLoad(tree, ctx, UNIT)
+        case _ =>
+          genLoad(tree, ctx, UNIT)
+      }
     }
 
     private def genThrow(expr: Tree, ctx: Context): (Context, TypeKind) = {
@@ -618,9 +640,9 @@ abstract class GenICode extends SubComponent  {
               ctx1.bb.emit(DROP(l), fun.pos)
               if (cast) {
                 ctx1.bb.emit(Seq(
-                  NEW(REFERENCE(definitions.ClassCastExceptionClass)),
+                  NEW(REFERENCE(ClassCastExceptionClass)),
                   DUP(ObjectReference),
-                  THROW(definitions.ClassCastExceptionClass)
+                  THROW(ClassCastExceptionClass)
                 ))
               } else
                 ctx1.bb.emit(CONSTANT(Constant(false)))
@@ -628,7 +650,7 @@ abstract class GenICode extends SubComponent  {
               /* Erasure should have added an unboxing operation to prevent that. */
               abort("should have been unboxed by erasure: " + tree)
             } else if (r.isValueType) {
-              ctx.bb.emit(IS_INSTANCE(REFERENCE(definitions.boxedClass(r.toType.typeSymbol))))
+              ctx.bb.emit(IS_INSTANCE(REFERENCE(boxedClass(r.toType.typeSymbol))))
             } else {
               genCast(l, r, ctx1, cast)
             }
@@ -706,7 +728,7 @@ abstract class GenICode extends SubComponent  {
           }
           genLoadApply3
 
-        case Apply(fun @ _, List(expr)) if (definitions.isBox(fun.symbol)) =>
+        case Apply(fun @ _, List(expr)) if (isBox(fun.symbol)) =>
           def genLoadApply4 = {
             debuglog("BOX : " + fun.symbol.fullName)
             val ctx1 = genLoad(expr, ctx, toTypeKind(expr.tpe))
@@ -725,7 +747,7 @@ abstract class GenICode extends SubComponent  {
           }
           genLoadApply4
 
-        case Apply(fun @ _, List(expr)) if (definitions.isUnbox(fun.symbol)) =>
+        case Apply(fun @ _, List(expr)) if (isUnbox(fun.symbol)) =>
           debuglog("UNBOX : " + fun.symbol.fullName)
           val ctx1 = genLoad(expr, ctx, toTypeKind(expr.tpe))
           val boxType = toTypeKind(fun.symbol.owner.linkedClassOfClass.tpe)

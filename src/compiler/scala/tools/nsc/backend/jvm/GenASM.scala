@@ -1773,6 +1773,7 @@ abstract class GenASM extends SubComponent with BytecodeWriters with GenJVMASM {
       }
 
 
+      def iinc(idx: Int, inc: Int)      { emitIincInsn(idx, inc) }
       def load( idx: Int, tk: TypeKind) { emitVarInsn(Opcodes.ILOAD,  idx, tk) }
       def store(idx: Int, tk: TypeKind) { emitVarInsn(Opcodes.ISTORE, idx, tk) }
 
@@ -1894,6 +1895,9 @@ abstract class GenASM extends SubComponent with BytecodeWriters with GenJVMASM {
       def emitVarInsn(opc: Int, idx: Int, tk: TypeKind) {
         assert((opc == Opcodes.ILOAD) || (opc == Opcodes.ISTORE), opc)
         jmethod.visitVarInsn(javaType(tk).getOpcode(opc), idx)
+      }
+      def emitIincInsn(idx: Int, inc: Int) {
+        jmethod.visitIincInsn(idx, inc)
       }
 
       // ---------------- array load and store ----------------
@@ -2299,10 +2303,7 @@ abstract class GenASM extends SubComponent with BytecodeWriters with GenJVMASM {
 
       def genBlock(b: BasicBlock) {
         jmethod.visitLabel(labels(b))
-
         debuglog("Generating code for block: " + b)
-
-        // val lastInstr = b.lastInstruction
 
         for (instr <- b) {
 
@@ -2331,10 +2332,11 @@ abstract class GenASM extends SubComponent with BytecodeWriters with GenJVMASM {
 
           case icodes.localsCat =>
           def genLocalInstr() = (instr: @unchecked) match {
-            case THIS(_) => jmethod.visitVarInsn(Opcodes.ALOAD, 0)
-            case LOAD_LOCAL(local) => jcode.load(indexOf(local), local.kind)
-            case STORE_LOCAL(local) => jcode.store(indexOf(local), local.kind)
-            case STORE_THIS(_) =>
+            case THIS(_)             => jmethod.visitVarInsn(Opcodes.ALOAD, 0)
+            case IINC_LOCAL(lv, inc) => logResult(s"Generating IINC($lv, $inc) in $m")(jcode.iinc(indexOf(lv), inc))
+            case LOAD_LOCAL(local)   => jcode.load(indexOf(local), local.kind)
+            case STORE_LOCAL(local)  => jcode.store(indexOf(local), local.kind)
+            case STORE_THIS(_)       =>
               // this only works for impl classes because the self parameter comes first
               // in the method signature. If that changes, this code has to be revisited.
               jmethod.visitVarInsn(Opcodes.ASTORE, 0)

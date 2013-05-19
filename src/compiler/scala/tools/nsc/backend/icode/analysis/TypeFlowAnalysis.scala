@@ -263,6 +263,8 @@ abstract class TypeFlowAnalysis {
           stack.pop(stack.length)
           stack.push(toTypeKind(clasz.tpe))
 
+        case IINC_LOCAL(_, _) =>
+
         case _ =>
           dumpClassesAndAbort("Unknown instruction: " + i)
       }

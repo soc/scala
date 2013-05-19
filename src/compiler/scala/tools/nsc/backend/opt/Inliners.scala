@@ -849,19 +849,20 @@ abstract class Inliners extends SubComponent {
           def isInlined(l: Local) = inlinedLocals isDefinedAt l
 
           val newInstr = i match {
-            case THIS(clasz)                    => LOAD_LOCAL(inlinedThis)
-            case STORE_THIS(_)                  => STORE_LOCAL(inlinedThis)
-            case JUMP(whereto)                  => JUMP(inlinedBlock(whereto))
-            case CJUMP(succ, fail, cond, kind)  => CJUMP(inlinedBlock(succ), inlinedBlock(fail), cond, kind)
-            case CZJUMP(succ, fail, cond, kind) => CZJUMP(inlinedBlock(succ), inlinedBlock(fail), cond, kind)
-            case SWITCH(tags, labels)           => SWITCH(tags, labels map inlinedBlock)
-            case RETURN(_)                      => JUMP(afterBlock)
-            case LOAD_LOCAL(l) if isInlined(l)  => LOAD_LOCAL(inlinedLocals(l))
-            case STORE_LOCAL(l) if isInlined(l) => STORE_LOCAL(inlinedLocals(l))
-            case LOAD_LOCAL(l)                  => assertLocal(l)
-            case STORE_LOCAL(l)                 => assertLocal(l)
-            case SCOPE_ENTER(l) if isInlined(l) => SCOPE_ENTER(inlinedLocals(l))
-            case SCOPE_EXIT(l) if isInlined(l)  => SCOPE_EXIT(inlinedLocals(l))
+            case THIS(clasz)                        => LOAD_LOCAL(inlinedThis)
+            case STORE_THIS(_)                      => STORE_LOCAL(inlinedThis)
+            case JUMP(whereto)                      => JUMP(inlinedBlock(whereto))
+            case CJUMP(succ, fail, cond, kind)      => CJUMP(inlinedBlock(succ), inlinedBlock(fail), cond, kind)
+            case CZJUMP(succ, fail, cond, kind)     => CZJUMP(inlinedBlock(succ), inlinedBlock(fail), cond, kind)
+            case SWITCH(tags, labels)               => SWITCH(tags, labels map inlinedBlock)
+            case RETURN(_)                          => JUMP(afterBlock)
+            case LOAD_LOCAL(l) if isInlined(l)      => LOAD_LOCAL(inlinedLocals(l))
+            case STORE_LOCAL(l) if isInlined(l)     => STORE_LOCAL(inlinedLocals(l))
+            case IINC_LOCAL(l, inc) if isInlined(l) => IINC_LOCAL(inlinedLocals(l), inc)
+            case LOAD_LOCAL(l)                      => assertLocal(l)
+            case STORE_LOCAL(l)                     => assertLocal(l)
+            case SCOPE_ENTER(l) if isInlined(l)     => SCOPE_ENTER(inlinedLocals(l))
+            case SCOPE_EXIT(l) if isInlined(l)      => SCOPE_EXIT(inlinedLocals(l))
 
             case nw @ NEW(sym) =>
               val r = NEW(sym)

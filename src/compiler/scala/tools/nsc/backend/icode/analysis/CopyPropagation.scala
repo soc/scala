@@ -402,6 +402,8 @@ abstract class CopyPropagation {
         case LOAD_EXCEPTION(_) =>
           out.stack = Unknown :: Nil
 
+        case IINC_LOCAL(_, _) =>
+
         case _ =>
           dumpClassesAndAbort("Unknown instruction: " + i)
       }

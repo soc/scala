@@ -159,7 +159,7 @@ abstract class DeadCodeElimination extends SubComponent {
 
             case RETURN(_) | JUMP(_) | CJUMP(_, _, _, _) | CZJUMP(_, _, _, _) | STORE_FIELD(_, _) |
                  THROW(_)   | LOAD_ARRAY_ITEM(_) | STORE_ARRAY_ITEM(_) | SCOPE_ENTER(_) | SCOPE_EXIT(_) | STORE_THIS(_) |
-                 LOAD_EXCEPTION(_) | SWITCH(_, _) | MONITOR_ENTER() | MONITOR_EXIT() =>
+                 LOAD_EXCEPTION(_) | SWITCH(_, _) | MONITOR_ENTER() | MONITOR_EXIT() | IINC_LOCAL(_, _) =>
               moveToWorkList()
 
             case CALL_METHOD(m1, _) if isSideEffecting(m1) =>
@@ -419,7 +419,7 @@ abstract class DeadCodeElimination extends SubComponent {
         if (idx != -1)
           return (b, idx)
       }
-      abort("could not find init in: " + method)
+      abort(s"could not find $i in $method")
     }
 
     private def isPure(sym: Symbol) = (

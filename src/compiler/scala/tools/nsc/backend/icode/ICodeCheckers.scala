@@ -687,6 +687,8 @@ abstract class ICodeCheckers {
           case SCOPE_ENTER(_) | SCOPE_EXIT(_) =>
             ()
 
+          case IINC_LOCAL(_, _) =>
+
           case _ =>
             abort("Unknown instruction: " + instr)
         }

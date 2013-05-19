@@ -251,6 +251,12 @@ trait Opcodes { self: ICodes =>
       override def category = localsCat
     }
 
+    case class IINC_LOCAL(local: Local, inc: Int) extends Instruction {
+      override def consumed = 0
+      override def produced = 0
+      override def category = localsCat
+    }
+
     /** Store a value into a field.
      * Stack: ...:ref:value   (assuming isStatic=false)
      *    ->: ...
