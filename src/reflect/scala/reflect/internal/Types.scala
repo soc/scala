@@ -1037,6 +1037,8 @@ trait Types
       else suspendingTypeVars(typeVarsInType(this))(findMembersInternal)
     }
 
+    def hasMemberWhich(name: Name, p: Symbol => Boolean): Boolean = (member(name) filter p) != NoSymbol
+
     /**
      *  Find member(s) in this type. If several members matching criteria are found, they are
      *  returned in an OverloadedSymbol
