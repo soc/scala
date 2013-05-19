@@ -303,7 +303,7 @@ trait Importers extends api.Importers { self: SymbolTable =>
     }
 
     def importTypeConstraint(constr: from.TypeConstraint): TypeConstraint = {
-      val result = new TypeConstraint(constr.loBounds map importType, constr.hiBounds map importType)
+      val result  = TypeConstraint(constr.loBounds map importType, constr.hiBounds map importType)
       result.inst = importType(constr.inst)
       result
     }

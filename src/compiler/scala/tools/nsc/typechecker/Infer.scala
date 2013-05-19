@@ -610,7 +610,7 @@ trait Infer extends Checkable {
             if (targ.typeSymbol == RepeatedParamClass)     targ.baseType(SeqClass)
             else if (targ.typeSymbol == JavaRepeatedParamClass) targ.baseType(ArrayClass)
             // this infers Foo.type instead of "object Foo" (see also widenIfNecessary)
-            else if (targ.typeSymbol.isModuleClass || tvar.constr.avoidWiden) targ
+            else if (targ.typeSymbol.isModuleClass || tvar.constr.avoidWidening) targ
             else targ.widen
           )
         ))

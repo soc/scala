@@ -107,6 +107,8 @@ trait Types
 
   protected val enableTypeVarExperimentals = settings.Xexperimental.value
 
+  val typeVarMap = mutable.Map[TypeVar, List[TypeConstraint]]() withDefaultValue Nil
+
   /** The current skolemization level, needed for the algorithms
    *  in isSameType, isSubType that do constraint solving under a prefix.
    */
@@ -2831,6 +2833,8 @@ trait Types
   // but pattern-matching returned the original constr0 (a bug)
   // now, pattern-matching returns the most recent constr
   object TypeVar {
+    def unapply(tv: TypeVar): Some[(Type, TypeConstraint)] = Some((tv.origin, tv.constr))
+
     @inline final def trace[T](action: String, msg: => String)(value: T): T = {
       if (traceTypeVars) {
         val s = msg match {
@@ -2855,13 +2859,16 @@ trait Types
        * the complexity of the search even if it doesn't improve
        * any results.
        */
-      if (propagateParameterBoundsToTypeVars) {
-        val exclude = bounds.isEmptyBounds || (bounds exists typeIsNonClassType)
+      def seedBounds = (
+           propagateParameterBoundsToTypeVars
+        && !bounds.isEmptyBounds
+        && !(bounds exists typeIsNonClassType)
+      )
 
-        if (exclude) new TypeConstraint
-        else TypeVar.trace("constraint", "For " + tparam.fullLocationString)(new TypeConstraint(bounds))
-      }
-      else new TypeConstraint
+      if (seedBounds)
+        TypeVar.trace("constraint", "For " + tparam.fullLocationString)(TypeConstraint(tparam, bounds))
+      else
+        TypeConstraint(tparam)
     }
     def untouchable(tparam: Symbol): TypeVar                 = createTypeVar(tparam, untouchable = true)
     def apply(tparam: Symbol): TypeVar                       = createTypeVar(tparam, untouchable = false)
@@ -2874,20 +2881,21 @@ trait Types
     private def createTypeVar(origin: Type, constr: TypeConstraint, args: List[Type], params: List[Symbol], untouchable: Boolean): TypeVar = {
       val tv = (
         if (args.isEmpty && params.isEmpty) {
-          if (untouchable) new TypeVar(origin, constr) with UntouchableTypeVar
-          else new TypeVar(origin, constr) {}
+          if (untouchable) new TypeVar(origin) with UntouchableTypeVar
+          else new TypeVar(origin) { }
         }
         else if (args.size == params.size) {
-          if (untouchable) new AppliedTypeVar(origin, constr, params zip args) with UntouchableTypeVar
-          else new AppliedTypeVar(origin, constr, params zip args)
+          if (untouchable) new AppliedTypeVar(origin, params zip args) with UntouchableTypeVar
+          else new AppliedTypeVar(origin, params zip args)
         }
         else if (args.isEmpty) {
-          if (untouchable) new HKTypeVar(origin, constr, params) with UntouchableTypeVar
-          else new HKTypeVar(origin, constr, params)
+          if (untouchable) new HKTypeVar(origin, params) with UntouchableTypeVar
+          else new HKTypeVar(origin, params)
         }
         else throw new Error("Invalid TypeVar construction: " + ((origin, constr, args, params)))
       )
 
+      tv setConstraint constr
       trace("create", "In " + tv.originLocation)(tv)
     }
     private def createTypeVar(tparam: Symbol, untouchable: Boolean): TypeVar =
@@ -2896,24 +2904,14 @@ trait Types
 
   /** Precondition: params.nonEmpty.  (args.nonEmpty enforced structurally.)
    */
-  class HKTypeVar(
-    _origin: Type,
-    _constr: TypeConstraint,
-    override val params: List[Symbol]
-  ) extends TypeVar(_origin, _constr) {
-
+  class HKTypeVar(origin: Type, override val params: List[Symbol]) extends TypeVar(origin) {
     require(params.nonEmpty, this)
-    override def isHigherKinded          = true
+    override def isHigherKinded = true
   }
 
   /** Precondition: zipped params/args nonEmpty.  (Size equivalence enforced structurally.)
    */
-  class AppliedTypeVar(
-    _origin: Type,
-    _constr: TypeConstraint,
-    zippedArgs: List[(Symbol, Type)]
-  ) extends TypeVar(_origin, _constr) {
-
+  class AppliedTypeVar(origin: Type, zippedArgs: List[(Symbol, Type)]) extends TypeVar(origin) {
     require(zippedArgs.nonEmpty, this)
 
     override def params: List[Symbol] = zippedArgs map (_._1)
@@ -2937,6 +2935,12 @@ trait Types
     }
   }
 
+  // case class TypeVarState(
+  //   constr: TypeConstraint,
+  //   untouchable: Boolean,
+  //   encounteredHigherLevel: Boolean
+  // )
+
   /** A class representing a type variable: not used after phase `typer`.
    *
    *  A higher-kinded TypeVar has params (Symbols) and typeArgs (Types).
@@ -2946,10 +2950,21 @@ trait Types
    *
    *  Precondition for this class, enforced structurally: args.isEmpty && params.isEmpty.
    */
-  abstract case class TypeVar(
-                               origin: Type,
-    var constr: TypeConstraint
-  ) extends Type {
+  abstract class TypeVar(val origin: Type) extends Type {
+    def setConstraint(c: TypeConstraint): this.type = {
+      constr = c
+      this
+    }
+    def constr: TypeConstraint = typeVarMap(this).head
+    def constr_=(c: TypeConstraint) = typeVarMap(this) ::= c
+
+    // var untouchable = false
+    // var encounteredHigherLevel = false
+
+    def reset(): this.type = {
+      constr = TypeConstraint(origin.typeSymbolDirect)
+      this
+    }
 
     // We don't want case class equality/hashing as TypeVar-s are mutable,
     // and TypeRefs based on them get wrongly `uniqued` otherwise. See SI-7226.
@@ -3025,7 +3040,7 @@ trait Types
         log(s"TypeVar cycle: called setInst passing $this to itself.")
         return this
       }
-      undoLog record this
+      // undoLog record this
       // if we were compared against later typeskolems, repack the existential,
       // because skolems are only compatible if they were created at the same level
       val res = if (shouldRepackType) repackExistential(tp) else tp
@@ -3036,14 +3051,14 @@ trait Types
     def addLoBound(tp: Type, isNumericBound: Boolean = false) {
       assert(tp != this, tp) // implies there is a cycle somewhere (?)
       //println("addLoBound: "+(safeToString, debugString(tp))) //DEBUG
-      undoLog record this
+      // undoLog record this
       constr.addLoBound(tp, isNumericBound)
     }
 
     def addHiBound(tp: Type, isNumericBound: Boolean = false) {
       // assert(tp != this)
       //println("addHiBound: "+(safeToString, debugString(tp))) //DEBUG
-      undoLog record this
+      // undoLog record this
       constr.addHiBound(tp, isNumericBound)
     }
     // </region>

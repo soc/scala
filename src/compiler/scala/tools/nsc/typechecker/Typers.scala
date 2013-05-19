@@ -116,11 +116,11 @@ trait Typers extends Adaptations with Tags {
       typed(docDef.definition, mode, pt)
 
     val infer = new Inferencer(context0) {
-      override def isCoercible(tp: Type, pt: Type): Boolean = undoLog undo { // #3281
+      override def isCoercible(tp: Type, pt: Type): Boolean = undoLog.undo(s"isCoercible($tp, $pt)", { // #3281
         tp.isError || pt.isError ||
         context0.implicitsEnabled && // this condition prevents chains of views
         inferView(EmptyTree, tp, pt, reportAmbiguous = false) != EmptyTree
-      }
+      })
     }
 
     /** Find implicit arguments and pass them to given tree.

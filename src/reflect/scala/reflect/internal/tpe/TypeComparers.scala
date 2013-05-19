@@ -99,17 +99,17 @@ trait TypeComparers {
     //      isSameType1(tp1, tp2)
     //    }
 
-    undoLog.lock()
-    try {
-      val before = undoLog.log
-      var result = false
-      try {
-        result = isSameType1(tp1, tp2)
-      }
-      finally if (!result) undoLog.undoTo(before)
-      result
-    }
-    finally undoLog.unlock()
+    undoLog.undoably(s"$tp1 =:= $tp2", isSameType1(tp1, tp2))(x => !x)
+
+    // undoLog.lock()
+    // try {
+    //   val start = markUndoStart()
+    //   var result = false
+    //   try result = isSameType1(tp1, tp2)
+    //   finally markUndoComplete(start, !result)
+    //   result
+    // }
+    // finally undoLog.unlock()
   }
   finally {
     subsametypeRecursions -= 1
@@ -263,31 +263,24 @@ trait TypeComparers {
     //      }
     //    }
 
-    undoLog.lock()
-    try {
-      val before = undoLog.log
-      var result = false
-
-      try result = { // if subtype test fails, it should not affect constraints on typevars
-        if (subsametypeRecursions >= LogPendingSubTypesThreshold) {
-          val p = new SubTypePair(tp1, tp2)
-          if (pendingSubTypes(p))
-            false
-          else
-            try {
-              pendingSubTypes += p
-              isSubType2(tp1, tp2, depth)
-            } finally {
-              pendingSubTypes -= p
-            }
-        } else {
-          isSubType2(tp1, tp2, depth)
-        }
-      } finally if (!result) undoLog.undoTo(before)
-
-      result
-    } finally undoLog.unlock()
-  } finally {
+    def basicBody() = isSubType2(tp1, tp2, depth)
+    def guardedBody() = {
+      val p = new SubTypePair(tp1, tp2)
+      !pendingSubTypes(p) && {
+        pendingSubTypes += p
+        try basicBody() finally pendingSubTypes -= p
+      }
+    }
+    def body() = (
+      if (subsametypeRecursions < LogPendingSubTypesThreshold)
+        basicBody()
+      else
+        guardedBody()
+    )
+    // if subtype test fails, it should not affect constraints on typevars
+    undoLog.undoably(s"$tp1 <:< $tp2", body())(x => !x)
+  }
+  finally {
     subsametypeRecursions -= 1
     // XXX AM TODO: figure out when it is safe and needed to clear the log -- the commented approach below is too eager (it breaks #3281, #3866)
     // it doesn't help to keep separate recursion counts for the three methods that now share it

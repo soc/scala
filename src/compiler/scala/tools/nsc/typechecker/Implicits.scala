@@ -883,7 +883,7 @@ trait Implicits {
               rankImplicits(is, acc)
             case newBest        =>
               best = newBest
-              val newPending = undoLog undo {
+              val newPending = undoLog undo(s"rankImplicits(best=$best)", {
                 is filterNot (alt => alt == i || {
                   try improves(i, alt)
                   catch {
@@ -895,7 +895,7 @@ trait Implicits {
                       true
                   }
                 })
-              }
+              })
               rankImplicits(newPending, i :: acc)
           }
       }
@@ -1395,7 +1395,7 @@ trait Implicits {
     // find all implicits for some type that contains type variables
     // collect the constraints that result from typing each implicit
     def allImplicitsPoly(tvars: List[TypeVar]): List[(SearchResult, List[TypeConstraint])] = {
-      def resetTVars() = tvars foreach { _.constr = new TypeConstraint }
+      def resetTVars() = tvars foreach (_.reset())
 
       def eligibleInfos(iss: Infoss, isLocal: Boolean) = {
         val eligible = new ImplicitComputation(iss, isLocal).eligible

@@ -936,12 +936,9 @@ private[internal] trait TypeMaps {
     *  type variable */
   object wildcardToTypeVarMap extends TypeMap {
     def apply(tp: Type): Type = tp match {
-      case WildcardType =>
-        TypeVar(tp, new TypeConstraint)
-      case BoundedWildcardType(bounds) =>
-        TypeVar(tp, new TypeConstraint(bounds))
-      case _ =>
-        mapOver(tp)
+      case WildcardType                => TypeVar(tp, TypeConstraint())
+      case BoundedWildcardType(bounds) => TypeVar(tp, TypeConstraint(bounds))
+      case _                           => mapOver(tp)
     }
   }
 

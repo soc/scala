@@ -3,9 +3,8 @@ package reflect
 package internal
 package tpe
 
-import scala.collection.{ generic }
+import scala.collection.{ mutable, immutable, generic }
 import generic.Clearable
-
 
 private[internal] trait TypeConstraints {
   self: SymbolTable =>
@@ -18,71 +17,152 @@ private[internal] trait TypeConstraints {
 
   protected def newUndoLog = new UndoLog
 
-  class UndoLog extends Clearable {
-    private type UndoPairs = List[(TypeVar, TypeConstraint)]
-    //OPT this method is public so we can do `manual inlining`
-    var log: UndoPairs = List()
+  val liveConstraints = mutable.Set[Int]()
+  // val constraintsRolledBack = mutable.Set[Int]()
+  val typeConstraintMap = mutable.Map[TypeConstraint, List[TypeConstraintState]]() withDefaultValue Nil
+  def typeConstraintSync() {
+    typeConstraintMap foreach { case (k, vs) =>
+      typeConstraintMap(k) = vs filter (v => liveConstraints(v.id))
+    }
+  }
+  var undoStarts = List[Int](-1)
+  private def undoSpaces = "  " * (undoStarts.size - 1)
+  def alreadyStacked = lastConstraintId == undoStarts.head
+  def pushUndo(id: Int): Unit = {
+    // undoStarts match {
+    //   case -1 :: Nil             => ()
+    //   case hd :: -1 :: Nil       => ()
+    //   case x1 :: x2 :: -1 :: Nil =>
+    //     ulog(x2 + "->")
+    //     ulog(undoSpaces + id + "->")
+    //   case _ =>
+    //     ulog(undoSpaces + id + "->")
+    // }
+    undoStarts ::= id
+  }
+  def popUndo(id: Int): Unit = {
+    assert(undoStarts.head == id, (undoStarts.head, id))
+    undoStarts = undoStarts.tail
+    // undoStarts match {
+    //   case -1 :: Nil             => ()
+    //   case hd :: -1 :: Nil       => ()
+    //   case x1 :: x2 :: -1 :: Nil =>
+    //     ulog(undoSpaces + "<-" + id)
+    //     ulog("<-" + x2)
+    //   case _ =>
+    //     ulog(undoSpaces + "<-" + id)
+    // }
+    if (undoStarts.isEmpty) {
+      ulog(s"Clearing ${liveConstraints.size} live constraints")
+      liveConstraints.clear()
+    }
+    // ulog(undoSpaces + "<-" + id)
+  }
 
-    /*
-     * These two methods provide explicit locking mechanism that is overridden in SynchronizedUndoLog.
-     *
-     * The idea behind explicit locking mechanism is that all public methods that access mutable state
-     * will have to obtain the lock for their entire execution so both reads and writes can be kept in
-     * right order. Originally, that was achieved by overriding those public methods in
-     * `SynchronizedUndoLog` which was fine but expensive. The reason is that those public methods take
-     * thunk as argument and if we keep them non-final there's no way to make them inlined so thunks
-     * can go away.
-     *
-     * By using explicit locking we can achieve inlining.
-     *
-     * NOTE: They are made public for now so we can apply 'manual inlining' (copy&pasting into hot
-     * places implementation of `undo` or `undoUnless`). This should be changed back to protected
-     * once inliner is fixed.
-     */
+  private val undoLogLog = sys.props contains "scalac.debug.undo"
+  private def ulog(msg: => Any): Unit = {
+    if (undoLogLog)
+      Console.err.println(msg)
+  }
+  private var constraintId = 1
+  def nextConstraintId() = {
+    val result = try constraintId finally constraintId += 1
+    liveConstraints += result
+    result
+  }
+  def lastConstraintId = constraintId - 1
+  def rollBackTo(id: Int) {
+    liveConstraints --= (id until lastConstraintId)
+    // val newRollbacks = id until lastConstraintId filter liveConstraints
+    // if (newRollbacks.nonEmpty) {
+    //   val roll_s = newRollbacks.toList match {
+    //     case hd :: Nil => s"[$hd]"
+    //     case elems     =>
+    //       val min = elems.head.toInt
+    //       val max = elems.last.toInt
+    //       if (elems.size > max - min)
+    //         s"[$min,$max]"
+    //       else
+    //         elems.mkString("[", ",", "]")
+    //   }
+    //   // Console.err.println(f"[rollback] $roll_s")
+    //   // [$id,$lastConstraintId)")
+    //   liveConstraints --= newRollbacks
+    // }
+    // for ((k, vs) <- typeConstraintMap) {
+    //   val (keep, drop0) = vs partition (_.id <= id)
+    //   val drop = drop0 //filter (_.instValid)
+    //   typeConstraintMap(k) = keep
+    //   if (drop.nonEmpty) {
+    //     Console.err.println(s"Wound constraints for $k back to id=$id, dropped:")
+    //     drop foreach (d => Console.err.println("  " + d))
+    //   }
+    //   // typeConstraintMap(k) = vs filter (c => (c.id <= id) || {
+    //   //   if (c.instValid)
+    //   //     Console.err.println(s"Dropping $c")
+
+    //   //   false
+    //   // })
+    // }
+  }
+
+  def getConstraint(tc: TypeConstraint): TypeConstraintState = {
+    typeConstraintMap(tc) match {
+      case Nil                                 => TypeConstraint.InitialState
+      case hd :: tl if !liveConstraints(hd.id) => typeConstraintMap(tc) = tl ; getConstraint(tc)
+      case hd :: _                             => hd
+    }
+  }
+
+  class UndoLog extends Clearable {
     def lock(): Unit = ()
     def unlock(): Unit = ()
+    def clear() { typeConstraintMap.clear() }
+    def dump() {
+      val size    = typeConstraintMap.size
+      val states  = typeConstraintMap.values.flatten.size
+      val average = if (size == 0) 0 else states / size
+      ulog(s"$size keys in map, which holds $states states (average: $average)")
 
-    // register with the auto-clearing cache manager
-    perRunCaches.recordCache(this)
+      val pairs = typeConstraintMap.mapValues(_ filterNot (_.isEmpty)).toList filterNot (_._2.isEmpty) sortBy (-_._2.length)
 
-    /** Undo all changes to constraints to type variables upto `limit`. */
-    //OPT this method is public so we can do `manual inlining`
-    def undoTo(limit: UndoPairs) {
-      assertCorrectThread()
-      while ((log ne limit) && log.nonEmpty) {
-        val (tv, constr) = log.head
-        tv.constr = constr
-        log = log.tail
+      pairs foreach { case (tc, states) =>
+        ulog(s"[states=${states.size}] $tc")
+        states map (_.longString) filterNot (_ == "") foreach (s => ulog("    " + s))
+        ulog("")
       }
     }
+    // perRunCaches recordCache this
+    // scala.sys addShutdownHook dump()
 
-    /** No sync necessary, because record should only
-      *  be called from within an undo or undoUnless block,
-      *  which is already synchronized.
-      */
-    private[reflect] def record(tv: TypeVar) = {
-      log ::= ((tv, tv.constr.cloneInternal))
+    @inline final def locked[T](body: => T): T = {
+      lock()
+      try body finally unlock()
     }
 
-    def clear() {
-      lock()
-      try {
-        if (settings.debug)
-          self.log("Clearing " + log.size + " entries from the undoLog.")
-        log = Nil
-      } finally unlock()
+    @inline final def onStack[T](start: Int)(body: => T)(f: T => Unit): T = {
+      pushUndo(start)
+      val result = locked {
+        try body finally popUndo(start)
+      }
+      if (start < lastConstraintId)
+        f(result)
+
+      result
+    }
+
+    @inline final def undoably[T](label: => String, body: => T)(undo: T => Boolean): T = {
+      val start = lastConstraintId
+      if (alreadyStacked)
+        body
+      else onStack(start)(body)(result =>
+        if (undo(result))
+          rollBackTo(start)
+      )
     }
 
     // `block` should not affect constraints on typevars
-    def undo[T](block: => T): T = {
-      lock()
-      try {
-        val before = log
-
-        try block
-        finally undoTo(before)
-      } finally unlock()
-    }
+    @inline final def undo[T](label: => String, body: => T): T = undoably(label, body)(_ => true)
   }
 
   /** @PP: Unable to see why these apparently constant types should need vals
@@ -91,13 +171,90 @@ private[internal] trait TypeConstraints {
   private lazy val numericLoBound = IntClass.tpe
   private lazy val numericHiBound = intersectionType(List(ByteClass.tpe, CharClass.tpe), ScalaPackageClass)
 
+  case class TypeConstraintState (
+    prev: TypeConstraintState,
+    origin: Symbol         = NoSymbol,
+    lo: List[Type]         = Nil,
+    hi: List[Type]         = Nil,
+    numlo: Type            = NoType,
+    numhi: Type            = NoType,
+    avoidWidening: Boolean = false,
+    inst: Type             = NoType
+  ) {
+    def copy(
+      origin: Symbol         = this.origin,
+      lo: List[Type]         = this.lo,
+      hi: List[Type]         = this.hi,
+      numlo: Type            = this.numlo,
+      numhi: Type            = this.numhi,
+      avoidWidening: Boolean = this.avoidWidening,
+      inst: Type             = this.inst
+    ): TypeConstraintState = new TypeConstraintState(prev = this, origin, lo, hi, numlo, numhi, avoidWidening, inst)
+
+    val id = nextConstraintId()
+    def instValid = (inst ne null) && (inst ne NoType)
+    def loBounds: List[Type] = if (numlo == NoType) lo else numlo :: lo
+    def hiBounds: List[Type] = if (numhi == NoType) hi else numhi :: hi
+    def isEmpty = (
+         (loBounds filterNot typeIsNothing).isEmpty
+      && (hiBounds filterNot typeIsAny).isEmpty
+    )
+    def cloneState() = new TypeConstraintState(prev = TypeConstraint.InitialState, origin, lo, hi, numlo, numhi, avoidWidening, inst)
+    private def origin_s = origin match {
+      case NoSymbol                              => "<>"
+      case sym if sym.safeOwner == sym.enclClass => s"${sym.safeOwner.nameString}#${sym.nameString}"
+      case sym                                   => s"${sym.enclClass.nameString}.${sym.safeOwner.nameString}#${sym.nameString}"
+    }
+    override def toString = f"$origin_s  $inst"
+    def prevLongString: String = prev match {
+      case null                    => ""
+      case prev if !prev.instValid => prev.prevLongString
+      case _                       => prev.longString.lines.mkString(s" { // id=$id\n    ", "\n    ", "\n}")
+    }
+    def longString: String = toList filter (_.instValid) mkString " -> " //s"$this$prevLongString"
+    def toList: List[TypeConstraintState] = this :: (prev match {
+      case null => Nil
+      case _    => prev.toList
+    })
+  }
+
+  object TypeConstraint {
+    val InitialState = new TypeConstraintState(prev = null)
+
+    def apply(): TypeConstraint                                   = apply(NoSymbol)
+    def apply(tparam: Symbol): TypeConstraint                     = apply(InitialState.copy(origin = tparam))
+    def apply(tparam: Symbol, bounds: TypeBounds): TypeConstraint = apply(InitialState.copy(origin = tparam, lo = bounds.lo :: Nil, hi = bounds.hi :: Nil))
+    def apply(bounds: TypeBounds): TypeConstraint                 = apply(InitialState.copy(lo = bounds.lo :: Nil, hi = bounds.hi :: Nil))
+    def apply(lo0: List[Type], hi0: List[Type]): TypeConstraint   = apply(InitialState.copy(lo = lo0, hi = hi0))
+    def apply(state: TypeConstraintState): TypeConstraint         = new TypeConstraint newState state
+  }
+
   /** A class expressing upper and lower bounds constraints of type variables,
     * as well as their instantiations.
     */
-  class TypeConstraint(lo0: List[Type], hi0: List[Type], numlo0: Type, numhi0: Type, avoidWidening0: Boolean = false) {
-    def this(lo0: List[Type], hi0: List[Type]) = this(lo0, hi0, NoType, NoType)
-    def this(bounds: TypeBounds) = this(List(bounds.lo), List(bounds.hi))
-    def this() = this(List(), List())
+  class TypeConstraint private () {
+    def state         = getConstraint(this)
+    def tparam        = state.origin
+    def origin        = state.origin
+    def lobounds      = state.lo
+    def hibounds      = state.hi
+    def avoidWidening = state.avoidWidening
+    def inst          = state.inst
+    def numlo         = state.numlo
+    def numhi         = state.numhi
+    def loBounds      = state.loBounds
+    def hiBounds      = state.hiBounds
+
+    def newState(state: TypeConstraintState): this.type = {
+      typeConstraintMap(this) ::= state
+      this
+    }
+    def numlo_=(tp: Type) = newState(state.copy(numlo = tp))
+    def numhi_=(tp: Type) = newState(state.copy(numhi = tp))
+    def lobounds_=(tps: List[Type]) = newState(state.copy(lo = tps))
+    def hibounds_=(tps: List[Type]) = newState(state.copy(hi = tps))
+    def avoidWidening_=(value: Boolean) = newState(state.copy(avoidWidening = value))
+    def inst_=(tp: Type) = newState(state.copy(inst = tp))
 
     /*  Syncnote: Type constraints are assumed to be used from only one
      *  thread. They are not exposed in api.Types and are used only locally
@@ -111,15 +268,14 @@ private[internal] trait TypeConstraints {
       *  guarding addLoBound/addHiBound somehow broke raw types so it
       *  only guards against being created with them.]
       */
-    private var lobounds = lo0 filterNot typeIsNothing
-    private var hibounds = hi0 filterNot typeIsAny
-    private var numlo = numlo0
-    private var numhi = numhi0
-    private var avoidWidening = avoidWidening0
-
-    def loBounds: List[Type] = if (numlo == NoType) lobounds else numlo :: lobounds
-    def hiBounds: List[Type] = if (numhi == NoType) hibounds else numhi :: hibounds
-    def avoidWiden: Boolean = avoidWidening
+    // private var lobounds = lo0 filterNot typeIsNothing
+    // private var hibounds = hi0 filterNot typeIsAny
+    // private var numlo = numlo0
+    // private var numhi = numhi0
+    // private var avoidWidening = avoidWidening0
+    // def loBounds: List[Type] = if (numlo == NoType) lobounds else numlo :: lobounds
+    // def hiBounds: List[Type] = if (numhi == NoType) hibounds else numhi :: hibounds
+    // def avoidWiden: Boolean = state.avoidWidening
 
     def addLoBound(tp: Type, isNumericBound: Boolean = false) {
       // For some reason which is still a bit fuzzy, we must let Nothing through as
@@ -130,7 +286,7 @@ private[internal] trait TypeConstraints {
       // See pos/t6367 and pos/t6499 for the competing test cases.
       val mustConsider = tp.typeSymbol match {
         case NothingClass => true
-        case _            => !(lobounds contains tp)
+        case _            => !(loBounds contains tp)
       }
       if (mustConsider) {
         if (isNumericBound && isNumericValueType(tp)) {
@@ -176,15 +332,10 @@ private[internal] trait TypeConstraints {
         (numlo == NoType || (numlo weak_<:< tp)) &&
         (numhi == NoType || (tp weak_<:< numhi))
 
-    var inst: Type = NoType // @M reduce visibility?
 
-    def instValid = (inst ne null) && (inst ne NoType)
-
-    def cloneInternal = {
-      val tc = new TypeConstraint(lobounds, hibounds, numlo, numhi, avoidWidening)
-      tc.inst = inst
-      tc
-    }
+    // var inst: Type = NoType // @M reduce visibility?
+    def instValid = inst ne NoType
+    def cloneInternal = TypeConstraint(state.cloneState())
 
     override def toString = {
       val boundsStr = {
@@ -193,7 +344,10 @@ private[internal] trait TypeConstraints {
         val lostr = if (lo.isEmpty) Nil else List(lo.mkString(" >: (", ", ", ")"))
         val histr = if (hi.isEmpty) Nil else List(hi.mkString(" <: (", ", ", ")"))
 
-        lostr ++ histr mkString ("[", " | ", "]")
+        lostr ++ histr match {
+          case Nil => "<empty>"
+          case xs  => xs mkString ("[", " | ", "]")
+        }
       }
       if (inst eq NoType) boundsStr
       else boundsStr + " _= " + inst.safeToString
