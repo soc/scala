@@ -718,7 +718,7 @@ trait Namers extends MethodSynthesis {
     def initializeLowerBounds(tp: Type): Type = {
       tp match {
         case TypeBounds(lo, _) =>
-          // check that lower bound is not an F-bound
+          // ensure that lower bound is not an F-bound by forcing cycles
           for (TypeRef(_, sym, _) <- lo)
             sym.initialize
         case _ =>

@@ -1,4 +1,37 @@
-t1224.scala:4: error: illegal cyclic reference involving type T
- type T >: C[T] <: C[C[T]]
-      ^
-one error found
+t1224.scala:6: error: illegal cyclic reference involving type T
+     type T >: C[T] <: C[T]
+          ^
+t1224.scala:10: error: illegal cyclic reference involving type T
+     type T >: C[T] <: C[C[T]]
+          ^
+t1224.scala:14: error: illegal cyclic reference involving type T
+     type T >: C[C[T]] <: C[T]
+          ^
+t1224.scala:18: error: illegal cyclic reference involving type T
+     type T >: C[C[T]] <: C[C[T]]
+          ^
+t1224.scala:26: error: illegal cyclic reference involving type T
+     type T >: C[T] <: C[T]
+          ^
+t1224.scala:30: error: illegal cyclic reference involving type T
+     type T >: C[T] <: C[C[T]]
+          ^
+t1224.scala:34: error: illegal cyclic reference involving type T
+     type T >: C[C[T]] <: C[T]
+          ^
+t1224.scala:38: error: illegal cyclic reference involving type T
+     type T >: C[C[T]] <: C[C[T]]
+          ^
+t1224.scala:46: error: illegal cyclic reference involving type T
+     type T >: C[T] <: C[T]
+          ^
+t1224.scala:50: error: illegal cyclic reference involving type T
+     type T >: C[T] <: C[C[T]]
+          ^
+t1224.scala:54: error: illegal cyclic reference involving type T
+     type T >: C[C[T]] <: C[T]
+          ^
+t1224.scala:58: error: illegal cyclic reference involving type T
+     type T >: C[C[T]] <: C[C[T]]
+          ^
+12 errors found
