@@ -49,7 +49,18 @@ abstract class BytecodeTest extends ASMConverters {
   // descriptors and generic signatures? Method bodies are not considered, and
   // the names of the classes containing the methods are substituted so they do
   // not appear as differences.
-  def sameMethodAndFieldSignatures(clazzA: ClassNode, clazzB: ClassNode): Boolean = {
+  def sameMethodAndFieldSignatures(clazzA: ClassNode, clazzB: ClassNode) =
+    sameCharacteristics(clazzA, clazzB)(_.characteristics)
+
+  // Same as sameMethodAndFieldSignatures, but ignoring generic signatures.
+  // This allows for methods which receive the same descriptor but differing
+  // generic signatures. In particular, this happens with value classes,
+  // which get a generic signature where a method written in terms of the
+  // underlying values does not.
+  def sameMethodAndFieldDescriptors(clazzA: ClassNode, clazzB: ClassNode) =
+    sameCharacteristics(clazzA, clazzB)(_.erasedCharacteristics)
+
+  private def sameCharacteristics(clazzA: ClassNode, clazzB: ClassNode)(f: AsmNode[_] => String): Boolean = {
     val ms1 = clazzA.fieldsAndMethods.toIndexedSeq
     val ms2 = clazzB.fieldsAndMethods.toIndexedSeq
     val name1 = clazzA.name
@@ -60,8 +71,8 @@ abstract class BytecodeTest extends ASMConverters {
       false
     }
     else (ms1, ms2).zipped forall { (m1, m2) =>
-      val c1 = m1.characteristics
-      val c2 = m2.characteristics.replaceAllLiterally(name2, name1)
+      val c1 = f(m1)
+      val c2 = f(m2).replaceAllLiterally(name2, name1)
       if (c1 == c2)
         println(s"[ok] $m1")
       else
