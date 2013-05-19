@@ -151,7 +151,6 @@ object NestUI {
     println("    --pos           run compilation tests (success)")
     println("    --neg           run compilation tests (failure)")
     println("    --run           run interpreter and backend tests")
-    println("    --jvm           run JVM backend tests")
     println("    --res           run resident compiler tests")
     println("    --scalacheck    run ScalaCheck tests")
     println("    --instrumented  run instrumented tests")

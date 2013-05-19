@@ -12,7 +12,7 @@ import AsmNode._
  * Provides utilities for inspecting bytecode using ASM library.
  *
  * HOW TO USE
- * 1. Create subdirectory in test/files/jvm for your test. Let's name it $TESTDIR.
+ * 1. Create subdirectory in test/files/run for your test. Let's name it $TESTDIR.
  * 2. Create $TESTDIR/BytecodeSrc_1.scala that contains Scala source file that you
  *    want to inspect the bytecode for. The '_1' suffix signals to partest that it
  *    should compile this file first.
@@ -26,7 +26,7 @@ import AsmNode._
  * 4. Create corresponding check file.
  *
  * EXAMPLE
- * See test/files/jvm/bytecode-test-example for an example of bytecode test.
+ * See test/files/run/bytecode-test-example for an example of bytecode test.
  *
  */
 abstract class BytecodeTest extends ASMConverters {

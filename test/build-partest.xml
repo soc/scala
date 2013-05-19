@@ -7,7 +7,7 @@
     <attribute name="srcdir" default="files"/> <!-- TODO: make targets for `pending` and other subdirs -->
     <attribute name="colors" default="${partest.colors}"/>
     <attribute name="scalacOpts" default="${scalac.args.optimise}"/>
-    <attribute name="kinds" default="pos neg run jvm res scalap scalacheck specialized instrumented presentation"/>
+    <attribute name="kinds" default="pos neg run res scalap scalacheck specialized instrumented presentation"/>
     <sequential>
       <property name="partest.dir" value="@{dir}" />
       <partest    srcdir="@{srcdir}"
