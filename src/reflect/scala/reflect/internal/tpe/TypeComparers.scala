@@ -67,10 +67,10 @@ trait TypeComparers {
 
   def isDifferentType(tp1: Type, tp2: Type): Boolean = try {
     subsametypeRecursions += 1
-    undoLog undo { // undo type constraints that arise from operations in this block
-      !isSameType1(tp1, tp2)
-    }
-  } finally {
+    // undo type constraints that arise from operations in this block
+    undoLog.undo("isSameType1($tp1, $tp2)", !isSameType1(tp1, tp2))
+  }
+  finally {
     subsametypeRecursions -= 1
     // XXX AM TODO: figure out when it is safe and needed to clear the log -- the commented approach below is too eager (it breaks #3281, #3866)
     // it doesn't help to keep separate recursion counts for the three methods that now share it
