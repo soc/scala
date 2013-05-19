@@ -166,28 +166,18 @@ trait Implicits {
    *                  that were instantiated by the winning implicit.
    */
   class SearchResult(val tree: Tree, val subst: TreeTypeSubstituter) {
-    override def toString = "SearchResult(%s, %s)".format(tree,
-      if (subst.isEmpty) "" else subst)
-
     def isFailure          = false
     def isAmbiguousFailure = false
     def isDivergent        = false
     final def isSuccess    = !isFailure
-  }
 
-  lazy val SearchFailure = new SearchResult(EmptyTree, EmptyTreeTypeSubstituter) {
-    override def isFailure = true
+    private def subst_s = if (subst.isEmpty) "" else "" + subst
+    override def toString = s"SearchResult($tree, $subst_s)"
   }
-
-  lazy val DivergentSearchFailure = new SearchResult(EmptyTree, EmptyTreeTypeSubstituter) {
-    override def isFailure   = true
-    override def isDivergent = true
-  }
-
-  lazy val AmbiguousSearchFailure = new SearchResult(EmptyTree, EmptyTreeTypeSubstituter) {
-    override def isFailure          = true
-    override def isAmbiguousFailure = true
-  }
+  abstract class FailedSearchResult extends SearchResult(EmptyTree, EmptyTreeTypeSubstituter) { override def isFailure = true }
+  object          SearchFailure extends FailedSearchResult
+  object DivergentSearchFailure extends FailedSearchResult { override def isDivergent = true }
+  object AmbiguousSearchFailure extends FailedSearchResult { override def isAmbiguousFailure = true }
 
   /** A class that records an available implicit
    *  @param   name   The name of the implicit

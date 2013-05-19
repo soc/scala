@@ -190,26 +190,6 @@ trait Implicits {
     infoMapCache.clear()
     improvesCache.clear()
   }
-
-  /** The result of an implicit search
-   *  @param  tree    The tree representing the implicit
-   *  @param  subst   A substituter that represents the undetermined type parameters
-   *                  that were instantiated by the winning implicit.
-   */
-  class SearchResult(val tree: Tree, val subst: TreeTypeSubstituter) {
-    def isFailure          = false
-    def isAmbiguousFailure = false
-    def isDivergent        = false
-    final def isSuccess    = !isFailure
-
-    private def subst_s = if (subst.isEmpty) "" else "" + subst
-    override def toString = s"SearchResult($tree, $subst_s)"
-  }
-  abstract class FailedSearchResult extends SearchResult(EmptyTree, EmptyTreeTypeSubstituter) { override def isFailure = true }
-  object          SearchFailure extends FailedSearchResult
-  object DivergentSearchFailure extends FailedSearchResult { override def isDivergent = true }
-  object AmbiguousSearchFailure extends FailedSearchResult { override def isAmbiguousFailure = true }
-
   /** A class that records an available implicit
    *  @param   name   The name of the implicit
    *  @param   pre    The prefix type of the implicit
