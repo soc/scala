@@ -205,28 +205,6 @@ trait Implicits {
       if (tpeCache eq null) tpeCache = pre.memberType(sym)
       tpeCache
     }
-    def makeSelect = {
-      assert(pre != NoPrefix, this)
-      // SI-2405 Not this.name, which might be an aliased import
-      Select(gen.mkAttributedQualifier(pre), sym.name)
-    }
-    // SI-4270 SI-5376 Always use an unattributed Ident for implicits in the local scope,
-    // rather than an attributed Select, to detect shadowing.
-    def makeIdent = Ident(name)
-
-    /* Map a polytype to one in which all type parameters and argument-dependent types are replaced by wildcards.
-     * Consider `implicit def b(implicit x: A): x.T`. We need to approximate debruijn index types
-     * when checking whether `b` is a valid implicit, as we haven't even searched a value for the implicit arg `x`,
-     * so we have to approximate (otherwise it is excluded a priori).
-     */
-    def depoly: Type = tpe match {
-      case PolyType(tparams, restpe) => deriveTypeWithWildcards(tparams)(ApproximateDependentMap(restpe))
-      case _                         => ApproximateDependentMap(tpe)
-    }
-
-    def isCyclic =
-      try sym.hasFlag(LOCKED) catch { case _: CyclicReference => true }
-
     def isCyclicOrErroneous =
       try sym.hasFlag(LOCKED) || containsError(tpe)
       catch { case _: CyclicReference => true }

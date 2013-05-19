@@ -150,16 +150,6 @@ trait Implicits {
     improvesCache.clear()
   }
 
-  /* Map a polytype to one in which all type parameters and argument-dependent types are replaced by wildcards.
-   * Consider `implicit def b(implicit x: A): x.T = error("")`. We need to approximate debruijn index types
-   * when checking whether `b` is a valid implicit, as we haven't even searched a value for the implicit arg `x`,
-   * so we have to approximate (otherwise it is excluded a priori).
-   */
-  private def depoly(tp: Type): Type = tp match {
-    case PolyType(tparams, restpe) => deriveTypeWithWildcards(tparams)(ApproximateDependentMap(restpe))
-    case _                         => ApproximateDependentMap(tp)
-  }
-
   /** The result of an implicit search
    *  @param  tree    The tree representing the implicit
    *  @param  subst   A substituter that represents the undetermined type parameters
@@ -192,6 +182,26 @@ trait Implicits {
       if (tpeCache eq null) tpeCache = pre.memberType(sym)
       tpeCache
     }
+    def makeSelect = {
+      assert(pre != NoPrefix, this)
+      // SI-2405 Not this.name, which might be an aliased import
+      Select(gen.mkAttributedQualifier(pre), sym.name)
+    }
+    // SI-4270 SI-5376 Always use an unattributed Ident for implicits in the local scope,
+    // rather than an attributed Select, to detect shadowing.
+    def makeIdent = Ident(name)
+
+    /* Map a polytype to one in which all type parameters and argument-dependent types are replaced by wildcards.
+     * Consider `implicit def b(implicit x: A): x.T`. We need to approximate debruijn index types
+     * when checking whether `b` is a valid implicit, as we haven't even searched a value for the implicit arg `x`,
+     * so we have to approximate (otherwise it is excluded a priori).
+     */
+    def depoly: Type = tpe match {
+      case PolyType(tparams, restpe) => deriveTypeWithWildcards(tparams)(ApproximateDependentMap(restpe))
+      case _                         => ApproximateDependentMap(tpe)
+    }
+
+    def isCyclic = try sym.hasFlag(LOCKED) catch { case _: CyclicReference => true }
 
     def isCyclicOrErroneous =
       try sym.hasFlag(LOCKED) || containsError(tpe)
@@ -203,14 +213,10 @@ trait Implicits {
     /** Does type `tp` contain an Error type as parameter or result?
      */
     private def containsError(tp: Type): Boolean = tp match {
-      case PolyType(tparams, restpe) =>
-        containsError(restpe)
-      case NullaryMethodType(restpe) =>
-        containsError(restpe)
-      case mt @ MethodType(_, restpe) =>
-        (mt.paramTypes exists typeIsError) || containsError(restpe)
-      case _ =>
-        tp.isError
+      case PolyType(_, restpe)        => containsError(restpe)
+      case NullaryMethodType(restpe)  => containsError(restpe)
+      case mt @ MethodType(_, restpe) => (mt.paramTypes exists typeIsError) || containsError(restpe)
+      case _                          => tp.isError
     }
 
     def isStablePrefix = pre.isStable
@@ -258,7 +264,7 @@ trait Implicits {
   object HasMember {
     private val hasMemberCache = perRunCaches.newMap[Name, Type]()
     def apply(name: Name): Type = hasMemberCache.getOrElseUpdate(name, memberWildcardType(name, WildcardType))
-    }
+  }
 
   /** An extractor for types of the form ? { name: (? >: argtpe <: Any*)restp }
    */
@@ -469,7 +475,7 @@ trait Implicits {
       result
     }
     private def matchesPt(info: ImplicitInfo): Boolean = (
-      info.isStablePrefix && matchesPt(depoly(info.tpe), wildPt, Nil)
+      info.isStablePrefix && matchesPt(info.depoly, wildPt, Nil)
     )
 
     private def matchesPtView(tp: Type, ptarg: Type, ptres: Type, undet: List[Symbol]): Boolean = tp match {
