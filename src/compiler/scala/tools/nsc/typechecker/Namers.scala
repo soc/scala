@@ -1412,6 +1412,8 @@ trait Namers extends MethodSynthesis {
               AnnotationInfo lazily {
                 val context1 = typer.context.make(ann)
                 context1.setReportErrors()
+                annotated.unsafeTypeParams foreach (p =>
+                  context1.scope enterIfNotThere logResult(s"Entering $p from ${defn.name} into annotation scope")(p))
                 enteringTyper(newTyper(context1) typedAnnotation ann)
               }
             }

@@ -134,10 +134,14 @@ trait Scopes extends api.Scopes { self: SymbolTable =>
 
     /** enter a symbol, asserting that no symbol with same name exists in scope
      */
-    def enterUnique(sym: Symbol) {
+    def enterUnique[T <: Symbol](sym: T): T = {
       assert(lookup(sym.name) == NoSymbol, (sym.fullLocationString, lookup(sym.name).fullLocationString))
       enter(sym)
     }
+
+    /** enter a symbol into scope unless it's already there. */
+    def enterIfNotThere[T <: Symbol](sym: T): T =
+      if (lookupAll(sym.name) contains sym) sym else enter(sym)
 
     private def createHash() {
       hashtable = new Array[ScopeEntry](HASHSIZE)
