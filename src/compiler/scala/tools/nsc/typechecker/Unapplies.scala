@@ -57,14 +57,10 @@ trait Unapplies extends ast.TreeDSL
     case _        => NoSymbol
   }
 
-  def copyUntyped[T <: Tree](tree: T): T =
-    returning[T](tree.duplicate)(UnTyper traverse _)
-
-  def copyUntypedInvariant(td: TypeDef): TypeDef = {
-    val copy = treeCopy.TypeDef(td, td.mods &~ (COVARIANT | CONTRAVARIANT), td.name, td.tparams, td.rhs)
-
-    returning[TypeDef](copy.duplicate)(UnTyper traverse _)
-  }
+  def untyped[T <: Tree](tree: T): T             = UnTyper(tree)
+  def copyUntyped[T <: Tree](tree: T): T         = UnTyper(tree.duplicate)
+  def copyUntypedInvariant(td: TypeDef): TypeDef = copyUntyped(copyTypeDef(td)(mods = td.mods &~ VarianceFlags))
+  def copyUntypedNoDefault(vd: ValDef): ValDef   = copyUntyped(copyValDef(vd)(mods = vd.mods &~ DEFAULTPARAM, rhs = EmptyTree))
 
   private def toIdent(x: DefTree) = Ident(x.name) setPos x.pos.focus
 

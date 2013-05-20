@@ -1920,6 +1920,9 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
     /** If this is an accessor, the accessed symbol.  Otherwise, this symbol. */
     def accessedOrSelf: Symbol = if (hasAccessorFlag) accessed else this
 
+    /** If this is a module, the module class. Otherwise, this symbol. */
+    def moduleClassOrSelf: Symbol = if (isModule) moduleClass else this
+
     /** For an outer accessor: The class from which the outer originates.
      *  For all other symbols: NoSymbol
      */
@@ -2466,7 +2469,10 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
      */
     def ownsString: String = {
       val owns = effectiveOwner
-      if (owns.isClass && !owns.isEmptyPrefix) "" + owns else ""
+      if (owns.isEmptyPrefix) ""
+      else if (owns.isMethod) s"$owns in ${owns.enclClass}"
+      else if (owns.isClass) "" + owns
+      else ""
     }
 
     /** String representation of location, plus a preposition.  Doesn't do much,

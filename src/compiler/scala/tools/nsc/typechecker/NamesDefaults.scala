@@ -105,8 +105,7 @@ trait NamesDefaults { self: Analyzer =>
    *  @return the transformed application (a Block) together with the NamedApplyInfo.
    *     if isNamedApplyBlock(tree), returns the existing context.namedApplyBlockInfo
    */
-  def transformNamedApplication(typer: Typer, mode: Mode, pt: Type)
-                               (tree: Tree, argPos: Int => Int): Tree = {
+  def transformNamedApplication(typer: Typer, mode: Mode, pt: Type)(tree: Tree, argPos: Int => Int): Tree = printResult(s"transformNamedApplication($tree, _)") {
     import typer._
     import typer.infer._
     val context = typer.context
@@ -159,6 +158,7 @@ trait NamesDefaults { self: Analyzer =>
 
         case _ => (baseFun, Nil, Nil)
       }
+      println("161 " + ((baseFun1, funTargs, defaultTargs)))
 
       // never used for constructor calls, they always have a stable qualifier
       def blockWithQualifier(qual: Tree, selected: Name) = {
@@ -192,21 +192,18 @@ trait NamesDefaults { self: Analyzer =>
         b
       }
 
-      def moduleQual(pos: Position, classType: Type) = {
-        // prefix does 'normalize', which fixes #3384
-        val pre = classType.prefix
-        if (pre == NoType) {
-          None
-        } else {
-          val module = companionSymbolOf(baseFun.symbol.owner, context)
-          if (module == NoSymbol) None
-          else {
-            val ref = atPos(pos.focus)(gen.mkAttributedRef(pre, module))
-            if (treeInfo.admitsTypeSelection(ref))  // fixes #4524. the type checker does the same for
-              ref.setType(singleType(pre, module))  // typedSelect, it calls "stabilize" on the result.
-            Some(ref)
+      // prefix does 'normalize', which fixes #3384
+      def moduleQual(pos: Position, classType: Type) = classType.prefix match {
+        case NoType => None
+        case pre    =>
+          companionSymbolOf(baseFun.symbol.owner, context) match {
+            case NoSymbol => None
+            case module   =>
+              val ref = atPos(pos.focus)(gen.mkAttributedRef(pre, module))
+              if (treeInfo.admitsTypeSelection(ref))  // fixes #4524. the type checker does the same for
+                ref.setType(singleType(pre, module))  // typedSelect, it calls "stabilize" on the result.
+              Some(ref)
           }
-        }
       }
 
       baseFun1 match {
@@ -396,12 +393,13 @@ trait NamesDefaults { self: Analyzer =>
    */
   def addDefaults(givenArgs: List[Tree], qual: Option[Tree], targs: List[Tree],
                   previousArgss: List[List[Tree]], params: List[Symbol],
-                  pos: scala.reflect.internal.util.Position, context: Context): (List[Tree], List[Symbol]) = {
+                  pos: scala.reflect.internal.util.Position, context: Context): (List[Tree], List[Symbol]) = printResult(s"addDefaults($givenArgs, $qual, $targs, $previousArgss, $params, $pos)") {
     if (givenArgs.length < params.length) {
       val (missing, positional) = missingParams(givenArgs, params)
       if (missing forall (_.hasDefault)) {
         val defaultArgs = missing flatMap (p => {
           val defGetter = defaultGetter(p, context)
+          println("defGetter = " + defGetter)
           // TODO #3649 can create spurious errors when companion object is gone (because it becomes unlinked from scope)
           if (defGetter == NoSymbol) None // prevent crash in erroneous trees, #3649
           else {
@@ -410,10 +408,13 @@ trait NamesDefaults { self: Analyzer =>
               case None    => gen.mkAttributedRef(defGetter)
 
             }
-            default1 = if (targs.isEmpty) default1
-                       else TypeApply(default1, targs.map(_.duplicate))
-            val default2 = (default1 /: previousArgss)((tree, args) =>
-              Apply(tree, args.map(_.duplicate)))
+            default1 = if (targs.isEmpty) default1 else TypeApply(default1, targs.map(_.duplicate))
+            previousArgss.flatten foreach (arg => println("arg: " + arg + " " + arg.symbol))
+            defGetter.paramss.flatten foreach (p => println("defgetter param: " + p))
+
+            val default2 = (default1 /: previousArgss)((tree, args) => Apply(tree, args.map(_.duplicate)))
+
+            // val default2 = (default1 /: previousArgss)((tree, args) => Apply(tree, args.map(_.duplicate)))
             Some(atPos(pos) {
               if (positional) default2
               else AssignOrNamedArg(Ident(p.name), default2)
@@ -429,26 +430,22 @@ trait NamesDefaults { self: Analyzer =>
    * For a parameter with default argument, find the method symbol of
    * the default getter.
    */
-  def defaultGetter(param: Symbol, context: Context): Symbol = {
-    val i = param.owner.paramss.flatten.indexWhere(p => p.name == param.name) + 1
-    if (i > 0) {
-      val defGetterName = nme.defaultGetterName(param.owner.name, i)
-      if (param.owner.isConstructor) {
-        val mod = companionSymbolOf(param.owner.owner, context)
-        mod.info.member(defGetterName)
-      }
-      else {
-        // isClass also works for methods in objects, owner is the ModuleClassSymbol
-        if (param.owner.owner.isClass) {
-          // .toInterface: otherwise we get the method symbol of the impl class
-          param.owner.owner.toInterface.info.member(defGetterName)
-        } else {
-          // the owner of the method is another method. find the default
-          // getter in the context.
-          context.lookup(defGetterName, param.owner.owner)
-        }
-      }
-    } else NoSymbol
+  def defaultGetter(param: Symbol, context: Context): Symbol ={
+    val owner      = param.owner
+    def grandOwner = owner.owner
+    val i          = owner.paramss.flatten.indexWhere(_.name == param.name) + 1
+    def name       = nme.defaultGetterName(owner.name, i)
+
+    printResult(s"defaultGetter($param, _)/ownerChain=${param.ownerChain} name=$name")(
+    if (i <= 0)
+      NoSymbol
+    else if (owner.isConstructor)
+      companionSymbolOf(grandOwner, context).info member name
+    else if (grandOwner.isClass) // .toInterface: otherwise we get the method symbol of the impl class
+      grandOwner.toInterface.info member name
+    else // the owner of the method is another method, so look in the context
+      context.lookup(name, grandOwner)
+    )
   }
 
   /** A full type check is very expensive; let's make sure there's a name

@@ -1597,6 +1597,51 @@ trait Trees extends api.Trees { self: SymbolTable =>
 
   // ------ copiers -------------------------------------------
 
+  // def copyMemberDef[T <: MemberDef](tree: T)(
+  //   mods: Modifiers = null,
+  //   name: Name      = null,
+  //   bodyFn: Tree => Tree = null
+  // ): T = {
+  //   def getRhs(md: ValOrDefDef): Tree = {
+  //     val res = if (bodyFn eq null) null else bodyFn(md.rhs)
+  //     if (res eq null) md.rhs else res
+  //   }
+  //   def getImpl(md: ImplDef) = {
+  //     val res = if (bodyFn eq null) null else bodyFn(md.impl)
+  //     res match {
+  //       case t: Template => t
+  //       case _           => md.impl
+  //     }
+  //   }
+  //   val result: Tree = tree match {
+  //     case t: DefDef     => copyDefDef(tree)(mods = mods, name = name, rhs = getRhs(t))
+  //     case t: ValDef     => copyValDef(tree)(mods = mods, name = name, rhs = getRhs(t))
+  //     case t: ClassDef   => copyClassDef(tree)(mods = mods, name = name, impl = getImpl(t))
+  //     case t: ModuleDef  => copyModuleDef(tree)(mods = mods, name = name, impl = getImpl(t))
+  //     case t: TypeDef    => copyTypeDef(tree)(mods = mods, name = name)
+  //     case t: PackageDef => treeCopy.PackageDef(t, pid = Ident(name), t.stats)
+  //     case t             => sys.error("Unknown MemberDef " + t + "/" + t.getClass)
+  //   }
+  //   result.asInstanceOf[T]
+  // }
+
+  def copyTypeDef(tree: Tree)(
+    mods: Modifiers        = null,
+    name: Name             = null,
+    tparams: List[TypeDef] = null,
+    rhs: Tree              = null
+  ): TypeDef = tree match {
+    case TypeDef(mods0, name0, tparams0, rhs0) =>
+      treeCopy.TypeDef(tree,
+        if (mods eq null) mods0 else mods,
+        if (name eq null) name0 else name,
+        if (tparams eq null) tparams0 else tparams,
+        if (rhs eq null) rhs0 else rhs
+      )
+    case t =>
+      sys.error("Not a TypeDef: " + t + "/" + t.getClass)
+  }
+
   def copyDefDef(tree: Tree)(
     mods: Modifiers              = null,
     name: Name                   = null,

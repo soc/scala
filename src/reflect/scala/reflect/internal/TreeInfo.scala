@@ -18,7 +18,10 @@ abstract class TreeInfo {
   val global: SymbolTable
 
   import global._
-  import definitions.{ isTupleSymbol, isVarArgsList, isCastSymbol, ThrowableClass, TupleClass, MacroContextClass, MacroContextPrefixType, uncheckedStableClass }
+  import definitions.{
+    isTupleSymbol, isVarArgsList, isCastSymbol, ThrowableClass, TupleClass,
+    MacroContextClass, MacroContextPrefixType, uncheckedStableClass, dropByName
+  }
 
   /* Does not seem to be used. Not sure what it does anyway.
   def isOwnerDefinition(tree: Tree): Boolean = tree match {
@@ -445,9 +448,14 @@ abstract class TreeInfo {
 
   /** Is tpt a by-name parameter type of the form => T? */
   def isByNameParamType(tpt: Tree) = tpt match {
-    case TypeTree()                                                 => definitions.isByNameParamType(tpt.tpe)
+    case TypeTree()                                                   => definitions.isByNameParamType(tpt.tpe)
     case AppliedTypeTree(Select(_, tpnme.BYNAME_PARAM_CLASS_NAME), _) => true
-    case _                                                          => false
+    case _                                                            => false
+  }
+  def dropByNameParamType(tpt: Tree) = tpt match {
+    case TypeTree() if isByNameParamType(tpt)                     => tpt modifyType dropByName
+    case AppliedTypeTree(_, arg :: Nil) if isByNameParamType(tpt) => arg
+    case _                                                        => tpt
   }
 
   /** Translates an Assign(_, _) node to AssignOrNamedArg(_, _) if

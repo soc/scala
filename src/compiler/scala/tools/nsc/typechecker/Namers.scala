@@ -60,20 +60,15 @@ trait Namers extends MethodSynthesis {
       if (isTemplateContext(context)) createInnerNamer() else this
 
     def createNamer(tree: Tree): Namer = {
-      val sym = tree match {
-        case ModuleDef(_, _, _) => tree.symbol.moduleClass
-        case _                  => tree.symbol
-      }
-      def isConstrParam(vd: ValDef) = {
-        (sym hasFlag PARAM | PRESUPER) &&
-        !vd.mods.isJavaDefined &&
-        sym.owner.isConstructor
-      }
+      val sym = tree.symbol.moduleClassOrSelf
+      def isConstrParam(mods: Modifiers) = (
+           (sym hasFlag PARAM | PRESUPER)
+        && mods.isJavaDefined
+        && sym.owner.isConstructor
+      )
       val ownerCtx = tree match {
-        case vd: ValDef if isConstrParam(vd) =>
-          context.makeConstructorContext
-        case _ =>
-          context
+        case ValDef(mods, _, _, _) if isConstrParam(mods) => context.makeConstructorContext
+        case _                                            => context
       }
       newNamer(ownerCtx.makeNewScope(tree, sym))
     }
@@ -697,6 +692,11 @@ trait Namers extends MethodSynthesis {
     def enterSyntheticSym(tree: Tree): Symbol = {
       enterSym(tree)
       context.unit.synthetics(tree.symbol) = tree
+      // reset the interface flag if we're adding a concrete member
+      tree match {
+        case vd: ValOrDefDef if !vd.rhs.isEmpty && owner.isInterface => owner resetFlag INTERFACE
+        case _                                                       =>
+      }
       tree.symbol
     }
 
@@ -1127,7 +1127,7 @@ trait Namers extends MethodSynthesis {
         }
       }
 
-      addDefaultGetters(meth, vparamss, tparams, overriddenSymbol(methResTp))
+      addDefaultGetters(meth, vparamss, tparams)
 
       // fast track macros, i.e. macros defined inside the compiler, are hardcoded
       // hence we make use of that and let them have whatever right-hand side they need
@@ -1169,124 +1169,90 @@ trait Namers extends MethodSynthesis {
      * typechecked, the corresponding param would not yet have the "defaultparam"
      * flag.
      */
-    private def addDefaultGetters(meth: Symbol, vparamss: List[List[ValDef]], tparams: List[TypeDef], overriddenSymbol: => Symbol) {
-      val methOwner  = meth.owner
-      val isConstr   = meth.isConstructor
-      val overridden = if (isConstr || !methOwner.isClass) NoSymbol else overriddenSymbol
-      val overrides  = overridden != NoSymbol && !overridden.isOverloaded
-      // value parameters of the base class (whose defaults might be overridden)
-      var baseParamss = (vparamss, overridden.tpe.paramss) match {
-        // match empty and missing parameter list
-        case (Nil, List(Nil)) => Nil
-        case (List(Nil), Nil) => ListOfNil
-        case (_, paramss)     => paramss
-      }
-      assert(
-        !overrides || vparamss.length == baseParamss.length,
-        "" + meth.fullName + ", "+ overridden.fullName
+    private def addDefaultGetters(meth: Symbol, vparamss: List[List[ValDef]], tparams: List[TypeDef]) {
+      val methOwner    = meth.owner
+      val isConstr     = meth.isConstructor
+      val vparamssSyms = vparamss.flatten map (_.symbol)
+
+      def correspondingParamHasDefault(param: Symbol): Boolean = (
+        // value parameters of the base class (whose defaults might be overridden)
+        vparamssSyms zip meth.nextOverriddenSymbol.paramss.flatten
+          exists { case (vd, m) => vd == param && m.hasDefault }
       )
 
       // cache the namer used for entering the default getter symbols
-      var ownerNamer: Option[Namer] = None
-      var moduleNamer: Option[(ClassDef, Namer)] = None
-      var posCounter = 1
+      lazy val ownerNamer = newNamer(context.nextEnclosing(_.scope.toList contains meth))
+      lazy val constructorAttachment = if (!isConstr) None else {
+        // call type completer (typedTemplate), adds the module's templateNamer to classAndNamerOfModule
+        val module = companionSymbolOf(methOwner, context).initialize
+        // by martin: the null case can happen in IDE; this is really an ugly hack on top of an ugly hack but it seems to work. SI-6576
+        module.attachments.get[ConstructorDefaultsAttachment] filterNot (_.companionModuleClassNamer eq null)
+      }
+      // Si-3649 (prevent crash in erroneous source code)
+      if (isConstr && constructorAttachment.isEmpty)
+        return
+
+      val symbolsForDefaults = vparamssSyms filter (_.hasDefault)
+      val getterNames        = mapWithIndex(vparamssSyms)((sym, i) => sym -> nme.defaultGetterName(meth.name, i + 1)).toMap
+
+      def symbolsIn(t: Tree): Set[Symbol] = t collect { case t if t.symbol ne null => t.symbol } toSet;
+      def simpleNamesIn(t: Tree): Set[Name] = t collect { case Ident(name) => name } toSet;
+
+      def buildDefaultGetter(vparam: ValDef, listIndex: Int): DefDef = {
+        val ValDef(mods0, name0, tpt0, rhs0) = vparam
+        val sym          = vparam.symbol
+        val name         = getterNames(sym)
+        val overrideFlag = if (correspondingParamHasDefault(sym)) OVERRIDE else 0
+        val mods         = Modifiers(meth.flags & DefaultGetterFlags) | SYNTHETIC | DEFAULTPARAM | overrideFlag
+
+        def isReferenced(p: ValDef) = (
+             simpleNamesIn(rhs0)(p.name)
+          || symbolsIn(rhs0)(p.symbol)
+        )
+        // Create trees for the defaultGetter. Uses tools from Unapplies.scala
+        // drop params are not referenced from the getter
+        val newVparamss = vparamss take listIndex map (_ filter isReferenced map copyUntypedNoDefault)
+        val newTparams: List[TypeDef] = constructorAttachment match {
+          case Some(cda) if isConstr => cda.classWithDefault.tparams map copyUntypedInvariant
+          case _                     => tparams map copyUntyped[TypeDef]
+        }
+        val tpt = copyUntyped(treeInfo.dropByNameParamType(tpt0))
+        val rhs = copyUntyped(rhs0)
+        // If the parameter type mentions any type parameter of the method, let the compiler infer the
+        // return type of the default getter => allow "def foo[T](x: T = 1)" to compile.
+        // This is better than always using Wildcard for inferring the result type, for example in
+        //    def f(i: Int, m: Int => Int = identity _) = m(i)
+        // if we use Wildcard as expected, we get "Nothing => Nothing", and the default is not usable.
+        val subst  = new TypeTreeSubstituter(newTparams map (_.name) toSet)
+        val defdef = atPos(vparam.pos.focus)(DefDef(mods, name, newTparams, newVparamss, subst(tpt), rhs))
+        val namer  = constructorAttachment match {
+          case Some(cda) if isConstr => cda.companionModuleClassNamer
+          case _                     => ownerNamer
+        }
+        namer enterSyntheticSym defdef match {
+          case sym if sym.owner.isTerm => saveDefaultGetter(meth, sym)
+          case _                       =>
+        }
+
+        defdef
+      }
 
       // For each value parameter, create the getter method if it has a
-      // default argument. previous denotes the parameter lists which
-      // are on the left side of the current one. These get added to the
-      // default getter. Example:
+      // default argument. Parameters from preceding parameter lists are passed
+      // to the default getter if they are needed. Example:
       //
       //   def foo(a: Int)(b: Int = a)      becomes
       //   foo$default$1(a: Int) = a
-      //
-      vparamss.foldLeft(Nil: List[List[ValDef]]) { (previous, vparams) =>
-        assert(!overrides || vparams.length == baseParamss.head.length, ""+ meth.fullName + ", "+ overridden.fullName)
-        var baseParams = if (overrides) baseParamss.head else Nil
-        for (vparam <- vparams) {
+      foreachWithIndex(vparamss)((vparams, i) =>
+        vparams foreach { vparam =>
           val sym = vparam.symbol
-          // true if the corresponding parameter of the base class has a default argument
-          val baseHasDefault = overrides && baseParams.head.hasDefault
-          if (sym.hasDefault) {
-            // generate a default getter for that argument
-            val oflag = if (baseHasDefault) OVERRIDE else 0
-            val name = nme.defaultGetterName(meth.name, posCounter)
-
-            // Create trees for the defaultGetter. Uses tools from Unapplies.scala
-            var deftParams = tparams map copyUntyped[TypeDef]
-            val defvParamss = mmap(previous) { p =>
-              // in the default getter, remove the default parameter
-              val p1 = atPos(p.pos.focus) { ValDef(p.mods &~ DEFAULTPARAM, p.name, p.tpt.duplicate, EmptyTree) }
-              UnTyper.traverse(p1)
-              p1
-            }
-
-            val parentNamer = if (isConstr) {
-              val (cdef, nmr) = moduleNamer.getOrElse {
-                val module = companionSymbolOf(methOwner, context)
-                module.initialize // call type completer (typedTemplate), adds the
-                                  // module's templateNamer to classAndNamerOfModule
-                module.attachments.get[ConstructorDefaultsAttachment] match {
-                  // by martin: the null case can happen in IDE; this is really an ugly hack on top of an ugly hack but it seems to work
-                  case Some(cda) =>
-                    if (cda.companionModuleClassNamer == null) {
-                      debugwarn(s"SI-6576 The companion module namer for $meth was unexpectedly null")
-                      return
-                    }
-                    val p = (cda.classWithDefault, cda.companionModuleClassNamer)
-                    moduleNamer = Some(p)
-                    p
-                  case _ =>
-                    return // fix #3649 (prevent crash in erroneous source code)
-                }
-              }
-              deftParams = cdef.tparams map copyUntypedInvariant
-              nmr
-            }
-            else ownerNamer getOrElse {
-              val ctx = context.nextEnclosing(c => c.scope.toList.contains(meth))
-              assert(ctx != NoContext, meth)
-              val nmr = newNamer(ctx)
-              ownerNamer = Some(nmr)
-              nmr
-            }
-
-            // If the parameter type mentions any type parameter of the method, let the compiler infer the
-            // return type of the default getter => allow "def foo[T](x: T = 1)" to compile.
-            // This is better than always using Wildcard for inferring the result type, for example in
-            //    def f(i: Int, m: Int => Int = identity _) = m(i)
-            // if we use Wildcard as expected, we get "Nothing => Nothing", and the default is not usable.
-            val names = deftParams map { case TypeDef(_, name, _, _) => name }
-            val subst = new TypeTreeSubstituter(names contains _)
-
-            val defTpt = subst(copyUntyped(vparam.tpt match {
-              // default getter for by-name params
-              case AppliedTypeTree(_, List(arg)) if sym.hasFlag(BYNAMEPARAM) => arg
-              case t => t
-            }))
-            val defRhs = copyUntyped(vparam.rhs)
-
-            val defaultTree = atPos(vparam.pos.focus) {
-              DefDef(
-                Modifiers(meth.flags & DefaultGetterFlags) | SYNTHETIC | DEFAULTPARAM | oflag,
-                name, deftParams, defvParamss, defTpt, defRhs)
-            }
-            if (!isConstr)
-              methOwner.resetFlag(INTERFACE) // there's a concrete member now
-            val default = parentNamer.enterSyntheticSym(defaultTree)
-            if (default.owner.isTerm)
-              saveDefaultGetter(meth, default)
-          }
-          else if (baseHasDefault) {
-            // the parameter does not have a default itself, but the
-            // corresponding parameter in the base class does.
-            sym.setFlag(DEFAULTPARAM)
-          }
-          posCounter += 1
-          if (overrides) baseParams = baseParams.tail
+          if (sym.hasDefault)
+            buildDefaultGetter(vparam, i)
+          // the parameter does not have a default itself, but the corresponding parameter in the base class does.
+          else if (correspondingParamHasDefault(sym))
+            sym setFlag DEFAULTPARAM
         }
-        if (overrides) baseParamss = baseParamss.tail
-        previous :+ vparams
-      }
+      )
     }
 
     private def valDefSig(vdef: ValDef) = {
@@ -1413,7 +1379,7 @@ trait Namers extends MethodSynthesis {
                 val context1 = typer.context.make(ann)
                 context1.setReportErrors()
                 annotated.unsafeTypeParams foreach (p =>
-                  context1.scope enterIfNotThere logResult(s"Entering $p from ${defn.name} into annotation scope")(p))
+                  context1.scope enterIfNotThere logResult(s"Entering ${p.fullLocationString} into annotation scope: tree=$tree, annotated=${annotated.fullLocationString}")(p))
                 enteringTyper(newTyper(context1) typedAnnotation ann)
               }
             }
