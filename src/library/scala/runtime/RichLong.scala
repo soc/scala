@@ -9,6 +9,15 @@
 package scala
 package runtime
 
+import java.lang.Long.{bitCount              => javaBitCount,
+                       highestOneBit         => javaHighestOneBit,
+                       lowestOneBit          => javaLowestOneBit,
+                       numberOfLeadingZeros  => javaNumberOfLeadingZeros,
+                       numberOfTrailingZeros => javaNumberOfTrailingZeros,
+                       reverse               => javaReverse,
+                       reverseBytes          => javaReverseBytes,
+                       rotateLeft            => javaRotateLeft,
+                       rotateRight           => javaRotateRight}
 
 final class RichLong(val self: Long) extends AnyVal with IntegralProxy[Long] {
   protected def num = scala.math.Numeric.LongIsIntegral
@@ -25,4 +34,14 @@ final class RichLong(val self: Long) extends AnyVal with IntegralProxy[Long] {
   // override def isValidLong = true
   // override def isValidFloat = self.toFloat.toLong == self && self != Long.MaxValue
   // override def isValidDouble = self.toDouble.toLong == self && self != Long.MaxValue
+
+  @inline def bitCount: Int                = javaBitCount(self)
+  @inline def highestSetBit: Long          = javaHighestOneBit(self)
+  @inline def lowestSetBit: Long           = javaLowestOneBit(self)
+  @inline def numberOfLeadingZeros: Int    = javaNumberOfLeadingZeros(self)
+  @inline def numberOfTrailingZeros: Int   = javaNumberOfTrailingZeros(self)
+  @inline def reverse: Long                = javaReverse(self)
+  @inline def reverseBytes: Long           = javaReverseBytes(self)
+  @inline def rotateLeft(dist: Int): Long  = javaRotateLeft(self, dist)
+  @inline def rotateRight(dist: Int): Long = javaRotateRight(self, dist)
 }

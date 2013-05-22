@@ -9,6 +9,15 @@
 package scala
 package runtime
 
+import java.lang.Integer.{bitCount              => javaBitCount,
+                          highestOneBit         => javaHighestOneBit,
+                          lowestOneBit          => javaLowestOneBit,
+                          numberOfLeadingZeros  => javaNumberOfLeadingZeros,
+                          numberOfTrailingZeros => javaNumberOfTrailingZeros,
+                          reverse               => javaReverse,
+                          reverseBytes          => javaReverseBytes,
+                          rotateLeft            => javaRotateLeft,
+                          rotateRight           => javaRotateRight}
 
 import scala.collection.immutable.Range
 
@@ -70,6 +79,16 @@ final class RichInt(val self: Int) extends AnyVal with ScalaNumberProxy[Int] wit
     * Computes the absolute value of `'''this'''`.
     */
   override def abs: Int = if (self < 0) -self else self
+
+  @inline def bitCount: Int               = javaBitCount(self)
+  @inline def highestSetBit: Int          = javaHighestOneBit(self)
+  @inline def lowestSetBit: Int           = javaLowestOneBit(self)
+  @inline def numberOfLeadingZeros: Int   = javaNumberOfLeadingZeros(self)
+  @inline def numberOfTrailingZeros: Int  = javaNumberOfTrailingZeros(self)
+  @inline def reverse: Int                = javaReverse(self)
+  @inline def reverseBytes: Int           = javaReverseBytes(self)
+  @inline def rotateLeft(dist: Int): Int  = javaRotateLeft(self, dist)
+  @inline def rotateRight(dist: Int): Int = javaRotateRight(self, dist)
 
   def toBinaryString: String = java.lang.Integer.toBinaryString(self)
   def toHexString: String = java.lang.Integer.toHexString(self)
