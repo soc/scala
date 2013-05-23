@@ -531,7 +531,7 @@ trait Parsers {
     }
   }
 
-	/*trait ElemFun
+        /*trait ElemFun
   case class EFCons(hd: Elem => ElemFun, tl: ElemFun) extends ElemFun
   case class EFNil(res: Boolean) extends ElemFun*/
 
