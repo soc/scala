@@ -1,20 +1,21 @@
 package scala
 package coll
 
-sealed trait List[+A] extends Linear[A, List[A]] {
+sealed trait List[+A] extends Linear[A, List[A]] with ContainerIsRepr[List[A]] {
   def foreach(f: A => Any) = List.foreach(this, f)
+  override def toString = s"PNil" // only so I don't get confused what List I'm looking at
 }
 
 final case class ::[+A](head: A, tail: List[A]) extends List[A] {
   def isEmpty = false
-  def repr    = this
+
+  override def toString = s"$head :: $tail"
 }
 
 final case object Nil extends List[Nothing] {
   def isEmpty = true
   def head    = sys.error("Nil.head")
   def tail    = sys.error("Nil.tail")
-  def repr    = this
 }
 
 object List {
