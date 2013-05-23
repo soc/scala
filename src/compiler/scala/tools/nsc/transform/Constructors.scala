@@ -9,7 +9,6 @@ package transform
 import scala.collection.{ mutable, immutable }
 import scala.collection.mutable.ListBuffer
 import symtab.Flags._
-import util.TreeSet
 
 /** This phase converts classes with parameters into Java-like classes with
  *  fields, which are assigned to from constructors.
@@ -239,7 +238,7 @@ abstract class Constructors extends Transform with ast.TreeDSL {
       // ----------- avoid making parameter-accessor fields for symbols accessed only within the primary constructor --------------
 
       // A sorted set of symbols that are known to be accessed outside the primary constructor.
-      val accessedSyms = new TreeSet[Symbol]((x, y) => x isLess y)
+      val accessedSyms = scala.coll.MutableJavaSet[Symbol](_ isLess _)
 
       // a list of outer accessor symbols and their bodies
       var outerAccessors: List[(Symbol, Tree)] = List()

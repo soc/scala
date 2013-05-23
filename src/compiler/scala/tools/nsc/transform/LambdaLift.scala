@@ -8,7 +8,6 @@ package transform
 
 import symtab._
 import Flags._
-import util.TreeSet
 import scala.collection.{ mutable, immutable }
 import scala.collection.mutable.{ LinkedHashMap, LinkedHashSet }
 
@@ -107,9 +106,9 @@ abstract class LambdaLift extends InfoTransform {
     /** Buffers for lifted out classes and methods */
     private val liftedDefs = new LinkedHashMap[Symbol, List[Tree]]
 
-    private type SymSet = TreeSet[Symbol]
+    private type SymSet = scala.coll.MutableJavaSet[Symbol, java.util.TreeSet[Symbol]]
 
-    private def newSymSet = new TreeSet[Symbol](_ isLess _)
+    private def newSymSet = scala.coll.MutableJavaSet[Symbol](_ isLess _)
 
     private def symSet(f: LinkedHashMap[Symbol, SymSet], sym: Symbol): SymSet =
       f.getOrElseUpdate(sym, newSymSet)
@@ -302,7 +301,7 @@ abstract class LambdaLift extends InfoTransform {
           val newFlags = SYNTHETIC | ( if (owner.isClass) PARAMACCESSOR | PrivateLocal else PARAM )
           debuglog("free var proxy: %s, %s".format(owner.fullLocationString, freeValues.toList.mkString(", ")))
           proxies(owner) =
-            for (fv <- freeValues.toList) yield {
+            for (fv <- freeValues.toScalaList) yield {
               val proxyName = proxyNames.getOrElse(fv, fv.name)
               val proxy = owner.newValue(proxyName.toTermName, owner.pos, newFlags) setInfo fv.info
               if (owner.isClass) owner.info.decls enter proxy
@@ -367,7 +366,7 @@ abstract class LambdaLift extends InfoTransform {
 
     private def addFreeArgs(pos: Position, sym: Symbol, args: List[Tree]) = {
       free get sym match {
-        case Some(fvs) => args ++ (fvs.toList map (fv => atPos(pos)(proxyRef(fv))))
+        case Some(fvs) => args ++ (fvs.toScalaList map (fv => atPos(pos)(proxyRef(fv))))
         case _         => args
       }
     }
