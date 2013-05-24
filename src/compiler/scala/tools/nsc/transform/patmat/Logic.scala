@@ -11,8 +11,6 @@ import scala.language.postfixOps
 import scala.collection.mutable
 import scala.reflect.internal.util.Statistics
 import scala.reflect.internal.util.Position
-import scala.reflect.internal.util.HashSet
-
 
 trait Logic extends Debugging  {
   import PatternMatchingStats._
@@ -120,12 +118,10 @@ trait Logic extends Debugging  {
     }
     class UniqueSym(variable: Var, const: Const) extends Sym(variable, const)
     object Sym {
-      private val uniques: HashSet[Sym] = new HashSet("uniques", 512)
-      def apply(variable: Var, const: Const): Sym = {
-        val newSym = new UniqueSym(variable, const)
-        (uniques findEntryOrUpdate newSym)
-      }
-      private def nextSymId = {_symId += 1; _symId}; private var _symId = 0
+      private val uniques = scala.coll.JavaHashMapBackedSet[Sym](initialCapacity = 512)()
+      def apply(variable: Var, const: Const): Sym = uniques getOrAdd new UniqueSym(variable, const)
+      private def nextSymId = {_symId += 1; _symId}
+      private var _symId = 0
     }
 
     def /\(props: Iterable[Prop]) = if (props.isEmpty) True else props.reduceLeft(And(_, _))

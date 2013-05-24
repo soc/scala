@@ -8,7 +8,6 @@ package transform
 
 import scala.collection.mutable
 import symtab.Flags._
-import util.HashSet
 import scala.annotation.tailrec
 
 /** A class that yields a kind of iterator (`Cursor`),
@@ -165,7 +164,7 @@ abstract class OverridingPairs {
      *  (maybe excluded because of hasCommonParentAsSubclass).
      *  These will not appear as overriding
      */
-    private val visited = HashSet[ScopeEntry]("visited", 64)
+    private val visited = scala.coll.MutableJavaHashSet[ScopeEntry](64)()
 
     /** The current entry candidate for overriding
      */
@@ -203,7 +202,7 @@ abstract class OverridingPairs {
                       (overriding.owner == nextEntry.sym.owner) ||
                       (!matches(overriding, nextEntry.sym)) ||
                       (exclude(overriding))))
-            if (nextEntry ne null) visited addEntry nextEntry
+            if (nextEntry ne null) visited add nextEntry
             // skip nextEntry if a class in `parents` is a subclass of the owners of both
             // overriding and nextEntry.sym
           } while ((nextEntry ne null) && (hasCommonParentAsSubclass(overriding, nextEntry.sym)))

@@ -13,8 +13,11 @@ package object coll extends DecorateAsScala {
   type jSet[A]                = java.util.Set[A]
   type jHashSet[A]            = java.util.HashSet[A]
   type jTreeSet[A]            = java.util.TreeSet[A]
+  type jMap[K, V]             = java.util.Map[K, V]
+  type jHashMap[K, V]         = java.util.HashMap[K, V]
   type Builder[-Elem, +To]    = scala.collection.mutable.Builder[Elem, To]
   type Comparator[A]          = java.util.Comparator[A]
+  type jMapEntry[K, V]        = java.util.Map.Entry[K, V]
 
   def builderForThis[A, Coll](xs: Coll with Traversable[A])(implicit cbf: CBF[Nothing, A, Coll], ev: Coll <:< Traversable[A]): Builder[A, Coll] = {
     val builder = cbf()

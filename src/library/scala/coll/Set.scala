@@ -11,6 +11,7 @@ trait Set[+A, +Repr] extends CovariantContainer[A, Repr] {
 
 abstract class JavaSet[A, Repr <: jSet[A]] extends InvariantSet[A, Repr] {
   protected[this] def jset: Repr
+  def size = jset.size
   def isEmpty = jset.isEmpty
   def contains(elem: A) = jset contains elem
   def apply(elem: A): Boolean = contains(elem)
@@ -20,6 +21,31 @@ abstract class JavaSet[A, Repr <: jSet[A]] extends InvariantSet[A, Repr] {
   }
   def toStringPrefix = "JavaSet"
   override def toString = jset.asScala.mkString(toStringPrefix + "(", ", ", ")")
+}
+
+abstract class JavaMapBackedSet[A, Repr <: jMap[A, A]] extends InvariantSet[A, Repr] with Clearable {
+  protected[this] def jmap: Repr
+
+  def clear(): Unit = jmap.clear()
+  def addAll(elems: A*): this.type = { elems foreach add ; this }
+  def add(elem: A): A = jmap.put(elem, elem)
+  def get(elem: A): A = jmap get elem
+  def getOrAdd(elem: A): A = if (contains(elem)) get(elem) else add(elem)
+
+  def size = jmap.size
+  def isEmpty = jmap.isEmpty
+  def contains(elem: A) = jmap containsKey elem
+  def apply(elem: A) = this contains elem
+  def foreach(f: A => Any): Unit = Foreach(jmap.keySet) foreach f
+  def toStringPrefix = "JavaMapBackedSet"
+}
+
+class JavaHashMapBackedSet[A](protected[this] val jmap: jHashMap[A, A]) extends JavaMapBackedSet[A, jHashMap[A, A]] {
+
+}
+object JavaHashMapBackedSet {
+  def apply[A](initialCapacity: Int = 16)(xs: A*): JavaHashMapBackedSet[A] =
+    new JavaHashMapBackedSet[A](new jHashMap[A, A](initialCapacity)).addAll(xs: _*)
 }
 
 class MutableJavaSet[A, Repr <: jSet[A]](protected[this] val jset: Repr) extends JavaSet[A, Repr] with Clearable {
@@ -45,6 +71,10 @@ object MutableJavaTreeSet {
 object MutableJavaHashSet {
   def apply[A](initialCapacity: Int = 16, loadFactor: Float = 0.75f)(xs: A*): MutableJavaHashSet[A] =
     new MutableJavaHashSet[A](initialCapacity, loadFactor).addAll(xs: _*)
+}
+
+object MutableJavaSet {
+  def apply[A, Repr <: jSet[A]](jset: Repr) = new MutableJavaSet[A, Repr](jset)
 }
 
 class ImmutableJavaSet[A, Repr <: jSet[A]](protected[this] val jset: Repr) extends JavaSet[A, Repr] {
