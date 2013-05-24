@@ -25,18 +25,24 @@ trait Adaptations {
     self: Typer =>
 
     def checkValidAdaptation(t: Tree, args: List[Tree]): Boolean = {
+      val m = t.symbol
       def applyArg = t match {
         case Apply(_, arg :: Nil) => arg
         case _                    => EmptyTree
       }
+      def prefix = t match {
+        case Apply(qual, _) => qual.tpe
+        case _              => m.owner.tpe
+      }
       def callString = (
-        ( if (t.symbol.isConstructor) "new " else "" ) +
-        ( t.symbol.owner.decodedName ) +
-        ( if (t.symbol.isConstructor || t.symbol.name == nme.apply) "" else "." + t.symbol.decodedName )
+        ( if (m.isConstructor) "new " else "" ) +
+        ( m.owner.decodedName ) +
+        ( if (m.isConstructor || m.name == nme.apply) "" else "." + m.decodedName )
       )
-      def sigString = t.symbol.owner.decodedName + (
-        if (t.symbol.isConstructor) t.symbol.signatureString
-        else "." + t.symbol.decodedName + t.symbol.signatureString
+      def sigString = (
+          m.owner.decodedName
+        + ( if (m.isConstructor) "" else "." + m.decodedName )
+        + m.signatureString
       )
       def givenString = if (args.isEmpty) "<none>" else args.mkString(", ")
       def adaptedArgs = if (args.isEmpty) "(): Unit" else args.mkString("(", ", ", "): " + applyArg.tpe)
@@ -50,7 +56,7 @@ trait Adaptations {
       // at this point if the class is java defined) is a "leaky target" for
       // which we should be especially reluctant to insert () or auto-tuple.
       def isLeakyTarget = {
-        val oneArgObject = t.symbol.paramss match {
+        val oneArgObject = m.paramss match {
           case (param :: Nil) :: Nil  => ObjectClass isSubClass param.tpe.typeSymbol
           case _                      => false
         }
@@ -58,15 +64,28 @@ trait Adaptations {
         // they are used limits our ability to enforce anything sensible until
         // an opt-in compiler option is given.
         oneArgObject && !(
-             isStringAddition(t.symbol)
-          || isArrowAssoc(t.symbol)
-          || t.symbol.name == nme.equals_
-          || t.symbol.name == nme.EQ
-          || t.symbol.name == nme.NE
+             isStringAddition(m)
+          || isArrowAssoc(m)
+          || m.name == nme.equals_
+          || m.name == nme.EQ
+          || m.name == nme.NE
         )
       }
+      val mm = m.owner.info member m.name
+      val isLeakyOverload = isLeakyTarget && mm.isOverloaded
+      println("m = " + m.defString + " " + mm.defString)
 
-      if (settings.noAdaptedArgs)
+      withAddendum(applyArg.pos)(
+        "Refusing to tuple argument list for leaky (Object-receiving) overloaded method. Wrap it in ((double parentheses)) if it is what you intended."
+      )
+      if (isLeakyOverload) {
+        def msg = "Refusing to tuple argument list for leaky (Object-receiving) overloaded method. Wrap it in ((double parentheses)) if it is what you intended."
+        adaptWarning(msg)
+        context.error(t.pos, msg)
+        // TyperErrorGen.AdaptTypeError(t, t.tpe, mm.tpe)
+        // setError(t)
+      }
+      else if (settings.noAdaptedArgs)
         adaptWarning("No automatic adaptation here: use explicit parentheses.")
       else if (settings.warnAdaptedArgs)
         adaptWarning(
@@ -74,10 +93,10 @@ trait Adaptations {
             if (isLeakyTarget) "leaky (Object-receiving) target makes this especially dangerous."
             else "this is unlikely to be what you want."
           )
-          else "Adapting argument list by creating a " + args.size + "-tuple: this may not be what you want."
+          else s"Adapting argument list by creating a ${args.size}-tuple: this may not be what you want."
         )
 
-      !settings.noAdaptedArgs
+      !settings.noAdaptedArgs && !isLeakyOverload
     }
   }
 }
