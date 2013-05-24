@@ -1335,7 +1335,7 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
     }
 
     def info_=(info: Type) {
-      assert(info ne null)
+      assert(info ne null, this)
       infos = TypeHistory(currentPeriod, info, null)
       unlock()
       _validTo = if (info.isComplete) currentPeriod else NoPeriod
@@ -2831,7 +2831,7 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
 
     private var tyconCache: Type = null
     private var tyconRunId = NoRunId
-    private var tpeCache: Type = _
+    private var tpeCache: Type = null
     private var tpePeriod = NoPeriod
 
     override def isAbstractType          = this hasFlag DEFERRED

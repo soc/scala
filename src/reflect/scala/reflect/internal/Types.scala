@@ -2271,8 +2271,8 @@ trait Types
       import scala.util.hashing.MurmurHash3._
       val hasArgs = args.nonEmpty
       var h = productSeed
-      h = mix(h, pre.hashCode)
-      h = mix(h, sym.hashCode)
+      h = mix(h, pre.##)
+      h = mix(h, sym.##)
       if (hasArgs)
         finalizeHash(mix(h, args.hashCode()), 3)
       else
@@ -3669,13 +3669,14 @@ trait Types
 // Hash consing --------------------------------------------------------------
 
   private val initialUniquesCapacity = 4096
-  private var uniques: JavaHashMapBackedSet[Type] = _
+  private def newUniques() = new JavaHashMapBackedSet[Type](new java.util.HashMap[Type, Type](initialUniquesCapacity))
+  private var uniques: JavaHashMapBackedSet[Type] = null
   private var uniqueRunId = NoRunId
 
   protected def unique[T <: Type](tp: T): T = {
     if (Statistics.canEnable) Statistics.incCounter(rawTypeCount)
     if (uniqueRunId != currentRunId) {
-      uniques = JavaHashMapBackedSet[Type](initialUniquesCapacity)()
+      uniques = newUniques()
       perRunCaches recordCache uniques
       uniqueRunId = currentRunId
     }

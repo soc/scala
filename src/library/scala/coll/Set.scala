@@ -27,25 +27,30 @@ abstract class JavaMapBackedSet[A, Repr <: jMap[A, A]] extends InvariantSet[A, R
   protected[this] def jmap: Repr
 
   def clear(): Unit = jmap.clear()
-  def addAll(elems: A*): this.type = { elems foreach add ; this }
-  def add(elem: A): A = jmap.put(elem, elem)
-  def get(elem: A): A = jmap get elem
-  def getOrAdd(elem: A): A = if (contains(elem)) get(elem) else add(elem)
 
-  def size = jmap.size
-  def isEmpty = jmap.isEmpty
+  def get(elem: A): A              = jmap get elem
+  def getOrAdd(elem: A): A         = if (contains(elem)) get(elem) else add(elem)
+  def add(elem: A): A              = { jmap.put(elem, elem) ; elem }
+  def addAll(elems: A*): this.type = { elems foreach add ; this }
+
+  def size              = jmap.size
+  def isEmpty           = jmap.isEmpty
   def contains(elem: A) = jmap containsKey elem
-  def apply(elem: A) = this contains elem
+  def apply(elem: A)    = jmap containsKey elem
+
   def foreach(f: A => Any): Unit = Foreach(jmap.keySet) foreach f
   def toStringPrefix = "JavaMapBackedSet"
 }
 
 class JavaHashMapBackedSet[A](protected[this] val jmap: jHashMap[A, A]) extends JavaMapBackedSet[A, jHashMap[A, A]] {
-
+  override def toStringPrefix = "JavaHashMapBackedSet"
 }
 object JavaHashMapBackedSet {
-  def apply[A](initialCapacity: Int = 16)(xs: A*): JavaHashMapBackedSet[A] =
-    new JavaHashMapBackedSet[A](new jHashMap[A, A](initialCapacity)).addAll(xs: _*)
+  def apply[A](initialCapacity: Int = 16)(xs: A*): JavaHashMapBackedSet[A] = {
+    val map = new JavaHashMapBackedSet[A](new jHashMap[A, A](initialCapacity))
+    xs foreach map.add
+    map
+  }
 }
 
 class MutableJavaSet[A, Repr <: jSet[A]](protected[this] val jset: Repr) extends JavaSet[A, Repr] with Clearable {
