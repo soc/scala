@@ -1,6 +1,10 @@
 package scala
 package coll
 
+import com.carrotsearch.hppc.ObjectOpenHashSet
+
+class HppcHashSet[KType]
+
 trait InvariantSet[A, +Repr] extends InvariantContainer[A, Repr] {
   def contains(elem: A): Boolean
 }

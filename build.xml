@@ -207,6 +207,9 @@ TODO:
       <artifact:dependencies pathId="extra.tasks.classpath" filesetId="extra.tasks.fileset">
         <dependency groupId="biz.aQute" artifactId="bnd" version="1.50.0"/>
       </artifact:dependencies>
+      <artifact:dependencies pathId="hppc.classpath">
+        <dependency groupId="com.carrotsearch" artifactId="hppc" version="0.4.3"/>
+      </artifact:dependencies>
 
       <!-- Pax runner -->
       <property name="pax.exam.version" value="2.5.0"/>
