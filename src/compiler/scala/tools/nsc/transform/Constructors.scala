@@ -8,6 +8,7 @@ package transform
 
 import scala.collection.{ mutable, immutable }
 import scala.collection.mutable.ListBuffer
+import scala.coll.MutableJavaTreeSet
 import symtab.Flags._
 
 /** This phase converts classes with parameters into Java-like classes with
@@ -238,7 +239,7 @@ abstract class Constructors extends Transform with ast.TreeDSL {
       // ----------- avoid making parameter-accessor fields for symbols accessed only within the primary constructor --------------
 
       // A sorted set of symbols that are known to be accessed outside the primary constructor.
-      val accessedSyms = scala.coll.MutableJavaSet[Symbol](_ isLess _)
+      val accessedSyms = MutableJavaTreeSet.compare[Symbol](_ isLess _)
 
       // a list of outer accessor symbols and their bodies
       var outerAccessors: List[(Symbol, Tree)] = List()
@@ -270,7 +271,7 @@ abstract class Constructors extends Transform with ast.TreeDSL {
             case Select(_, _) =>
               if (!mustbeKept(tree.symbol)) {
                 debuglog("accessedSyms += " + tree.symbol.fullName)
-                accessedSyms addEntry tree.symbol
+                accessedSyms add tree.symbol
               }
               super.traverse(tree)
             case _ =>
