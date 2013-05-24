@@ -10,6 +10,7 @@ import symtab._
 import Flags._
 import scala.collection.{ mutable, immutable }
 import scala.collection.mutable.{ LinkedHashMap, LinkedHashSet }
+import scala.coll.MutableJavaTreeSet
 
 abstract class LambdaLift extends InfoTransform {
   import global._
@@ -106,9 +107,9 @@ abstract class LambdaLift extends InfoTransform {
     /** Buffers for lifted out classes and methods */
     private val liftedDefs = new LinkedHashMap[Symbol, List[Tree]]
 
-    private type SymSet = scala.coll.MutableJavaSet[Symbol, java.util.TreeSet[Symbol]]
+    private type SymSet = MutableJavaTreeSet[Symbol]
 
-    private def newSymSet = scala.coll.MutableJavaSet[Symbol](_ isLess _)
+    private def newSymSet = MutableJavaTreeSet.compare[Symbol](_ isLess _)
 
     private def symSet(f: LinkedHashMap[Symbol, SymSet], sym: Symbol): SymSet =
       f.getOrElseUpdate(sym, newSymSet)
@@ -154,8 +155,8 @@ abstract class LambdaLift extends InfoTransform {
         else {
           val ss = symSet(free, enclosure)
           if (!ss(sym)) {
-            ss addEntry sym
-            renamable addEntry sym
+            ss add sym
+            renamable add sym
             changedFreeVars = true
             debuglog("" + sym + " is free in " + enclosure)
             if (sym.isVariable) sym setFlag CAPTURED
@@ -167,7 +168,7 @@ abstract class LambdaLift extends InfoTransform {
 
     private def markCalled(sym: Symbol, owner: Symbol) {
       debuglog("mark called: " + sym + " of " + sym.owner + " is called by " + owner)
-      symSet(called, owner) addEntry sym
+      symSet(called, owner) add sym
       if (sym.enclClass != owner.enclClass) calledFromInner += sym
     }
 
@@ -194,17 +195,17 @@ abstract class LambdaLift extends InfoTransform {
               if (sym.isImplClass)
                 localImplClasses((sym.owner, tpnme.interfaceName(sym.name))) = sym
               else {
-                renamable addEntry sym
+                renamable add sym
                 if (sym.isTrait)
                   localTraits((sym, sym.name)) = sym.owner
               }
             }
           case DefDef(_, _, _, _, _, _) =>
             if (sym.isLocal) {
-              renamable addEntry sym
+              renamable add sym
               sym setFlag (PrivateLocal | FINAL)
             } else if (sym.isPrimaryConstructor) {
-              symSet(called, sym) addEntry sym.owner
+              symSet(called, sym) add sym.owner
             }
           case Ident(name) =>
             if (sym == NoSymbol) {
@@ -213,7 +214,7 @@ abstract class LambdaLift extends InfoTransform {
               val owner = currentOwner.logicallyEnclosingMember
               if (sym.isTerm && !sym.isMethod) markFree(sym, owner)
               else if (sym.isMethod) markCalled(sym, owner)
-                //symSet(called, owner) addEntry sym
+                //symSet(called, owner) add sym
             }
           case Select(_, _) =>
             if (sym.isConstructor && sym.owner.isLocal)

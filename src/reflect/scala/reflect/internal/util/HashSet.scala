@@ -7,25 +7,6 @@ package scala
 package reflect
 package internal.util
 
-// abstract class Set[+A <: AnyRef] extends scala.coll.Set[A, Set[A]] {
-
-//   // def findEntry(x: T): T
-
-//   // def addEntry(x: T): Unit
-
-//   // def iterator: Iterator[T]
-
-//   // def foreach[U](f: T => U): Unit = iterator foreach f
-
-//   // def apply(x: T): Boolean = contains(x)
-
-//   // def contains(x: T): Boolean =
-//   //   findEntry(x) ne null
-
-//   // def toList = iterator.toList
-
-// }
-
 object HashSet {
   implicit class HashSetOps[A >: Null <: AnyRef](val xs: HashSet[A]) extends AnyVal {
     import xs._

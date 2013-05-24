@@ -11,7 +11,10 @@ package object coll extends DecorateAsScala {
   type CBF[-From, -Elem, +To] = scala.collection.generic.CanBuildFrom[From, Elem, To]
   type Clearable              = scala.collection.generic.Clearable
   type jSet[A]                = java.util.Set[A]
+  type jHashSet[A]            = java.util.HashSet[A]
+  type jTreeSet[A]            = java.util.TreeSet[A]
   type Builder[-Elem, +To]    = scala.collection.mutable.Builder[Elem, To]
+  type Comparator[A]          = java.util.Comparator[A]
 
   def builderForThis[A, Coll](xs: Coll with Traversable[A])(implicit cbf: CBF[Nothing, A, Coll], ev: Coll <:< Traversable[A]): Builder[A, Coll] = {
     val builder = cbf()
