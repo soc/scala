@@ -788,9 +788,9 @@ trait Implicits {
       private val shadower: Shadower = {
         /** Used for exclude implicits from outer scopes that are shadowed by same-named implicits */
         final class LocalShadower extends Shadower {
-          val shadowed = util.HashSet[Name](512)
+          val shadowed = scala.coll.JavaMutableHashSet[Name](512)()
           def addInfos(infos: Infos) {
-            shadowed addEntries infos.map(_.name)
+            infos foreach (shadowed add _.name)
           }
           def isShadowed(name: Name) = shadowed(name)
         }

@@ -30,9 +30,15 @@ object Foreach {
     def next = queue.take()
   }
 
-  def apply[A](g: (A => Any) => Unit): Foreach[A] = new ForeachClass[A](g)
+  def apply[A](xs: java.lang.Iterable[A]): Foreach[A] = new ForeachClass[A](iterator(xs) foreach _)
+  def apply[A](f: (A => Any) => Unit): Foreach[A]     = new ForeachClass[A](f)
 
   def iterator[A](xs: Foreach[A]): Iterator[A] = new ForeachIterator(xs)
+  def iterator[A](xs: java.lang.Iterable[A]): Iterator[A] = iterator(xs.iterator)
+  def iterator[A](xs: java.util.Iterator[A]): Iterator[A] = new Iterator[A] {
+    def hasNext = xs.hasNext
+    def next()  = xs.next()
+  }
 
   def map[A, B](xs: Foreach[A], g: A => B): Foreach[B] =
     new ForeachClass((f: B => Any) => xs foreach (x => f(g(x))))

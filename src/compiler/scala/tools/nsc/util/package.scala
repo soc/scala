@@ -16,9 +16,7 @@ package object util {
   // forwarder for old code that builds against 2.9 and 2.10
   val Chars = scala.reflect.internal.Chars
 
-  type Set[A <: AnyRef] = scala.coll.Set[A, Repr forSome { type Repr <: java.util.Set[A] }]
-  type HashSet[A >: Null <: AnyRef] = scala.reflect.internal.util.HashSet[A]
-  val HashSet = scala.reflect.internal.util.HashSet
+  type Set[A <: AnyRef] = scala.coll.Set[A, _ <: java.util.Set[A]]
 
   /** Apply a function and return the passed value */
   def returning[T](x: T)(f: T => Unit): T = { f(x) ; x }

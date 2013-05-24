@@ -273,13 +273,12 @@ trait Trees extends scala.reflect.internal.Trees { self: Global =>
   private class ResetAttrs(localOnly: Boolean, leaveAlone: Tree => Boolean = null, keepLabels: Boolean = false) {
     val debug = settings.debug.value
     val trace = scala.tools.nsc.util.trace when debug
-
-    val locals = util.HashSet[Symbol](8)
+    val locals = scala.coll.MutableJavaHashSet[Symbol](8)()
     val orderedLocals = scala.collection.mutable.ListBuffer[Symbol]()
     def registerLocal(sym: Symbol) {
       if (sym != null && sym != NoSymbol) {
         if (debug && !(locals contains sym)) orderedLocals append sym
-        locals addEntry sym
+        locals add sym
       }
     }
 
