@@ -53,55 +53,55 @@ object Bug1189 {
   println(f(x))
 }
 
-object Test extends App {
+object Test {
+  var ex: Counter[T] forSome { type T } = _
+  var exW: Counter[_] = _
 
-  val x = { class I; class J; (new C(new I), new C(new J)) }
-  val y: (C[X], C[Y]) forSome { type X; type Y } = x
+  def foo(x : Counter[T] { def name : String } forSome { type T }) = x match {
+    case ctr: Counter[t] =>
+    val c = ctr.newCounter
+    println(ctr.name+" "+ctr.get(ctr.inc(ctr.inc(c))))
+    case _ =>
+  }
 
-   def foo(x : Counter[T] { def name : String } forSome { type T }) = x match {
-     case ctr: Counter[t] =>
-       val c = ctr.newCounter
-       println(ctr.name+" "+ctr.get(ctr.inc(ctr.inc(c))))
-     case _ =>
-   }
+  def fooW(x : Counter[T] { def name : String } forSome { type T }) = x match {
+    case ctr: Counter[t] =>
+    val c = ctr.newCounter
+    println(ctr.name+" "+ctr.get(ctr.inc(ctr.inc(c))))
+    case _ =>
+  }
 
-   def fooW(x : Counter[T] { def name : String } forSome { type T }) = x match {
-     case ctr: Counter[t] =>
-       val c = ctr.newCounter
-       println(ctr.name+" "+ctr.get(ctr.inc(ctr.inc(c))))
-     case _ =>
-   }
+  def main(args: Array[String]): Unit = {
+    val x = { class I; class J; (new C(new I), new C(new J)) }
+    val y: (C[X], C[Y]) forSome { type X; type Y } = x
 
-   val ci = new Counter[Int] {
-     def newCounter = 0
-     def get(i: Int) = i
-     def inc(i: Int) = i+1
-     def name = "Int"
-   }
+    val ci = new Counter[Int] {
+      def newCounter = 0
+      def get(i: Int) = i
+      def inc(i: Int) = i+1
+      def name = "Int"
+    }
 
-   val cf = new Counter[Float] {
-     def newCounter = 0
-     def get(i: Float) = i.intValue
-     def inc(i: Float) = i+1
-     def name = "Float"
-   }
+    val cf = new Counter[Float] {
+      def newCounter = 0
+      def get(i: Float) = i.intValue
+      def inc(i: Float) = i+1
+      def name = "Float"
+    }
 
-   var ex: Counter[T] forSome { type T } = _
-   ex = ci
-   ex = cf
+    ex = ci
+    ex = cf
+    ex = ci
+    ex = cf
 
-   var exW: Counter[_] = _
-   ex = ci
-   ex = cf
+    foo(ci)
+    foo(cf)
+    fooW(ci)
+    fooW(cf)
 
-   foo(ci)
-   foo(cf)
-   fooW(ci)
-   fooW(cf)
-   val foo = new Foo
-   new foo.Line
-   val fooW = new FooW
-   new fooW.Line
+    { val foo = new Foo ; new foo.Line }
+    { val fooW = new FooW ; new fooW.Line }
+  }
 }
 
 trait FooBar[ A <: Option[_]] { def foo: A }
