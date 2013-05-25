@@ -109,7 +109,7 @@ trait Typers extends Adaptations with Tags {
 
     val infer = new Inferencer(context0) {
       // See SI-3281 re undoLog
-      override def isCoercible(tp: Type, pt: Type) = undoLog undo viewExists(tp, pt)
+      override def isCoercible(tp: Type, pt: Type) = undoLog.undo("isCoercible", viewExists(tp, pt))
     }
 
     /** Overridden to false in scaladoc and/or interactive. */
