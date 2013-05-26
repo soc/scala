@@ -168,8 +168,8 @@ private[internal] trait TypeConstraints {
   /** @PP: Unable to see why these apparently constant types should need vals
     *  in every TypeConstraint, I lifted them out.
     */
-  private lazy val numericLoBound = IntClass.tpe
-  private lazy val numericHiBound = intersectionType(List(ByteClass.tpe, CharClass.tpe), ScalaPackageClass)
+  private lazy val numericLoBound = IntTpe
+  private lazy val numericHiBound = intersectionType(List(ByteTpe, CharTpe), ScalaPackageClass)
 
   case class TypeConstraintState (
     prev: TypeConstraintState,
