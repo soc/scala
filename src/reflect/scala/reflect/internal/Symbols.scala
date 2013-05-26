@@ -1224,7 +1224,15 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
 
 // ------ info and type -------------------------------------------------------------------
 
-    private[Symbols] var infos: TypeHistory = null
+    // private[Symbols] var infos: TypeHistory = null
+    private val infos_sv = (
+      if (this.isMethod) StackVar[TypeHistory](null, th => defStringSeenAs(th.info))
+      else StackVar[TypeHistory](null, _ => "")
+    )
+
+    private[Symbols] def infos: TypeHistory = infos_sv.get
+    private[Symbols] def infos_=(th: TypeHistory) = infos_sv set th
+
     def originalInfo = {
       if (infos eq null) null
       else {

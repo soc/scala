@@ -4,21 +4,25 @@ import scala.collection.{ mutable, immutable, generic }
 
 object StackVar {
   private val record = mutable.Set[StackVar[_]]()
+
+  def safeString(x: Any): String =
+    try "" + x catch { case t: Throwable => "" + t }
+
   def dump() {
-    try record.toList.map(_.toString).sorted foreach println
+    try record.toList.map(safeString).sorted foreach println
     finally record.clear()
   }
 
   scala.sys addShutdownHook dump()
 
-  def apply[T](initialValue: T): StackVar[T] = {
-    val sv = new StackVar[T](initialValue)
+  def apply[T](initialValue: T, stringFn: T => String): StackVar[T] = {
+    val sv = new StackVar[T](initialValue, stringFn)
     record += sv
     sv
   }
 }
 
-class StackVar[T] private (initialValue: T) {
+class StackVar[T] private (initialValue: T, stringFn: T => String) {
   private[this] var values: List[Update] = initialValue :: Nil
   private implicit def mkUpdate(value: T): Update = Update(value)
 
@@ -26,7 +30,7 @@ class StackVar[T] private (initialValue: T) {
     val index             = if (values eq null) 0 else values.length
     val timestamp         = System.currentTimeMillis
     private def date_s    = new java.util.Date(timestamp)
-    override def toString = s"#$index $date_s $value"
+    override def toString = s"#$index $date_s ${stringFn(value)}"
   }
   private def head = values.head
   def index = head.index
