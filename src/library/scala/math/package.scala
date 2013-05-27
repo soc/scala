@@ -12,7 +12,7 @@ package scala
   * numeric operations such as elementary exponential, logarithmic, root and
   * trigonometric functions.
   */
-package object math {
+package object math extends PackageLevelOrderingOps {
   /** The `double` value that is closer than any other to `e`, the base of
    *  the natural logarithms.
    */
