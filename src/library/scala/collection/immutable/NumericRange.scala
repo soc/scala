@@ -261,14 +261,14 @@ object NumericRange {
     new Inclusive(start, end, step)
 
   private[collection] val defaultOrdering = Map[Numeric[_], Ordering[_]](
-    Numeric.BigIntIsIntegral -> Ordering.BigInt,
-    Numeric.IntIsIntegral -> Ordering.Int,
-    Numeric.ShortIsIntegral -> Ordering.Short,
-    Numeric.ByteIsIntegral -> Ordering.Byte,
-    Numeric.CharIsIntegral -> Ordering.Char,
-    Numeric.LongIsIntegral -> Ordering.Long,
-    Numeric.FloatAsIfIntegral -> Ordering.Float,
-    Numeric.DoubleAsIfIntegral -> Ordering.Double,
+    Numeric.BigIntIsIntegral       -> Ordering.BigInt,
+    Numeric.IntIsIntegral          -> Ordering.Int,
+    Numeric.ShortIsIntegral        -> Ordering.Int,
+    Numeric.ByteIsIntegral         -> Ordering.Int,
+    Numeric.CharIsIntegral         -> Ordering.Int,
+    Numeric.LongIsIntegral         -> Ordering.Long,
+    Numeric.FloatAsIfIntegral      -> Ordering.Float,
+    Numeric.DoubleAsIfIntegral     -> Ordering.Double,
     Numeric.BigDecimalAsIfIntegral -> Ordering.BigDecimal
   )
 

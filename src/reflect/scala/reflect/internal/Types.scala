@@ -2987,7 +2987,11 @@ trait Types
      *  in operations that are exposed from types. Hence, no syncing of `constr`
      *  or `encounteredHigherLevel` or `suspended` accesses should be necessary.
      */
-    def instValid = constr.instValid
+    def instValid = constr.inst match {
+      case null | NoType => false
+      case _: TypeVar    => devWarning(s"constr.inst is a TypeVar in $this") ; false
+      case _             => constr.instValid
+    }
     override def isGround = instValid && constr.inst.isGround
 
     /** The variable's skolemization level */
@@ -3175,7 +3179,7 @@ trait Types
       // AM: I think we could use the `suspended` flag to avoid side-effecting during unification
       if (suspended)         // constraint accumulation is disabled
         checkSubtype(tp, origin)
-      else if (constr.instValid)  // type var is already set
+      else if (instValid)    // type var is already set
         checkSubtype(tp, constr.inst)
       else isRelatable(tp) && {
         unifySimple || unifyFull(tp) || (
@@ -3199,7 +3203,7 @@ trait Types
       )
 
       if (suspended) tp =:= origin
-      else if (constr.instValid) checkIsSameType(tp)
+      else if (instValid) checkIsSameType(tp)
       else isRelatable(tp) && {
         val newInst = wildcardToTypeVarMap(tp)
         (constr isWithinBounds newInst) && {
@@ -3238,7 +3242,7 @@ trait Types
     )
 
     override def normalize: Type = (
-      if (constr.instValid) constr.inst
+      if (instValid) constr.inst
       // get here when checking higher-order subtyping of the typevar by itself
       // TODO: check whether this ever happens?
       else if (isHigherKinded) logResult("Normalizing HK $this")(typeFun(params, applyArgs(params map (_.typeConstructor))))

@@ -10,6 +10,8 @@ package scala
 package collection
 package mutable
 
+import scala.math.Compared._
+
 /**
  * An immutable AVL Tree implementation used by mutable.TreeSet
  *
@@ -83,30 +85,26 @@ private case class Node[A](data: A, left: AVLTree[A], right: AVLTree[A]) extends
 
   override def iterator[B >: A]: Iterator[B] = new AVLIterator(this)
 
-  override def contains[B >: A](value: B, ordering: Ordering[B]) = {
-    val ord = ordering.compare(value, data)
-    if (0 == ord)
-      true
-    else if (ord < 0)
-      left.contains(value, ordering)
-    else
-      right.contains(value, ordering)
-  }
+  override def contains[B >: A](value: B, ordering: Ordering[B]) = (
+    ordering.compare(value, data) match {
+      case EQ => true
+      case LT => left.contains(value, ordering)
+      case GT => right.contains(value, ordering)
+    }
+  )
 
   /**
    * Returns a new tree containing the given element.
    * Thows an IllegalArgumentException if element is already present.
    *
    */
-  override def insert[B >: A](value: B, ordering: Ordering[B]) = {
-    val ord = ordering.compare(value, data)
-    if (0 == ord)
-      throw new IllegalArgumentException()
-    else if (ord < 0)
-      Node(data, left.insert(value, ordering), right).rebalance
-    else
-      Node(data, left, right.insert(value, ordering)).rebalance
-  }
+  override def insert[B >: A](value: B, ordering: Ordering[B]) = (
+    ordering.compare(value, data) match {
+      case EQ => throw new IllegalArgumentException()
+      case LT => Node(data, left.insert(value, ordering), right).rebalance
+      case GT => Node(data, left, right.insert(value, ordering)).rebalance
+    }
+  )
 
   /**
    * Return a new tree which not contains given element.

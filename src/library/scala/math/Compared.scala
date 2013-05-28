@@ -29,14 +29,16 @@ final class Compared private (val value: Byte) extends AnyVal {
 }
 
 object Compared {
-  import ReOrdering._
+  // Temporary XXX
+  implicit def intToCompared(value: Int): scala.math.Compared = scala.math.Compared(value)
+  implicit def comparedToInt(cmp: scala.math.Compared): Int = cmp.value
 
   def apply(x: Long, y: Long): Compared     = apply(x - y)
   def apply(x: Int, y: Int): Compared       = apply(x - y)
   def apply(x: Float, y: Float): Compared   = apply(java.lang.Float.compare(x, y))
   def apply(x: Double, y: Double): Compared = apply(java.lang.Double.compare(x, y))
 
-  def apply[T: ReOrdering](lhs: T, rhs: T): Compared = lhs cmp rhs //implicitly[ReOrdering[T]].compare(lhs, rhs)
+  def apply[T: Ordering](lhs: T, rhs: T): Compared = implicitly[Ordering[T]].compare(lhs, rhs)
 
   def apply(difference: Long): Compared = (
     if (difference < 0) LT

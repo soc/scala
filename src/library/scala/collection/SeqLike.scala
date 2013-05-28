@@ -13,7 +13,6 @@ import mutable.{ ListBuffer, ArraySeq }
 import immutable.{ List, Range }
 import generic._
 import parallel.ParSeq
-import scala.math.{ min, max, Ordering }
 
 /** A template trait for sequences of type `Seq[A]`
  *  $seqInfo
@@ -569,7 +568,7 @@ trait SeqLike[+A, +Repr] extends Any with IterableLike[A, Repr] with GenSeqLike[
    *    List("Bob", "John", "Steve", "Tom")
    *  }}}
    */
-  def sortWith(lt: (A, A) => Boolean): Repr = sorted(Ordering fromLessThan lt)
+  def sortWith(lt: (A, A) => Boolean): Repr = sorted[A](Ordering less lt)
 
   /** Sorts this $Coll according to the Ordering which results from transforming
    *  an implicitly given Ordering with a transformation function.
@@ -591,7 +590,7 @@ trait SeqLike[+A, +Repr] extends Any with IterableLike[A, Repr] with GenSeqLike[
    *    res0: Array[String] = Array(The, dog, fox, the, lazy, over, brown, quick, jumped)
    *  }}}
    */
-  def sortBy[B](f: A => B)(implicit ord: Ordering[B]): Repr = sorted(ord on f)
+  def sortBy[B](f: A => B)(implicit ord: Ordering[B]): Repr = sorted[A](ord map f)
 
   /** Sorts this $coll according to an Ordering.
    *
@@ -612,7 +611,7 @@ trait SeqLike[+A, +Repr] extends Any with IterableLike[A, Repr] with GenSeqLike[
       arr(i) = x
       i += 1
     }
-    java.util.Arrays.sort(arr.array, ord.asInstanceOf[Ordering[Object]])
+    java.util.Arrays.sort(arr.array, ord.toComparator)
     val b = newBuilder
     b.sizeHint(len)
     for (x <- arr) b += x

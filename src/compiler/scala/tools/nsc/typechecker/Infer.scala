@@ -175,9 +175,9 @@ trait Infer extends Checkable {
   object instantiate extends TypeMap {
     private var excludedVars = immutable.Set[TypeVar]()
     private def applyTypeVar(tv: TypeVar): Type = tv match {
-      case TypeVar(origin, constr) if !constr.instValid => throw new DeferredNoInstance(() => s"no unique instantiation of type variable $origin could be found")
-      case _ if excludedVars(tv)                        => throw new NoInstance("cyclic instantiation")
-      case TypeVar(_, constr)                           =>
+      case tv @ TypeVar(origin, constr) if !tv.instValid => throw new DeferredNoInstance(() => s"no unique instantiation of type variable $origin could be found")
+      case _ if excludedVars(tv)                         => throw new NoInstance("cyclic instantiation")
+      case TypeVar(_, constr)                            =>
         excludedVars += tv
         try apply(constr.inst)
         finally excludedVars -= tv
@@ -489,7 +489,7 @@ trait Infer extends Checkable {
           assert(tvar.constr.inst != tvar, tvar.origin)
           instantiate(tvar.constr.inst)
         }
-        if (tvar.constr.instValid)
+        if (tvar.instValid)
           instantiate(tvar.constr.inst)
         else if (loBounds.nonEmpty && variance.isContravariant)
           setInst(lower)

@@ -6,8 +6,6 @@
 **                          |/                                          **
 \*                                                                      */
 
-
-
 package scala
 package collection
 package generic
@@ -15,6 +13,7 @@ package generic
 import mutable.Builder
 import scala.annotation.unchecked.uncheckedVariance
 import scala.language.higherKinds
+import scala.math.Ordering
 
 /** This trait represents collections classes which require
  *  ordered element types.

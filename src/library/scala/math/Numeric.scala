@@ -15,6 +15,9 @@ import scala.language.implicitConversions
  * @since 2.8
  */
 object Numeric {
+  type Ordering[A] = old.Ordering[A]
+  val Ordering = old.Ordering
+
   trait ExtraImplicits {
     /** These implicits create conversions from a value for which an implicit Numeric
      *  exists to the inner class which creates infix operations.  Once imported, you
@@ -187,7 +190,7 @@ object Numeric {
   object DoubleAsIfIntegral extends DoubleAsIfIntegral with Ordering.DoubleOrdering
 }
 
-trait Numeric[T] extends Ordering[T] {
+trait Numeric[T] extends old.Ordering[T] {
   def plus(x: T, y: T): T
   def minus(x: T, y: T): T
   def times(x: T, y: T): T

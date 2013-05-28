@@ -173,7 +173,7 @@ private[internal] trait TypeMaps {
         if ((pre1 eq pre) && (args1 eq args)) tp
         else AntiPolyType(pre1, args1)
       case tv@TypeVar(_, constr) =>
-        if (constr.instValid) this(constr.inst)
+        if (tv.instValid) this(constr.inst)
         else tv.applyArgs(mapOverArgs(tv.typeArgs, tv.params))  //@M !args.isEmpty implies !typeParams.isEmpty
       case AnnotatedType(annots, atp, selfsym) =>
         val annots1 = mapOverAnnotations(annots)

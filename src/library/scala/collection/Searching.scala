@@ -12,7 +12,7 @@ package collection
 import scala.language.implicitConversions
 import scala.annotation.tailrec
 import scala.collection.generic.IsSeqLike
-import scala.math.Ordering
+import scala.math.Compared._
 
 /** A collection of wrappers that provide sequence classes with search functionality.
   *
@@ -103,10 +103,11 @@ object Searching {
       var idx = offset
       val it = c.iterator
       while (it.hasNext) {
-        val cur = it.next()
-        if (ord.equiv(elem, cur)) return Found(idx)
-        else if (ord.lt(elem, cur)) return InsertionPoint(idx-1)
-        idx += 1
+        ord.compare(elem, it.next()) match {
+          case EQ => return Found(idx)
+          case LT => return InsertionPoint(idx-1)
+          case _  => idx += 1
+        }
       }
       InsertionPoint(idx)
     }

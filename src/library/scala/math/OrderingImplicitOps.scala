@@ -3,11 +3,14 @@ package math
 
 import java.util.Comparator
 import Compared.{ LT, EQ, GT }
-import ReOrdering._
+import Ordering._
 
 trait PackageLevelOrderingOps {
-  implicit class ReOrderingElementOps[A: ReOrdering](lhs: A) {
-    def cmp(rhs: A): Compared = implicitly[ReOrdering[A]].compare(lhs, rhs)
+  implicit def orderingContravariance[A, A1 <: A](ord: Ordering[A]): Ordering[A1] =
+    ord.asInstanceOf[Ordering[A1]]
+
+  implicit class OrderingElementOps[A: Ordering](lhs: A) {
+    def cmp(rhs: A): Compared = implicitly[Ordering[A]].compare(lhs, rhs)
     def <(rhs: A)  = cmp(rhs).isLess
     def <=(rhs: A) = cmp(rhs).isLessOrEqual
     def >(rhs: A)  = cmp(rhs).isGreater
@@ -19,35 +22,35 @@ trait PackageLevelOrderingOps {
   }
 }
 
-trait ReOrderingImplicitOps {
-  import ReOrdering._
-
-  implicit def reorderingToOrdering[A](ord: ReOrdering[A]): Ordering[A] =
+trait OrderingImplicitOps {
+  implicit def oldOrderingToOrdering[A](ord: scala.math.old.Ordering[A]): Ordering[A] =
     new Ordering[A] { def compare(x: A, y: A): Int = ord.compare(x, y).value }
 
-  implicit def reorderingContravariance[A, A1 <: A](ord: ReOrdering[A]): ReOrdering[A1] =
-    ord.asInstanceOf[ReOrdering[A1]]
-
-  implicit def comparablesToReOrdering[A](implicit cmp: A => Comparable[A]): ReOrdering[A] =
+  implicit def comparablesToOrdering[A](implicit cmp: A => Comparable[A]): Ordering[A] =
     comparing[A]((x, y) => Compared(x compareTo y))
 
-  implicit def comparatorToReOrdering[A, Coll <: Comparator[A]](cmp: Coll): ReOrdering[A] =
+  implicit def comparatorToOrdering[A, Coll <: Comparator[A]](cmp: Coll): Ordering[A] =
     comparing[A]((x, y) => Compared(cmp.compare(x, y)))
 
-  implicit class ReOrderingOps[A](ord: ReOrdering[A]) {
-    def map[B](f: B => A): ReOrdering[B] =
+  implicit class OrderingOps[A](ord: Ordering[A]) {
+    def on[B](f: B => A): Ordering[B] = map(f)
+
+    def map[B](f: B => A): Ordering[B] =
       comparing[B]((x, y) => ord.compare(f(x), f(y)))
 
-    def orElse[B: ReOrdering](f: A => B): ReOrdering[A] =
+    def orElse[B: Ordering](f: A => B): Ordering[A] =
       comparing[A]((x, y) => ord.compare(x, y) || ordering[B].map(f).compare(x, y))
 
-    def reverse: ReOrdering[A] =
+    def reverse: Ordering[A] =
       comparing[A]((x, y) => ord.compare(x, y).flip)
 
-    def |> [B: ReOrdering](f: A => B): ReOrdering[A] = orElse[B](f)
+    def |> [B: Ordering](f: A => B): Ordering[A] = orElse[B](f)
+
+    def toComparator[A1 <: A]: Comparator[A1] =
+      (new Comparator[A] { def compare(x: A, y: A) = ord.compare(x, y).value }).asInstanceOf[Comparator[A1]]
   }
 
-  class CollectionReOrdering[A : ReOrdering, CC[X] <: Traversable[X]] extends ReOrdering[CC[A]] {
+  class CollectionOrdering[A : Ordering, CC[X] <: Traversable[X]] extends Ordering[CC[A]] {
     def compare(x: CC[A], y: CC[A]): Compared = {
       var result: Compared = EQ
       val xs = x.toIterator

@@ -40,8 +40,6 @@ class PriorityQueue[A](implicit val ord: Ordering[A])
       with Serializable
       with scala.Cloneable
 {
-  import ord._
-
   private class ResizableArrayAccess[A] extends AbstractSeq[A] with ResizableArray[A] {
     def p_size0 = size0
     def p_size0_=(s: Int) = size0 = s
@@ -66,6 +64,8 @@ class PriorityQueue[A](implicit val ord: Ordering[A])
 
   private def toA(x: AnyRef): A = x.asInstanceOf[A]
   protected def fixUp(as: Array[AnyRef], m: Int): Unit = {
+    import scala.math.Ordering._
+
     var k: Int = m
     while (k > 1 && toA(as(k / 2)) < toA(as(k))) {
       resarr.p_swap(k, k / 2)
@@ -252,7 +252,7 @@ class PriorityQueue[A](implicit val ord: Ordering[A])
 
 
 object PriorityQueue extends OrderedTraversableFactory[PriorityQueue] {
-  def newBuilder[A](implicit ord: Ordering[A]) = new PriorityQueue[A]
-  implicit def canBuildFrom[A](implicit ord: Ordering[A]): CanBuildFrom[Coll, A, PriorityQueue[A]] = new GenericCanBuildFrom[A]
+  def newBuilder[A: Ordering] = new PriorityQueue[A]
+  implicit def canBuildFrom[A: Ordering] : CanBuildFrom[Coll, A, PriorityQueue[A]] = new GenericCanBuildFrom[A]
 }
 
