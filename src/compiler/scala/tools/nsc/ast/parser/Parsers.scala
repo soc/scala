@@ -2464,7 +2464,7 @@ self =>
           val vparamss = paramClauses(nme.CONSTRUCTOR, classContextBounds map (_.duplicate), ofCaseClass = false)
           newLineOptWhenFollowedBy(LBRACE)
           val rhs = in.token match {
-            case LBRACE   => atPos(in.offset) { constrBlock(vparamss) }
+            case LBRACE   => warning(in.offset, "?!?PROCEDURE in THIS?!?"); atPos(in.offset) { constrBlock(vparamss) }
             case _        => accept(EQUALS) ; atPos(in.offset) { constrExpr(vparamss) }
           }
           DefDef(mods, nme.CONSTRUCTOR, List(), vparamss, TypeTree(), rhs)
@@ -2494,6 +2494,7 @@ self =>
             newmods |= Flags.DEFERRED
             EmptyTree
           } else if (restype.isEmpty && in.token == LBRACE) {
+            deprecationWarning(in.offset, "Procedure syntax is deprecated, use `: Unit =` instead.")
             restype = scalaUnitConstr
             blockExpr()
           } else {
