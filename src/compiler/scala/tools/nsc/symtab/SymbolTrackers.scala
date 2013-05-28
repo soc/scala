@@ -16,10 +16,10 @@ trait SymbolTrackers {
   val global: Global
   import global._
 
-  private implicit lazy val SymbolOrdering: Ordering[Symbol] =
-    Ordering by (x => (x.kindString, x.name.toString))
+  private implicit lazy val SymbolOrdering =
+    ReOrdering[Symbol](x => (x.kindString, x.name.toString))
 
-  private implicit def toList[T: Ordering](xs: Set[T]): List[T] = xs.toList.sorted
+  private implicit def toList[T: ReOrdering](xs: Set[T]): List[T] = xs.toList.sorted
 
   /** Reversing the direction of Symbol's owner arrow. */
   trait Hierarchy {
@@ -71,7 +71,7 @@ trait SymbolTrackers {
     private def isOwnerChange(sym: Symbol) = changed.owners contains sym
     private def isFlagsChange(sym: Symbol) = changed.flags contains sym
 
-    private implicit def NodeOrdering: Ordering[Node] = Ordering by (_.root)
+    private implicit def NodeOrdering = ReOrdering[Node](_.root)
 
     object Node {
       def nodes(syms: Set[Symbol]): List[Node] = {

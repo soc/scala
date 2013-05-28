@@ -30,7 +30,7 @@ object IndexModelFactory {
             immutable.SortedMap[String, SortedSet[MemberEntity]]()
           }
           val members = letter.get(d.name).getOrElse {
-            SortedSet.empty[MemberEntity](Ordering.by { _.toString })
+            SortedSet.empty[MemberEntity](ReOrdering.string[MemberEntity])
           } + d
           this(firstLetter) = letter + (d.name -> members)
         }

@@ -11,7 +11,7 @@
  * Core Scala types. They are always available without an explicit import.
  * @contentDiagram hideNodes "scala.Serializable"
  */
-package object scala {
+package object scala extends math.PackageLevelOrderingOps {
   type Throwable = java.lang.Throwable
   type Exception = java.lang.Exception
   type Error     = java.lang.Error
@@ -102,6 +102,9 @@ package object scala {
 
   type Ordering[T] = scala.math.Ordering[T]
   val Ordering = scala.math.Ordering
+
+  type ReOrdering[T] = scala.math.ReOrdering[T]
+  val ReOrdering = scala.math.ReOrdering
 
   type PartialOrdering[T] = scala.math.PartialOrdering[T]
   type PartiallyOrdered[T] = scala.math.PartiallyOrdered[T]

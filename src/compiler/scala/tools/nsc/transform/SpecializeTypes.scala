@@ -68,8 +68,7 @@ abstract class SpecializeTypes extends InfoTransform with TypingTransformers {
   type TypeEnv = immutable.Map[Symbol, Type]
   def emptyEnv: TypeEnv = Map[Symbol, Type]()
 
-  private implicit val typeOrdering: Ordering[Type] = Ordering[String] on ("" + _.typeSymbol.name)
-
+  private implicit val typeOrdering = ReOrdering[Type]("" + _.typeSymbol.name)
 
   /** TODO - this is a lot of maps.
    */
@@ -861,7 +860,7 @@ abstract class SpecializeTypes extends InfoTransform with TypingTransformers {
 
   // concise printing of type env
   private def pp(env: TypeEnv): String = {
-    env.toList.sortBy(_._1.name) map {
+    env.toList.sortBy("" + _._1.name) map {
       case (k, v) =>
         val vsym = v.typeSymbol
         if (k == vsym) "" + k.name

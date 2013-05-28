@@ -63,8 +63,8 @@ trait SeqProxyLike[+A, +Repr <: SeqLike[A, Repr] with Seq[A]] extends SeqLike[A,
   override def padTo[B >: A, That](len: Int, elem: B)(implicit bf: CanBuildFrom[Repr, B, That]): That = self.padTo(len, elem)(bf)
   override def corresponds[B](that: GenSeq[B])(p: (A,B) => Boolean): Boolean = self.corresponds(that)(p)
   override def sortWith(lt: (A, A) => Boolean): Repr = self.sortWith(lt)
-  override def sortBy[B](f: A => B)(implicit ord: Ordering[B]): Repr = self.sortBy(f)(ord)
-  override def sorted[B >: A](implicit ord: Ordering[B]): Repr = self.sorted(ord)
+  override def sortBy[B](f: A => B)(implicit ord: ReOrdering[B]): Repr = self.sortBy(f)(ord)
+  override def sorted[B >: A](implicit ord: ReOrdering[B]): Repr = self.sorted(ord)
   override def indices: Range = self.indices
   override def view = self.view
   override def view(from: Int, until: Int) = self.view(from, until)

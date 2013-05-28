@@ -11,7 +11,7 @@ case class MethodCallTrace(className: String, methodName: String, methodDescript
   override def toString(): String = className + "." + methodName + methodDescriptor
 }
 object MethodCallTrace {
-  implicit val ordering: Ordering[MethodCallTrace] = Ordering.by(x => (x.className, x.methodName, x.methodDescriptor))
+  implicit val ordering = ReOrdering[MethodCallTrace](x => (x.className, x.methodName, x.methodDescriptor))
 }
 
 /**

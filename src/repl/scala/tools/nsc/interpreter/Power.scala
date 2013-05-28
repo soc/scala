@@ -236,7 +236,7 @@ class Power[ReplValsImpl <: ReplVals : ru.TypeTag: ClassTag](val intp: IMain, re
 
     def freq[U](p: T => U) = (value.toSeq groupBy p mapValues (_.size)).toList sortBy (-_._2) map (_.swap)
 
-    def >>(implicit ord: Ordering[T]): Unit      = pp(_.sorted)
+    def >>(implicit ord: ReOrdering[T]): Unit    = pp(_.sorted)
     def >!(): Unit                               = pp(_.distinct)
     def >(): Unit                                = pp(identity)
   }
@@ -269,25 +269,18 @@ class Power[ReplValsImpl <: ReplVals : ru.TypeTag: ClassTag](val intp: IMain, re
       new SinglePrettifierClass[T](x)
   }
   trait Implicits2 extends Implicits1 {
-    class RichSymbol(sym: Symbol) {
-      // convenient type application
-      def apply(targs: Type*): Type = typeRef(NoPrefix, sym, targs.toList)
+    implicit class RichSymbol(sym: Symbol) {
+      def apply(targs: Type*): Type = appliedType(sym, targs: _*)
     }
-    object symbolSubtypeOrdering extends Ordering[Symbol] {
-      def compare(s1: Symbol, s2: Symbol) =
-        if (s1 eq s2) 0
-        else if (s1 isLess s2) -1
-        else 1
-    }
-    implicit lazy val powerSymbolOrdering: Ordering[Symbol] = Ordering[Name] on (_.name)
-    implicit lazy val powerTypeOrdering: Ordering[Type]     = Ordering[Symbol] on (_.typeSymbol)
+    val symbolSubtypeOrdering = ReOrdering.less[Symbol](_ isLess _)
+    implicit lazy val powerSymbolOrdering = ReOrdering[Symbol](_.name)
+    implicit lazy val powerTypeOrdering  = ReOrdering[Type](_.typeSymbol)
 
     implicit def replInternalInfo[T: ru.TypeTag : ClassTag](x: T): InternalInfoWrapper[T] = new InternalInfoWrapper[T](Some(x))
     implicit def replEnhancedStrings(s: String): RichReplString = new RichReplString(s)
     implicit def replMultiPrinting[T: Prettifier](xs: TraversableOnce[T]): MultiPrettifierClass[T] =
       new MultiPrettifierClass[T](xs.toSeq)
     implicit def replPrettifier[T] : Prettifier[T] = Prettifier.default[T]
-    implicit def replTypeApplication(sym: Symbol): RichSymbol = new RichSymbol(sym)
 
     implicit def replInputStream(in: InputStream)(implicit codec: Codec) = new RichInputStream(in)
     implicit def replEnhancedURLs(url: URL)(implicit codec: Codec): RichReplURL = new RichReplURL(url)(codec)

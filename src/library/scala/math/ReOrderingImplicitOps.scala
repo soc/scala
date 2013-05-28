@@ -7,24 +7,23 @@ import ReOrdering._
 
 trait PackageLevelOrderingOps {
   implicit class ReOrderingElementOps[A: ReOrdering](lhs: A) {
-    def cmp(rhs: A): Compared = implicitly[ReOrdering[A]].compare(lhs, rhs)
-    def <(rhs: A)  = cmp(rhs).isLess
-    def <=(rhs: A) = cmp(rhs).isLessOrEqual
-    def >(rhs: A)  = cmp(rhs).isGreater
-    def >=(rhs: A) = cmp(rhs).isGreaterOrEqual
+    def cmp(rhs: A): Compared = summon[A].compare(lhs, rhs)
+    def <(rhs: A): Boolean  = cmp(rhs).isLess
+    def <=(rhs: A): Boolean = cmp(rhs).isLessOrEqual
+    def >(rhs: A): Boolean  = cmp(rhs).isGreater
+    def >=(rhs: A): Boolean = cmp(rhs).isGreaterOrEqual
 
-    def equiv(rhs: A)  = cmp(rhs).isEqual
+    def equiv(rhs: A): Boolean  = cmp(rhs).isEqual
     def max(rhs: A): A = if (this < rhs) rhs else lhs
     def min(rhs: A): A = if (this > rhs) rhs else lhs
   }
 }
 
-trait ReOrderingImplicitOps {
-  import ReOrdering._
+trait LowPriorityReOrderingImplicitOps {
+  implicit def reorderingToOrdering[A](ord: ReOrdering[A]): scala.math.Ordering[A] = ord.toOldOrdering
+}
 
-  implicit def reorderingToOrdering[A](ord: ReOrdering[A]): Ordering[A] =
-    new Ordering[A] { def compare(x: A, y: A): Int = ord.compare(x, y).value }
-
+trait ReOrderingImplicitOps extends LowPriorityReOrderingImplicitOps {
   implicit def reorderingContravariance[A, A1 <: A](ord: ReOrdering[A]): ReOrdering[A1] =
     ord.asInstanceOf[ReOrdering[A1]]
 
@@ -35,16 +34,27 @@ trait ReOrderingImplicitOps {
     comparing[A]((x, y) => Compared(cmp.compare(x, y)))
 
   implicit class ReOrderingOps[A](ord: ReOrdering[A]) {
-    def map[B](f: B => A): ReOrdering[B] =
-      comparing[B]((x, y) => ord.compare(f(x), f(y)))
+    //  XXX remove
+    // def reverse = flip
+    // def |> [B: ReOrdering](f: A => B) = this | (summon[B] map f).compare
 
-    def orElse[B: ReOrdering](f: A => B): ReOrdering[A] =
-      comparing[A]((x, y) => ord.compare(x, y) || ordering[B].map(f).compare(x, y))
+    def | (cmp: (A, A) => Compared) = join[A](ord.compare, cmp)
 
-    def reverse: ReOrdering[A] =
-      comparing[A]((x, y) => ord.compare(x, y).flip)
+    def cast[B] : ReOrdering[B] = ord.asInstanceOf[ReOrdering[B]]
 
-    def |> [B: ReOrdering](f: A => B): ReOrdering[A] = orElse[B](f)
+    def map[B](f: B => A) = comparing[B]((x, y) => ord.compare(f(x), f(y)))
+
+    def flip = comparing[A](ord.compare(_, _).flip)
+
+    def ++ [B: ReOrdering](f: A => B) = this | (summon[B] map f).flip.compare
+
+    def -- [B: ReOrdering](f: A => B) = this | (summon[B] map f).compare
+
+    def toComparator: Comparator[A] =
+      new Comparator[A] { def compare(x: A, y: A): Int = ord.compare(x, y).value }
+
+    def toOldOrdering: Ordering[A] =
+      new scala.math.Ordering[A] { def compare(x: A, y: A): Int = ord.compare(x, y).value }
   }
 
   class CollectionReOrdering[A : ReOrdering, CC[X] <: Traversable[X]] extends ReOrdering[CC[A]] {

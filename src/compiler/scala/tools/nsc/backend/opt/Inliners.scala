@@ -254,15 +254,7 @@ abstract class Inliners extends SubComponent {
       tfa.isOnWatchlist.clear()
     }
 
-    object imethodOrdering extends Ordering[IMethod] {
-      def compare(a: IMethod, b: IMethod) = {
-        val namesComparison = (a.toString() compare b.toString())
-        if(namesComparison != 0) namesComparison
-        else {
-          a.symbol.id compare b.symbol.id
-        }
-      }
-    }
+    val imethodOrdering = ReOrdering[IMethod](x => (x.toString, x.symbol.id))
 
     def analyzeClass(cls: IClass): Unit =
       if (settings.inline) {

@@ -62,8 +62,9 @@ class Template(universe: doc.Universe, generator: DiagramGenerator, tpl: DocTemp
    	  </script>
     </xml:group>
 
-  val valueMembers =
+  val valueMembers: List[MemberEntity] = (
     tpl.methods ++ tpl.values ++ tpl.templates.filter(x => x.isObject || x.isPackage) sorted
+  )
 
   val (absValueMembers, nonAbsValueMembers) =
     valueMembers partition (_.isAbstract)
@@ -74,13 +75,13 @@ class Template(universe: doc.Universe, generator: DiagramGenerator, tpl: DocTemp
   val (concValueMembers, shadowedImplicitMembers) =
     nonDeprValueMembers partition (!_.isShadowedOrAmbiguousImplicit)
 
-  val typeMembers =
-    tpl.abstractTypes ++ tpl.aliasTypes ++ tpl.templates.filter(x => x.isTrait || x.isClass) sorted (implicitly[Ordering[MemberEntity]])
-
-  val constructors = (tpl match {
+  val typeMembers: List[MemberEntity] = (
+    (tpl.abstractTypes ++ tpl.aliasTypes ++ tpl.templates.filter(x => x.isTrait || x.isClass)).sorted[MemberEntity]
+  )
+  val constructors: List[MemberEntity] = tpl match {
     case cls: Class => (cls.constructors: List[MemberEntity]).sorted
-    case _ => Nil
-  })
+    case _          => Nil
+  }
 
   /* for body, there is a special case for AnyRef, otherwise AnyRef appears
    * like a package/object this problem should be fixed, this implementation

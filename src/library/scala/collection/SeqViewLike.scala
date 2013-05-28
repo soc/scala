@@ -134,7 +134,7 @@ trait SeqViewLike[+A,
   override def intersect[B >: A](that: GenSeq[B]): This =
     newForced(thisSeq intersect that).asInstanceOf[This]
 
-  override def sorted[B >: A](implicit ord: Ordering[B]): This =
+  override def sorted[B >: A](implicit ord: ReOrdering[B]): This =
     newForced(thisSeq sorted ord).asInstanceOf[This]
 
   override def stringPrefix = "SeqView"

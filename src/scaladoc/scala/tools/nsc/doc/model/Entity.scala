@@ -63,8 +63,13 @@ object Entity {
     case _                => false
   }
   /** Ordering deprecated things last. */
-  implicit lazy val EntityOrdering: Ordering[Entity] =
-    Ordering[(Boolean, String)] on (x => (isDeprecated(x), x.name))
+  implicit lazy val EntityOrdering = ReOrdering[Entity](x => (isDeprecated(x), x.name))
+}
+
+object MemberEntity {
+  // Oh contravariance, contravariance, wherefore art thou contravariance?
+  // Note: the above works for both the commonly misunderstood meaning of the line and the real one.
+  implicit lazy val MemberEntityOrdering: ReOrdering[MemberEntity] = Entity.EntityOrdering
 }
 
 /** A template, which is either a class, trait, object or package. Depending on whether documentation is available
@@ -192,12 +197,6 @@ trait MemberEntity extends Entity {
 
   /** Indicates whether the implicitly inherited member is shadowed or ambiguous in its template */
   def isShadowedOrAmbiguousImplicit: Boolean
-}
-
-object MemberEntity {
-  // Oh contravariance, contravariance, wherefore art thou contravariance?
-  // Note: the above works for both the commonly misunderstood meaning of the line and the real one.
-  implicit lazy val MemberEntityOrdering: Ordering[MemberEntity] = Entity.EntityOrdering on (x => x)
 }
 
 /** An entity that is parameterized by types */

@@ -27,7 +27,7 @@ trait MemberLookup extends base.MemberLookupBase {
     if (mbrs.isEmpty)
       links.head
     else
-      mbrs.min(Ordering[MemberEntity].on[(MemberEntity, LinkTo)](_._1))._2
+      mbrs.min(ReOrdering[(MemberEntity, LinkTo)](_._1))._2
   }
 
   override def toString(link: LinkTo) = link match {
@@ -40,7 +40,7 @@ trait MemberLookup extends base.MemberLookupBase {
   override def findExternalLink(sym: Symbol, name: String): Option[LinkToExternal] = {
     val sym1 =
       if (sym == AnyClass || sym == AnyRefClass || sym == AnyValClass || sym == NothingClass) ListClass
-      else if (sym.isPackage) 
+      else if (sym.isPackage)
         /* Get package object which has associatedFile ne null */
         sym.info.member(newTermName("package"))
       else sym
