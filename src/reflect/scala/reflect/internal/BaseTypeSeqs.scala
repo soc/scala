@@ -42,8 +42,6 @@ trait BaseTypeSeqs {
   self =>
     if (Statistics.canEnable) Statistics.incCounter(baseTypeSeqCount)
     if (Statistics.canEnable) Statistics.incCounter(baseTypeSeqLenTotal, elems.length)
-    if (parents.distinct.size < parents.size)
-      printCaller("Gotcha")("")
 
     /** The number of types in the sequence */
     def length: Int = elems.length
@@ -91,17 +89,17 @@ trait BaseTypeSeqs {
      *  no evaluation needed.
      */
     def typeSymbol(i: Int): Symbol = elems(i) match {
-      case RefinedType(v :: vs, _) =>
-        val res    = v.typeSymbol
+      case RefinedType(v :: vs, _) => v.typeSymbol
+        // val res    = v.typeSymbol
 
-        val p1 = (v :: vs).size
-        val p2 = (v :: vs).distinct.size
-        val p3 = (v :: vs).map(_.typeSymbolDirect).distinct.size
+        // val p1 = (v :: vs).size
+        // val p2 = (v :: vs).distinct.size
+        // val p3 = (v :: vs).map(_.typeSymbolDirect).distinct.size
 
-        if (p1 == p2 && p3 == 1) ()
-        else devWarning(s"bts.typeSymbol($i) == $res: $p1 parents, $p2 distinct, $p3 symbols")
+        // if (p1 == p2 && p3 == 1) ()
+        // else devWarning(s"bts.typeSymbol($i) == $res: $p1 parents, $p2 distinct, $p3 symbols")
         // else util.Origins("BTS.typeSymbol", 200)(devWarning(s"bts.typeSymbol($i) == $res: $p1 parents, $p2 distinct, $p3 symbols"))
-        res
+        // res
 
       case tp                      => tp.typeSymbol
     }
