@@ -268,7 +268,7 @@ trait Implicits {
   object HasMember {
     private val hasMemberCache = perRunCaches.newMap[Name, Type]()
     def apply(name: Name): Type = hasMemberCache.getOrElseUpdate(name, memberWildcardType(name, WildcardType))
-    }
+  }
 
   /** An extractor for types of the form ? { name: (? >: argtpe <: Any*)restp }
    */
@@ -354,6 +354,7 @@ trait Implicits {
         } else isStrictlyMoreSpecific(info1.tpe, info2.tpe, info1.sym, info2.sym)
       }
     }
+
     def isPlausiblyCompatible(tp: Type, pt: Type) = checkCompatibility(fast = true, tp, pt)
     def normSubType(tp: Type, pt: Type) = checkCompatibility(fast = false, tp, pt)
 
@@ -560,11 +561,12 @@ trait Implicits {
      */
     private def isPlausiblySubType(tp1: Type, tp2: Type) = !isImpossibleSubType(tp1, tp2)
     private def isImpossibleSubType(tp1: Type, tp2: Type) = tp1.dealiasWiden match {
+      // case TypeRef(_, ByNameParamClass | RepeatedParamClass, _) => true
       // We can only rule out a subtype relationship if the left hand
       // side is a class, else we may not know enough.
-      case tr1 @ TypeRef(_, sym1, _) if sym1.isClass =>
+      case tr1 @ TypeRef(_, sym1, _) if sym1.isClass            =>
         tp2.dealiasWiden match {
-          case TypeRef(_, sym2, _)         => sym2.isClass && !(sym1 isWeakSubClass sym2)
+          case TypeRef(_, sym2, _)         => sym2.isClass && isImpossibleSubTypeRef(sym1, sym2)
           case RefinedType(parents, decls) => decls.nonEmpty && tr1.member(decls.head.name) == NoSymbol
           case _                           => false
         }

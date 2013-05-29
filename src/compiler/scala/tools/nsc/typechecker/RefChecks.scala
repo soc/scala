@@ -828,21 +828,17 @@ abstract class RefChecks extends InfoTransform with scala.reflect.internal.trans
      */
     private def validateBaseTypes(clazz: Symbol) {
       val seenParents = mutable.HashSet[Type]()
-      val seenTypes = new Array[List[Type]](clazz.info.baseTypeSeq.length)
-      for (i <- 0 until seenTypes.length)
-        seenTypes(i) = Nil
+      val seenTypes   = Array.fill[List[Type]](clazz.info.baseTypeSeq.length)(Nil)
 
       /* validate all base types of a class in reverse linear order. */
       def register(tp: Type): Unit = {
-//        if (clazz.fullName.endsWith("Collection.Projection"))
-//            println("validate base type "+tp)
         val baseClass = tp.typeSymbol
         if (baseClass.isClass) {
           val index = clazz.info.baseTypeIndex(baseClass)
           if (index >= 0) {
             if (seenTypes(index) forall (tp1 => !(tp1 <:< tp)))
-              seenTypes(index) =
-                tp :: (seenTypes(index) filter (tp1 => !(tp <:< tp1)))
+            seenTypes(index) =
+              tp :: (seenTypes(index) filter (tp1 => !(tp <:< tp1)))
           }
         }
         val remaining = tp.parents filterNot seenParents
@@ -850,20 +846,18 @@ abstract class RefChecks extends InfoTransform with scala.reflect.internal.trans
         remaining foreach register
       }
       register(clazz.tpe)
-      for (i <- 0 until seenTypes.length) {
+      var i = 0
+      while (i < seenTypes.length) {
         val baseClass = clazz.info.baseTypeSeq(i).typeSymbol
         seenTypes(i) match {
-          case Nil =>
-            println("??? base "+baseClass+" not found in basetypes of "+clazz)
-          case _ :: Nil =>
-            ;// OK
+          case Nil             => devWarning(s"base $baseClass not found in basetypes of $clazz")
+          case _ :: Nil        => // OK
           case tp1 :: tp2 :: _ =>
-            unit.error(clazz.pos, "illegal inheritance;\n " + clazz +
-                       " inherits different type instances of " + baseClass +
-                       ":\n" + tp1 + " and " + tp2)
+            unit.error(clazz.pos, s"illegal inheritance;\n $clazz inherits different type instances of $baseClass:\n$tp1 and $tp2")
             explainTypes(tp1, tp2)
             explainTypes(tp2, tp1)
         }
+        i += 1
       }
     }
 

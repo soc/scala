@@ -12,6 +12,7 @@ import scala.annotation.{ switch, meta }
 import scala.collection.{ mutable, immutable }
 import Flags._
 import scala.reflect.api.{Universe => ApiUniverse}
+// import SymbolIdAssignments._
 
 trait Definitions extends api.StandardDefinitions {
   self: SymbolTable =>
@@ -153,7 +154,7 @@ trait Definitions extends api.StandardDefinitions {
     def ScalaPrimitiveValueClasses: List[ClassSymbol] = ScalaValueClasses
   }
 
-  abstract class DefinitionsClass extends DefinitionsApi with ValueClassDefinitions {
+  abstract class DefinitionsClass extends DefinitionsApi with ValueClassDefinitions with WellKnownIds {
     private var isInitialized = false
     def isDefinitionsInitialized = isInitialized
 
@@ -1126,8 +1127,8 @@ trait Definitions extends api.StandardDefinitions {
     private lazy val boxedValueClassesSet = boxedClass.values.toSet[Symbol] + BoxedUnitClass
 
     /** Is symbol a value class? */
-    def isPrimitiveValueClass(sym: Symbol) = ScalaValueClasses contains sym
-    def isPrimitiveValueType(tp: Type)     = isPrimitiveValueClass(tp.typeSymbol)
+    def isPrimitiveValueClass(sym: Symbol) = isPrimitiveClassId(sym.id)
+    def isPrimitiveValueType(tp: Type)     = isPrimitiveClassId(tp.typeSymbol.id)
 
     /** Is symbol a boxed value class, e.g. java.lang.Integer? */
     def isBoxedValueClass(sym: Symbol) = boxedValueClassesSet(sym)
@@ -1141,10 +1142,7 @@ trait Definitions extends api.StandardDefinitions {
       else boxedClass.map(kvp => (kvp._2: Symbol, kvp._1)).getOrElse(sym, NoSymbol)
 
     /** Is type's symbol a numeric value class? */
-    def isNumericValueType(tp: Type): Boolean = tp match {
-      case TypeRef(_, sym, _) => isNumericValueClass(sym)
-      case _                  => false
-    }
+    def isNumericValueType(tp: Type) = isNumericClassId(tp.typeSymbol.id)
 
     // todo: reconcile with javaSignature!!!
     def signature(tp: Type): String = {

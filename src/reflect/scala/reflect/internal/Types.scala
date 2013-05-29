@@ -17,6 +17,7 @@ import scala.annotation.tailrec
 import util.Statistics
 import util.ThreeValues._
 import Variance._
+import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet
 
 /* A standard type pattern match:
   case ErrorType =>
@@ -790,7 +791,7 @@ trait Types
           case ArrayTypeRef(elem1) => elem1 matchesPattern elem2
           case _                   => false
         }
-      case TypeRef(_, sym, args) =>
+      case TypeRef(_, sym, args) if args forall (_.typeSymbol.isTypeParameter) =>
         val that1 = existentialAbstraction(args map (_.typeSymbol), that)
         (that ne that1) && (this <:< that1) && {
           log(s"$this.matchesPattern($that) depended on discarding args and testing <:< $that1")
@@ -894,10 +895,11 @@ trait Types
         if (sym == btssym) return mid
         else if (sym isLess btssym) hi = mid - 1
         else if (btssym isLess sym) lo = mid + 1
-        else abort()
+        else abort("fourth state of equality discovered in base types of $this")
       }
       -1
     }
+    def containsBase(sym: Symbol) = baseTypeIndex(sym) >= 0
 
     /** If this is a poly- or methodtype, a copy with cloned type / value parameters
      *  owned by `owner`. Identity for all other types.
@@ -1470,41 +1472,47 @@ trait Types
     }
   }
 
-  /** A common base class for intersection types and class types
-   */
-  abstract class CompoundType extends Type {
-
+  trait CompoundTypeOrTypeRef extends Type {
     private[reflect] var baseTypeSeqCache: BaseTypeSeq = _
     private[reflect] var baseTypeSeqPeriod = NoPeriod
+
+    def baseTypeSeqCacheIsCurrent = (
+         baseTypeSeqPeriod == currentPeriod
+      && baseTypeSeqCache != null
+      && baseTypeSeqCache != undetBaseTypeSeq
+    )
+    override def baseTypeSeq: BaseTypeSeq = {
+      if (!baseTypeSeqCacheIsCurrent) {
+        defineBaseTypeSeqImpl()
+        if (baseTypeSeqCache eq undetBaseTypeSeq)
+          throw new RecoverableCyclicReference(typeSymbol)
+      }
+      baseTypeSeqCache
+    }
+    protected def defineBaseTypeSeqImpl(): BaseTypeSeq
+  }
+
+  /** A common base class for intersection types and class types
+   */
+  abstract class CompoundType extends Type with CompoundTypeOrTypeRef {
     private[reflect] var baseClassesCache: List[Symbol] = _
     private[reflect] var baseClassesPeriod = NoPeriod
 
-    override def baseTypeSeq: BaseTypeSeq = {
-      val cached = baseTypeSeqCache
-      if (baseTypeSeqPeriod == currentPeriod && cached != null && cached != undetBaseTypeSeq)
-        cached
-      else {
-        defineBaseTypeSeqOfCompoundType(this)
-        if (baseTypeSeqCache eq undetBaseTypeSeq)
-          throw new RecoverableCyclicReference(typeSymbol)
-
-        baseTypeSeqCache
-      }
-    }
-
-    override def baseTypeSeqDepth: Int = baseTypeSeq.maxDepth
-
+    def baseClassesCacheIsCurrent = (
+         baseClassesPeriod == currentPeriod
+      && baseClassesCache != null
+    )
     override def baseClasses: List[Symbol] = {
-      val cached = baseClassesCache
-      if (baseClassesPeriod == currentPeriod && cached != null) cached
-      else {
+      if (!baseClassesCacheIsCurrent) {
         defineBaseClassesOfCompoundType(this)
         if (baseClassesCache eq null)
           throw new RecoverableCyclicReference(typeSymbol)
-
-        baseClassesCache
       }
+      baseClassesCache
     }
+
+    protected def defineBaseTypeSeqImpl() = defineBaseTypeSeqOfCompoundType(this)
+    override def baseTypeSeqDepth: Int = baseTypeSeq.maxDepth
 
     /** The slightly less idiomatic use of Options is due to
      *  performance considerations. A version using for comprehensions
@@ -1576,7 +1584,7 @@ trait Types
     tpe.typeSymbol :: baseTail
   }
 
-  protected def defineBaseTypeSeqOfCompoundType(tpe: CompoundType) = {
+  protected def defineBaseTypeSeqOfCompoundType(tpe: CompoundType): BaseTypeSeq = {
     val period = tpe.baseTypeSeqPeriod
     if (period != currentPeriod) {
       tpe.baseTypeSeqPeriod = currentPeriod
@@ -1606,8 +1614,15 @@ trait Types
             }
           }
           val bts = copyRefinedType(tpe.asInstanceOf[RefinedType], tpe.parents map varToParam, varToParam mapOver tpe.decls).baseTypeSeq
-          tpe.baseTypeSeqCache = bts lateMap paramToVar
-        } else {
+          val bts1 = bts lateMap paramToVar
+          val bts2 = bts map paramToVar
+          log(s"bts0: $bts")
+          log(s"bts1: $bts1")
+          log(s"bts2: $bts2")
+          // XXX was bts1
+          tpe.baseTypeSeqCache = bts2
+        }
+        else {
           if (Statistics.canEnable) Statistics.incCounter(compoundBaseTypeSeqCount)
           val start = if (Statistics.canEnable) Statistics.pushTimer(typeOpsStack, baseTypeSeqNanos) else null
           try {
@@ -1634,6 +1649,8 @@ trait Types
     //Console.println("baseTypeSeq(" + typeSymbol + ") = " + baseTypeSeqCache.toList);//DEBUG
     if (tpe.baseTypeSeqCache eq undetBaseTypeSeq)
       throw new TypeError("illegal cyclic inheritance involving " + tpe.typeSymbol)
+
+    tpe.baseTypeSeqCache
   }
 
   object baseClassesCycleMonitor {
@@ -2098,7 +2115,7 @@ trait Types
 
     override def baseType(clazz: Symbol): Type =
       if (sym == clazz) this
-      else transform(sym.info.baseType(clazz))
+      else transform(sym.info baseType clazz)
   }
 
   trait NonClassTypeRef extends TypeRef {
@@ -2252,18 +2269,16 @@ trait Types
    *
    * @M: a higher-kinded type is represented as a TypeRef with sym.typeParams.nonEmpty, but args.isEmpty
    */
-  abstract case class TypeRef(pre: Type, sym: Symbol, args: List[Type]) extends UniqueType with TypeRefApi {
+  abstract case class TypeRef(pre: Type, sym: Symbol, args: List[Type]) extends UniqueType with TypeRefApi with CompoundTypeOrTypeRef {
     private var trivial: ThreeValue = UNKNOWN
     override def isTrivial: Boolean = {
       if (trivial == UNKNOWN)
         trivial = fromBoolean(!sym.isTypeParameter && pre.isTrivial && areTrivialTypes(args))
       toBoolean(trivial)
     }
-    private[reflect] var parentsCache: List[Type]      = _
-    private[reflect] var parentsPeriod                 = NoPeriod
-    private[reflect] var baseTypeSeqCache: BaseTypeSeq = _
-    private[reflect] var baseTypeSeqPeriod             = NoPeriod
-    private var normalized: Type                       = _
+    private[reflect] var parentsCache: List[Type] = _
+    private[reflect] var parentsPeriod            = NoPeriod
+    private var normalized: Type                  = _
 
     //OPT specialize hashCode
     override final def computeHashCode = {
@@ -2334,38 +2349,25 @@ trait Types
     override def typeSymbol       = sym
     override def typeSymbolDirect = sym
 
+    private def isParentsCacheCurrent = (
+         parentsPeriod == currentPeriod
+      && parentsCache != null
+    )
     override def parents: List[Type] = {
-      val cache = parentsCache
-      if (parentsPeriod == currentPeriod && cache != null) cache
-      else {
-        defineParentsOfTypeRef(this)
-        parentsCache
-      }
+      if (!isParentsCacheCurrent)
+        parentsCache = defineParentsOfTypeRef(this)
+
+      parentsCache
     }
 
     override def decls: Scope = {
-      sym.info match {
-        case TypeRef(_, sym1, _) =>
-          assert(sym1 != sym, this) // @MAT was != typeSymbol
-        case _ =>
-      }
+      // assert(sym.info.typeSymbolDirect ne sym, this)
       thisInfo.decls
     }
 
     protected[Types] def baseTypeSeqImpl: BaseTypeSeq = sym.info.baseTypeSeq map transform
 
-    override def baseTypeSeq: BaseTypeSeq = {
-      val cache = baseTypeSeqCache
-      if (baseTypeSeqPeriod == currentPeriod && cache != null && cache != undetBaseTypeSeq)
-        cache
-      else {
-        defineBaseTypeSeqOfTypeRef(this)
-        if (baseTypeSeqCache == undetBaseTypeSeq)
-          throw new RecoverableCyclicReference(sym)
-
-        baseTypeSeqCache
-      }
-    }
+    protected def defineBaseTypeSeqImpl() = defineBaseTypeSeqOfTypeRef(this)
 
     // ensure that symbol is not a local copy with a name coincidence
     private def needsPreString = (
@@ -2475,9 +2477,29 @@ trait Types
         tpe.parentsCache = List(AnyTpe)
       }
     }
+
+    tpe.parentsCache
   }
 
-  protected def defineBaseTypeSeqOfTypeRef(tpe: TypeRef) = {
+  // protected def defineParentsOfTypeRef(tpe: TypeRef): List[Type] = {
+  //   val period = tpe.parentsPeriod
+  //   if (period == currentPeriod)
+  //     tpe.parentsCache
+  //   else {
+  //     tpe.parentsPeriod = currentPeriod
+  //     if (isValidForBaseClasses(period)) {
+  //       if (tpe.parentsCache eq null) {
+  //         // seems this can happen if things are corrupted enough, see #2641
+  //         devWarning("Inserting Any parent for unexpectedly null parents cache")
+  //         AnyTpe :: Nil
+  //       }
+  //       else tpe.parentsCache
+  //     }
+  //     else tpe.thisInfo.parents map tpe.transform
+  //   }
+  // }
+
+  protected def defineBaseTypeSeqOfTypeRef(tpe: TypeRef): BaseTypeSeq = {
     val period = tpe.baseTypeSeqPeriod
     if (period != currentPeriod) {
       tpe.baseTypeSeqPeriod = currentPeriod
@@ -2494,6 +2516,8 @@ trait Types
     }
     if (tpe.baseTypeSeqCache == undetBaseTypeSeq)
       throw new TypeError("illegal cyclic inheritance involving " + tpe.sym)
+
+    tpe.baseTypeSeqCache
   }
 
   /** A class representing a method type with parameters.
@@ -2673,6 +2697,10 @@ trait Types
   case class ExistentialType(quantified: List[Symbol],
                              override val underlying: Type) extends RewrappingTypeProxy with ExistentialTypeApi
   {
+    // if (quantified exists isPrimitiveValueClass) {
+    //   println(s"Existential($quantified, _)")
+    //   util.Origins("Existential", 20)("")
+    // }
     override protected def rewrap(newtp: Type) = existentialAbstraction(quantified, newtp)
 
     override def isTrivial = false
@@ -3442,6 +3470,32 @@ trait Types
 
   /** the canonical creator for a refined type with a given scope */
   def refinedType(parents: List[Type], owner: Symbol, decls: Scope, pos: Position): Type = {
+    def nolook(p: Type) = (
+         !isDefinitionsInitialized
+      || p.typeSymbolDirect.isAbstractType
+      || !p.typeSymbolDirect.hasCompleteInfo
+    )
+    // def loop(ps: List[Type]): List[Type] =
+
+    // ps match {
+    //   case Nil                                          => Nil
+    //   case p :: Nil                                     => ps
+    //   case p :: ps if p.typeSymbolDirect.isAbstractType => p :: loop(ps)
+    //   case p :: ps                                      => p :: loop(ps filter (p1 => p.typeSymbolDirect.isAbstractType || !(p <:< p1)))
+    // }
+
+    val parentSyms = parents map (_.typeSymbolDirect) distinct;
+    try {
+      if (parents.size > 1 && parentSyms.size == 1) {
+        log(s"refinedType contains ${parents.size} applications of ${parentSyms.head}")
+        parents.zipWithIndex foreach { case (p, i) =>
+          log(f"  $i%-2d  " + p.typeArgs.mkString("[", ", ", "]"))
+        }
+        log("")
+      }
+    }
+    catch { case t: Throwable => println("Cycle, don't sweat it: " + t) }
+
     if (phase.erasedTypes)
       if (parents.isEmpty) ObjectTpe else parents.head
     else {
@@ -3646,7 +3700,7 @@ trait Types
    *  indirectly referenced by type `tpe1`. If there are no remaining type
    *  parameters, simply returns result type `tpe`.
    */
-  def existentialAbstraction(tparams: List[Symbol], tpe0: Type): Type =
+  def existentialAbstraction(tparams: List[Symbol], tpe0: Type): Type = {
     if (tparams.isEmpty) tpe0
     else {
       val tpe      = normalizeAliases(tpe0)
@@ -3662,23 +3716,27 @@ trait Types
       }
       newExistentialType(tparams1, tpe1)
     }
-
+  }
 
 
 // Hash consing --------------------------------------------------------------
 
   private val initialUniquesCapacity = 4096
-  private var uniques: util.HashSet[Type] = _
+  private var uniques = newUniques()
   private var uniqueRunId = NoRunId
+  private def newUniques() = new ObjectOpenHashSet[Type](initialUniquesCapacity) with Clearable
 
   protected def unique[T <: Type](tp: T): T = {
     if (Statistics.canEnable) Statistics.incCounter(rawTypeCount)
     if (uniqueRunId != currentRunId) {
-      uniques = util.HashSet[Type]("uniques", initialUniquesCapacity)
+      uniques = newUniques()
       perRunCaches.recordCache(uniques)
       uniqueRunId = currentRunId
     }
-    (uniques findEntryOrUpdate tp).asInstanceOf[T]
+    uniques get tp match {
+      case null => uniques add tp ; tp
+      case tp   => tp.asInstanceOf[T]
+    }
   }
 
 // Helper Classes ---------------------------------------------------------

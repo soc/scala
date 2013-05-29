@@ -437,7 +437,7 @@ abstract class ScalaPrimitives {
 
   /** Add a primitive operation to the map */
   def addPrimitive(s: Symbol, code: Int) {
-    assert(!(primitives contains s), "Duplicate primitive " + s)
+    assert(!(primitives contains s), "Duplicate primitive " + s + "#" + s.id)
     primitives(s) = code
   }
 

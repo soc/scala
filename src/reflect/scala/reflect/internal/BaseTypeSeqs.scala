@@ -42,6 +42,8 @@ trait BaseTypeSeqs {
   self =>
     if (Statistics.canEnable) Statistics.incCounter(baseTypeSeqCount)
     if (Statistics.canEnable) Statistics.incCounter(baseTypeSeqLenTotal, elems.length)
+    if (parents.distinct.size < parents.size)
+      printCaller("Gotcha")("")
 
     /** The number of types in the sequence */
     def length: Int = elems.length
@@ -88,11 +90,20 @@ trait BaseTypeSeqs {
     /** The type symbol of the type at i'th position in this sequence;
      *  no evaluation needed.
      */
-    def typeSymbol(i: Int): Symbol = {
-      elems(i) match {
-        case RefinedType(v :: vs, _) => v.typeSymbol
-        case tp => tp.typeSymbol
-      }
+    def typeSymbol(i: Int): Symbol = elems(i) match {
+      case RefinedType(v :: vs, _) =>
+        val res    = v.typeSymbol
+
+        val p1 = (v :: vs).size
+        val p2 = (v :: vs).distinct.size
+        val p3 = (v :: vs).map(_.typeSymbolDirect).distinct.size
+
+        if (p1 == p2 && p3 == 1) ()
+        else devWarning(s"bts.typeSymbol($i) == $res: $p1 parents, $p2 distinct, $p3 symbols")
+        // else util.Origins("BTS.typeSymbol", 200)(devWarning(s"bts.typeSymbol($i) == $res: $p1 parents, $p2 distinct, $p3 symbols"))
+        res
+
+      case tp                      => tp.typeSymbol
     }
 
     /** Return all evaluated types in this sequence as a list */
@@ -137,7 +148,7 @@ trait BaseTypeSeqs {
       d
     }
 
-    override def toString = elems.mkString("BTS(", ",", ")")
+    override def toString = elems.mkString("BTS(\n  ", "\n  ", "\n)")
 
     private def typeError(msg: String): Nothing =
       throw new TypeError(
@@ -145,7 +156,7 @@ trait BaseTypeSeqs {
         "\n --- because ---\n"+msg)
   }
 
-  /** A merker object for a base type sequence that's no yet computed.
+  /** A marker object for a base type sequence that's no yet computed.
    *  used to catch inheritance cycles
    */
   val undetBaseTypeSeq: BaseTypeSeq = newBaseTypeSeq(List(), Array())
@@ -157,10 +168,7 @@ trait BaseTypeSeqs {
   def compoundBaseTypeSeq(tp: Type): BaseTypeSeq = {
     val tsym = tp.typeSymbol
     val parents = tp.parents
-//    Console.println("computing baseTypeSeq of " + tsym.tpe + " " + parents)//DEBUG
-    val buf = new mutable.ListBuffer[Type]
-    buf += tsym.tpe_*
-    var btsSize = 1
+    val buf = mutable.ArrayBuilder.make[Type] += tsym.tpe_*
     if (parents.nonEmpty) {
       val nparents = parents.length
       val pbtss = new Array[BaseTypeSeq](nparents)
@@ -217,13 +225,9 @@ trait BaseTypeSeqs {
           i += 1
         }
         buf += intersectionType(minTypes)
-        btsSize += 1
       }
     }
-    val elems = new Array[Type](btsSize)
-    buf.copyToArray(elems, 0)
-//    Console.println("computed baseTypeSeq of " + tsym.tpe + " " + parents + ": "+elems.toString)//DEBUG
-    newBaseTypeSeq(parents, elems)
+    newBaseTypeSeq(parents, buf.result)
   }
 
   class MappedBaseTypeSeq(orig: BaseTypeSeq, f: Type => Type) extends BaseTypeSeq(orig.parents map f, orig.elems) {
@@ -236,7 +240,8 @@ trait BaseTypeSeqs {
     override def lateMap(g: Type => Type) = orig.lateMap(x => g(f(x)))
     override def exists(p: Type => Boolean) = elems exists (x => p(f(x)))
     override protected def maxDepthOfElems: Int = elems.map(x => typeDepth(f(x))).max
-    override def toString = elems.mkString("MBTS(", ",", ")")
+    // override def toString = elems.mkString("MBTS(", ",", ")")
+    override def toString = "M" + super.toString
   }
 
   val CyclicInheritance = new Throwable

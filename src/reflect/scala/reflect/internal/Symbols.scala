@@ -14,14 +14,13 @@ import Flags._
 import scala.annotation.tailrec
 import scala.reflect.io.{ AbstractFile, NoAbstractFile }
 import Variance._
+// import SymbolIdAssignments._
 
-trait Symbols extends api.Symbols { self: SymbolTable =>
+trait Symbols extends api.Symbols with SymbolIdAssignments {
+  self: SymbolTable =>
+
   import definitions._
   import SymbolsStats._
-
-  protected var ids = 0
-
-  protected def nextId() = { ids += 1; ids }
 
   /** Used for deciding in the IDE whether we can interrupt the compiler */
   //protected var activeLocks = 0
@@ -136,10 +135,15 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
 
     type AccessBoundaryType = Symbol
     type AnnotationType     = AnnotationInfo
-
     // TODO - don't allow names to be renamed in this unstructured a fashion.
     // Rename as little as possible.  Enforce invariants on all renames.
     type TypeOfClonedSymbol >: Null <: Symbol { type NameType = Symbol.this.NameType }
+
+    protected def showInit() {
+      val pos_s  = if (initPos == NoPosition) "_" else "" + initPos
+      val name_s = initName.longString
+      println(f"#$id%-5s  $this%8h  new $shortSymbolClass($initOwner#${initOwner.id}, $pos_s, $name_s)")
+    }
 
     // Abstract here so TypeSymbol and TermSymbol can have a private[this] field
     // with the proper specific type.
@@ -161,8 +165,11 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
 
     rawatt = initPos
 
-    val id = nextId() // identity displayed when -uniqid
-    //assert(id != 3390, initName)
+    // identity displayed when -uniqid
+    def id: Int
+
+    // println(f"#$id%-5s  new Symbol($initOwner, $initPos, $initName)")
+    // override def hashCode = id
 
     private[this] var _validTo: Period = NoPeriod
 
@@ -520,7 +527,7 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
     def isNonClassType = false
 
     /** The bottom classes are Nothing and Null, found in Definitions. */
-    def isBottomClass  = false
+    def isBottomClass  = isBottomClassId(id)
 
     /** These are all tests for varieties of ClassSymbol, which has these subclasses:
      *  - ModuleClassSymbol
@@ -1003,7 +1010,9 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
     }
 
     // Like owner, but NoSymbol.owner == NoSymbol instead of throwing an exception.
-    final def safeOwner: Symbol = if (this eq NoSymbol) NoSymbol else owner
+    final def safeOwner: Symbol = if (id < 0) NoSymbol else owner
+
+    def ownerId: Int = if (id < 0) id else owner.id
 
     // TODO - don't allow the owner to be changed without checking invariants, at least
     // when under some flag. Define per-phase invariants for owner/owned relationships,
@@ -1729,10 +1738,11 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
      *  TODO - what is implied by the fact that AnyVal now has
      *  infinitely many non-bottom subclasses, not only 9?
      */
-    def isBottomSubClass(that: Symbol) = (
-         (this eq NothingClass)
-      || (this eq NullClass) && that.isClass && (that ne NothingClass) && !(that isNonBottomSubClass AnyValClass)
-    )
+    def isBottomSubClass(that: Symbol) = id match {
+      case ScalaWellKnownIds.Nothing => true
+      case ScalaWellKnownIds.Null    => that.isClass && (that ne NothingClass) && !(that isNonBottomSubClass AnyValClass)
+      case _                         => false
+    }
 
     /** Overridden in NullClass and NothingClass for custom behavior.
      */
@@ -1741,8 +1751,13 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
     final def isNumericSubClass(that: Symbol): Boolean =
       definitions.isNumericSubClass(this, that)
 
-    final def isWeakSubClass(that: Symbol) =
-      isSubClass(that) || isNumericSubClass(that)
+    final def isWeakSubClass(that: Symbol) = isSubClass(that) || isNumericSubClass(that)
+
+    // util.Origins("isWeakSubClass", 15)(
+    //   printResult(s"$this isWeakSubClass $that")(
+    //     isSubClass(that) || isNumericSubClass(that)
+    //   )
+    // )
 
 // ------ overloaded alternatives ------------------------------------------------------
 
@@ -2546,6 +2561,7 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
   /** A class for term symbols */
   class TermSymbol protected[Symbols] (initOwner: Symbol, initPos: Position, initName: TermName)
   extends Symbol(initOwner, initPos, initName) with TermSymbolApi {
+    val id = acquireSymbolId()
     private[this] var _referenced: Symbol = NoSymbol
     privateWithin = NoSymbol
 
@@ -2767,8 +2783,16 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
   }
   implicit val MethodSymbolTag = ClassTag[MethodSymbol](classOf[MethodSymbol])
 
+  abstract class NonClassTypeSymbol protected[Symbols] (initOwner: Symbol, initPos: Position, initName: TypeName) extends {
+    val id = acquireSymbolId()
+  }
+  with TypeSymbol(initOwner, initPos, initName) {
+    final override def isNonClassType = true
+    // showInit()
+  }
+
   class AliasTypeSymbol protected[Symbols] (initOwner: Symbol, initPos: Position, initName: TypeName)
-  extends TypeSymbol(initOwner, initPos, initName) {
+  extends NonClassTypeSymbol(initOwner, initPos, initName) {
     type TypeOfClonedSymbol = TypeSymbol
     override def variance = if (hasLocalFlag) Bivariant else info.typeSymbol.variance
     override def isContravariant = variance.isContravariant
@@ -2793,7 +2817,7 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
    *  }}}
    */
   class AbstractTypeSymbol protected[Symbols] (initOwner: Symbol, initPos: Position, initName: TypeName)
-  extends TypeSymbol(initOwner, initPos, initName) {
+  extends NonClassTypeSymbol(initOwner, initPos, initName) {
     type TypeOfClonedSymbol = TypeSymbol
     final override def isAbstractType = true
     override def existentialBound = this.info
@@ -2801,8 +2825,7 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
       owner.newNonClassSymbol(name, pos, newFlags)
   }
 
-  /** A class of type symbols. Alias and abstract types are direct instances
-   *  of this class. Classes are instances of a subclass.
+  /** A class of type symbols.
    */
   abstract class TypeSymbol protected[Symbols] (initOwner: Symbol, initPos: Position, initName: TypeName)
   extends Symbol(initOwner, initPos, initName) with TypeSymbolApi {
@@ -2959,7 +2982,7 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
    *     origin.isInstanceOf[Symbol] == !hasFlag(EXISTENTIAL)
    */
   class TypeSkolem protected[Symbols] (initOwner: Symbol, initPos: Position, initName: TypeName, origin: AnyRef)
-  extends TypeSymbol(initOwner, initPos, initName) {
+  extends NonClassTypeSymbol(initOwner, initPos, initName) {
     type TypeOfClonedSymbol = TypeSkolem
     /** The skolemization level in place when the skolem was constructed */
     val level = skolemizationLevel
@@ -2996,9 +3019,17 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
   }
 
   /** A class for class symbols */
-  class ClassSymbol protected[Symbols] (initOwner: Symbol, initPos: Position, initName: TypeName)
-  extends TypeSymbol(initOwner, initPos, initName) with ClassSymbolApi {
+  class ClassSymbol protected[Symbols] (initOwner: Symbol, initPos: Position, initName: TypeName) extends {
+    val id = acquireClassSymbolId(initOwner.id, initName)
+  }
+  with TypeSymbol(initOwner, initPos, initName) with ClassSymbolApi {
     type TypeOfClonedSymbol = ClassSymbol
+
+    // if (isCompilerUniverse && (id < 1000)) {
+    //   util.Origins("new ClassSymbol", 20)(
+    //   showInit()
+    // )
+    // }
 
     private[this] var flatname: TypeName            = _
     private[this] var _associatedFile: AbstractFile = _
@@ -3158,8 +3189,10 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
    *  Note: Not all module classes are of this type; when unpickled, we get
    *  plain class symbols!
    */
-  class ModuleClassSymbol protected[Symbols] (owner: Symbol, pos: Position, name: TypeName)
-  extends ClassSymbol(owner, pos, name) {
+  class ModuleClassSymbol protected[Symbols] (owner: Symbol, pos: Position, name: TypeName) extends {
+    // override val id = if (name == nme.ROOT || name == TypeName("scala")) acquireClassSymbolId(owner.id, name) else acquireSymbolId()
+  }
+  with ClassSymbol(owner, pos, name) {
     private[this] var module: Symbol        = _
     private[this] var typeOfThisCache: Type = _
     private[this] var typeOfThisPeriod      = NoPeriod
@@ -3291,6 +3324,7 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
 
   /** An object representing a missing symbol */
   class NoSymbol protected[Symbols]() extends Symbol(null, NoPosition, nme.NO_NAME) {
+    val id = ScalaWellKnownIds.NoSymbol
     final type NameType = TermName
     type TypeOfClonedSymbol = NoSymbol
 
@@ -3451,7 +3485,7 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
 
 // -------------- Statistics --------------------------------------------------------
 
-  Statistics.newView("#symbols")(ids)
+  // Statistics.newView("#symbols")(ids)
 
 }
 

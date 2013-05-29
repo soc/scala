@@ -1759,6 +1759,7 @@ trait Typers extends Adaptations with Tags {
 
       def validateParentClass(parent: Tree, superclazz: Symbol) =
         if (!parent.isErrorTyped) {
+          log(s"Initializing symbol of parent ${parent.tpe.typeSymbol}")
           val psym = parent.tpe.typeSymbol.initialize
 
           checkStablePrefixClassType(parent)
