@@ -19,6 +19,7 @@ import scala.util.matching.Regex
 import symtab.Flags._
 import scala.reflect.internal.util.Statistics
 import scala.language.implicitConversions
+import scala.reflect.internal.ScalaWellKnownIds
 
 /** This trait provides methods to find various kinds of implicits.
  *

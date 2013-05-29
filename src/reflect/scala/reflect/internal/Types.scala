@@ -3470,11 +3470,11 @@ trait Types
 
   /** the canonical creator for a refined type with a given scope */
   def refinedType(parents: List[Type], owner: Symbol, decls: Scope, pos: Position): Type = {
-    def nolook(p: Type) = (
-         !isDefinitionsInitialized
-      || p.typeSymbolDirect.isAbstractType
-      || !p.typeSymbolDirect.hasCompleteInfo
-    )
+    // def nolook(p: Type) = (
+    //      !isDefinitionsInitialized
+    //   || p.typeSymbolDirect.isAbstractType
+    //   || !p.typeSymbolDirect.hasCompleteInfo
+    // )
     // def loop(ps: List[Type]): List[Type] =
 
     // ps match {
@@ -3484,17 +3484,17 @@ trait Types
     //   case p :: ps                                      => p :: loop(ps filter (p1 => p.typeSymbolDirect.isAbstractType || !(p <:< p1)))
     // }
 
-    val parentSyms = parents map (_.typeSymbolDirect) distinct;
-    try {
-      if (parents.size > 1 && parentSyms.size == 1) {
-        log(s"refinedType contains ${parents.size} applications of ${parentSyms.head}")
-        parents.zipWithIndex foreach { case (p, i) =>
-          log(f"  $i%-2d  " + p.typeArgs.mkString("[", ", ", "]"))
-        }
-        log("")
-      }
-    }
-    catch { case t: Throwable => println("Cycle, don't sweat it: " + t) }
+    // val parentSyms = parents map (_.typeSymbolDirect) distinct;
+    // try {
+    //   if (parents.size > 1 && parentSyms.size == 1) {
+    //     log(s"refinedType contains ${parents.size} applications of ${parentSyms.head}")
+    //     parents.zipWithIndex foreach { case (p, i) =>
+    //       log(f"  $i%-2d  " + p.typeArgs.mkString("[", ", ", "]"))
+    //     }
+    //     log("")
+    //   }
+    // }
+    // catch { case t: Throwable => println("Cycle, don't sweat it: " + t) }
 
     if (phase.erasedTypes)
       if (parents.isEmpty) ObjectTpe else parents.head
