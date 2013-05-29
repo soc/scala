@@ -1614,13 +1614,7 @@ trait Types
             }
           }
           val bts = copyRefinedType(tpe.asInstanceOf[RefinedType], tpe.parents map varToParam, varToParam mapOver tpe.decls).baseTypeSeq
-          val bts1 = bts lateMap paramToVar
-          // val bts2 = bts map paramToVar
-          // log(s"bts0: $bts")
-          // log(s"bts1: $bts1")
-          // log(s"bts2: $bts2")
-          // XXX was bts1
-          tpe.baseTypeSeqCache = bts1
+          tpe.baseTypeSeqCache = bts lateMap paramToVar
         }
         else {
           if (Statistics.canEnable) Statistics.incCounter(compoundBaseTypeSeqCount)
