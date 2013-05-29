@@ -561,7 +561,7 @@ trait Implicits {
      *  to a final true or false.
      */
     private def isPlausiblySubType(tp1: Type, tp2: Type) = !isImpossibleSubType(tp1, tp2)
-    private def isImpossibleSubTypeRef(sym1: Symbol, sym2: Symbol) = {
+    private def isImpossibleSubTypeRef(sym1: Symbol, sym2: Symbol) = /*printResult(s"isImpossibleSubType($sym1, $sym2)") */ {
       if (sym1.id <= 8)
         !ScalaWellKnownIds.isWeakPrimitiveSubclass(sym1.id, sym2.id)
       else

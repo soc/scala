@@ -119,7 +119,7 @@ trait MatchTranslation { self: PatternMatching  =>
       // (that would require more sophistication when generating trees,
       //  and the only place that emits Matches after typers is for exception handling anyway)
       if (phase.id >= currentRun.uncurryPhase.id)
-        devWarning(s"running translateMatch past uncurry (at $phase) on $selector match $cases")
+        devWarning(s"phase=$phase phase.id=${phase.id} >= c.up.id=${currentRun.uncurryPhase.id} running translateMatch past uncurry (at $phase) on $selector match $cases")
 
       debug.patmat("translating "+ cases.mkString("{", "\n", "}"))
 
