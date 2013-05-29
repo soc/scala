@@ -47,13 +47,6 @@ abstract class SymbolTable extends macros.Universe
   val gen = new TreeGen { val global: SymbolTable.this.type = SymbolTable.this }
   lazy val treeBuild = gen
 
-  def isImpossibleSubTypeRef(sym1: Symbol, sym2: Symbol) = {
-    if (sym1.id <= 8)
-      !ScalaWellKnownIds.isWeakPrimitiveSubclass(sym1.id, sym2.id)
-    else
-      !(sym1 isWeakSubClass sym2)
-  }
-
   def log(msg: => AnyRef): Unit
   def warning(msg: String): Unit     = Console.err.println(msg)
   def inform(msg: String): Unit      = Console.err.println(msg)

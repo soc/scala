@@ -560,8 +560,14 @@ trait Implicits {
      *  to a final true or false.
      */
     private def isPlausiblySubType(tp1: Type, tp2: Type) = !isImpossibleSubType(tp1, tp2)
+    private def isImpossibleSubTypeRef(sym1: Symbol, sym2: Symbol) = {
+      if (sym1.id <= 8)
+        !ScalaWellKnownIds.isWeakPrimitiveSubclass(sym1.id, sym2.id)
+      else
+        !(sym1 isWeakSubClass sym2)
+    }
     private def isImpossibleSubType(tp1: Type, tp2: Type) = tp1.dealiasWiden match {
-      // case TypeRef(_, ByNameParamClass | RepeatedParamClass, _) => true
+      case TypeRef(_, ByNameParamClass | RepeatedParamClass, _) => true
       // We can only rule out a subtype relationship if the left hand
       // side is a class, else we may not know enough.
       case tr1 @ TypeRef(_, sym1, _) if sym1.isClass            =>
