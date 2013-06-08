@@ -6,7 +6,8 @@
 **                          |/                                          **
 \*                                                                      */
 
-package scala.util.parsing.json
+package scala
+package util.parsing.json
 
 /**
  * This object provides a simple interface to the JSON parser class.
@@ -27,6 +28,7 @@ package scala.util.parsing.json
  *
  * @author Derek Chen-Becker <"java"+@+"chen-becker"+"."+"org">
  */
+@deprecated("This object will be removed.", "2.11.0")
 object JSON extends Parser {
 
   /**

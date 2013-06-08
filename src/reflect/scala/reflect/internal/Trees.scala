@@ -3,7 +3,8 @@
  * @author  Martin Odersky
  */
 
-package scala.reflect
+package scala
+package reflect
 package internal
 
 import Flags._
@@ -250,6 +251,19 @@ trait Trees extends api.Trees { self: SymbolTable =>
   trait RefTree extends SymTree with NameTree with RefTreeApi {
     def qualifier: Tree    // empty for Idents
     def name: Name
+  }
+
+  object RefTree extends RefTreeExtractor {
+    def apply(qualifier: Tree, name: Name): RefTree = qualifier match {
+      case EmptyTree =>
+        Ident(name)
+      case qual if qual.isTerm =>
+        Select(qual, name)
+      case qual if qual.isType =>
+        assert(name.isTypeName, s"qual = $qual, name = $name")
+        SelectFromTypeTree(qual, name.toTypeName)
+    }
+    def unapply(refTree: RefTree): Option[(Tree, Name)] = Some((refTree.qualifier, refTree.name))
   }
 
   abstract class DefTree extends SymTree with NameTree with DefTreeApi {
@@ -943,6 +957,7 @@ trait Trees extends api.Trees { self: SymbolTable =>
       if (flags1 == flags) this
       else Modifiers(flags1, privateWithin, annotations) setPositions positions
     }
+    def | (flag: Int): Modifiers = this | flag.toLong
     def | (flag: Long): Modifiers = {
       val flags1 = flags | flag
       if (flags1 == flags) this
@@ -1647,6 +1662,21 @@ trait Trees extends api.Trees { self: SymbolTable =>
       )
     case t =>
       sys.error("Not a ClassDef: " + t + "/" + t.getClass)
+  }
+
+  def copyModuleDef(tree: Tree)(
+    mods: Modifiers        = null,
+    name: Name             = null,
+    impl: Template         = null
+  ): ModuleDef = tree match {
+    case ModuleDef(mods0, name0, impl0) =>
+      treeCopy.ModuleDef(tree,
+        if (mods eq null) mods0 else mods,
+        if (name eq null) name0 else name,
+        if (impl eq null) impl0 else impl
+      )
+    case t =>
+      sys.error("Not a ModuleDef: " + t + "/" + t.getClass)
   }
 
   def deriveDefDef(ddef: Tree)(applyToRhs: Tree => Tree): DefDef = ddef match {

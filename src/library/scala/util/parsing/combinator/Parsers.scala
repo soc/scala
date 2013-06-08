@@ -6,7 +6,8 @@
 **                          |/                                          **
 \*                                                                      */
 
-package scala.util.parsing.combinator
+package scala
+package util.parsing.combinator
 
 import scala.util.parsing.input._
 import scala.collection.mutable.ListBuffer
@@ -156,12 +157,6 @@ trait Parsers {
   }
 
   private lazy val lastNoSuccessVar = new DynamicVariable[Option[NoSuccess]](None)
-
-  @deprecated("lastNoSuccess was not thread-safe and will be removed in 2.11.0", "2.10.0")
-  def lastNoSuccess: NoSuccess = lastNoSuccessVar.value.orNull
-
-  @deprecated("lastNoSuccess was not thread-safe and will be removed in 2.11.0", "2.10.0")
-  def lastNoSuccess_=(x: NoSuccess): Unit = lastNoSuccessVar.value = Option(x)
 
   /** A common super-class for unsuccessful parse results. */
   sealed abstract class NoSuccess(val msg: String, override val next: Input) extends ParseResult[Nothing] { // when we don't care about the difference between Failure and Error

@@ -251,15 +251,15 @@ trait JavaParsers extends ast.parser.ParsersCommon with JavaScanners {
     def basicType(): Tree =
       atPos(in.pos) {
         in.token match {
-          case BYTE => in.nextToken(); TypeTree(ByteClass.tpe)
-          case SHORT => in.nextToken(); TypeTree(ShortClass.tpe)
-          case CHAR => in.nextToken(); TypeTree(CharClass.tpe)
-          case INT => in.nextToken(); TypeTree(IntClass.tpe)
-          case LONG => in.nextToken(); TypeTree(LongClass.tpe)
-          case FLOAT => in.nextToken(); TypeTree(FloatClass.tpe)
-          case DOUBLE => in.nextToken(); TypeTree(DoubleClass.tpe)
-          case BOOLEAN => in.nextToken(); TypeTree(BooleanClass.tpe)
-          case _ => syntaxError("illegal start of type", skipIt = true); errorTypeTree
+          case BYTE    => in.nextToken(); TypeTree(ByteTpe)
+          case SHORT   => in.nextToken(); TypeTree(ShortTpe)
+          case CHAR    => in.nextToken(); TypeTree(CharTpe)
+          case INT     => in.nextToken(); TypeTree(IntTpe)
+          case LONG    => in.nextToken(); TypeTree(LongTpe)
+          case FLOAT   => in.nextToken(); TypeTree(FloatTpe)
+          case DOUBLE  => in.nextToken(); TypeTree(DoubleTpe)
+          case BOOLEAN => in.nextToken(); TypeTree(BooleanTpe)
+          case _       => syntaxError("illegal start of type", skipIt = true); errorTypeTree
         }
       }
 
@@ -368,6 +368,9 @@ trait JavaParsers extends ast.parser.ParsersCommon with JavaScanners {
           case FINAL =>
             flags |= Flags.FINAL
             in.nextToken()
+          case DEFAULT =>
+            flags |= Flags.DEFAULTMETHOD
+            in.nextToken()
           case NATIVE =>
             addAnnot(NativeAttr)
             in.nextToken()
@@ -459,7 +462,7 @@ trait JavaParsers extends ast.parser.ParsersCommon with JavaScanners {
       var rtpt =
         if (isVoid) {
           in.nextToken()
-          TypeTree(UnitClass.tpe) setPos in.pos
+          TypeTree(UnitTpe) setPos in.pos
         } else typ()
       var pos = in.currentPos
       val rtptName = rtpt match {
@@ -485,8 +488,9 @@ trait JavaParsers extends ast.parser.ParsersCommon with JavaScanners {
           val vparams = formalParams()
           if (!isVoid) rtpt = optArrayBrackets(rtpt)
           optThrows()
+          val bodyOk = !inInterface || (mods hasFlag Flags.DEFAULTMETHOD)
           val body =
-            if (!inInterface && in.token == LBRACE) {
+            if (bodyOk && in.token == LBRACE) {
               methodBody()
             } else {
               if (parentToken == AT && in.token == DEFAULT) {
@@ -494,7 +498,7 @@ trait JavaParsers extends ast.parser.ParsersCommon with JavaScanners {
                   atPos(pos) {
                     New(Select(scalaDot(nme.runtime), tpnme.AnnotationDefaultATTR), Nil)
                   }
-                mods1 = mods1 withAnnotations List(annot)
+                mods1 = mods1 withAnnotations annot :: Nil
                 skipTo(SEMI)
                 accept(SEMI)
                 blankExpr
@@ -781,7 +785,7 @@ trait JavaParsers extends ast.parser.ParsersCommon with JavaScanners {
           blankExpr),
         DefDef(
           Modifiers(Flags.JAVA | Flags.STATIC), nme.valueOf, List(),
-          List(List(makeParam("x", TypeTree(StringClass.tpe)))),
+          List(List(makeParam("x", TypeTree(StringTpe)))),
           enumType,
           blankExpr))
       accept(RBRACE)

@@ -3,7 +3,8 @@
  * @author  Martin Odersky
  */
 
-package scala.reflect
+package scala
+package reflect
 package internal
 
 import Flags._
@@ -17,7 +18,7 @@ abstract class TreeInfo {
   val global: SymbolTable
 
   import global._
-  import definitions.{ isVarArgsList, isCastSymbol, ThrowableClass, TupleClass, MacroContextClass, MacroContextPrefixType }
+  import definitions.{ isTupleSymbol, isVarArgsList, isCastSymbol, ThrowableClass, TupleClass, MacroContextClass, MacroContextPrefixType, uncheckedStableClass }
 
   /* Does not seem to be used. Not sure what it does anyway.
   def isOwnerDefinition(tree: Tree): Boolean = tree match {
@@ -64,6 +65,80 @@ abstract class TreeInfo {
     case _ =>
       false
   }
+
+  /** Is `tree` a path, defined as follows? (Spec: 3.1 Paths)
+   *
+   * - The empty path ε (which cannot be written explicitly in user programs).
+   * - C.this, where C references a class.
+   * - p.x where p is a path and x is a stable member of p.
+   * - C.super.x or C.super[M].x where C references a class
+   *   and x references a stable member of the super class or designated parent class M of C.
+   *
+   * NOTE: Trees with errors are (mostly) excluded.
+   *
+   * Path ::= StableId | [id ‘.’] this
+   *
+   */
+  def isPath(tree: Tree, allowVolatile: Boolean): Boolean =
+    tree match {
+      // Super is not technically a path.
+      // However, syntactically, it can only occur nested in a Select.
+      // This gives a nicer definition of isStableIdentifier that's equivalent to the spec's.
+      // must consider Literal(_) a path for typedSingletonTypeTree
+      case EmptyTree | Literal(_) => true
+      case This(_) | Super(_, _)  => symOk(tree.symbol)
+      case _                      => isStableIdentifier(tree, allowVolatile)
+    }
+
+  /** Is `tree` a stable identifier, a path which ends in an identifier?
+   *
+   * StableId ::= id
+   *           | Path ‘.’ id
+   *           | [id ’.’] ‘super’ [‘[’ id ‘]’] ‘.’ id
+   */
+  def isStableIdentifier(tree: Tree, allowVolatile: Boolean): Boolean =
+    tree match {
+      case Ident(_)        => symOk(tree.symbol) && tree.symbol.isStable && !tree.symbol.hasVolatileType // TODO SPEC: not required by spec
+      case Select(qual, _) => isStableMemberOf(tree.symbol, qual, allowVolatile) && isPath(qual, allowVolatile)
+      case Apply(Select(free @ Ident(_), nme.apply), _) if free.symbol.name endsWith nme.REIFY_FREE_VALUE_SUFFIX =>
+        // see a detailed explanation of this trick in `GenSymbols.reifyFreeTerm`
+        free.symbol.hasStableFlag && isPath(free, allowVolatile)
+      case _               => false
+    }
+
+  private def symOk(sym: Symbol) = sym != null && !sym.isError && sym != NoSymbol
+  private def typeOk(tp: Type)   =  tp != null && ! tp.isError
+
+  /** Assuming `sym` is a member of `tree`, is it a "stable member"?
+   *
+   * Stable members are packages or members introduced
+   * by object definitions or by value definitions of non-volatile types (§3.6).
+   */
+  def isStableMemberOf(sym: Symbol, tree: Tree, allowVolatile: Boolean): Boolean = (
+    symOk(sym)       && (!sym.isTerm   || (sym.isStable && (allowVolatile || !sym.hasVolatileType))) &&
+    typeOk(tree.tpe) && (allowVolatile || !hasVolatileType(tree)) && !definitions.isByNameParamType(tree.tpe)
+  )
+
+  /** Is `tree`'s type volatile? (Ignored if its symbol has the @uncheckedStable annotation.)
+   */
+  def hasVolatileType(tree: Tree): Boolean =
+    symOk(tree.symbol) && tree.tpe.isVolatile && !tree.symbol.hasAnnotation(uncheckedStableClass)
+
+  /** Is `tree` either a non-volatile type,
+   *  or a path that does not include any of:
+   *   - a reference to a mutable variable/field
+   *   - a reference to a by-name parameter
+   *   - a member selection on a volatile type (Spec: 3.6 Volatile Types)?
+   *
+   * Such a tree is a suitable target for type selection.
+   */
+  def admitsTypeSelection(tree: Tree): Boolean = isPath(tree, allowVolatile = false)
+
+  /** Is `tree` admissible as a stable identifier pattern (8.1.5 Stable Identifier Patterns)?
+   *
+   * We disregard volatility, as it's irrelevant in patterns (SI-6815)
+   */
+  def isStableIdentifierPattern(tree: Tree): Boolean = isStableIdentifier(tree, allowVolatile = true)
 
   // TODO SI-5304 tighten this up so we don't elide side effect in module loads
   def isQualifierSafeToElide(tree: Tree): Boolean = isExprSafeToInline(tree)
@@ -202,16 +277,16 @@ abstract class TreeInfo {
    *  same object?
    */
   def isSelfConstrCall(tree: Tree): Boolean = tree match {
-    case Applied(Ident(nme.CONSTRUCTOR), _, _) => true
+    case Applied(Ident(nme.CONSTRUCTOR), _, _)           => true
     case Applied(Select(This(_), nme.CONSTRUCTOR), _, _) => true
-    case _ => false
+    case _                                               => false
   }
 
   /** Is tree a super constructor call?
    */
   def isSuperConstrCall(tree: Tree): Boolean = tree match {
     case Applied(Select(Super(_, _), nme.CONSTRUCTOR), _, _) => true
-    case _ => false
+    case _                                                   => false
   }
 
   /**
@@ -472,9 +547,9 @@ abstract class TreeInfo {
   /** Does this CaseDef catch Throwable? */
   def catchesThrowable(cdef: CaseDef) = (
     cdef.guard.isEmpty && (unbind(cdef.pat) match {
-      case Ident(nme.WILDCARD)       => true
-      case i@Ident(name)             => hasNoSymbol(i)
-      case _                         => false
+      case Ident(nme.WILDCARD) => true
+      case i@Ident(name)       => hasNoSymbol(i)
+      case _                   => false
     })
   )
 
@@ -530,6 +605,20 @@ abstract class TreeInfo {
     case Star(_)  => true
     case _        => false
   }
+
+  /**
+   * {{{
+   * //------------------------ => effectivePatternArity(args)
+   * case Extractor(a)          => 1
+   * case Extractor(a, b)       => 2
+   * case Extractor((a, b))     => 2
+   * case Extractor(a @ (b, c)) => 2
+   * }}}
+   */
+  def effectivePatternArity(args: List[Tree]): Int = (args.map(unbind) match {
+    case Apply(fun, xs) :: Nil if isTupleSymbol(fun.symbol) => xs
+    case xs                                                 => xs
+  }).length
 
 
   // used in the symbols for labeldefs and valdefs emitted by the pattern matcher
@@ -747,8 +836,18 @@ abstract class TreeInfo {
     }
 
     def unapply(tree: Tree) = refPart(tree) match {
-      case ref: RefTree => Some((ref.qualifier.symbol, ref.symbol, dissectApplied(tree).targs))
-      case _            => None
+      case ref: RefTree => {
+        val qual = ref.qualifier
+        val isBundle = definitions.isMacroBundleType(qual.tpe)
+        val owner =
+          if (isBundle) qual.tpe.typeSymbol
+          else {
+            val sym = if (qual.hasSymbolField) qual.symbol else NoSymbol
+            if (sym.isModule) sym.moduleClass else sym
+          }
+        Some((isBundle, owner, ref.symbol, dissectApplied(tree).targs))
+      }
+      case _  => None
     }
   }
 

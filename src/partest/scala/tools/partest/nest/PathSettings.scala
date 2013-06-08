@@ -5,11 +5,9 @@
 package scala.tools.partest
 package nest
 
-import scala.tools.nsc.Properties.{ setProp, propOrEmpty, propOrNone, propOrElse }
 import scala.tools.nsc.util.ClassPath
-import scala.tools.nsc.io
-import scala.util.Properties.{ envOrElse, envOrNone, javaHome, jdkHome }
-import io.{ Path, File, Directory }
+import scala.tools.nsc.io.{ Path, File, Directory }
+import Path._
 
 object PathSettings {
   import PartestDefaults.{ testRootDir, srcDirName }
@@ -19,6 +17,8 @@ object PathSettings {
   private def findJar(d: Directory, name: String): Option[File] = findJar(d.files, name)
   private def findJar(files: Iterator[File], name: String): Option[File] =
     files filter (_ hasExtension "jar") find { _.name startsWith name }
+  private def findJarOrFail(name: String, ds: Directory*): File = findJar(ds flatMap (_.files) iterator, name) getOrElse
+    sys.error(s"'${name}.jar' not found in '${ds map (_.path) mkString ", "}'.")
 
   // Directory <root>/test
   lazy val testRoot: Directory = testRootDir getOrElse {
@@ -73,37 +73,14 @@ object PathSettings {
       sys.error("No scalacheck jar found in '%s' or '%s'".format(buildPackLibDir, srcLibDir))
     }
 
+  lazy val testInterface: File = findJarOrFail("test-interface", buildPackLibDir, srcLibDir)
+
   lazy val diffUtils: File =
     findJar(buildPackLibDir.files, "diffutils") getOrElse sys.error(s"No diffutils.jar found in '$buildPackLibDir'.")
 
-  /** The platform-specific support jar.
-   *  Usually this is tools.jar in the jdk/lib directory of the platform distribution.
-   *  The file location is determined by probing the lib directory under JDK_HOME or JAVA_HOME,
-   *  if one of those environment variables is set, then the lib directory under java.home,
-   *  and finally the lib directory under the parent of java.home. Or, as a last resort,
-   *  search deeply under those locations (except for the parent of java.home, on the notion
-   *  that if this is not a canonical installation, then that search would have little
-   *  chance of succeeding).
+  /** The platform-specific support jar, `tools.jar`.
    */
-  lazy val platformTools: Option[File] = {
-    val jarName = "tools.jar"
-    def jarPath(path: Path) = (path / "lib" / jarName).toFile
-    def jarAt(path: Path) = {
-      val f = jarPath(path)
-      if (f.isFile) Some(f) else None
-    }
-    val jdkDir = {
-      val d = Directory(jdkHome)
-      if (d.isDirectory) Some(d) else None
-    }
-    def deeply(dir: Directory) = dir.deepFiles find (_.name == jarName)
-
-    val home    = envOrNone("JDK_HOME") orElse envOrNone("JAVA_HOME") map (p => Path(p))
-    val install = Some(Path(javaHome))
-
-    (home flatMap jarAt) orElse (install flatMap jarAt) orElse (install map (_.parent) flatMap jarAt) orElse
-      (jdkDir flatMap deeply)
-  }
+  lazy val platformTools: Option[File] = PathResolver.SupplementalLocations.platformTools
 }
 
 class PathSettings() {

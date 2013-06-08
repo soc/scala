@@ -8,7 +8,8 @@
 
 
 
-package scala.util.parsing.json
+package scala
+package util.parsing.json
 
 import scala.util.parsing.combinator._
 import scala.util.parsing.combinator.lexical._
@@ -17,6 +18,7 @@ import scala.util.parsing.input.CharArrayReader.EofCh
 /**
  *  @author Derek Chen-Becker <"java"+@+"chen-becker"+"."+"org">
  */
+@deprecated("This class will be removed.", "2.11.0")
 class Lexer extends StdLexical with ImplicitConversions {
 
   override def token: Parser[Token] =

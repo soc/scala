@@ -3,10 +3,13 @@
  * @author  Martin Odersky
  */
 
-package scala.tools.nsc
+package scala
+package tools
+package nsc
 
 import java.io.{ File, FileOutputStream, PrintWriter, IOException, FileNotFoundException }
 import java.nio.charset.{ Charset, CharsetDecoder, IllegalCharsetNameException, UnsupportedCharsetException }
+import java.util.UUID._
 import scala.compat.Platform.currentTime
 import scala.collection.{ mutable, immutable }
 import io.{ SourceReader, AbstractFile, Path }
@@ -14,6 +17,7 @@ import reporters.{ Reporter, ConsoleReporter }
 import util.{ ClassPath, MergedClassPath, StatisticsInfo, returning, stackTraceString, stackTraceHeadString }
 import scala.reflect.internal.util.{ OffsetPosition, SourceFile, NoSourceFile, BatchSourceFile, ScriptSourceFile }
 import scala.reflect.internal.pickling.{ PickleBuffer, PickleFormat }
+import scala.reflect.io.VirtualFile
 import symtab.{ Flags, SymbolTable, SymbolLoaders, SymbolTrackers }
 import symtab.classfile.Pickler
 import plugins.Plugins
@@ -218,7 +222,7 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
   // not deprecated yet, but a method called "error" imported into
   // nearly every trait really must go.  For now using globalError.
   def error(msg: String)                = globalError(msg)
-  def inform(msg: String)               = reporter.echo(msg)
+  override def inform(msg: String)      = reporter.echo(msg)
   override def globalError(msg: String) = reporter.error(NoPosition, msg)
   override def warning(msg: String)     =
     if (settings.fatalWarnings) globalError(msg)
@@ -1056,14 +1060,12 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
   @inline final def enteringTyper[T](op: => T): T         = enteringPhase(currentRun.typerPhase)(op)
   @inline final def enteringUncurry[T](op: => T): T       = enteringPhase(currentRun.uncurryPhase)(op)
 
-  // Owners up to and including the first package class.
+  // Owners which aren't package classes.
   private def ownerChainString(sym: Symbol): String = (
     if (sym == null) ""
-    else sym.ownerChain.span(!_.isPackageClass) match {
-      case (xs, pkg :: _) => (xs :+ pkg) mkString " -> "
-      case _              => sym.ownerChain mkString " -> " // unlikely
-    }
+    else sym.ownerChain takeWhile (!_.isPackageClass) mkString " -> "
   )
+
   private def formatExplain(pairs: (String, Any)*): String = (
     pairs.toList collect { case (k, v) if v != null => "%20s: %s".format(k, v) } mkString "\n"
   )
@@ -1071,41 +1073,45 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
   /** Don't want to introduce new errors trying to report errors,
    *  so swallow exceptions.
    */
-  override def supplementErrorMessage(errorMessage: String): String =
+  override def supplementErrorMessage(errorMessage: String): String = {
     if (currentRun.supplementedError) errorMessage
     else try {
+      currentRun.supplementedError = true
       val tree      = analyzer.lastTreeToTyper
       val sym       = tree.symbol
       val tpe       = tree.tpe
-      val enclosing = lastSeenContext.enclClassOrMethod.tree
+      val site      = lastSeenContext.enclClassOrMethod.owner
+      val pos_s     = if (tree.pos.isDefined) s"line ${tree.pos.line} of ${tree.pos.source.file}" else "<unknown>"
+      val context_s = try {
+        // Taking 3 before, 3 after the fingered line.
+        val start = 0 max (tree.pos.line - 3)
+        val xs = scala.reflect.io.File(tree.pos.source.file.file).lines drop start take 7
+        val strs = xs.zipWithIndex map { case (line, idx) => f"${start + idx}%6d $line" }
+        strs.mkString("== Source file context for tree position ==\n\n", "\n", "")
+      }
+      catch { case t: Exception => devWarning("" + t) ; "<Cannot read source file>" }
 
       val info1 = formatExplain(
         "while compiling"    -> currentSource.path,
-        "during phase"       -> ( if (globalPhase eq phase) phase else "global=%s, enteringPhase=%s".format(globalPhase, phase) ),
+        "during phase"       -> ( if (globalPhase eq phase) phase else "globalPhase=%s, enteringPhase=%s".format(globalPhase, phase) ),
         "library version"    -> scala.util.Properties.versionString,
         "compiler version"   -> Properties.versionString,
         "reconstructed args" -> settings.recreateArgs.mkString(" ")
       )
       val info2 = formatExplain(
         "last tree to typer" -> tree.summaryString,
+        "tree position"      -> pos_s,
+        "tree tpe"           -> tpe,
         "symbol"             -> Option(sym).fold("null")(_.debugLocationString),
-        "symbol definition"  -> Option(sym).fold("null")(_.defString),
-        "tpe"                -> tpe,
+        "symbol definition"  -> Option(sym).fold("null")(s => s.defString + s" (a ${s.shortSymbolClass})"),
+        "symbol package"     -> sym.enclosingPackage.fullName,
         "symbol owners"      -> ownerChainString(sym),
-        "context owners"     -> ownerChainString(lastSeenContext.owner)
+        "call site"          -> (site.fullLocationString + " in " + site.enclosingPackage)
       )
-      val info3: List[String] = (
-           ( List("== Enclosing template or block ==", nodePrinters.nodeToString(enclosing).trim) )
-        ++ ( if (tpe eq null) Nil else List("== Expanded type of tree ==", typeDeconstruct.show(tpe)) )
-        ++ ( if (!settings.debug) Nil else List("== Current unit body ==", nodePrinters.nodeToString(currentUnit.body)) )
-        ++ ( List(errorMessage) )
-      )
-
-      currentRun.supplementedError = true
-
-      ("\n" + info1) :: info2 :: info3 mkString "\n\n"
+      ("\n" + info1) :: info2 :: context_s :: Nil mkString "\n\n"
     }
     catch { case _: Exception | _: TypeError => errorMessage }
+  }
 
   /** The id of the currently active run
    */
@@ -1489,18 +1495,8 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
       compileUnits(sources map (new CompilationUnit(_)), firstPhase)
     }
 
-    def compileUnits(units: List[CompilationUnit], fromPhase: Phase) {
-      try compileUnitsInternal(units, fromPhase)
-      catch { case ex: Throwable =>
-        val shown = if (settings.verbose)
-           stackTraceString(ex)
-         else
-           stackTraceHeadString(ex) // note that error stacktraces do not print in fsc
-
-        globalError(supplementErrorMessage("uncaught exception during compilation: " + shown))
-        throw ex
-      }
-    }
+    def compileUnits(units: List[CompilationUnit], fromPhase: Phase): Unit =
+      compileUnitsInternal(units, fromPhase)
 
     private def compileUnitsInternal(units: List[CompilationUnit], fromPhase: Phase) {
       doInvalidation()
@@ -1617,6 +1613,25 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
           enteringPhase(ph)(ph.asInstanceOf[GlobalPhase] applyPhase unit))
         refreshProgress()
       }
+    }
+
+    // TODO: provide a way to specify a pretty name for debugging purposes
+    private def randomFileName() = (
+      "compileLateSynthetic-" + randomUUID().toString.replace("-", "") + ".scala"
+    )
+
+    def compileLate(code: PackageDef) {
+      // compatibility with SBT
+      // on the one hand, we need to specify some jfile here, otherwise sbt crashes with an NPE (SI-6870)
+      // on the other hand, we can't specify the obvious enclosingUnit, because then sbt somehow fails to run tests using type macros
+      // okay, now let's specify a guaranteedly non-existent file in an existing directory (so that we don't run into permission problems)
+      val syntheticFileName = randomFileName()
+      val fakeJfile = new java.io.File(syntheticFileName)
+      val virtualFile = new VirtualFile(syntheticFileName) { override def file = fakeJfile }
+      val sourceFile = new BatchSourceFile(virtualFile, code.toString)
+      val unit = new CompilationUnit(sourceFile)
+      unit.body = code
+      compileLate(unit)
     }
 
     /** Reset package class to state at typer (not sure what this

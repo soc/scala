@@ -3,7 +3,8 @@
  * @author Alexander Spoon
  */
 
-package scala.tools.nsc
+package scala
+package tools.nsc
 package interpreter
 
 import Predef.{ println => _, _ }
@@ -221,6 +222,7 @@ class ILoop(in0: Option[BufferedReader], protected val out: JPrintWriter)
     shCommand,
     nullary("silent", "disable/enable automatic printing of results", verbosity),
     cmd("type", "[-v] <expr>", "display the type of an expression without evaluating it", typeCommand),
+    cmd("kind", "[-v] <expr>", "display the kind of expression's type", kindCommand),
     nullary("warnings", "show the suppressed warnings from the most recent line which had any", warningsCommand)
   )
 
@@ -253,16 +255,8 @@ class ILoop(in0: Option[BufferedReader], protected val out: JPrintWriter)
     }
   }
 
-  private def findToolsJar() = {
-    val jdkPath = Directory(jdkHome)
-    val jar     = jdkPath / "lib" / "tools.jar" toFile
+  private def findToolsJar() = PathResolver.SupplementalLocations.platformTools
 
-    if (jar isFile)
-      Some(jar)
-    else if (jdkPath.isDirectory)
-      jdkPath.deepFiles find (_.name == "tools.jar")
-    else None
-  }
   private def addToolsJarToLoader() = {
     val cl = findToolsJar() match {
       case Some(tools) => ScalaClassLoader.fromURLs(Seq(tools.toURL), intp.classLoader)
@@ -286,9 +280,15 @@ class ILoop(in0: Option[BufferedReader], protected val out: JPrintWriter)
   // Still todo: modules.
   private def typeCommand(line0: String): Result = {
     line0.trim match {
-      case ""                      => ":type [-v] <expression>"
-      case s if s startsWith "-v " => intp.typeCommandInternal(s stripPrefix "-v " trim, verbose = true)
-      case s                       => intp.typeCommandInternal(s, verbose = false)
+      case "" => ":type [-v] <expression>"
+      case s  => intp.typeCommandInternal(s stripPrefix "-v " trim, verbose = s startsWith "-v ")
+    }
+  }
+
+  private def kindCommand(expr: String): Result = {
+    expr.trim match {
+      case "" => ":kind [-v] <expression>"
+      case s  => intp.kindCommandInternal(s stripPrefix "-v " trim, verbose = s startsWith "-v ")
     }
   }
 
@@ -642,10 +642,6 @@ class ILoop(in0: Option[BufferedReader], protected val out: JPrintWriter)
   }
 
   private def loopPostInit() {
-    in match {
-      case x: JLineReader => x.consoleReader.postInit
-      case _              =>
-    }
     // Bind intp somewhere out of the regular namespace where
     // we can get at it in generated code.
     intp.quietBind(NamedParam[IMain]("$intp", intp)(tagOfIMain, classTag[IMain]))
@@ -660,6 +656,11 @@ class ILoop(in0: Option[BufferedReader], protected val out: JPrintWriter)
       replProps.power setValue true
       unleashAndSetPhase()
       asyncMessage(power.banner)
+    }
+    // SI-7418 Now, and only now, can we enable TAB completion.
+    in match {
+      case x: JLineReader => x.consoleReader.postInit
+      case _              =>
     }
   }
   def process(settings: Settings): Boolean = savingContextLoader {

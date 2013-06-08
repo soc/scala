@@ -6,7 +6,8 @@
 **                          |/                                          **
 \*                                                                      */
 
-package scala.xml
+package scala
+package xml
 package factory
 
 /** This class logs what the nodefactory is actually doing.
@@ -14,8 +15,9 @@ package factory
 {{{
 object testLogged extends App {
   val x = new scala.xml.parsing.NoBindingFactoryAdapter
-        with scala.xml.factory.LoggedNodeFactory[scala.xml.Elem]
-        with scala.util.logging.ConsoleLogger
+              with scala.xml.factory.LoggedNodeFactory[scala.xml.Elem] {
+            override def log(s: String) = println(s)
+          }
 
   Console.println("Start")
   val doc = x.load(new java.net.URL("http://example.com/file.xml"))
@@ -27,7 +29,8 @@ object testLogged extends App {
  *  @author  Burak Emir
  *  @version 1.0
  */
-trait LoggedNodeFactory[A <: Node] extends NodeFactory[A] with scala.util.logging.Logged {
+@deprecated("This trait will be removed.", "2.11")
+trait LoggedNodeFactory[A <: Node] extends NodeFactory[A] {
   // configuration values
   val logNode      = true
   val logText      = false
@@ -82,4 +85,6 @@ trait LoggedNodeFactory[A <: Node] extends NodeFactory[A] with scala.util.loggin
     super.makeProcInstr(t, s)
   }
 
+  @deprecated("This method and its usages will be removed. Use a debugger to debug code.", "2.11")
+  def log(msg: String): Unit = {}
 }

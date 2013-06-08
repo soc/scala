@@ -103,7 +103,7 @@ trait MethodSynthesis {
       createMethod(original)(m => gen.mkMethodCall(newMethod, transformArgs(m.paramss.head map Ident)))
 
     def createSwitchMethod(name: Name, range: Seq[Int], returnType: Type)(f: Int => Tree) = {
-      createMethod(name, List(IntClass.tpe), returnType) { m =>
+      createMethod(name, List(IntTpe), returnType) { m =>
         val arg0    = Ident(m.firstParam)
         val default = DEFAULT ==> THROW(IndexOutOfBoundsExceptionClass, arg0)
         val cases   = range.map(num => CASE(LIT(num)) ==> f(num)).toList :+ default
@@ -382,7 +382,7 @@ trait MethodSynthesis {
       def name       = tree.name
       def category   = GetterTargetClass
       def flagsMask  = GetterFlags
-      def flagsExtra = ACCESSOR | ( if (tree.mods.isMutable) 0 else STABLE )
+      def flagsExtra = ACCESSOR.toLong | ( if (tree.mods.isMutable) 0 else STABLE )
 
       override def validate() {
         assert(derivedSym != NoSymbol, tree)

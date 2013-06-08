@@ -6,7 +6,8 @@
 **                          |/                                          **
 \*                                                                      */
 
-package scala.math
+package scala
+package math
 
 import java.math.BigInteger
 import scala.language.implicitConversions
@@ -33,9 +34,9 @@ object BigInt {
     if (minCached <= i && i <= maxCached) {
       val offset = i - minCached
       var n = cache(offset)
-      if (n eq null) { n = new BigInt(BigInteger.valueOf(i)); cache(offset) = n }
+      if (n eq null) { n = new BigInt(BigInteger.valueOf(i.toLong)); cache(offset) = n }
       n
-    } else new BigInt(BigInteger.valueOf(i))
+    } else new BigInt(BigInteger.valueOf(i.toLong))
 
   /** Constructs a `BigInt` whose value is equal to that of the
    *  specified long value.

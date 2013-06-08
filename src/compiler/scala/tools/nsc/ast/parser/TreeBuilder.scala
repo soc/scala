@@ -242,14 +242,25 @@ abstract class TreeBuilder {
       Assign(lhs, rhs)
   }
 
+  /** Tree for `od op`, start is start0 if od.pos is borked. */
+  def makePostfixSelect(start0: Int, end: Int, od: Tree, op: Name): Tree = {
+    val start = if (od.pos.isDefined) od.pos.startOrPoint else start0
+    atPos(r2p(start, end, end)) { new PostfixSelect(od, op.encode) }
+  }
+
   /** A type tree corresponding to (possibly unary) intersection type */
   def makeIntersectionTypeTree(tps: List[Tree]): Tree =
     if (tps.tail.isEmpty) tps.head
     else CompoundTypeTree(Template(tps, emptyValDef, Nil))
 
   /** Create tree representing a while loop */
-  def makeWhile(lname: TermName, cond: Tree, body: Tree): Tree = {
-    val continu = atPos(o2p(body.pos pointOrElse wrappingPos(List(cond, body)).pos.endOrPoint)) { Apply(Ident(lname), Nil) }
+  def makeWhile(startPos: Int, cond: Tree, body: Tree): Tree = {
+    val lname = freshTermName(nme.WHILE_PREFIX)
+    def default = wrappingPos(List(cond, body)) match {
+      case p if p.isDefined => p.endOrPoint
+      case _                => startPos
+    }
+    val continu = atPos(o2p(body.pos pointOrElse default)) { Apply(Ident(lname), Nil) }
     val rhs = If(cond, Block(List(body), continu), Literal(Constant(())))
     LabelDef(lname, Nil, rhs)
   }

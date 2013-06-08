@@ -8,7 +8,8 @@
 
 
 
-package scala.util.parsing.json
+package scala
+package util.parsing.json
 
 import scala.util.parsing.combinator._
 import scala.util.parsing.combinator.syntactical._
@@ -18,6 +19,7 @@ import scala.util.parsing.combinator.syntactical._
  *
  *  @author Derek Chen-Becker <"java"+@+"chen-becker"+"."+"org">
  */
+@deprecated("This class will be removed.", "2.11.0")
 sealed abstract class JSONType {
   /**
    * This version of toString allows you to provide your own value
@@ -39,6 +41,7 @@ sealed abstract class JSONType {
  *
  * @author Derek Chen-Becker <"java"+@+"chen-becker"+"."+"org">
  */
+@deprecated("This object will be removed.", "2.11.0")
 object JSONFormat {
   /**
    * This type defines a function that can be used to
@@ -80,7 +83,7 @@ object JSONFormat {
        * Per RFC4627, section 2.5, we're not technically required to
        * encode the C1 codes, but we do to be safe.
        */
-      case c if ((c >= '\u0000' && c <= '\u001f') || (c >= '\u007f' && c <= '\u009f')) => "\\u%04x".format(c: Int)
+      case c if ((c >= '\u0000' && c <= '\u001f') || (c >= '\u007f' && c <= '\u009f')) => "\\u%04x".format(c.toInt)
       case c => c
     }.mkString
 }
@@ -90,6 +93,7 @@ object JSONFormat {
  *
  *  @author Derek Chen-Becker <"java"+@+"chen-becker"+"."+"org">
  */
+@deprecated("This class will be removed.", "2.11.0")
 case class JSONObject (obj : Map[String,Any]) extends JSONType {
   def toString (formatter : JSONFormat.ValueFormatter) =
     "{" + obj.map({ case (k,v) => formatter(k.toString) + " : " + formatter(v) }).mkString(", ") + "}"
@@ -99,6 +103,7 @@ case class JSONObject (obj : Map[String,Any]) extends JSONType {
  *  Represents a JSON Array (list).
  *  @author Derek Chen-Becker <"java"+@+"chen-becker"+"."+"org">
  */
+@deprecated("This class will be removed.", "2.11.0")
 case class JSONArray (list : List[Any]) extends JSONType {
   def toString (formatter : JSONFormat.ValueFormatter) =
     "[" + list.map(formatter).mkString(", ") + "]"
@@ -109,6 +114,7 @@ case class JSONArray (list : List[Any]) extends JSONType {
  *
  *  @author Derek Chen-Becker <"java"+@+"chen-becker"+"."+"org">
  */
+@deprecated("This class will be removed.", "2.11.0")
 class Parser extends StdTokenParsers with ImplicitConversions {
   // Fill in abstract defs
   type Tokens = Lexer

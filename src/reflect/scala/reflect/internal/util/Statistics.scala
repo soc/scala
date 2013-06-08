@@ -1,4 +1,5 @@
-package scala.reflect.internal.util
+package scala
+package reflect.internal.util
 
 import scala.collection.mutable
 
@@ -102,8 +103,8 @@ quant)
     for ((_, q) <- qs if q.underlying == q;
          r <- q :: q.children.toList if r.prefix.nonEmpty) yield r
 
-  private def showPercent(x: Double, base: Double) =
-    if (base == 0) "" else f" (${x / base * 100}%2.1f%)"
+  private def showPercent(x: Long, base: Long) =
+    if (base == 0) "" else f" (${x.toDouble / base.toDouble * 100}%2.1f%%)"
 
   /** The base trait for quantities.
    *  Quantities with non-empty prefix are printed in the statistics info.
@@ -155,7 +156,7 @@ quant)
       value = value0 + underlying.value - uvalue0
     }
     override def toString =
-      value + showPercent(value, underlying.value)
+      value + showPercent(value.toLong, underlying.value.toLong)
   }
 
   class Timer(val prefix: String, val phases: Seq[String]) extends Quantity {

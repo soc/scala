@@ -767,7 +767,7 @@ trait Namers extends MethodSynthesis {
     def accessorTypeCompleter(tree: ValDef, isSetter: Boolean) = mkTypeCompleter(tree) { sym =>
       logAndValidate(sym) {
         sym setInfo {
-          val tp = if (isSetter) MethodType(List(sym.newSyntheticValueParam(typeSig(tree))), UnitClass.tpe)
+          val tp = if (isSetter) MethodType(List(sym.newSyntheticValueParam(typeSig(tree))), UnitTpe)
                    else NullaryMethodType(typeSig(tree))
           pluginsTypeSigAccessor(tp, typer, tree, sym)
         }
@@ -866,7 +866,7 @@ trait Namers extends MethodSynthesis {
     private def templateSig(templ: Template): Type = {
       val clazz = context.owner
       def checkParent(tpt: Tree): Type = {
-        if (tpt.tpe.isError) AnyRefClass.tpe
+        if (tpt.tpe.isError) AnyRefTpe
         else tpt.tpe
       }
 
@@ -1271,7 +1271,7 @@ trait Namers extends MethodSynthesis {
 
             val defaultTree = atPos(vparam.pos.focus) {
               DefDef(
-                Modifiers(meth.flags & DefaultGetterFlags) | SYNTHETIC | DEFAULTPARAM | oflag,
+                Modifiers(meth.flags & DefaultGetterFlags) | (SYNTHETIC | DEFAULTPARAM | oflag).toLong,
                 name, deftParams, defvParamss, defTpt, defRhs)
             }
             if (!isConstr)
@@ -1346,13 +1346,16 @@ trait Namers extends MethodSynthesis {
     private def importSig(imp: Import) = {
       val Import(expr, selectors) = imp
       val expr1 = typer.typedQualifier(expr)
-      typer checkStable expr1
+
       if (expr1.symbol != null && expr1.symbol.isRootPackage)
         RootImportError(imp)
 
       if (expr1.isErrorTyped)
         ErrorType
       else {
+        if (!treeInfo.isStableIdentifierPattern(expr1))
+          typer.TyperErrorGen.UnstableTreeError(expr1)
+
         val newImport = treeCopy.Import(imp, expr1, selectors).asInstanceOf[Import]
         checkSelectors(newImport)
         transformed(imp) = newImport
@@ -1494,8 +1497,8 @@ trait Namers extends MethodSynthesis {
     private object RestrictJavaArraysMap extends TypeMap {
       def apply(tp: Type): Type = tp match {
         case TypeRef(pre, ArrayClass, List(elemtp))
-        if elemtp.typeSymbol.isAbstractType && !(elemtp <:< ObjectClass.tpe) =>
-          TypeRef(pre, ArrayClass, List(intersectionType(List(elemtp, ObjectClass.tpe))))
+        if elemtp.typeSymbol.isAbstractType && !(elemtp <:< ObjectTpe) =>
+          TypeRef(pre, ArrayClass, List(intersectionType(List(elemtp, ObjectTpe))))
         case _ =>
           mapOver(tp)
       }
@@ -1517,7 +1520,7 @@ trait Namers extends MethodSynthesis {
           AbstractMemberWithModiferError(sym, flag)
       }
       def checkNoConflict(flag1: Int, flag2: Int) {
-        if (sym hasAllFlags flag1 | flag2)
+        if (sym hasAllFlags flag1.toLong | flag2)
           IllegalModifierCombination(sym, flag1, flag2)
       }
       if (sym.isImplicit) {

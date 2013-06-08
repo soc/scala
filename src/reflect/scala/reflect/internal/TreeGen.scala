@@ -1,4 +1,5 @@
-package scala.reflect
+package scala
+package reflect
 package internal
 
 abstract class TreeGen extends macros.TreeBuilder {
@@ -141,17 +142,15 @@ abstract class TreeGen extends macros.TreeBuilder {
   }
 
   /** Computes stable type for a tree if possible */
-  def stableTypeFor(tree: Tree): Option[Type] = tree match {
-    case This(_) if tree.symbol != null && !tree.symbol.isError =>
-      Some(ThisType(tree.symbol))
-    case Ident(_) if tree.symbol.isStable =>
-      Some(singleType(tree.symbol.owner.thisType, tree.symbol))
-    case Select(qual, _) if ((tree.symbol ne null) && (qual.tpe ne null)) && // turned assert into guard for #4064
-                            tree.symbol.isStable && qual.tpe.isStable =>
-      Some(singleType(qual.tpe, tree.symbol))
-    case _ =>
-      None
-  }
+  def stableTypeFor(tree: Tree): Option[Type] =
+    if (treeInfo.admitsTypeSelection(tree))
+      tree match {
+        case This(_)         => Some(ThisType(tree.symbol))
+        case Ident(_)        => Some(singleType(tree.symbol.owner.thisType, tree.symbol))
+        case Select(qual, _) => Some(singleType(qual.tpe, tree.symbol))
+        case _               => None
+      }
+    else None
 
   /** Builds a reference with stable type to given symbol */
   def mkAttributedStableRef(pre: Type, sym: Symbol): Tree =
@@ -228,7 +227,7 @@ abstract class TreeGen extends macros.TreeBuilder {
 
   /** Cast `tree` to `pt`, unless tpe is a subtype of pt, or pt is Unit.  */
   def maybeMkAsInstanceOf(tree: Tree, pt: Type, tpe: Type, beforeRefChecks: Boolean = false): Tree =
-    if ((pt == UnitClass.tpe) || (tpe <:< pt)) tree
+    if ((pt == UnitTpe) || (tpe <:< pt)) tree
     else atPos(tree.pos)(mkAsInstanceOf(tree, pt, any = true, wrapInApply = !beforeRefChecks))
 
   /** Apparently we smuggle a Type around as a Literal(Constant(tp))
@@ -254,7 +253,7 @@ abstract class TreeGen extends macros.TreeBuilder {
    *  which is appropriate to the given Type.
    */
   def mkZero(tp: Type): Tree = tp.typeSymbol match {
-    case NothingClass => mkMethodCall(Predef_???, Nil) setType NothingClass.tpe
+    case NothingClass => mkMethodCall(Predef_???, Nil) setType NothingTpe
     case _            => Literal(mkConstantZero(tp)) setType tp
   }
 

@@ -27,9 +27,14 @@ class Colors(enabled: => Boolean) {
 
 object NestUI {
   private val testNum = new java.util.concurrent.atomic.AtomicInteger(1)
+  @volatile private var testNumberFmt = "%3d"
   // @volatile private var testNumber = 1
-  private def testNumber = "%3d" format testNum.getAndIncrement()
-  def resetTestNumber() = testNum set 1
+  private def testNumber = testNumberFmt format testNum.getAndIncrement()
+  def resetTestNumber(max: Int = -1) {
+    testNum set 1
+    val width = if (max > 0) max.toString.length else 3
+    testNumberFmt = s"%${width}d"
+  }
 
   var colorEnabled = sys.props contains "partest.colors"
   val color = new Colors(colorEnabled)
@@ -57,12 +62,15 @@ object NestUI {
 
   def statusLine(state: TestState) = {
     import state._
-    val word = bold(
-      if (isSkipped) yellow("--")
-      else if (isOk) green("ok")
-      else red("!!")
-    )
-    word + f" $testNumber%3s - $testIdent%-40s$reasonString"
+    import TestState._
+    val colorizer = state match {
+      case _: Skip     => yellow
+      case _: Updated  => cyan
+      case s if s.isOk => green
+      case _           => red
+    }
+    val word = bold(colorizer(state.shortStatus))
+    f"$word $testNumber - $testIdent%-40s$reasonString"
   }
 
   def reportTest(state: TestState) = {
@@ -76,7 +84,13 @@ object NestUI {
         dotCount += 1
       }
     }
-    else echo(statusLine(state))
+    else {
+      echo(statusLine(state))
+      if (!state.isOk && isDiffy) {
+        val differ = bold(red("% ")) + "diff "
+        state.transcript find (_ startsWith differ) foreach (echo(_))
+      }
+    }
   }
 
   def echo(message: String): Unit = synchronized {
@@ -164,10 +178,12 @@ object NestUI {
   var _verbose = false
   var _debug = false
   var _terse = false
+  var _diff  = false
 
   def isVerbose = _verbose
   def isDebug = _debug
   def isTerse = _terse
+  def isDiffy = _diff
 
   def setVerbose() {
     _verbose = true
@@ -177,6 +193,9 @@ object NestUI {
   }
   def setTerse() {
     _terse = true
+  }
+  def setDiffOnFail() {
+    _diff = true
   }
   def verbose(msg: String) {
     if (isVerbose)

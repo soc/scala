@@ -467,6 +467,7 @@ trait Scanners extends ScannersCommon {
               if (ch == '\"') {
                 nextRawChar()
                 if (ch == '\"') {
+                  offset += 3
                   nextRawChar()
                   getStringPart(multiLine = true)
                   sepRegions = STRINGPART :: sepRegions // indicate string part
@@ -476,6 +477,7 @@ trait Scanners extends ScannersCommon {
                   strVal = ""
                 }
               } else {
+                offset += 1
                 getStringPart(multiLine = false)
                 sepRegions = STRINGLIT :: sepRegions // indicate single line string part
               }
@@ -559,7 +561,7 @@ trait Scanners extends ScannersCommon {
               nextChar()
               getOperatorRest()
             } else {
-              syntaxError("illegal character '" + ("" + '\\' + 'u' + "%04x".format(ch: Int)) + "'")
+              syntaxError("illegal character '" + ("" + '\\' + 'u' + "%04x".format(ch.toInt)) + "'")
               nextChar()
             }
           }
@@ -696,7 +698,7 @@ trait Scanners extends ScannersCommon {
       }
     }
 
-    @annotation.tailrec private def getStringPart(multiLine: Boolean): Unit = {
+    @scala.annotation.tailrec private def getStringPart(multiLine: Boolean): Unit = {
       def finishStringPart() = {
         setStrVal()
         token = STRINGPART
@@ -882,7 +884,7 @@ trait Scanners extends ScannersCommon {
      */
     def intVal(negated: Boolean): Long = {
       if (token == CHARLIT && !negated) {
-        charVal
+        charVal.toLong
       } else {
         var value: Long = 0
         val divider = if (base == 10) 1 else 2
