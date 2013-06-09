@@ -5222,7 +5222,7 @@ trait Typers extends Adaptations with Tags {
 
         if (!refTyped.isErrorTyped) {
           tree setType (
-            if (tree.isLiteral) refTyped.tpe.resultType.asDeclaredSingleton
+            if (tree.isLiteral) ConstantType asDeclaredSingleton refTyped.tpe.resultType
             else refTyped.tpe.resultType
           )
         }

@@ -266,11 +266,8 @@ trait Types
 
   /** The base class for all types */
   abstract class Type extends TypeApiImpl with Annotatable[Type] {
-    var isDeclaredSingleton: Boolean = false
-    def asDeclaredSingleton: this.type = {
-      isDeclaredSingleton = true
-      this
-    }
+    def isDeclaredSingleton = false
+
     /** Types for which asSeenFrom always is the identity, no matter what
      *  prefix or owner.
      */
@@ -2005,10 +2002,19 @@ trait Types
     override def safeToString: String = value.escapedStringValue + ".type"
     override def kind = "ConstantType"
   }
+  final class DeclaredSingletonConstantType(value: Constant) extends ConstantType(value) {
+    override def isDeclaredSingleton = true
+  }
 
   final class UniqueConstantType(value: Constant) extends ConstantType(value)
 
   object ConstantType extends ConstantTypeExtractor {
+    def asDeclaredSingleton(tpe: Type): Type = {
+      tpe match {
+        case ConstantType(value) => unique(new DeclaredSingletonConstantType(value))
+        case tpe                 => tpe
+      }
+    }
     def apply(value: Constant) = unique(new UniqueConstantType(value))
   }
 
