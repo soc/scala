@@ -1321,7 +1321,9 @@ trait Typers extends Adaptations with Tags {
 
       val widened = qual.tpe.widen
 
-      attempt(widened) || (!(qual.tpe =:= widened) && { println("Reattempting isAdaptableWithView with " + qual.tpe) ; attempt(qual.tpe) })
+      (    attempt(widened)
+        || (qual.tpe ne widened) && attempt(logResult(s"Trying non-widened isAdaptableWithView(tpe=${qual.tpe})")(qual.tpe))
+      )
     }
 
     def adaptToMember(qual: Tree, searchTemplate: Type, reportAmbiguous: Boolean = true, saveErrors: Boolean = true): Tree = {
