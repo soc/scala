@@ -625,7 +625,6 @@ trait Infer extends Checkable {
 
       // Then define remaining type variables from argument types.
       map2(argtpes, formals) { (argtpe, formal) =>
-        // val tp1 = argtpe.deconst.instantiateTypeParams(tparams, tvars)
         val tp1 = argtpe.instantiateTypeParams(tparams, tvars)
         val pt1 = formal.instantiateTypeParams(tparams, tvars)
 
@@ -1070,14 +1069,11 @@ trait Infer extends Checkable {
      */
     def inferMethodInstance(fn: Tree, undetparams: List[Symbol], args: List[Tree], pt0: Type): List[Symbol] = fn.tpe match {
       case mt @ MethodType(params0, _) =>
-        // println(s"inferMethodInstance($fn, ..., $args, $pt0)")
-
         try {
           val pt      = if (pt0.typeSymbol == UnitClass) WildcardType else pt0
           val formals = formalTypes(mt.paramTypes, args.length)
           val argtpes = tupleIfNecessary(formals, args map (x => elimAnonymousClass(x.tpe)))
           val restpe  = fn.tpe.resultType(argtpes)
-          // println("argtpes = " + argtpes + ", restpe = " + restpe)
 
           val AdjustedTypeArgs.AllArgsAndUndets(okparams, okargs, allargs, leftUndet) =
             methTypeArgs(undetparams, formals, restpe, argtpes, pt)
@@ -1363,7 +1359,6 @@ trait Infer extends Checkable {
      *  If no alternative matches `pt`, take the parameterless one anyway.
      */
     def inferExprAlternative(tree: Tree, pt: Type): Tree = {
-      // println(s"inferExprAlternative($tree, $pt)")
 
       def tryOurBests(pre: Type, alts: List[Symbol], isSecondTry: Boolean): Unit = {
         val alts0 = alts filter (alt => isWeaklyCompatible(pre memberType alt, pt))
@@ -1456,8 +1451,6 @@ trait Infer extends Checkable {
      *  @pre  tree.tpe is an OverloadedType.
      */
     def inferMethodAlternative(tree: Tree, undetparams: List[Symbol], argtpes0: List[Type], pt0: Type): Unit = {
-      // println(s"inferMethodAlternative($tree, ..., $argtpes0, $pt0)")
-
       val OverloadedType(pre, alts) = tree.tpe
       var varargsStar = false
       val argtpes = argtpes0 mapConserve {
@@ -1530,8 +1523,6 @@ trait Infer extends Checkable {
      *  If no such polymorphic alternative exist, error.
      */
     def inferPolyAlternatives(tree: Tree, argtypes: List[Type]): Unit = {
-      // println(s"inferPolyAlternatives($tree, $argtypes)")
-
       val OverloadedType(pre, alts) = tree.tpe
       // Alternatives with a matching length type parameter list
       val matchingLength   = tree.symbol filter (alt => sameLength(alt.typeParams, argtypes))
