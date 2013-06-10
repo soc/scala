@@ -1301,8 +1301,8 @@ trait Typers extends Adaptations with Tags {
     }
 
     private def isAdaptableWithView(qual: Tree) = {
-      val qtpe = qual.tpe.widen
-      (    !isPastTyper
+      def attempt(qtpe: Type): Boolean = (
+           !isPastTyper
         && qual.isTerm
         && !qual.isInstanceOf[Super]
         && ((qual.symbol eq null) || !qual.symbol.isTerm || qual.symbol.isValue)
@@ -1318,6 +1318,10 @@ trait Typers extends Adaptations with Tags {
         // (If we allow this, we get divergence, e.g., starting at `conforms` during ant quick.bin)
         // Note: implicit arguments are still inferred (this kind of "chaining" is allowed)
       )
+
+      val widened = qual.tpe.widen
+
+      attempt(widened) || (!(qual.tpe =:= widened) && { println("Reattempting isAdaptableWithView with " + qual.tpe) ; attempt(qual.tpe) })
     }
 
     def adaptToMember(qual: Tree, searchTemplate: Type, reportAmbiguous: Boolean = true, saveErrors: Boolean = true): Tree = {
