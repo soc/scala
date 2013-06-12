@@ -116,36 +116,32 @@ trait Infer extends Checkable {
       if (tp eq toRepeated) throw new TypeError("(the last tuple-component of) the result type of an unapplySeq must be a Seq[_]")
       else toRepeated
     }
-    // empty list --> error, otherwise length == 1
-    lazy val optionArg = typeOfMemberNamedGet(resTp)
+    // product element types
+    lazy val productArgs = typesOfProductAccessors(resTp)
+    def optionArg        = tupleType(productArgs)
 
     // empty list --> not a ProductN, otherwise product element types
-    def productArgs = getProductArgs(optionArg)
-
-    val formals =
+    // def productArgs = getProductArgs(optionArg)
+    val formals = (
       // convert Seq[T] to the special repeated argument type
       // so below we can use formalTypes to expand formals to correspond to the number of actuals
       if (isUnapplySeq) {
-        if (optionArg.isErroneous)
-          throw new TypeError(s"result type $resTp of unapplySeq defined in ${unappSym.fullLocationString} does not conform to Option[_]")
-        else
-          productArgs match {
-            case Nil                => seqToRepeatedChecked(optionArg) :: Nil
-            case normalTps :+ seqTp => normalTps :+ seqToRepeatedChecked(seqTp)
-          }
+        productArgs match {
+          case Nil                => throw new TypeError(s"result type $resTp of unapplySeq defined in ${unappSym.fullLocationString} does not conform to Option[_]")
+          case arg :: Nil         => seqToRepeatedChecked(arg) :: Nil
+          case normalTps :+ seqTp => normalTps :+ seqToRepeatedChecked(seqTp)
+        }
       }
-      else {
-        if (booleanExtractor && nbSubPats == 0) Nil
-        else if (optionArg.isErroneous) productArgs
-        else if (nbSubPats == 1) {
+      else nbSubPats match {
+        case 0 if resTp <:< BooleanTpe => Nil
+        case 1                         =>
           val productArity = productArgs.size
           if (productArity > 1 && settings.lint)
             global.currentUnit.warning(pos, s"extractor pattern binds a single value to a Product${productArity} of type $optionArg")
           optionArg :: Nil
-        }
-        // TODO: update spec to reflect we allow any ProductN, not just TupleN
-        else productArgs
+        case _ => productArgs // TODO: update spec to reflect we allow any ProductN, not just TupleN
       }
+    )
 
     // for unapplySeq, replace last vararg by as many instances as required by nbSubPats
     val formalsExpanded =

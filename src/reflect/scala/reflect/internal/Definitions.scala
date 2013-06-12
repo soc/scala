@@ -651,10 +651,10 @@ trait Definitions extends api.StandardDefinitions {
       def productProj(z:Symbol, j: Int): TermSymbol = getMemberValue(z, nme.productAccessorName(j))
 
     /** if tpe <: ProductN[T1,...,TN], returns List(T1,...,TN) else Nil */
-    def getProductArgs(tpe: Type): List[Type] = tpe.baseClasses find isProductNClass match {
-      case Some(x)  => tpe.baseType(x).typeArgs
-      case _        => Nil
-    }
+    // def getProductArgs(tpe: Type): List[Type] = tpe.baseClasses find isProductNClass match {
+    //   case Some(x)  => tpe.baseType(x).typeArgs
+    //   case _        => Nil
+    // }
 
     def dropNullaryMethod(tp: Type) = tp match {
       case NullaryMethodType(restpe) => restpe
@@ -695,6 +695,16 @@ trait Definitions extends api.StandardDefinitions {
     def typeOfMemberNamedGet(tp: Type) = tp member nme.get filter (_.paramss.isEmpty) match {
       case NoSymbol => NoType
       case get      => (tp memberType get).finalResultType
+    }
+    def typesOfProductAccessors(tp: Type): List[Type] = {
+      def loop(n: Int): List[Type] = tp member TermName("_" + n) filter (_.paramss.isEmpty) match {
+        case NoSymbol => Nil
+        case m        => (tp memberType m).finalResultType :: loop(n + 1)
+      }
+      loop(1) match {
+        case Nil => typeOfMemberNamedGet(tp) match { case NoType => Nil ; case tp => tp :: Nil }
+        case tps => tps
+      }
     }
 
     def ClassType(arg: Type) = if (phase.erasedTypes) ClassClass.tpe else appliedType(ClassClass, arg)

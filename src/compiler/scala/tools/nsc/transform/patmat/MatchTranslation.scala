@@ -643,9 +643,9 @@ trait MatchTranslation { self: PatternMatching  =>
       protected lazy val rawSubPatTypes =
         if (resultInMonad.typeSymbol eq UnitClass) Nil
         else if(!isSeq && nbSubPats == 1)          List(resultInMonad)
-        else getProductArgs(resultInMonad) match {
-          case Nil => List(resultInMonad)
-          case x   => x
+        else typesOfProductAccessors(resultInMonad) match {
+          case Nil => resultInMonad :: Nil
+          case tps => tps
         }
 
       override def toString() = extractorCall +": "+ extractorCall.tpe +" (symbol= "+ extractorCall.symbol +")."
