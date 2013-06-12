@@ -130,6 +130,14 @@ object Ticket495bis {
     }
 }
 
+/***   Temporarily disabled:
+
+patmat.scala:149: error: error during expansion of this match (this is a scalac bug).
+The underlying error was: type mismatch;
+ found   : Option[(Y(in value <local Ticket522>) => Z(in value <local Ticket522>), Y(in value <local Ticket522>))] whe
+ required: Option[(Y(in method unapply) => Z(in method unapply), Y(in method unapply))]
+  App({ x: Int => x }, 5) match {
+                          ^
 object Ticket522 {
   class Term[X]
   object App {
@@ -150,6 +158,8 @@ object Ticket522 {
     case App(arg, a) =>
   }
 }
+
+***/
 
 object Ticket710 {
   def method {

@@ -221,7 +221,8 @@ trait MatchTranslation { self: PatternMatching  =>
       *    a function that will take care of binding and substitution of the next ast (to the right).
       *
       */
-    def translateCase(scrutSym: Symbol, pt: Type)(caseDef: CaseDef) = caseDef match { case CaseDef(pattern, guard, body) =>
+    def translateCase(scrutSym: Symbol, pt: Type)(caseDef: CaseDef) = {
+      val CaseDef(pattern, guard, body) = caseDef
       translatePattern(scrutSym, pattern) ++ translateGuard(guard) :+ translateBody(body, pt)
     }
 
@@ -244,7 +245,7 @@ trait MatchTranslation { self: PatternMatching  =>
         // (it will later result in a type test when `tp` is not a subtype of `b.info`)
         // TODO: can we simplify this, together with the Bound case?
         (extractor.subPatBinders, extractor.subPatTypes).zipped foreach { case (b, tp) =>
-          debug.patmat("changing "+ b +" : "+ b.info +" -> "+ tp)
+          debug.patmat(s"changing $b: ${b.info} -> $tp")
           b setInfo tp
         }
 
@@ -291,7 +292,7 @@ trait MatchTranslation { self: PatternMatching  =>
           case Bound(subpatBinder, typed@Typed(Ident(_), tpt)) if typed.tpe ne null => Some((subpatBinder, typed.tpe))
           case Bind(_, typed@Typed(Ident(_), tpt))             if typed.tpe ne null => Some((patBinder, typed.tpe))
           case Typed(Ident(_), tpt)                            if tree.tpe ne null  => Some((patBinder, tree.tpe))
-          case _  => None
+          case _                                                                    => None
         }
       }
 
@@ -401,8 +402,23 @@ trait MatchTranslation { self: PatternMatching  =>
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     object ExtractorCall {
-      def apply(unfun: Tree, args: List[Tree]): ExtractorCall = new ExtractorCallRegular(unfun, args)
-      def fromCaseClass(fun: Tree, args: List[Tree]): Option[ExtractorCall] =  Some(new ExtractorCallProd(fun, args))
+      def apply(unfun: Tree, args: List[Tree]): ExtractorCall = {
+        val Some(Apply(fun, applyArgs)) = unfun find {
+          case Apply(fun, Ident(nme.SELECTOR_DUMMY) :: Nil) => true
+          case _                                            => false
+        }
+        val funType = fun.tpe.finalResultType
+        val hasProductSelectors = (
+          1 to applyArgs.size forall (n =>
+            funType member TermName("_" + n) filter (_.paramss.isEmpty) exists
+          )
+        )
+        if (hasProductSelectors)
+          new ExtractorCallProd(unfun, args)
+        else
+          new ExtractorCallRegular(unfun, args)
+      }
+      def fromCaseClass(fun: Tree, args: List[Tree]): Option[ExtractorCall] = Some(new ExtractorCallProd(fun, args))
     }
 
     abstract class ExtractorCall(val args: List[Tree]) {
@@ -514,7 +530,6 @@ trait MatchTranslation { self: PatternMatching  =>
 
     // TODO: to be called when there's a def unapplyProd(x: T): U
     // U must have N members _1,..., _N -- the _i are type checked, call their type Ti,
-    //
     // for now only used for case classes -- pretending there's an unapplyProd that's the identity (and don't call it)
     class ExtractorCallProd(fun: Tree, args: List[Tree]) extends ExtractorCall(args) {
       // TODO: fix the illegal type bound in pos/t602 -- type inference messes up before we get here:
@@ -568,12 +583,14 @@ trait MatchTranslation { self: PatternMatching  =>
     }
 
     class ExtractorCallRegular(extractorCallIncludingDummy: Tree, args: List[Tree]) extends ExtractorCall(args) {
-      private lazy val Some(Apply(extractorCall, _)) = extractorCallIncludingDummy.find{ case Apply(_, List(Ident(nme.SELECTOR_DUMMY))) => true case _ => false }
-
+      lazy val Some(Apply(extractorCall, _)) = extractorCallIncludingDummy find {
+        case Apply(_, Ident(nme.SELECTOR_DUMMY) :: Nil) => true
+        case _                                          => false
+      }
       def tpe        = extractorCall.tpe
+      def paramType  = tpe.paramTypes.headOption getOrElse NoType
+      def resultType = extractorCall.tpe.finalResultType
       def isTyped    = (tpe ne NoType) && extractorCall.isTyped && (resultInMonad ne ErrorType)
-      def paramType  = tpe.paramTypes.head
-      def resultType = tpe.finalResultType
       def isSeq      = extractorCall.symbol.name == nme.unapplySeq
 
       /** Create the TreeMaker that embodies this extractor call
@@ -607,19 +624,21 @@ trait MatchTranslation { self: PatternMatching  =>
         object splice extends Transformer {
           override def transform(t: Tree) = t match {
             case Apply(x, List(i @ Ident(nme.SELECTOR_DUMMY))) =>
-              treeCopy.Apply(t, x, List(CODE.REF(binder).setPos(i.pos)))
-            case _ => super.transform(t)
+              treeCopy.Apply(t, x, List(CODE.REF(binder) setPos i.pos))
+            case _ =>
+              super.transform(t)
           }
         }
-        splice.transform(extractorCallIncludingDummy)
+        splice transform extractorCallIncludingDummy
       }
 
       // what's the extractor's result type in the monad?
       // turn an extractor's result type into something `monadTypeToSubPatTypesAndRefs` understands
-      protected lazy val resultInMonad: Type = if(!hasLength(tpe.paramTypes, 1)) ErrorType else {
-        if (resultType.typeSymbol == BooleanClass) UnitTpe
-        else matchMonadResult(resultType)
-      }
+      protected lazy val resultInMonad: Type = (
+        if (paramType eq NoType) ErrorType
+        else if (resultType =:= BooleanClass.tpe) UnitTpe
+        else matchMonadResult(resultType) // the type of "get"
+      )
 
       protected lazy val rawSubPatTypes =
         if (resultInMonad.typeSymbol eq UnitClass) Nil

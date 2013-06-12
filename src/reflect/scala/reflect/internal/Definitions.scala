@@ -692,6 +692,11 @@ trait Definitions extends api.StandardDefinitions {
     def scalaRepeatedType(arg: Type) = appliedType(RepeatedParamClass, arg)
     def seqType(arg: Type)           = appliedType(SeqClass, arg)
 
+    def typeOfMemberNamedGet(tp: Type) = tp member nme.get filter (_.paramss.isEmpty) match {
+      case NoSymbol => NoType
+      case get      => (tp memberType get).finalResultType
+    }
+
     def ClassType(arg: Type) = if (phase.erasedTypes) ClassClass.tpe else appliedType(ClassClass, arg)
 
     /** Can we tell by inspecting the symbol that it will never
