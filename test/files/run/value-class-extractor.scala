@@ -12,18 +12,29 @@ final class SomeProduct extends Product3[String, Int, List[String]] {
   def _2 = 5
   def _3 = List("bippy")
   def isEmpty = false
-
-  // Right now get is necessary to signal the product types; this should be improved.
-  def get = ((_1, _2, _3))
 }
 object SomeProduct {
   def unapply(x: SomeProduct) = x
 }
 
+final class SomeProductNamed {
+  def _1 = "abc"
+  def _2 = 5
+  def _3 = List("bippy")
+  def isEmpty = false
+}
+object SomeProductNamed {
+  def unapply(x: SomeProductNamed) = x
+}
+
 object Test {
-  def prod(x: SomeProduct): Int = x match {
+  def prod1(x: SomeProduct): Int = x match {
     case SomeProduct(x, y, z) => x.length + y + z.length
     case _                    => -1
+  }
+  def prod2(x: SomeProductNamed): Int = x match {
+    case SomeProductNamed(x, y, z) => x.length + y + z.length
+    case _                         => -1
   }
 
   def f(x: Char): NonNullChar = x match {
@@ -86,7 +97,8 @@ object Test {
   def main(args: Array[String]): Unit = {
     "abcd" foreach (ch => println(f(ch)))
     "abcd" foreach (ch => println(g(ch)))
-    println(prod(new SomeProduct))
+    println(prod1(new SomeProduct))
+    println(prod2(new SomeProductNamed))
   }
 }
 

@@ -532,6 +532,8 @@ trait MatchTranslation { self: PatternMatching  =>
     // U must have N members _1,..., _N -- the _i are type checked, call their type Ti,
     // for now only used for case classes -- pretending there's an unapplyProd that's the identity (and don't call it)
     class ExtractorCallProd(fun: Tree, args: List[Tree]) extends ExtractorCall(args) {
+      import CODE._
+
       // TODO: fix the illegal type bound in pos/t602 -- type inference messes up before we get here:
       /*override def equals(x$1: Any): Boolean = ...
              val o5: Option[com.mosol.sl.Span[Any]] =  // Span[Any] --> Any is not a legal type argument for Span!
@@ -573,10 +575,11 @@ trait MatchTranslation { self: PatternMatching  =>
       }
 
       // reference the (i-1)th case accessor if it exists, otherwise the (i-1)th tuple component
-      override protected def tupleSel(binder: Symbol)(i: Int): Tree = { import CODE._
-        val accessors = binder.caseFieldAccessors
-        if (accessors isDefinedAt (i-1)) REF(binder) DOT accessors(i-1)
-        else codegen.tupleSel(binder)(i) // this won't type check for case classes, as they do not inherit ProductN
+      override protected def tupleSel(binder: Symbol)(i: Int): Tree = {
+        binder.info member TermName("_" + i) match {
+          case NoSymbol => REF(binder) DOT binder.caseFieldAccessors(i - 1)
+          case accessor => REF(binder) DOT accessor
+        }
       }
 
       override def toString(): String = "case class "+ (if (constructorTp eq null) fun else paramType.typeSymbol) +" with arguments "+ args

@@ -303,10 +303,15 @@ trait ScalaLogic extends Interface with Logic with TreeAndTypeAnalysis {
 
       def resetUniques() = {_nextId = 0; uniques.clear()}
       private val uniques = new mutable.HashMap[Tree, Var]
-      def apply(x: Tree): Var = uniques getOrElseUpdate(x, new Var(x, x.tpe))
+      def apply(x: Tree): Var = uniques.getOrElseUpdate(x,
+        new Var(x, if (x.tpe ne null) x.tpe else (typer typed x).tpe)
+      )
       def unapply(v: Var) = Some(v.path)
     }
     class Var(val path: Tree, staticTp: Type) extends AbsVar {
+      assert(staticTp ne null, s"new Var($path, $staticTp)")
+      // global.printCaller(s"new Var($path, $staticTp)")("")
+
       private[this] val id: Int = Var.nextId
 
       // private[this] var canModify: Option[Array[StackTraceElement]] = None
