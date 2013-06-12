@@ -106,8 +106,7 @@ trait Infer extends Checkable {
    *   `T_1, ..., T_m, U, ..., U`. Here, `U` is repeated `n-m` times.
    *
    */
-  def extractorFormalTypes(pos: Position, resTp: Type, nbSubPats: Int,
-                           unappSym: Symbol, effectiveNbSubPats: Int): (List[Type], List[Type]) = {
+  def extractorFormalTypes(pos: Position, resTp: Type, nbSubPats: Int, unappSym: Symbol, effectiveNbSubPats: Int): (List[Type], List[Type]) = printResult("extractorFormalTypes") {
 
     def isUnapplySeq                 = unappSym.name == nme.unapplySeq
     def isBoolean                    = nbSubPats == 0 && resTp <:< BooleanTpe

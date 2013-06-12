@@ -407,16 +407,19 @@ trait MatchTranslation { self: PatternMatching  =>
           case Apply(fun, Ident(nme.SELECTOR_DUMMY) :: Nil) => true
           case _                                            => false
         }
+        val argType = fun.tpe.paramss.head.head
         val funType = fun.tpe.finalResultType
-        val hasProductSelectors = (
-          1 to applyArgs.size forall (n =>
-            funType member TermName("_" + n) filter (_.paramss.isEmpty) exists
-          )
-        )
-        if (hasProductSelectors)
-          new ExtractorCallProd(unfun, args)
-        else
-          new ExtractorCallRegular(unfun, args)
+        new ExtractorCallRegular(unfun, args)
+
+        // val hasProductSelectors = (
+        //   1 to applyArgs.size forall (n =>
+        //     funType member TermName("_" + n) filter (_.paramss.isEmpty) exists
+        //   )
+        // )
+        // if (hasProductSelectors)
+        //   new ExtractorCallProd(unfun, args)
+        // else
+        //   new ExtractorCallRegular(unfun, args)
       }
       def fromCaseClass(fun: Tree, args: List[Tree]): Option[ExtractorCall] = Some(new ExtractorCallProd(fun, args))
     }
@@ -575,12 +578,13 @@ trait MatchTranslation { self: PatternMatching  =>
       }
 
       // reference the (i-1)th case accessor if it exists, otherwise the (i-1)th tuple component
-      override protected def tupleSel(binder: Symbol)(i: Int): Tree = {
-        binder.info member TermName("_" + i) match {
-          case NoSymbol => REF(binder) DOT binder.caseFieldAccessors(i - 1)
-          case accessor => REF(binder) DOT accessor
-        }
-      }
+      override protected def tupleSel(binder: Symbol)(i: Int): Tree = REF(binder) DOT TermName("_" + i)
+      // override protected def tupleSel(binder: Symbol)(i: Int): Tree = {
+      //   binder.info member TermName("_" + i) match {
+      //     case NoSymbol => REF(binder) DOT binder.caseFieldAccessors(i - 1)
+      //     case accessor => REF(binder) DOT accessor
+      //   }
+      // }
 
       override def toString(): String = "case class "+ (if (constructorTp eq null) fun else paramType.typeSymbol) +" with arguments "+ args
     }
