@@ -109,42 +109,30 @@ trait Infer extends Checkable {
   def extractorFormalTypes(pos: Position, resTp: Type, nbSubPats: Int,
                            unappSym: Symbol, effectiveNbSubPats: Int): (List[Type], List[Type]) = {
 
-    val isUnapplySeq = unappSym.name == nme.unapplySeq
-    def fail() = {
-      throw new TypeError(s"result type $resTp of ${unappSym.name} defined in ${unappSym.fullLocationString} does not conform to extractor requirements")
-    }
+    def isUnapplySeq                 = unappSym.name == nme.unapplySeq
+    def isBoolean                    = nbSubPats == 0 && resTp <:< BooleanTpe
+    def noAccessorsMessage           = s"result type $resTp of ${unappSym.name} defined in ${unappSym.fullLocationString} does not conform to extractor requirements"
+    def noVarargsInUnapplySeqMessage = "(the last tuple-component of) the result type of an unapplySeq must be a Seq[_]"
 
-    def seqToRepeatedChecked(tp: Type) = {
-      val toRepeated = seqToRepeated(tp)
-      if (tp eq toRepeated) throw new TypeError("(the last tuple-component of) the result type of an unapplySeq must be a Seq[_]")
-      else toRepeated
+    def makeVarargs(tp: Type) = seqToRepeated(tp) match {
+      case varargs if tp ne varargs => varargs
+      case _                        => throw new TypeError(noVarargsInUnapplySeqMessage)
     }
     // empty list --> not a ProductN, otherwise product element types
-    // println("resTp = " + resTp)
-    val formals = typesOfProductAccessors(resTp) match {
-      case Nil if nbSubPats == 0 && resTp <:< BooleanTpe => Nil
-      case Nil                                           => fail()
-      case arg :: Nil                                    => arg :: Nil
-      case args if nbSubPats == 1                        => // args > 1, nbSubPats == 1
-        val tupledArgs = tupleType(args)
-        if (settings.lint)
-          currentUnit.warning(pos, s"extractor pattern binds a single value to a Product${args.size} of type $tupledArgs")
-
-        tupledArgs :: Nil
-
-      case init :+ last if isUnapplySeq => init :+ seqToRepeatedChecked(last)
-      case args                         => args  // TODO: update spec to reflect we allow any ProductN, not just TupleN
-    }
     // for unapplySeq, replace last vararg by as many instances as required by nbSubPats
-    val formalsExpanded = unappSym.name match {
-      case nme.unapplySeq if formals.nonEmpty => formalTypes(formals, nbSubPats)
-      case _                                  => formals
+    // TODO: update spec to reflect we allow any ProductN, not just TupleN
+    typesOfProductAccessors(resTp) match {
+      case Nil if isBoolean      => (Nil, Nil)
+      case Nil                   => throw new TypeError(noAccessorsMessage)
+      case args if !isUnapplySeq => (args, args)
+      case init :+ last          =>
+        val formals         = init :+ makeVarargs(last)
+        val formalsExpanded = formalTypes(formals, nbSubPats)
+        formalsExpanded lengthCompare nbSubPats match {
+          case 0 => (formals, formalsExpanded)
+          case _ =>  (null, null) // XXX ugh, surely we can devise better failure signals than (null, null)
+        }
     }
-
-    printResult(s"formalsExpanded = " + formalsExpanded + ", nbSubPats = " + nbSubPats)(
-      if (formalsExpanded.lengthCompare(nbSubPats) != 0) (null, null)
-      else (formals, formalsExpanded)
-    )
   }
 
   /** A fresh type variable with given type parameter as origin.

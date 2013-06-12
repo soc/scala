@@ -3,10 +3,10 @@ object Test {
   object Dingo { def unapply(x: Any) = new Bippy(x) }
 
   def f1 = (501: Any) match { case Dingo(a, b, c) => println(s"$a  $b  $c") }
-  def f2 = (501: Any) match { case Dingo((a, b, c)) => println(s"$a  $b  $c") }
+  // def f2 = (501: Any) match { case Dingo((a, b, c)) => println(s"$a  $b  $c") }
 
   def main(args: Array[String]): Unit = {
     f1
-    f2
+    // f2
   }
 }
