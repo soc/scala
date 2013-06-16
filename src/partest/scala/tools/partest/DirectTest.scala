@@ -5,9 +5,10 @@
 
 package scala.tools.partest
 
+import scala.tools.cmd.{ Parser => CommandLineParser }
 import scala.tools.nsc._
 import settings.ScalaVersion
-import util.{ SourceFile, BatchSourceFile, CommandLineParser }
+import util.{ SourceFile, BatchSourceFile }
 import reporters.{Reporter, ConsoleReporter}
 
 /** A class for testing code which is embedded as a string.
@@ -114,10 +115,10 @@ abstract class DirectTest extends App {
     val preamble = if (shouldRun) "Attempting" else "Doing fallback for"
 
     def logInfo() = log(s"$preamble java $version specific test under java version $javaVersion")
- 
+
    /*
     * If the current java version is at least 'version' then 'yesRun' is evaluated
-    * otherwise 'fallback' is 
+    * otherwise 'fallback' is
     */
     def otherwise(fallback: =>A): A = {
       logInfo()

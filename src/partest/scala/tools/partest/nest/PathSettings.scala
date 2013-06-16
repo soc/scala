@@ -68,6 +68,8 @@ object PathSettings {
   // Directory <root>/build/pack/lib
   lazy val buildPackLibDir = Directory(buildDir / "pack" / "lib")
 
+  lazy val scalaParsing: File = findJarOrFail("scala-parsing", buildPackLibDir, srcLibDir)
+
   lazy val scalaCheck: File =
     findJar(buildPackLibDir.files ++ srcLibDir.files, "scalacheck") getOrElse {
       sys.error("No scalacheck jar found in '%s' or '%s'".format(buildPackLibDir, srcLibDir))
