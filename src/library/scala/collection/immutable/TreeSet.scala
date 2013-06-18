@@ -139,6 +139,8 @@ class TreeSet[A] private (tree: RB.Tree[A, Unit])(implicit val ordering: Orderin
    */
   def contains(elem: A): Boolean = RB.contains(tree, elem)
 
+  def get(elem: A): Option[A] = RB.getKey(tree, elem)
+
   /** Creates a new iterator over all elements contained in this
    *  object.
    *
