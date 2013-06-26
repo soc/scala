@@ -50,6 +50,15 @@ trait Namers extends MethodSynthesis {
   def newNamer(context: Context): Namer = new NormalNamer(context)
 
   abstract class Namer(val context: Context) extends MethodSynth with NamerContextErrors { thisNamer =>
+    // The context for classes and modules defined by this namer.
+    // Same as `context` except for package objects, in which case it
+    // is the enclosing package context.
+    private def implContext = (
+      if (context.owner.isPackageObjectClass)
+        context.nextEnclosing(c => c.owner.isPackageClass)
+      else
+        context
+    )
     // overridden by the presentation compiler
     def saveDefaultGetter(meth: Symbol, default: Symbol) { }
 
@@ -364,6 +373,7 @@ trait Namers extends MethodSynthesis {
     }
 
     def enterClassSymbol(tree: ClassDef): Symbol = {
+      val context = implContext
       val existing = context.scope.lookup(tree.name)
       val isRedefinition = (
            existing.isType
@@ -426,6 +436,7 @@ trait Namers extends MethodSynthesis {
      *  a module definition or a class definition.
      */
     def enterModuleSymbol(tree : ModuleDef): Symbol = {
+      val context = implContext
       var m: Symbol = context.scope lookupAll tree.name find (_.isModule) getOrElse NoSymbol
       val moduleFlags = tree.mods.flags | MODULE
       if (m.isModule && !m.isPackage && inCurrentScope(m) && (currentRun.canRedefine(m) || m.isSynthetic)) {
