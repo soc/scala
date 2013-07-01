@@ -45,7 +45,7 @@ abstract class SubComponent {
   def newPhase(prev: Phase): Phase
 
   private var ownPhaseCache: WeakReference[Phase] = new WeakReference(null)
-  private var ownPhaseRunId = global.NoRunId
+  private var ownPhaseRunId: Int = global.NoRunId
 
   @inline final def beforeOwnPhase[T](op: => T) = global.enteringPhase(ownPhase)(op)
   @inline final def afterOwnPhase[T](op: => T)  = global.exitingPhase(ownPhase)(op)
