@@ -50,4 +50,4 @@ trait AnsiColor {
   final val INVISIBLE  = "\033[8m"
 }
 
-object AnsiColor extends AnsiColor { }
+object AnsiColor extends AnsiColor

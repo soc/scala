@@ -48,7 +48,7 @@ private[collection] trait Wrappers {
     def next() = underlying.nextElement
   }
 
-  case class IterableWrapper[A](underlying: Iterable[A]) extends ju.AbstractCollection[A] with IterableWrapperTrait[A] { }
+  case class IterableWrapper[A](underlying: Iterable[A]) extends ju.AbstractCollection[A] with IterableWrapperTrait[A]
 
   case class JIterableWrapper[A](underlying: jl.Iterable[A]) extends AbstractIterable[A] with Iterable[A] {
     def iterator = underlying.iterator

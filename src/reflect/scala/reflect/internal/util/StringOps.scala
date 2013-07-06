@@ -73,4 +73,4 @@ trait StringOps {
     }
 }
 
-object StringOps extends StringOps { }
+object StringOps extends StringOps

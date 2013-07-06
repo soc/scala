@@ -266,7 +266,7 @@ abstract class Source extends Iterator[Char] {
   object RelaxedPosition extends Position {
     def checkInput(line: Int, column: Int): Unit = ()
   }
-  object RelaxedPositioner extends Positioner(RelaxedPosition) { }
+  object RelaxedPositioner extends Positioner(RelaxedPosition)
   object NoPositioner extends Positioner(Position) {
     override def next(): Char = iter.next()
   }

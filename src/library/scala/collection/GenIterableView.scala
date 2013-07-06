@@ -9,4 +9,4 @@
 package scala
 package collection
 
-trait GenIterableView[+A, +Coll] extends GenIterableViewLike[A, Coll, GenIterableView[A, Coll]] { }
+trait GenIterableView[+A, +Coll] extends GenIterableViewLike[A, Coll, GenIterableView[A, Coll]]

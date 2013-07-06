@@ -10,7 +10,7 @@ import scala.reflect.internal.settings.MutableSettings
  */
 private[reflect] class Settings extends MutableSettings {
 
-  trait Setting extends SettingValue { }
+  trait Setting extends SettingValue
 
   class BooleanSetting(x: Boolean) extends Setting {
     type T = Boolean

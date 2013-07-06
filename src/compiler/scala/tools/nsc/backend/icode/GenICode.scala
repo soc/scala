@@ -1751,8 +1751,8 @@ abstract class GenICode extends SubComponent  {
     sealed abstract class Cleanup(val value: AnyRef) {
       def contains(x: AnyRef) = value == x
     }
-    case class MonitorRelease(m: Local) extends Cleanup(m) { }
-    case class Finalizer(f: Tree, ctx: Context) extends Cleanup (f) { }
+    case class MonitorRelease(m: Local) extends Cleanup(m)
+    case class Finalizer(f: Tree, ctx: Context) extends Cleanup(f)
 
     def duplicateFinalizer(boundLabels: Set[Symbol], targetCtx: Context, finalizer: Tree) =  {
       (new DuplicateLabels(boundLabels))(targetCtx, finalizer)

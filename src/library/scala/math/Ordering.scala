@@ -193,7 +193,7 @@ object Ordering extends LowPriorityOrderingImplicits {
   }
 
   /** An object containing implicits which are not in the default scope. */
-  object Implicits extends ExtraImplicits { }
+  object Implicits extends ExtraImplicits
 
   /** Construct an Ordering[T] given a function `lt`. */
   def fromLessThan[T](cmp: (T, T) => Boolean): Ordering[T] = new Ordering[T] {

@@ -25,7 +25,7 @@ object Numeric {
      */
     implicit def infixNumericOps[T](x: T)(implicit num: Numeric[T]): Numeric[T]#Ops = new num.Ops(x)
   }
-  object Implicits extends ExtraImplicits { }
+  object Implicits extends ExtraImplicits
 
   trait BigIntIsIntegral extends Integral[BigInt] {
     def plus(x: BigInt, y: BigInt): BigInt = x + y

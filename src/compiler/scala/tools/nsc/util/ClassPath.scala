@@ -397,4 +397,4 @@ extends ClassPath[T] {
 class JavaClassPath(
   containers: IndexedSeq[ClassPath[AbstractFile]],
   context: JavaContext)
-extends MergedClassPath[AbstractFile](containers, context) { }
+extends MergedClassPath[AbstractFile](containers, context)

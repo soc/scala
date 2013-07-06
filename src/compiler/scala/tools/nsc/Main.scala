@@ -24,4 +24,4 @@ class MainClass extends Driver with EvalLoop {
   }
 }
 
-object Main extends MainClass { }
+object Main extends MainClass

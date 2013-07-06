@@ -55,7 +55,7 @@ class DocFactory(val reporter: Reporter, val settings: doc.Settings) { processor
         val uncompilable = new {
           val global: compiler.type = compiler
           val settings = processor.settings
-        } with Uncompilable { }
+        } with Uncompilable
 
         compiler.docComments ++= uncompilable.comments
         docdbg("" + uncompilable)
@@ -90,7 +90,7 @@ class DocFactory(val reporter: Reporter, val settings: doc.Settings) { processor
     }
   }
 
-  object NoCompilerRunException extends ControlThrowable { }
+  object NoCompilerRunException extends ControlThrowable
 
   val documentError: PartialFunction[Throwable, Unit] = {
     case NoCompilerRunException =>

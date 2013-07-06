@@ -9,4 +9,4 @@
 package scala
 package collection
 
-trait GenTraversableView[+A, +Coll] extends GenTraversableViewLike[A, Coll, GenTraversableView[A, Coll]] { }
+trait GenTraversableView[+A, +Coll] extends GenTraversableViewLike[A, Coll, GenTraversableView[A, Coll]]

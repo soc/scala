@@ -1088,7 +1088,7 @@ abstract class BCodeHelpers extends BCodeTypes with BytecodeWriters {
     extends JBuilder
     with    BCAnnotGen
     with    BCForwardersGen
-    with    BCPickles { }
+    with    BCPickles
 
   /* builder of mirror classes */
   class JMirrorBuilder extends JCommonBuilder {

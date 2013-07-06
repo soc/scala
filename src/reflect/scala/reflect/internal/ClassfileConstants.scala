@@ -378,7 +378,7 @@ object ClassfileConstants {
       translateFlags(jflags, if ((jflags & JAVA_ACC_BRIDGE) != 0) BRIDGE | ARTIFACT else 0)
     }
   }
-  object FlagTranslation extends FlagTranslation { }
+  object FlagTranslation extends FlagTranslation
 
   def toScalaMethodFlags(flags: Int): Long = FlagTranslation methodFlags flags
   def toScalaClassFlags(flags: Int): Long  = FlagTranslation classFlags flags

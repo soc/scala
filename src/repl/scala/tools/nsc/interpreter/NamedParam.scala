@@ -36,7 +36,7 @@ object NamedParam extends NamedParamCreator {
   }
 }
 
-case class NamedParamClass(name: String, tpe: String, value: Any) extends NamedParam { }
+case class NamedParamClass(name: String, tpe: String, value: Any) extends NamedParam
 
 trait NamedParam {
   def name: String

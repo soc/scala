@@ -25,7 +25,7 @@ object ListSet extends ImmutableSetFactory[ListSet] {
   override def empty[A] = EmptyListSet.asInstanceOf[ListSet[A]]
   override def newBuilder[A]: Builder[A, ListSet[A]] = new ListSetBuilder[A]
 
-  private object EmptyListSet extends ListSet[Any] { }
+  private object EmptyListSet extends ListSet[Any]
 
   /** A custom builder because forgetfully adding elements one at
    *  a time to a list backed set puts the "squared" in N^2.  There is a

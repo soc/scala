@@ -46,7 +46,7 @@ trait BytecodeWriters {
     (emitAsmp, doDump) match {
       case (false, false) => new ClassBytecodeWriter { }
       case (false, true ) => new ClassBytecodeWriter with DumpBytecodeWriter { }
-      case (true,  false) => new ClassBytecodeWriter with AsmpBytecodeWriter
+      case (true,  false) => new ClassBytecodeWriter with AsmpBytecodeWriter { }
       case (true,  true ) => new ClassBytecodeWriter with AsmpBytecodeWriter with DumpBytecodeWriter { }
     }
   }

@@ -629,11 +629,11 @@ class ModelFactory(val global: Global, val settings: doc.Settings) {
         else if (bSym.isAbstractType)
           new DocTemplateImpl(bSym, inTpl) with TypeBoundsImpl with AbstractType { override def isAbstractType = true }
         else if (bSym.isModule)
-          new DocTemplateImpl(bSym, inTpl) with Object {}
+          new DocTemplateImpl(bSym, inTpl) with Object { }
         else if (bSym.isTrait)
-          new DocTemplateImpl(bSym, inTpl) with Trait {}
+          new DocTemplateImpl(bSym, inTpl) with Trait { }
         else if (bSym.isClass || bSym == AnyRefClass)
-          new DocTemplateImpl(bSym, inTpl) with Class {}
+          new DocTemplateImpl(bSym, inTpl) with Class { }
         else
           sys.error("'" + bSym + "' isn't a class, trait or object thus cannot be built as a documentable template.")
       }
@@ -696,11 +696,11 @@ class ModelFactory(val global: Global, val settings: doc.Settings) {
       def createNoDocMemberTemplate(bSym: Symbol, inTpl: DocTemplateImpl): MemberTemplateImpl = {
         assert(modelFinished) // only created AFTER the model is finished
         if (bSym.isModule || (bSym.isAliasType && bSym.tpe.typeSymbol.isModule))
-          new MemberTemplateImpl(bSym, inTpl) with Object {}
+          new MemberTemplateImpl(bSym, inTpl) with Object { }
         else if (bSym.isTrait || (bSym.isAliasType && bSym.tpe.typeSymbol.isTrait))
-          new MemberTemplateImpl(bSym, inTpl) with Trait {}
+          new MemberTemplateImpl(bSym, inTpl) with Trait { }
         else if (bSym.isClass || (bSym.isAliasType && bSym.tpe.typeSymbol.isClass))
-          new MemberTemplateImpl(bSym, inTpl) with Class {}
+          new MemberTemplateImpl(bSym, inTpl) with Class { }
         else
           sys.error("'" + bSym + "' isn't a class, trait or object thus cannot be built as a member template.")
       }
@@ -841,7 +841,7 @@ class ModelFactory(val global: Global, val settings: doc.Settings) {
                 def value = tree
               }
             }
-          case None => 
+          case None =>
             argTrees map { tree =>
               new ValueArgument {
                 def parameter = None

@@ -898,7 +898,7 @@ trait StdNames {
     val BITMAP_CHECKINIT_TRANSIENT: NameType = BITMAP_PREFIX + "inittrans$" // initialization bitmap for transient checkinit values
   }
 
-  object tpnme extends TypeNames { }
+  object tpnme extends TypeNames
 
   /** For fully qualified type names.
    */

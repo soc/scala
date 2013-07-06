@@ -91,7 +91,7 @@ scala source.
 }
 
 object GenericRunnerCommand {
-  sealed abstract class HowToRun(val name: String) { }
+  sealed abstract class HowToRun(val name: String)
   case object AsJar extends HowToRun("jar")
   case object AsObject extends HowToRun("object")
   case object AsScript extends HowToRun("script")

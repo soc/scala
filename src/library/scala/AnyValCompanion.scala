@@ -18,4 +18,4 @@ package scala
  *  }}}
  *
  */
-private[scala] trait AnyValCompanion extends Specializable { }
+private[scala] trait AnyValCompanion extends Specializable

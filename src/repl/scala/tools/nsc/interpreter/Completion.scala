@@ -23,7 +23,7 @@ object NoCompletion extends Completion {
 }
 
 object Completion {
-  case class Candidates(cursor: Int, candidates: List[String]) { }
+  case class Candidates(cursor: Int, candidates: List[String])
   val NoCandidates = Candidates(-1, Nil)
 
   object NullCompleter extends ScalaCompleter {

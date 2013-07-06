@@ -389,8 +389,8 @@ abstract class BCodeSyncAndTry extends BCodeBodyBuilder {
     abstract class Cleanup(val value: AnyRef) {
       def contains(x: AnyRef) = value == x
     }
-    case class MonitorRelease(v: Symbol) extends Cleanup(v) { }
-    case class Finalizer(f: Tree) extends Cleanup (f) { }
+    case class MonitorRelease(v: Symbol) extends Cleanup(v)
+    case class Finalizer(f: Tree) extends Cleanup(f)
 
     trait EHClause
     case class NamelessEH(typeToDrop: BType,  caseBody: Tree) extends EHClause

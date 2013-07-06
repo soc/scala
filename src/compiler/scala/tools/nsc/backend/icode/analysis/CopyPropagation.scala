@@ -27,8 +27,8 @@ abstract class CopyPropagation {
   case object This extends Location
 
   /** Values that can be on the stack. */
-  sealed abstract class Value { }
-  case class Record(cls: Symbol, bindings: mutable.Map[Symbol, Value]) extends Value { }
+  sealed abstract class Value
+  case class Record(cls: Symbol, bindings: mutable.Map[Symbol, Value]) extends Value
   /** The value of some location in memory. */
   case class Deref(l: Location) extends Value
 

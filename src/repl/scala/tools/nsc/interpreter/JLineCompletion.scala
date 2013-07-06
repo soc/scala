@@ -152,7 +152,7 @@ class JLineCompletion(val intp: IMain) extends Completion with CompletionOutput 
   }
 
   // not for completion but for excluding
-  object anyref extends TypeMemberCompletion(AnyRefTpe) { }
+  object anyref extends TypeMemberCompletion(AnyRefTpe)
 
   // the unqualified vals/defs/etc visible in the repl
   object ids extends CompletionAware {

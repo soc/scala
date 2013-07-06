@@ -105,7 +105,7 @@ abstract class ScaladocSyntaxAnalyzer[G <: Global](val global: G) extends Syntax
 
   class ScaladocJavaUnitParser(unit: CompilationUnit) extends {
     override val in = new ScaladocJavaUnitScanner(unit)
-  } with JavaUnitParser(unit) { }
+  } with JavaUnitParser(unit)
 
   class ScaladocJavaUnitScanner(unit: CompilationUnit) extends JavaUnitScanner(unit) {
     /** buffer for the documentation comment

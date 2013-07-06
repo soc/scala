@@ -148,9 +148,9 @@ trait Members {
   }
 
   /** Represent a field in ICode */
-  class IField(val symbol: Symbol) extends IMember { }
+  class IField(val symbol: Symbol) extends IMember
 
-  object NoIMethod extends IMethod(NoSymbol) { }
+  object NoIMethod extends IMethod(NoSymbol)
 
   /**
    * Represents a method in ICode. Local variables contain

@@ -12,9 +12,9 @@ import scala.reflect.io.{ AbstractFile, PlainDirectory, Directory }
 import scala.collection.generic.Clearable
 
 /** Directory to save .class files to. */
-trait ReplDir extends AbstractFile with Clearable { }
+trait ReplDir extends AbstractFile with Clearable
 
-private class ReplVirtualDir() extends VirtualDirectory("(memory)", None) with ReplDir { }
+private class ReplVirtualDir() extends VirtualDirectory("(memory)", None) with ReplDir
 private class ReplRealDir(dir: Directory) extends PlainDirectory(dir) with ReplDir {
   def clear() = {
     dir.deleteRecursively()

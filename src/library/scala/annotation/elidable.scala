@@ -62,7 +62,7 @@ import java.util.logging.Level
  *  @author   Paul Phillips
  *  @since    2.8
  */
-final class elidable(final val level: Int) extends scala.annotation.StaticAnnotation {}
+final class elidable(final val level: Int) extends scala.annotation.StaticAnnotation
 
 /** This useless appearing code was necessary to allow people to use
  *  named constants for the elidable annotation.  This is what it takes

@@ -962,7 +962,7 @@ trait Implicits {
      */
     def applicableInfos(iss: Infoss, isLocal: Boolean): Map[ImplicitInfo, SearchResult] = {
       val start       = if (Statistics.canEnable) Statistics.startCounter(subtypeAppInfos) else null
-      val computation = new ImplicitComputation(iss, isLocal) { }
+      val computation = new ImplicitComputation(iss, isLocal)
       val applicable  = computation.findAll()
 
       if (Statistics.canEnable) Statistics.stopCounter(subtypeAppInfos, start)

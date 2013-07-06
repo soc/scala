@@ -142,5 +142,5 @@ object Queue extends SeqFactory[Queue] {
   override def empty[A]: Queue[A] = EmptyQueue.asInstanceOf[Queue[A]]
   override def apply[A](xs: A*): Queue[A] = new Queue[A](Nil, xs.toList)
 
-  private object EmptyQueue extends Queue[Nothing](Nil, Nil) { }
+  private object EmptyQueue extends Queue[Nothing](Nil, Nil)
 }

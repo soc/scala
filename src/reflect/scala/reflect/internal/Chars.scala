@@ -96,4 +96,4 @@ trait Chars {
   }
 }
 
-object Chars extends Chars { }
+object Chars extends Chars

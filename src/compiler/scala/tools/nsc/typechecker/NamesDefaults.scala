@@ -40,7 +40,7 @@ trait NamesDefaults { self: Analyzer =>
     targs:      List[Tree],
     vargss:     List[List[Tree]],
     blockTyper: Typer
-  ) { }
+  )
 
   private def nameOfNamedArg(arg: Tree) = Some(arg) collect { case AssignOrNamedArg(Ident(name), _) => name }
   def isNamedArg(arg: Tree) = arg match {

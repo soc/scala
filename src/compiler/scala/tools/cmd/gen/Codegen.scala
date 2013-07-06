@@ -10,7 +10,7 @@ import scala.language.postfixOps
 
 class Codegen(args: List[String]) extends {
   val parsed = CodegenSpec(args: _*)
-} with CodegenSpec with Instance { }
+} with CodegenSpec with Instance
 
 object Codegen {
   def echo(msg: String) = Console println msg

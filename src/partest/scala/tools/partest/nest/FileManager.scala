@@ -44,7 +44,7 @@ trait FileUtil {
     else difflib.DiffUtils.generateUnifiedDiff(origName, newName, origLines.asJava, diff, 1).asScala.mkString("\n")
   }
 }
-object FileUtil extends FileUtil { }
+object FileUtil extends FileUtil
 
 trait FileManager extends FileUtil {
 

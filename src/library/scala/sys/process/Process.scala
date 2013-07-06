@@ -38,7 +38,7 @@ trait Process {
 }
 
 /** Methods for constructing simple commands that can then be combined. */
-object Process extends ProcessImpl with ProcessCreation { }
+object Process extends ProcessImpl with ProcessCreation
 
 /** Factories for creating [[scala.sys.process.ProcessBuilder]]. They can be
  *  found on and used through [[scala.sys.process.Process]]'s companion object.

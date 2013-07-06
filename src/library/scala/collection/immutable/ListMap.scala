@@ -29,7 +29,7 @@ object ListMap extends ImmutableMapFactory[ListMap] {
     new MapCanBuildFrom[A, B]
   def empty[A, B]: ListMap[A, B] = EmptyListMap.asInstanceOf[ListMap[A, B]]
 
-  private object EmptyListMap extends ListMap[Any, Nothing] { }
+  private object EmptyListMap extends ListMap[Any, Nothing]
 }
 
 /** This class implements immutable maps using a list-based data structure.
@@ -157,12 +157,12 @@ extends AbstractMap[A, B]
      *  @return     the value associated with the given key.
      */
     override def apply(k: A): B1 = apply0(this, k)
- 
-    
-    @tailrec private def apply0(cur: ListMap[A, B1], k: A): B1 = 
+
+
+    @tailrec private def apply0(cur: ListMap[A, B1], k: A): B1 =
       if (cur.isEmpty) throw new NoSuchElementException("key not found: "+k)
       else if (k == cur.key) cur.value
-      else apply0(cur.tail, k)  
+      else apply0(cur.tail, k)
 
     /** Checks if this map maps `key` to a value and return the
      *  value if it exists.

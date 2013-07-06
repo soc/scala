@@ -142,7 +142,7 @@ object HashMap extends ImmutableMapFactory[HashMap] with BitOperations.Int {
   implicit def canBuildFrom[A, B]: CanBuildFrom[Coll, (A, B), HashMap[A, B]] = new MapCanBuildFrom[A, B]
   def empty[A, B]: HashMap[A, B] = EmptyHashMap.asInstanceOf[HashMap[A, B]]
 
-  private object EmptyHashMap extends HashMap[Any, Nothing] { }
+  private object EmptyHashMap extends HashMap[Any, Nothing]
 
   // utility method to create a HashTrieMap from two leaf HashMaps (HashMap1 or HashMapCollision1) with non-colliding hash code)
   private def makeHashTrieMap[A, B](hash0:Int, elem0:HashMap[A, B], hash1:Int, elem1:HashMap[A, B], level:Int, size:Int) : HashTrieMap[A, B] = {

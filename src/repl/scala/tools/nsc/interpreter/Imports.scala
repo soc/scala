@@ -97,7 +97,7 @@ trait Imports {
      *  should be taken.  Removes requests which cannot contribute
      *  useful imports for the specified set of wanted names.
      */
-    case class ReqAndHandler(req: Request, handler: MemberHandler) { }
+    case class ReqAndHandler(req: Request, handler: MemberHandler)
 
     def reqsToUse: List[ReqAndHandler] = {
       /** Loop through a list of MemberHandlers and select which ones to keep.

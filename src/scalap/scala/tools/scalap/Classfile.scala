@@ -78,7 +78,7 @@ class Classfile(in: ByteArrayReader) {
     case class LongConst(x: Long) extends PoolEntry(CONSTANT_LONG)
     case class DoubleConst(x: Double) extends PoolEntry(CONSTANT_DOUBLE)
     case class NameAndType(nameId: Int, typeId: Int) extends PoolEntry(CONSTANT_NAMEANDTYPE)
-    case object Empty extends PoolEntry(0) { }
+    case object Empty extends PoolEntry(0)
 
     val entries = {
       val pool = new Array[PoolEntry](in.nextChar.toInt)

@@ -19,7 +19,7 @@ trait StructuredTypeStrings extends DestructureTypes {
   val global: Global
   import global._
 
-  case class LabelAndType(label: String, typeName: String) { }
+  case class LabelAndType(label: String, typeName: String)
   object LabelAndType {
     val empty = LabelAndType("", "")
   }
@@ -241,4 +241,4 @@ trait TypeStrings {
   }
 }
 
-object TypeStrings extends TypeStrings { }
+object TypeStrings extends TypeStrings

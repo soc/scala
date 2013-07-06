@@ -292,7 +292,7 @@ trait Checkable {
   }
 }
 
-private[typechecker] final class Checkability(val value: Int) extends AnyVal { }
+private[typechecker] final class Checkability(val value: Int) extends AnyVal
 private[typechecker] object Checkability {
   val StaticallyTrue    = new Checkability(0)
   val StaticallyFalse   = new Checkability(1)

@@ -14,4 +14,4 @@ package scala
  */
 
 @deprecated("This trait will be removed", "2.11.0")
-trait NotNull extends Any {}
+trait NotNull extends Any

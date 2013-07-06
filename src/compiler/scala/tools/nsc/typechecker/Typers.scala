@@ -76,8 +76,8 @@ trait Typers extends Adaptations with Tags {
       case SilentTypeError(err)     => f(err)
     }
   }
-  case class SilentTypeError(err: AbsTypeError) extends SilentResult[Nothing] { }
-  case class SilentResultValue[+T](value: T) extends SilentResult[T] { }
+  case class SilentTypeError(err: AbsTypeError) extends SilentResult[Nothing]
+  case class SilentResultValue[+T](value: T) extends SilentResult[T]
 
   def newTyper(context: Context): Typer = new NormalTyper(context)
 

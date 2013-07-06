@@ -235,7 +235,7 @@ abstract class SpecializeTypes extends InfoTransform with TypingTransformers {
   }
 
   /** Symbol is a specialized accessor for the `target` field. */
-  case class SpecializedAccessor(target: Symbol) extends SpecializedInfo { }
+  case class SpecializedAccessor(target: Symbol) extends SpecializedInfo
 
   /** Symbol is a specialized method whose body should be the target's method body. */
   case class Implementation(target: Symbol) extends SpecializedInfo

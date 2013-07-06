@@ -68,7 +68,7 @@ class IMain(@BeanProperty val factory: ScriptEngineFactory, initialSettings: Set
   imain =>
 
   setBindings(createBindings, ScriptContext.ENGINE_SCOPE)
-  object replOutput extends ReplOutput(settings.Yreploutdir) { }
+  object replOutput extends ReplOutput(settings.Yreploutdir)
 
   @deprecated("Use replOutput.dir instead", "2.11.0")
   def virtualDirectory = replOutput.dir
@@ -765,7 +765,7 @@ class IMain(@BeanProperty val factory: ScriptEngineFactory, initialSettings: Set
       try Right(call(name, args: _*))
       catch { case ex: Throwable => Left(ex) }
 
-    class EvalException(msg: String, cause: Throwable) extends RuntimeException(msg, cause) { }
+    class EvalException(msg: String, cause: Throwable) extends RuntimeException(msg, cause)
 
     private def evalError(path: String, ex: Throwable) =
       throw new EvalException("Failed to load '" + path + "': " + ex.getMessage, ex)
@@ -1094,7 +1094,7 @@ class IMain(@BeanProperty val factory: ScriptEngineFactory, initialSettings: Set
 
   object exprTyper extends {
     val repl: IMain.this.type = imain
-  } with ExprTyper { }
+  } with ExprTyper
 
   def parse(line: String): Option[List[Tree]] = exprTyper.parse(line)
 

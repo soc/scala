@@ -82,7 +82,7 @@ package object partest {
     def fileLines: List[String] = augmentString(fileContents).lines.toList
   }
 
-  implicit class PathOps(p: Path) extends FileOps(p.jfile) { }
+  implicit class PathOps(p: Path) extends FileOps(p.jfile)
 
   implicit class Copier(val f: SFile) extends AnyVal {
     def copyTo(dest: Path): Unit = dest.toFile writeAll f.slurp(scala.io.Codec.UTF8)

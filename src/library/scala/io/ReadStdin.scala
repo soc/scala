@@ -225,4 +225,4 @@ private[scala] trait ReadStdin {
   }
 }
 
-object ReadStdin extends ReadStdin { }
+object ReadStdin extends ReadStdin

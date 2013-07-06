@@ -9,4 +9,4 @@
 package scala
 package collection
 
-trait GenSeqView[+A, +Coll] extends GenSeqViewLike[A, Coll, GenSeqView[A, Coll]] { }
+trait GenSeqView[+A, +Coll] extends GenSeqViewLike[A, Coll, GenSeqView[A, Coll]]

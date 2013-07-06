@@ -207,4 +207,4 @@ class ScriptRunner extends HasCompileSocket {
   }
 }
 
-object ScriptRunner extends ScriptRunner { }
+object ScriptRunner extends ScriptRunner

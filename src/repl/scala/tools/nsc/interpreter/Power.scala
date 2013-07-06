@@ -153,7 +153,7 @@ class Power[ReplValsImpl <: ReplVals : ru.TypeTag: ClassTag](val intp: IMain, re
   trait LowPriorityInternalInfo {
     implicit def apply[T: ru.TypeTag : ClassTag] : InternalInfo[T] = new InternalInfo[T](None)
   }
-  object InternalInfo extends LowPriorityInternalInfo { }
+  object InternalInfo extends LowPriorityInternalInfo
 
   /** Now dealing with the problem of acidentally calling a method on Type
    *  when you're holding a Symbol and seeing the Symbol converted to the
@@ -161,7 +161,7 @@ class Power[ReplValsImpl <: ReplVals : ru.TypeTag: ClassTag](val intp: IMain, re
    *  symbol, by only implicitly installing one method, "?", and the rest
    *  of the conveniences exist on that wrapper.
    */
-  trait LowPriorityInternalInfoWrapper { }
+  trait LowPriorityInternalInfoWrapper
   class InternalInfoWrapper[T: ru.TypeTag : ClassTag](value: Option[T] = None) {
     def ? : InternalInfo[T] = new InternalInfo[T](value)
   }
@@ -241,7 +241,7 @@ class Power[ReplValsImpl <: ReplVals : ru.TypeTag: ClassTag](val intp: IMain, re
     def >(): Unit                                = pp(identity)
   }
 
-  class MultiPrettifierClass[T: Prettifier](val value: Seq[T]) extends PrettifierClass[T]() { }
+  class MultiPrettifierClass[T: Prettifier](val value: Seq[T]) extends PrettifierClass[T]()
   class SinglePrettifierClass[T: Prettifier](single: T) extends PrettifierClass[T]() {
     val value = List(single)
   }
