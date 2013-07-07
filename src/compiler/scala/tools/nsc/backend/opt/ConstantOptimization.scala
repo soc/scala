@@ -19,7 +19,7 @@ import scala.annotation.tailrec
  *
  * With some more work it could be extended to
  * - cache stable values (final fields, modules) in locals
- * - replace the copy propagation in ClosureElilmination
+ * - replace the copy propagation in ClosureElimination
  * - fold constants
  * - eliminate unnecessary stores and loads
  * - propagate knowledge gathered from conditionals for further optimization

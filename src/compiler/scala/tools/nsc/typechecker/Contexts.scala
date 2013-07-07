@@ -16,7 +16,7 @@ import scala.reflect.internal.util.shortClassOfInstance
  */
 trait Contexts { self: Analyzer =>
   import global._
-  import definitions.{ JavaLangPackage, ScalaPackage, PredefModule, ScalaXmlTopScope, ScalaXmlPackage }
+  import definitions.{ JavaLangPackage, StringClass, ClassClass, ScalaPackage, PredefModule, ScalaXmlTopScope, ScalaXmlPackage }
   import ContextMode._
 
   object NoContext
@@ -35,9 +35,9 @@ trait Contexts { self: Analyzer =>
   }
   private object RootImports {
     // Possible lists of root imports
-    val javaList         = JavaLangPackage :: Nil
-    val javaAndScalaList = JavaLangPackage :: ScalaPackage :: Nil
-    val completeList     = JavaLangPackage :: ScalaPackage :: PredefModule :: Nil
+    val javaList             = JavaLangPackage :: Nil
+    val someJavaAndScalaList = StringClass :: /*ClassClass ::*/ ScalaPackage :: Nil
+    val completeList         = StringClass :: /*ClassClass ::*/ ScalaPackage :: PredefModule :: Nil
   }
 
   def ambiguousImports(imp1: ImportInfo, imp2: ImportInfo) =
@@ -88,14 +88,20 @@ trait Contexts { self: Analyzer =>
     else if (unit.isJava) RootImports.javaList
     else if (settings.nopredef || treeInfo.noPredefImportForUnit(unit.body)) {
       debuglog("Omitted import of Predef._ for " + unit)
-      RootImports.javaAndScalaList
+      RootImports.someJavaAndScalaList
     }
     else RootImports.completeList
   }
 
+  private def importPackageOrModuleOrClass(sym: Symbol): Import =
+    if (sym.isPackage || sym.isModule)
+      gen.mkWildcardImport(sym)
+    else if (sym.isClass)
+      gen.mkImport(sym.enclosingPackage, sym.name.toTermName, sym.name.toTermName)
+    else ???
 
   def rootContext(unit: CompilationUnit, tree: Tree = EmptyTree, erasedTypes: Boolean = false): Context = {
-    val rootImportsContext = (startContext /: rootImports(unit))((c, sym) => c.make(gen.mkWildcardImport(sym)))
+    val rootImportsContext = (startContext /: rootImports(unit))((c, sym) => c.make(importPackageOrModuleOrClass(sym)))
 
     // there must be a scala.xml package when xml literals were parsed in this unit
     if (unit.hasXml && ScalaXmlPackage == NoSymbol)
