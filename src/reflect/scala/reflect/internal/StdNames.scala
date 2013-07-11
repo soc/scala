@@ -135,6 +135,9 @@ trait StdNames {
     final val ERROR: NameType    = "<error>"
     final val NO_NAME: NameType  = "<none>"  // formerly NOSYMBOL
     final val WILDCARD: NameType = "_"
+
+    final val lang: NameType    = "lang"
+    final val scala_ : NameType = "scala"
   }
 
   /** This should be the first trait in the linearization. */
@@ -668,7 +671,6 @@ trait StdNames {
     val isInstanceOf_Ob : NameType     = "$isInstanceOf"
     val java: NameType                 = "java"
     val key: NameType                  = "key"
-    val lang: NameType                 = "lang"
     val length: NameType               = "length"
     val lengthCompare: NameType        = "lengthCompare"
     val macroContext : NameType        = "c"
@@ -704,7 +706,6 @@ trait StdNames {
     val runtimeClass: NameType         = "runtimeClass"
     val runtimeMirror: NameType        = "runtimeMirror"
     val RefTree: NameType              = "RefTree"
-    val scala_ : NameType              = "scala"
     val selectDynamic: NameType        = "selectDynamic"
     val selectOverloadedMethod: NameType = "selectOverloadedMethod"
     val selectTerm: NameType           = "selectTerm"

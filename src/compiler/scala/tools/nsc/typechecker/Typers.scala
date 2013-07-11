@@ -4358,7 +4358,7 @@ trait Typers extends Adaptations with Tags {
         val sym = tp.typeSymbol.initialize
         if (sym.isAbstractType || sym.hasAbstractFlag)
           IsAbstractError(tree, sym)
-        else if (isPrimitiveValueClass(sym)) {
+        else if (sym.isPrimitiveValueClass) {
           NotAMemberError(tpt, TypeTree(tp), nme.CONSTRUCTOR)
           setError(tpt)
         }
@@ -4653,7 +4653,7 @@ trait Typers extends Adaptations with Tags {
         // resolution has already happened.
         if (isPastTyper) t.tpe match {
           case OverloadedType(pre, alts) =>
-            if (alts forall (s => (s.owner == ObjectClass) || (s.owner == AnyClass) || isPrimitiveValueClass(s.owner))) ()
+            if (alts forall (s => (s.owner == ObjectClass) || (s.owner == AnyClass) || s.owner.isPrimitiveValueClass)) ()
             else if (settings.debug) printCaller(
               s"""|Select received overloaded type during $phase, but typer is over.
                   |If this type reaches the backend, we are likely doomed to crash.
@@ -5085,7 +5085,7 @@ trait Typers extends Adaptations with Tags {
           case t if treeInfo isWildcardStarType t =>
             val exprTyped = typed(expr, mode.onlySticky)
             def subArrayType(pt: Type) =
-              if (isPrimitiveValueClass(pt.typeSymbol) || !isFullyDefined(pt)) arrayType(pt)
+              if (pt.typeSymbol.isPrimitiveValueClass || !isFullyDefined(pt)) arrayType(pt)
               else {
                 val tparam = context.owner freshExistential "" setInfo TypeBounds.upper(pt)
                 newExistentialType(List(tparam), arrayType(tparam.tpe))

@@ -51,9 +51,21 @@ trait TraceSymbolActivity {
     show(s1, ss: _*)
     show(dashes(s1), ss map dashes: _*)
   }
+  private def shouldShow(sym: Symbol) = (
+       sym.safeOwner.isPackageClass
+    && !sym.isSpecialized
+    && (sym.isPackage || sym.isModule && !sym.isJavaDefined || sym.isClass)
+    && !sym.isModuleClass
+    && !sym.isAnonOrRefinementClass
+    && !sym.isImplClass
+    && !sym.isPackageClass
+    && !sym.isSynthetic
+    && !(sym.decodedName contains "$")
+  )
+
   private def showSym(sym: Symbol) {
     def prefix = ("  " * (sym.ownerChain.length - 1)) + sym.id
-    try println("%s#%s %s".format(prefix, sym.accurateKindString, sym.name.decode))
+    try if (shouldShow(sym)) println("%s#%s %s".format(prefix, sym.accurateKindString, sym.name.decode))
     catch {
       case x: Throwable => println(prefix + " failed: " + x)
     }

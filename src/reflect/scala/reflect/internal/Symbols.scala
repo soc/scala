@@ -19,9 +19,36 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
   import definitions._
   import SymbolsStats._
 
-  protected var ids = 0
-
+  protected var ids = 200
   protected def nextId() = { ids += 1; ids }
+  private def getScalaPackageId(name: Name): Int = name match {
+    case tpnme.Byte      => 1
+    case tpnme.Short     => 2
+    case tpnme.Char      => 3
+    case tpnme.Int       => 4
+    case tpnme.Long      => 5
+    case tpnme.Float     => 6
+    case tpnme.Double    => 7
+    case tpnme.Boolean   => 8
+    case tpnme.Unit      => 9
+    case tpnme.Nothing   => 10
+    case tpnme.Null      => 11
+    case tpnme.Any       => 12
+    case tpnme.AnyVal    => 13
+    case tpnme.Singleton => 14
+    case _               => nextId()
+  }
+  private def getJavaLangPackageId(name: Name): Int = name match {
+    case tpnme.Object => 101
+    case tpnme.String => 102
+    case _            => nextId()
+  }
+  protected def getId(owner: Symbol, name: Name): Int = (
+    if (owner eq null) 1
+    else if ((owner.name eq tpnme.scala_) && owner.fullName == "scala") getScalaPackageId(name)
+    else if ((owner.name eq tpnme.lang) && owner.fullName == "java.lang") getJavaLangPackageId(name)
+    else nextId()
+  )
 
   /** Used for deciding in the IDE whether we can interrupt the compiler */
   //protected var activeLocks = 0
@@ -161,8 +188,7 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
 
     rawatt = initPos
 
-    val id = nextId() // identity displayed when -uniqid
-    //assert(id != 3390, initName)
+    val id = getId(initOwner, initName) // identity displayed when -uniqid
 
     private[this] var _validTo: Period = NoPeriod
 
@@ -534,10 +560,11 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
     def isConcreteClass         = false
     def isImplClass             = false   // the implementation class of a trait
     def isJavaInterface         = false
-    def isNumericValueClass     = false
-    def isPrimitiveValueClass   = false
     def isRefinementClass       = false
     override def isTrait        = false
+
+    final def isPrimitiveValueClass = (id < 10) && (id > 0)
+    final def isNumericValueClass   = (id < 8) && (id > 0)
 
     /** Qualities of Types, always false for TermSymbols.
      */
@@ -3034,10 +3061,8 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
     override def isConcreteClass         = !(this hasFlag ABSTRACT | TRAIT)
     override def isJavaInterface         = hasAllFlags(JAVA | TRAIT)
     override def isNestedClass           = !isTopLevel
-    override def isNumericValueClass     = definitions.isNumericValueClass(this)
     override def isNumeric               = isNumericValueClass
     override def isPackageObjectClass    = isModuleClass && (name == tpnme.PACKAGE)
-    override def isPrimitiveValueClass   = definitions.isPrimitiveValueClass(this)
     override def isPrimitive             = isPrimitiveValueClass
 
     // The corresponding interface is the last parent by convention.

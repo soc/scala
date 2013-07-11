@@ -433,7 +433,7 @@ abstract class Mixin extends InfoTransform with ast.TreeDSL {
               if ((sym.hasAccessorFlag || (sym.isTerm && !sym.isMethod))
                   && sym.isPrivate
                   && !(currentOwner.isGetter && currentOwner.accessed == sym) // getter
-                  && !definitions.isPrimitiveValueClass(sym.tpe.resultType.typeSymbol)
+                  && !sym.tpe.resultType.typeSymbol.isPrimitiveValueClass
                   && sym.owner == templ.symbol.owner
                   && !sym.isLazy
                   && !tree.isDef) {
@@ -517,7 +517,7 @@ abstract class Mixin extends InfoTransform with ast.TreeDSL {
           localTyper = erasure.newTyper(rootContext.make(tree, currentOwner))
           exitingMixin(currentOwner.owner.info)//todo: needed?
 
-          if (!currentOwner.isTrait && !isPrimitiveValueClass(currentOwner))
+          if (!currentOwner.isTrait && !currentOwner.isPrimitiveValueClass)
             addMixedinMembers(currentOwner, unit)
           else if (currentOwner hasFlag lateINTERFACE)
             addLateInterfaceMembers(currentOwner)

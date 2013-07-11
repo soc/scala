@@ -150,7 +150,7 @@ trait Erasure {
         apply(atp)
       case ClassInfoType(parents, decls, clazz) =>
         ClassInfoType(
-          if (clazz == ObjectClass || isPrimitiveValueClass(clazz)) Nil
+          if (clazz == ObjectClass || clazz.isPrimitiveValueClass) Nil
           else if (clazz == ArrayClass) ObjectTpe :: Nil
           else removeLaterObjects(parents map this),
           decls, clazz)
@@ -283,7 +283,7 @@ trait Erasure {
 
   object boxingErasure extends ScalaErasureMap {
     override def eraseNormalClassRef(pre: Type, clazz: Symbol) =
-      if (isPrimitiveValueClass(clazz)) boxedClass(clazz).tpe
+      if (clazz.isPrimitiveValueClass) boxedClass(clazz).tpe
       else super.eraseNormalClassRef(pre, clazz)
     override def eraseDerivedValueClassRef(tref: TypeRef) =
       super.eraseNormalClassRef(tref.pre, tref.sym)

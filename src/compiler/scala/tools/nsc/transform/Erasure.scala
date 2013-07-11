@@ -262,7 +262,7 @@ abstract class Erasure extends AddInterfaces
             jsig(RuntimeNothingClass.tpe)
           else if (sym == NullClass)
             jsig(RuntimeNullClass.tpe)
-          else if (isPrimitiveValueClass(sym)) {
+          else if (sym.isPrimitiveValueClass) {
             if (!primitiveOK) jsig(ObjectTpe)
             else if (sym == UnitClass) jsig(BoxedUnitTpe)
             else abbrvTag(sym).toString
@@ -520,13 +520,12 @@ abstract class Erasure extends AddInterfaces
   /** The modifier typer which retypes with erased types. */
   class Eraser(_context: Context) extends Typer(_context) {
 
-    private def isPrimitiveValueType(tpe: Type) = isPrimitiveValueClass(tpe.typeSymbol)
+    private def isPrimitiveValueType(tpe: Type) = tpe.typeSymbol.isPrimitiveValueClass
 
     private def isDifferentErasedValueType(tpe: Type, other: Type) =
       isErasedValueType(tpe) && (tpe ne other)
 
-    private def isPrimitiveValueMember(sym: Symbol) =
-      sym != NoSymbol && isPrimitiveValueClass(sym.owner)
+    private def isPrimitiveValueMember(sym: Symbol) = sym.safeOwner.isPrimitiveValueClass
 
     @inline private def box(tree: Tree, target: => String): Tree = {
       val result = box1(tree)
@@ -598,8 +597,7 @@ abstract class Erasure extends AddInterfaces
             log("not boxed: "+tree)
             lazy val underlying = underlyingOfValueClass(clazz)
             val tree0 =
-              if (tree.tpe.typeSymbol == NullClass &&
-                  isPrimitiveValueClass(underlying.typeSymbol)) {
+              if (tree.tpe.typeSymbol == NullClass && underlying.typeSymbol.isPrimitiveValueClass) {
                 // convert `null` directly to underlying type, as going
                 // via the unboxed type would yield a NPE (see SI-5866)
                 unbox1(tree, underlying)

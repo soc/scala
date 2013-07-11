@@ -135,8 +135,8 @@ abstract class SpecializeTypes extends InfoTransform with TypingTransformers {
   // then pos/spec-List.scala fails - why? Does this kind of check fail
   // for similar reasons? Does `sym.isAbstractType` make a difference?
   private def isSpecializedAnyRefSubtype(tp: Type, sym: Symbol) = {
-    specializedOn(sym).exists(s => !isPrimitiveValueClass(s)) &&
-    !isPrimitiveValueClass(tp.typeSymbol) &&
+    specializedOn(sym).exists(s => !s.isPrimitiveValueClass) &&
+    !tp.typeSymbol.isPrimitiveValueClass &&
     isBoundedGeneric(tp)
     //(tp <:< AnyRefTpe)
   }
@@ -340,7 +340,7 @@ abstract class SpecializeTypes extends InfoTransform with TypingTransformers {
    */
   def specializesClass(sym: Symbol): Symbol = {
     val c = sym.companionClass
-    if (isPrimitiveValueClass(c)) c else AnyRefClass
+    if (c.isPrimitiveValueClass) c else AnyRefClass
   }
 
   /** Return the types `sym` should be specialized at. This may be some of the primitive types
@@ -1058,7 +1058,7 @@ abstract class SpecializeTypes extends InfoTransform with TypingTransformers {
   private def unify(tp1: Type, tp2: Type, env: TypeEnv, strict: Boolean, tparams: Boolean = false): TypeEnv = (tp1, tp2) match {
     case (TypeRef(_, sym1, _), _) if sym1.isSpecialized =>
       debuglog("Unify " + tp1 + ", " + tp2)
-      if (isPrimitiveValueClass(tp2.typeSymbol) || isSpecializedAnyRefSubtype(tp2, sym1))
+      if (tp2.typeSymbol.isPrimitiveValueClass || isSpecializedAnyRefSubtype(tp2, sym1))
         env + ((sym1, tp2))
       else if (isSpecializedAnyRefSubtype(tp2, sym1))
         env + ((sym1, tp2))

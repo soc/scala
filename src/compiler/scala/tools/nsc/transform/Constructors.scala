@@ -587,7 +587,7 @@ abstract class Constructors extends Transform with ast.TreeDSL {
 
     override def transform(tree: Tree): Tree = {
       tree match {
-        case ClassDef(_,_,_,_) if !tree.symbol.isInterface && !isPrimitiveValueClass(tree.symbol) =>
+        case ClassDef(_,_,_,_) if !tree.symbol.isInterface && !tree.symbol.isPrimitiveValueClass =>
           deriveClassDef(tree)(transformClassTemplate)
         case _ =>
           super.transform(tree)
