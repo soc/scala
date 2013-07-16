@@ -15,8 +15,7 @@ import scala.collection.mutable
  *
  * ''Note:  This library is considered experimental and should not be used unless you know what you are doing.''
  */
-class VirtualDirectory(val name: String, maybeContainer: Option[VirtualDirectory])
-extends AbstractFile {
+class VirtualDirectory(val name: String, maybeContainer: Option[VirtualDirectory]) extends AbstractFileImpl {
   def path: String =
     maybeContainer match {
       case None => name
