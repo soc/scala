@@ -13,7 +13,6 @@ import scala.reflect.runtime.ReflectionUtils
 import scala.reflect.macros.runtime.AbortMacroException
 import scala.util.control.NonFatal
 import scala.tools.nsc.util.stackTraceString
-import scala.reflect.io.NoAbstractFile
 
 trait ContextErrors {
   self: Analyzer =>

@@ -9,7 +9,6 @@ package tests
 
 import scala.reflect.internal.util._
 import reporters._
-import io.AbstractFile
 import scala.collection.mutable.ArrayBuffer
 
 class Tester(ntests: Int, inputs: Array[SourceFile], settings: Settings) {

@@ -12,7 +12,6 @@ import scala.tools.nsc.util.{ ClassPath }
 import classfile.ClassfileParser
 import scala.reflect.internal.MissingRequirementError
 import scala.reflect.internal.util.Statistics
-import scala.reflect.io.{ AbstractFile, NoAbstractFile }
 
 /** This class ...
  *
@@ -139,17 +138,18 @@ abstract class SymbolLoaders {
 
   /** Initialize toplevel class and module symbols in `owner` from class path representation `classRep`
    */
-  def initializeFromClassPath(owner: Symbol, classRep: ClassPath[platform.BinaryRepr]#ClassRep) {
-    ((classRep.binary, classRep.source) : @unchecked) match {
-      case (Some(bin), Some(src))
-      if platform.needCompile(bin, src) && !binaryOnly(owner, classRep.name) =>
-        if (settings.verbose) inform("[symloader] picked up newer source file for " + src.path)
-        global.loaders.enterToplevelsFromSource(owner, classRep.name, src)
-      case (None, Some(src)) =>
-        if (settings.verbose) inform("[symloader] no class, picked up source file for " + src.path)
-        global.loaders.enterToplevelsFromSource(owner, classRep.name, src)
-      case (Some(bin), _) =>
-        global.loaders.enterClassAndModule(owner, classRep.name, platform.newClassLoader(bin))
+  def initializeFromClassPath(owner: Symbol, classRep: ClassRep) {
+    import classRep.{ bin, src }
+    if (classRep.hasBoth && platform.needCompile(bin, src) && !binaryOnly(owner, classRep.name)) {
+      if (settings.verbose) inform("[symloader] picked up newer source file for " + src.path)
+      global.loaders.enterToplevelsFromSource(owner, classRep.name, src)
+    }
+    else if (classRep.hasSourceOnly) {
+      if (settings.verbose) inform("[symloader] no class, picked up source file for " + src.path)
+      global.loaders.enterToplevelsFromSource(owner, classRep.name, src)
+    }
+    else if (classRep.hasBinary) {
+      global.loaders.enterClassAndModule(owner, classRep.name, platform.newClassLoader(bin))
     }
   }
 
@@ -221,7 +221,7 @@ abstract class SymbolLoaders {
   /**
    * Load contents of a package
    */
-  class PackageLoader(classpath: ClassPath[platform.BinaryRepr]) extends SymbolLoader with FlagAgnosticCompleter {
+  class PackageLoader(classpath: SimpleClassPath) extends SymbolLoader with FlagAgnosticCompleter {
     protected def description = "package loader "+ classpath.name
 
     protected def doComplete(root: Symbol) {

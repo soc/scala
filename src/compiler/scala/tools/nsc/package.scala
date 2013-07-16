@@ -9,6 +9,14 @@ package object nsc {
   type Mode = scala.reflect.internal.Mode
   val Mode = scala.reflect.internal.Mode
 
+  val SimpleClassPath = scala.tools.nsc.util.SimpleClassPath
+  type SimpleClassPath = scala.tools.nsc.util.SimpleClassPath
+  type ClassRep = scala.tools.nsc.util.ClassRep
+
+  type AbstractFile = scala.reflect.io.AbstractFile
+  val AbstractFile = scala.reflect.io.AbstractFile
+  val NoAbstractFile = scala.reflect.io.NoAbstractFile
+
   def EXPRmode = Mode.EXPRmode
 
   type Phase = scala.reflect.internal.Phase
