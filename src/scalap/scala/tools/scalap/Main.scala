@@ -11,7 +11,7 @@ package tools.scalap
 import java.io.{ PrintStream, OutputStreamWriter, ByteArrayOutputStream }
 import scala.reflect.NameTransformer
 import scalax.rules.scalasig._
-import scala.tools.nsc.util.{ ClassPath, JavaClassPath }
+import scala.tools.nsc.util.{ ClassPath, ClassPathImpl, JavaClassPath }
 import scala.tools.util.PathResolver
 import ClassPath.DefaultJavaContext
 import scala.tools.nsc.io.{ PlainFile, AbstractFile }
@@ -129,7 +129,7 @@ class Main {
       Console.println("class/object " + classname + " not found.")
   }
 
-  object EmptyClasspath extends ClassPath[AbstractFile] {
+  object EmptyClasspath extends ClassPathImpl[AbstractFile] {
     /**
      * The short name of the package (without prefix)
      */

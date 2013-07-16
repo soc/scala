@@ -142,9 +142,9 @@ object ClassPath {
     override def isValidName(name: String) = !isTraitImplementation(name)
   }
 
-  private def endsClass(s: String) = s.length > 6 && s.substring(s.length - 6) == ".class"
-  private def endsScala(s: String) = s.length > 6 && s.substring(s.length - 6) == ".scala"
-  private def endsJava(s: String)  = s.length > 5 && s.substring(s.length - 5) == ".java"
+  private[util] def endsClass(s: String) = s.length > 6 && s.substring(s.length - 6) == ".class"
+  private[util] def endsScala(s: String) = s.length > 6 && s.substring(s.length - 6) == ".scala"
+  private[util] def endsJava(s: String)  = s.length > 5 && s.substring(s.length - 5) == ".java"
 
   /** From the source file to its identifier.
    */
@@ -158,11 +158,38 @@ object ClassPath {
 }
 import ClassPath._
 
+trait ClassPath[T] {
+  type AnyClassRep = ClassPath[T]#ClassRep
+
+  protected def newClassRep(binary: Option[T], source: Option[AbstractFile]): ClassRep
+  trait ClassRep {
+    def binary: Option[T]
+    def source: Option[AbstractFile]
+    def name: String
+    def copy(binary: Option[T] = binary, source: Option[AbstractFile] = source): ClassRep = newClassRep(binary, source)
+  }
+
+  def name: String
+  def origin: Option[String]
+  def asURLs: List[URL]
+  def asClasspathString: String
+  def context: ClassPathContext[T]
+  def classes: IndexedSeq[AnyClassRep]
+  def packages: IndexedSeq[ClassPath[T]]
+  def sourcepaths: IndexedSeq[AbstractFile]
+  def validClassFile(name: String): Boolean
+  def validPackage(name: String): Boolean
+  def validSourceFile(name: String): Boolean
+  def findClass(name: String): Option[AnyClassRep]
+  def findSourceFile(name: String): Option[AbstractFile]
+  def sortString: String
+}
+
 /**
  * Represents a package which contains classes and other packages
  */
-abstract class ClassPath[T] {
-  type AnyClassRep = ClassPath[T]#ClassRep
+abstract class ClassPathImpl[T] extends ClassPath[T] {
+  final protected def newClassRep(binary: Option[T], source: Option[AbstractFile]): ClassRep = ClassRep(binary, source)
 
   /**
    * The short name of the package (without prefix)
@@ -196,7 +223,7 @@ abstract class ClassPath[T] {
   /**
    * Represents classes which can be loaded with a ClassfileLoader and/or SourcefileLoader.
    */
-  case class ClassRep(binary: Option[T], source: Option[AbstractFile]) {
+  case class ClassRep(binary: Option[T], source: Option[AbstractFile]) extends super.ClassRep {
     def name: String = binary match {
       case Some(x)  => context.toBinaryName(x)
       case _        =>
@@ -244,7 +271,7 @@ abstract class ClassPath[T] {
 /**
  * A Classpath containing source files
  */
-class SourcePath[T](dir: AbstractFile, val context: ClassPathContext[T]) extends ClassPath[T] {
+class SourcePath[T](dir: AbstractFile, val context: ClassPathContext[T]) extends ClassPathImpl[T] {
   def name = dir.name
   override def origin = dir.underlyingSource map (_.path)
   def asURLs = if (dir.file == null) Nil else List(dir.toURL)
@@ -270,7 +297,7 @@ class SourcePath[T](dir: AbstractFile, val context: ClassPathContext[T]) extends
 /**
  * A directory (or a .jar file) containing classfiles and packages
  */
-class DirectoryClassPath(val dir: AbstractFile, val context: ClassPathContext[AbstractFile]) extends ClassPath[AbstractFile] {
+class DirectoryClassPath(val dir: AbstractFile, val context: ClassPathContext[AbstractFile]) extends ClassPathImpl[AbstractFile] {
   def name = dir.name
   override def origin = dir.underlyingSource map (_.path)
   def asURLs = if (dir.file == null) List(new URL(name)) else List(dir.toURL)
@@ -320,7 +347,7 @@ extends MergedClassPath[T](original.entries map (e => subst getOrElse (e, e)), o
 class MergedClassPath[T](
   val entries: IndexedSeq[ClassPath[T]],
   val context: ClassPathContext[T])
-extends ClassPath[T] {
+extends ClassPathImpl[T] {
   def this(entries: TraversableOnce[ClassPath[T]], context: ClassPathContext[T]) =
     this(entries.toIndexedSeq, context)
 
