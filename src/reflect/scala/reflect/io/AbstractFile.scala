@@ -14,6 +14,78 @@ import java.net.URL
 import scala.collection.mutable.ArrayBuffer
 import scala.reflect.internal.util.Statistics
 
+trait AbstractFile extends Iterable[AbstractFile] {
+  def name: String
+  def path: String
+  def canonicalPath: String
+  def hasExtension(other: String): Boolean
+  def absolute: AbstractFile
+  def container: AbstractFile
+  def file: java.io.File
+  def underlyingSource: Option[AbstractFile]
+  def exists: Boolean
+  def isClassContainer: Boolean
+  def create(): Unit
+  def delete(): Unit
+  def isDirectory: Boolean
+  def isVirtual: Boolean
+  def lastModified: Long
+  def input: InputStream
+  def output: OutputStream
+  def bufferedOutput: BufferedOutputStream
+  def sizeOption: Option[Int]
+  def toURL: URL
+  def toCharArray: Array[Char]
+  def toByteArray: Array[Byte]
+  def iterator: Iterator[AbstractFile]
+  def lookupName(name: String, directory: Boolean): AbstractFile
+  def lookupNameUnchecked(name: String, directory: Boolean): AbstractFile
+  def lookupPathUnchecked(path: String, directory: Boolean): AbstractFile
+  def fileNamed(name: String): AbstractFile
+  def subdirectoryNamed(name: String): AbstractFile
+}
+
+import java.nio.file.{ Files, Paths }
+import improving.jio._
+class NioAbstractFile(val nioPath: java.nio.file.Path) extends AbstractFile {
+  private def mkPath(p: java.nio.file.Path): AbstractFile = new NioAbstractFile(p)
+
+  def name: String = nioPath.getFileName.toString
+  def path: String = nioPath.toString
+  def canonicalPath: String = nioPath.normalize.toString
+  def hasExtension(other: String) = nioPath hasExtension other
+  def absolute: AbstractFile = mkPath(nioPath.toAbsolutePath)
+  def container: AbstractFile = mkPath(nioPath.getParent)
+  def file: java.io.File = nioPath.toFile
+  def underlyingSource: Option[AbstractFile] = {
+    val str = nioPath.toUri.toString
+    str indexOf '!' match {
+      case -1  => None
+      case idx => Some(mkPath(Paths get (str take idx)))
+    }
+  }
+  def exists: Boolean = nioPath.isReadable
+  def isClassContainer: Boolean = nioPath.isDirectory()
+  def create(): Unit = ???
+  def delete(): Unit = ???
+  def isDirectory: Boolean = nioPath.isDirectory()
+  def isVirtual: Boolean = false
+  def lastModified: Long = 0L
+  def input: InputStream = nioPath.inputStream()
+  def output: OutputStream = nioPath.outputStream()
+  def bufferedOutput: BufferedOutputStream = new BufferedOutputStream(output)
+  def sizeOption: Option[Int] = Some(nioPath.size.toInt)
+  def toURL: URL = nioPath.toUri.toURL
+  def toCharArray: Array[Char] = toByteArray map (_.toChar)
+  def toByteArray: Array[Byte] = nioPath.bytes
+  def iterator: Iterator[AbstractFile] = nioPath.entries.iterator map mkPath
+  def lookupName(name: String, directory: Boolean): AbstractFile = mkPath(nioPath / name)
+  def lookupNameUnchecked(name: String, directory: Boolean): AbstractFile = mkPath(nioPath / name)
+  def lookupPathUnchecked(path: String, directory: Boolean): AbstractFile = mkPath(nioPath / path)
+  def fileNamed(name: String): AbstractFile = mkPath(nioPath / name)
+  def subdirectoryNamed(name: String): AbstractFile = mkPath(nioPath / name)
+}
+
 /**
  * An abstraction over files for use in the reflection/compiler libraries.
  *
@@ -86,7 +158,7 @@ object AbstractFile {
  *
  * ''Note:  This library is considered experimental and should not be used unless you know what you are doing.''
  */
-abstract class AbstractFile extends Iterable[AbstractFile] {
+abstract class AbstractFileImpl extends AbstractFile with Iterable[AbstractFile] {
 
   /** Returns the name of this abstract file. */
   def name: String
@@ -217,7 +289,7 @@ abstract class AbstractFile extends Iterable[AbstractFile] {
     val path: String = if (path0.last == separator) path0 dropRight 1 else path0
     val length = path.length()
     assert(length > 0 && !(path.last == separator), path)
-    var file = this
+    var file: AbstractFile = this
     var start = 0
     while (true) {
       val index = path.indexOf(separator, start)

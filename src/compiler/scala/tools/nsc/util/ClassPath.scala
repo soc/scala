@@ -189,6 +189,8 @@ trait ClassPath[T] {
  * Represents a package which contains classes and other packages
  */
 abstract class ClassPathImpl[T] extends ClassPath[T] {
+  outer =>
+
   final protected def newClassRep(binary: Option[T], source: Option[AbstractFile]): ClassRep = ClassRep(binary, source)
 
   /**
@@ -238,11 +240,17 @@ abstract class ClassPathImpl[T] extends ClassPath[T] {
   def validPackage(name: String)    = (name != "META-INF") && (name != "") && (name.charAt(0) != '.')
   def validSourceFile(name: String) = endsScala(name) || endsJava(name)
 
+  // private def printResult[T](msg: String)(body: => T): T = {
+  //   println(msg + ": " + body)
+  //   body
+  // }
+
   /**
    * Find a ClassRep given a class name of the form "package.subpackage.ClassName".
    * Does not support nested classes on .NET
    */
-  def findClass(name: String): Option[AnyClassRep] =
+  def findClass(name: String): Option[AnyClassRep] = {
+    println(s"  ${outer.name}.findClass($name)")
     splitWhere(name, _ == '.', doDropIndex = true) match {
       case Some((pkg, rest)) =>
         val rep = packages find (_.name == pkg) flatMap (_ findClass rest)
@@ -253,6 +261,7 @@ abstract class ClassPathImpl[T] extends ClassPath[T] {
       case _ =>
         classes find (_.name == name)
     }
+  }
 
   def findSourceFile(name: String): Option[AbstractFile] =
     findClass(name) match {
