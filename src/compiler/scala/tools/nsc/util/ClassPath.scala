@@ -3,13 +3,12 @@
  * @author  Martin Odersky
  */
 
-
 package scala.tools.nsc
 package util
 
 import java.net.URL
 import scala.collection.{ mutable, immutable }
-import io.{ File, Directory, Path, Jar, AbstractFile }
+import io.{ File, Directory, Path, Jar }
 import scala.reflect.internal.util.StringOps.splitWhere
 import Jar.isJarOrZip
 import File.pathSeparator
@@ -89,7 +88,7 @@ object ClassPath {
   /** A class modeling aspects of a ClassPath which should be
    *  propagated to any classpaths it creates.
    */
-  abstract class ClassPathContext[T] {
+  abstract class ClassPathContext {
     /** A filter which can be used to exclude entities from the classpath
      *  based on their name.
      */
@@ -97,23 +96,23 @@ object ClassPath {
 
     /** From the representation to its identifier.
      */
-    def toBinaryName(rep: T): String
+    def toBinaryName(rep: AbstractFile): String
 
     /** Create a new classpath based on the abstract file.
      */
-    def newClassPath(file: AbstractFile): ClassPath[T]
+    def newClassPath(file: AbstractFile): SimpleClassPath
 
     /** Creators for sub classpaths which preserve this context.
      */
-    def sourcesInPath(path: String): List[ClassPath[T]] =
+    def sourcesInPath(path: String): List[SimpleClassPath] = (
       for (file <- expandPath(path, expandStar = false) ; dir <- Option(AbstractFile getDirectory file)) yield
-        new SourcePath[T](dir, this)
-
-    def contentsOfDirsInPath(path: String): List[ClassPath[T]] =
+        new SourcePath(dir, this)
+    )
+    def contentsOfDirsInPath(path: String): List[SimpleClassPath] = (
       for (dir <- expandPath(path, expandStar = false) ; name <- expandDir(dir) ; entry <- Option(AbstractFile getDirectory name)) yield
         newClassPath(entry)
-
-    def classesInExpandedPath(path: String): IndexedSeq[ClassPath[T]] =
+    )
+    def classesInExpandedPath(path: String): Seq[SimpleClassPath] =
       classesInPathImpl(path, expand = true).toIndexedSeq
 
     def classesInPath(path: String) = classesInPathImpl(path, expand = false)
@@ -129,7 +128,7 @@ object ClassPath {
 
   def manifests = Thread.currentThread().getContextClassLoader().getResources("META-INF/MANIFEST.MF").filter(_.getProtocol() == "jar").toList
 
-  class JavaContext extends ClassPathContext[AbstractFile] {
+  class JavaContext extends ClassPathContext {
     def toBinaryName(rep: AbstractFile) = {
       val name = rep.name
       assert(endsClass(name), name)
@@ -158,40 +157,11 @@ object ClassPath {
 }
 import ClassPath._
 
-trait ClassPath[T] {
-  type AnyClassRep = ClassPath[T]#ClassRep
-
-  protected def newClassRep(binary: Option[T], source: Option[AbstractFile]): ClassRep
-  trait ClassRep {
-    def binary: Option[T]
-    def source: Option[AbstractFile]
-    def name: String
-    def copy(binary: Option[T] = binary, source: Option[AbstractFile] = source): ClassRep = newClassRep(binary, source)
-  }
-
-  def name: String
-  def origin: Option[String]
-  def asURLs: List[URL]
-  def asClasspathString: String
-  def context: ClassPathContext[T]
-  def classes: IndexedSeq[AnyClassRep]
-  def packages: IndexedSeq[ClassPath[T]]
-  def sourcepaths: IndexedSeq[AbstractFile]
-  def validClassFile(name: String): Boolean
-  def validPackage(name: String): Boolean
-  def validSourceFile(name: String): Boolean
-  def findClass(name: String): Option[AnyClassRep]
-  def findSourceFile(name: String): Option[AbstractFile]
-  def sortString: String
-}
-
 /**
  * Represents a package which contains classes and other packages
  */
-abstract class ClassPathImpl[T] extends ClassPath[T] {
+abstract class ClassPath extends SimpleClassPath {
   outer =>
-
-  final protected def newClassRep(binary: Option[T], source: Option[AbstractFile]): ClassRep = ClassRep(binary, source)
 
   /**
    * The short name of the package (without prefix)
@@ -214,25 +184,14 @@ abstract class ClassPathImpl[T] extends ClassPath[T] {
 
   /** Info which should be propagated to any sub-classpaths.
    */
-  def context: ClassPathContext[T]
+  def context: ClassPathContext
 
   /** Lists of entities.
    */
-  def classes: IndexedSeq[AnyClassRep]
-  def packages: IndexedSeq[ClassPath[T]]
-  def sourcepaths: IndexedSeq[AbstractFile]
-
-  /**
-   * Represents classes which can be loaded with a ClassfileLoader and/or SourcefileLoader.
-   */
-  case class ClassRep(binary: Option[T], source: Option[AbstractFile]) extends super.ClassRep {
-    def name: String = binary match {
-      case Some(x)  => context.toBinaryName(x)
-      case _        =>
-        assert(source.isDefined)
-        toSourceName(source.get)
-    }
-  }
+  def classes: Seq[ClassRep]
+  def packages: Seq[SimpleClassPath]
+  def sourcepaths: Seq[AbstractFile]
+  def entries: Seq[SimpleClassPath] = this :: Nil
 
   /** Filters for assessing validity of various entities.
    */
@@ -240,39 +199,36 @@ abstract class ClassPathImpl[T] extends ClassPath[T] {
   def validPackage(name: String)    = (name != "META-INF") && (name != "") && (name.charAt(0) != '.')
   def validSourceFile(name: String) = endsScala(name) || endsJava(name)
 
-  // private def printResult[T](msg: String)(body: => T): T = {
-  //   println(msg + ": " + body)
-  //   body
-  // }
-
   /**
    * Find a ClassRep given a class name of the form "package.subpackage.ClassName".
    * Does not support nested classes on .NET
    */
-  def findClass(name: String): Option[AnyClassRep] = {
-    println(s"  ${outer.name}.findClass($name)")
-    splitWhere(name, _ == '.', doDropIndex = true) match {
-      case Some((pkg, rest)) =>
-        val rep = packages find (_.name == pkg) flatMap (_ findClass rest)
-        rep map {
-          case x: ClassRep  => x
-          case x            => throw new FatalError("Unexpected ClassRep '%s' found searching for name '%s'".format(x, name))
-        }
-      case _ =>
-        classes find (_.name == name)
-    }
+  def findClass(name: String): ClassRep = splitWhere(name, _ == '.', doDropIndex = true) match {
+    case Some((pkg, rest)) =>
+      packages find (_.name == pkg) match {
+        case Some(pkg) => pkg findClass rest
+        case _         => NoClassRep
+      }
+    case _ =>
+      classes find (_.name == name) getOrElse NoClassRep
   }
 
-  def findSourceFile(name: String): Option[AbstractFile] =
-    findClass(name) match {
-      case Some(ClassRep(Some(x: AbstractFile), _)) => Some(x)
-      case _                                        => None
-    }
+  /** In spectacularly confusing fashion, "findSourceFile" means
+   *  to find the binary file.
+   */
+  def findSourceFile(name: String): AbstractFile = findClass(name) match {
+    case rep if rep.hasBinary => rep.bin
+    case _                    => NoAbstractFile
+  }
 
   def sortString = join(split(asClasspathString).sorted: _*)
+  def show() {
+    println("ClassPath %s has %d entries and results in:\n".format(name, entries.size))
+    asClasspathString split ':' foreach (x => println("  " + x))
+  }
   override def equals(that: Any) = that match {
-    case x: ClassPath[_]  => this.sortString == x.sortString
-    case _                => false
+    case x: SimpleClassPath => this.sortString == x.sortString
+    case _                  => false
   }
   override def hashCode = sortString.hashCode()
 }
@@ -280,21 +236,21 @@ abstract class ClassPathImpl[T] extends ClassPath[T] {
 /**
  * A Classpath containing source files
  */
-class SourcePath[T](dir: AbstractFile, val context: ClassPathContext[T]) extends ClassPathImpl[T] {
+class SourcePath(dir: AbstractFile, val context: ClassPathContext) extends ClassPath {
   def name = dir.name
   override def origin = dir.underlyingSource map (_.path)
   def asURLs = if (dir.file == null) Nil else List(dir.toURL)
   def asClasspathString = dir.path
-  val sourcepaths: IndexedSeq[AbstractFile] = IndexedSeq(dir)
+  val sourcepaths: Seq[AbstractFile] = IndexedSeq(dir)
 
   private def traverse() = {
     val classBuf   = immutable.Vector.newBuilder[ClassRep]
-    val packageBuf = immutable.Vector.newBuilder[SourcePath[T]]
+    val packageBuf = immutable.Vector.newBuilder[SourcePath]
     dir foreach { f =>
       if (!f.isDirectory && validSourceFile(f.name))
-        classBuf += ClassRep(None, Some(f))
+        classBuf += ClassRep(NoAbstractFile, f)
       else if (f.isDirectory && validPackage(f.name))
-        packageBuf += new SourcePath[T](f, context)
+        packageBuf += new SourcePath(f, context)
     }
     (packageBuf.result(), classBuf.result())
   }
@@ -306,12 +262,12 @@ class SourcePath[T](dir: AbstractFile, val context: ClassPathContext[T]) extends
 /**
  * A directory (or a .jar file) containing classfiles and packages
  */
-class DirectoryClassPath(val dir: AbstractFile, val context: ClassPathContext[AbstractFile]) extends ClassPathImpl[AbstractFile] {
+class DirectoryClassPath(val dir: AbstractFile, val context: ClassPathContext) extends ClassPath {
   def name = dir.name
   override def origin = dir.underlyingSource map (_.path)
   def asURLs = if (dir.file == null) List(new URL(name)) else List(dir.toURL)
   def asClasspathString = dir.path
-  val sourcepaths: IndexedSeq[AbstractFile] = IndexedSeq()
+  val sourcepaths: Seq[AbstractFile] = IndexedSeq()
 
   // calculates (packages, classes) in one traversal.
   private def traverse() = {
@@ -332,7 +288,7 @@ class DirectoryClassPath(val dir: AbstractFile, val context: ClassPathContext[Ab
             f.isDirectory
         }
         if (!isDirectory && validClassFile(f.name))
-          classBuf += ClassRep(Some(f), None)
+          classBuf += ClassRep(f, NoAbstractFile)
         else if (isDirectory && validPackage(f.name))
           packageBuf += new DirectoryClassPath(f, context)
     }
@@ -343,8 +299,8 @@ class DirectoryClassPath(val dir: AbstractFile, val context: ClassPathContext[Ab
   override def toString() = "directory classpath: "+ origin.getOrElse("?")
 }
 
-class DeltaClassPath[T](original: MergedClassPath[T], subst: Map[ClassPath[T], ClassPath[T]])
-extends MergedClassPath[T](original.entries map (e => subst getOrElse (e, e)), original.context) {
+class DeltaClassPath(original: SimpleClassPath, subst: Map[SimpleClassPath, SimpleClassPath])
+extends MergedClassPath(original.entries map (e => subst.getOrElse(e, e)), original.context) {
   // not sure we should require that here. Commented out for now.
   // require(subst.keySet subsetOf original.entries.toSet)
   // We might add specialized operations for computing classes packages here. Not sure it's worth it.
@@ -353,24 +309,24 @@ extends MergedClassPath[T](original.entries map (e => subst getOrElse (e, e)), o
 /**
  * A classpath unifying multiple class- and sourcepath entries.
  */
-class MergedClassPath[T](
-  val entries: IndexedSeq[ClassPath[T]],
-  val context: ClassPathContext[T])
-extends ClassPathImpl[T] {
-  def this(entries: TraversableOnce[ClassPath[T]], context: ClassPathContext[T]) =
+class MergedClassPath(
+  override val entries: Seq[SimpleClassPath],
+  val context: ClassPathContext)
+extends ClassPath {
+  def this(entries: TraversableOnce[SimpleClassPath], context: ClassPathContext) =
     this(entries.toIndexedSeq, context)
 
   def name = entries.head.name
   def asURLs = (entries flatMap (_.asURLs)).toList
-  lazy val sourcepaths: IndexedSeq[AbstractFile] = entries flatMap (_.sourcepaths)
+  lazy val sourcepaths: Seq[AbstractFile] = entries flatMap (_.sourcepaths)
 
   override def origin = Some(entries map (x => x.origin getOrElse x.name) mkString ("Merged(", ", ", ")"))
   override def asClasspathString: String = join(entries map (_.asClasspathString) : _*)
 
-  lazy val classes: IndexedSeq[AnyClassRep] = {
+  lazy val classes: Seq[ClassRep] = {
     var count   = 0
     val indices = mutable.HashMap[String, Int]()
-    val cls     = new mutable.ArrayBuffer[AnyClassRep](1024)
+    val cls     = new mutable.ArrayBuffer[ClassRep](1024)
 
     for (e <- entries; c <- e.classes) {
       val name = c.name
@@ -378,10 +334,10 @@ extends ClassPathImpl[T] {
         val idx      = indices(name)
         val existing = cls(idx)
 
-        if (existing.binary.isEmpty && c.binary.isDefined)
-          cls(idx) = existing.copy(binary = c.binary)
-        if (existing.source.isEmpty && c.source.isDefined)
-          cls(idx) = existing.copy(source = c.source)
+        if (!existing.hasBinary && c.hasBinary)
+          cls(idx) = existing.updateBinary(c.bin)
+        if (!existing.hasSource && c.hasSource)
+          cls(idx) = existing.updateSource(c.src)
       }
       else {
         indices(name) = count
@@ -392,10 +348,10 @@ extends ClassPathImpl[T] {
     cls.toIndexedSeq
   }
 
-  lazy val packages: IndexedSeq[ClassPath[T]] = {
+  lazy val packages: Seq[SimpleClassPath] = {
     var count   = 0
     val indices = mutable.HashMap[String, Int]()
-    val pkg     = new mutable.ArrayBuffer[ClassPath[T]](256)
+    val pkg     = new mutable.ArrayBuffer[SimpleClassPath](256)
 
     for (e <- entries; p <- e.packages) {
       val name = p.name
@@ -412,16 +368,12 @@ extends ClassPathImpl[T] {
     pkg.toIndexedSeq
   }
 
-  private def addPackage(to: ClassPath[T], pkg: ClassPath[T]) = {
-    val newEntries: IndexedSeq[ClassPath[T]] = to match {
-      case cp: MergedClassPath[_] => cp.entries :+ pkg
-      case _                      => IndexedSeq(to, pkg)
+  private def addPackage(to: SimpleClassPath, pkg: SimpleClassPath) = {
+    val newEntries: Seq[SimpleClassPath] = to match {
+      case cp: MergedClassPath => cp.entries :+ pkg
+      case _                   => IndexedSeq(to, pkg)
     }
-    new MergedClassPath[T](newEntries, context)
-  }
-  def show() {
-    println("ClassPath %s has %d entries and results in:\n".format(name, entries.size))
-    asClasspathString split ':' foreach (x => println("  " + x))
+    new MergedClassPath(newEntries, context)
   }
   override def toString() = "merged classpath "+ entries.mkString("(", "\n", ")")
 }
@@ -431,6 +383,7 @@ extends ClassPathImpl[T] {
  * as AbstractFile. nsc.io.ZipArchive is used to view zip/jar archives as directories.
  */
 class JavaClassPath(
-  containers: IndexedSeq[ClassPath[AbstractFile]],
+  containers: Seq[SimpleClassPath],
   context: JavaContext)
-extends MergedClassPath[AbstractFile](containers, context) { }
+extends MergedClassPath(containers, context) { }
+

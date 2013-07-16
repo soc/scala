@@ -10,7 +10,6 @@ package backend.jvm
 import scala.tools.asm
 import scala.annotation.switch
 import scala.collection.{ immutable, mutable }
-import scala.tools.nsc.io.AbstractFile
 
 /*
  *  Traits encapsulating functionality to convert Scala AST Trees into ASM ClassNodes.

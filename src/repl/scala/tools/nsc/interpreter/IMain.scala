@@ -12,7 +12,6 @@ import util.stringFromWriter
 import scala.reflect.internal.util._
 import java.net.URL
 import scala.sys.BooleanProp
-import scala.tools.nsc.io.AbstractFile
 import reporters._
 import scala.tools.util.PathResolver
 import scala.tools.nsc.util.ScalaClassLoader

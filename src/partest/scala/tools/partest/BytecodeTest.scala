@@ -107,11 +107,10 @@ abstract class BytecodeTest extends ASMConverters {
       sys.error(s"Didn't find method '$name' in class '${classNode.name}'")
 
   protected def loadClassNode(name: String, skipDebugInfo: Boolean = true): ClassNode = {
-    val classBytes: InputStream = (for {
-      classRep <- classpath.findClass(name)
-      binary <- classRep.binary
-    } yield binary.input) getOrElse sys.error(s"failed to load class '$name'; classpath = $classpath")
-
+    val classBytes: InputStream = classpath findClass name match {
+      case rep if rep.hasBinary => rep.bin.input
+      case _                    => sys.error(s"failed to load class '$name'; classpath = $classpath")
+    }
     val cr = new ClassReader(classBytes)
     val cn = new ClassNode()
     cr.accept(cn, if (skipDebugInfo) ClassReader.SKIP_DEBUG else 0)

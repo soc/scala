@@ -1,7 +1,8 @@
-package scala.tools.nsc.interactive.tests.core
+package scala.tools.nsc
+package interactive.tests.core
 
 import scala.reflect.internal.util.{SourceFile,BatchSourceFile}
-import scala.tools.nsc.io.{AbstractFile,Path}
+import scala.tools.nsc.io.Path
 
 private[tests] object SourcesCollector {
   type SourceFilter =  Path => Boolean

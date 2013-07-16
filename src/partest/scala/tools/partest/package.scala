@@ -11,13 +11,13 @@ import scala.tools.partest.nest.NestUI
 import scala.tools.nsc.util.{ ScalaClassLoader, Exceptional }
 
 package object partest {
-  type File         = java.io.File
-  type SFile        = scala.reflect.io.File
-  type Directory    = scala.reflect.io.Directory
-  type Path         = scala.reflect.io.Path
-  type PathResolver = scala.tools.util.PathResolver
-  type ClassPath[T] = scala.tools.nsc.util.ClassPath[T]
-  type StringWriter = java.io.StringWriter
+  type File            = java.io.File
+  type SFile           = scala.reflect.io.File
+  type Directory       = scala.reflect.io.Directory
+  type Path            = scala.reflect.io.Path
+  type PathResolver    = scala.tools.util.PathResolver
+  type SimpleClassPath = scala.tools.nsc.util.SimpleClassPath
+  type StringWriter    = java.io.StringWriter
 
   val SFile        = scala.reflect.io.File
   val Directory    = scala.reflect.io.Directory

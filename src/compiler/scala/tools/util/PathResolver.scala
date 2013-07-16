@@ -7,14 +7,14 @@ package scala
 package tools
 package util
 
+import java.net.URL
 import scala.tools.reflect.WrappedProperties.AccessControl
 import scala.tools.nsc.{ Settings, GenericRunnerSettings }
-import scala.tools.nsc.util.{ ClassPath, JavaClassPath, ScalaClassLoader }
-import scala.reflect.io.{ File, Directory, Path, AbstractFile, NioAbstractFile }
+import scala.tools.nsc.util.{ ClassPath, JavaClassPath, ScalaClassLoader, SimpleClassPath, ClassRep }
+import scala.reflect.io.{ File, Directory, Path }
 import ClassPath.{ JavaContext, DefaultJavaContext, join, split }
 import PartialFunction.condOpt
 import scala.language.postfixOps
-
 // Loosely based on the draft specification at:
 // https://wiki.scala-lang.org/display/SIW/Classpath
 
@@ -164,7 +164,7 @@ object PathResolver {
   }
 
   // called from scalap
-  def fromPathString(path: String, context: JavaContext = DefaultJavaContext): JavaClassPath = {
+  def fromPathString(path: String, context: JavaContext = DefaultJavaContext): SimpleClassPath = {
     val s = new Settings()
     s.classpath.value = path
     new PathResolver(s, context) result
@@ -250,7 +250,7 @@ class PathResolver(settings: Settings, context: JavaContext) {
     import context._
 
     // Assemble the elements!
-    def basis = List[Traversable[ClassPath[AbstractFile]]](
+    def basis = List[Traversable[SimpleClassPath]](
       classesInPath(javaBootClassPath),             // 1. The Java bootstrap class path.
       contentsOfDirsInPath(javaExtDirs),            // 2. The Java extension class path.
       classesInExpandedPath(javaUserClassPath),     // 3. The Java application class path.
@@ -278,25 +278,8 @@ class PathResolver(settings: Settings, context: JavaContext) {
   }
 
   def containers = Calculated.containers
-  lazy val result = {
-    object cp extends JavaClassPath(containers.toIndexedSeq, context) {
-      import improving.jio._
-
-      val mine = JioClassPath(JioClassPath.app(asClasspathString))
-      val myMap = mine.classMap
-
-      // println(Calculated)
-      // mine.classMap.toList map { case (k, v) => s"%60s   %s".format(k, v) } sortBy (_.trim) foreach println
-
-      override def findClass(name: String) = {
-        (myMap get name).fold(super.findClass(name))(bin => Some(newClassRep(Some(new NioAbstractFile(bin)), None)))
-
-        // myMap.getOrElse(name, super.findClass(name))
-        // println(s"findClass($name)")
-        // println(s"mine($name) == " + mine.classMap.get(name))
-        // super.findClass(name)
-      }
-    }
+  lazy val result: SimpleClassPath = {
+    val cp = new JavaClassPath(containers.toIndexedSeq, context)
     if (settings.Ylogcp) {
       Console print f"Classpath built from ${settings.toConciseString} %n"
       Console print s"Defaults: ${PathResolver.Defaults}"
