@@ -15,7 +15,7 @@ import java.util.regex.Pattern
 import javax.tools.{ Diagnostic, DiagnosticCollector, DiagnosticListener,
                      ForwardingJavaFileManager, JavaFileManager, JavaFileObject,
                      SimpleJavaFileObject, StandardLocation }
-import scala.reflect.io.{ AbstractFile, Directory, File, Path }
+import scala.reflect.io.{ Directory, File, Path }
 import scala.io.Source
 import scala.util.{ Try, Success, Failure }
 import scala.util.Properties.lineSeparator

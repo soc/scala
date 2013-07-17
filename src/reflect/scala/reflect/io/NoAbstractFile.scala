@@ -30,5 +30,6 @@ object NoAbstractFile extends AbstractFileImpl {
   def name: String = ""
   def output: java.io.OutputStream = null
   def path: String = ""
+  override def orElse(alt: => AbstractFile): AbstractFile = alt
   override def toByteArray = Array[Byte]()
 }

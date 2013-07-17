@@ -11,7 +11,8 @@ package tools.scalap
 import java.io.{ PrintStream, OutputStreamWriter, ByteArrayOutputStream }
 import scala.reflect.NameTransformer
 import scalax.rules.scalasig._
-import scala.tools.nsc.util.{ ClassPath, ClassPathImpl, JavaClassPath }
+// import scala.tools.nsc.util._
+import scala.reflect.io.classpath._
 import scala.tools.util.PathResolver
 import ClassPath.DefaultJavaContext
 import scala.tools.nsc.io.{ PlainFile, AbstractFile }
@@ -96,51 +97,35 @@ class Main {
   /** Executes scalap with the given arguments and classpath for the
    *  class denoted by `classname`.
    */
-  def process(args: Arguments, path: ClassPath[AbstractFile])(classname: String): Unit = {
+  def process(args: Arguments, path: ClassPath)(classname: String): Unit = {
     // find the classfile
+    // we have to encode every fragment of a name separately, otherwise the NameTransformer
+    // will encode using unicode escaping dot separators as well
     val encName = classname match {
       case "scala.AnyRef" => "java.lang.Object"
-      case _ =>
-        // we have to encode every fragment of a name separately, otherwise the NameTransformer
-        // will encode using unicode escaping dot separators as well
-        // we can afford allocations because this is not a performance critical code
-        classname.split('.').map(NameTransformer.encode).mkString(".")
+      case _              => classname.split('.').map(NameTransformer.encode).mkString(".")
     }
-    val cls = path.findClass(encName)
-    if (cls.isDefined && cls.get.binary.isDefined) {
-      val cfile = cls.get.binary.get
-      if (verbose) {
-        Console.println(Console.BOLD + "FILENAME" + Console.RESET + " = " + cfile.path)
-      }
-      val bytes = cfile.toByteArray
-      if (isScalaFile(bytes)) {
-        Console.println(decompileScala(bytes, isPackageObjectFile(encName)))
-      } else {
-        // construct a reader for the classfile content
-        val reader = new ByteArrayReader(cfile.toByteArray)
-        // parse the classfile
-        val clazz = new Classfile(reader)
-        processJavaClassFile(clazz)
-      }
-      // if the class corresponds to the artificial class scala.Any.
-      // (see member list in class scala.tool.nsc.symtab.Definitions)
-    }
-    else
+    path findClass encName match {
+      case rep if rep.hasBinary =>
+        val cfile = rep.bin
+        if (verbose) {
+          Console.println(Console.BOLD + "FILENAME" + Console.RESET + " = " + cfile.path)
+        }
+        val bytes = cfile.toByteArray
+        if (isScalaFile(bytes)) {
+          Console.println(decompileScala(bytes, isPackageObjectFile(encName)))
+        } else {
+          // construct a reader for the classfile content
+          val reader = new ByteArrayReader(cfile.toByteArray)
+          // parse the classfile
+          val clazz = new Classfile(reader)
+          processJavaClassFile(clazz)
+        }
+        // if the class corresponds to the artificial class scala.Any.
+        // (see member list in class scala.tool.nsc.symtab.Definitions)
+    case _ =>
       Console.println("class/object " + classname + " not found.")
-  }
-
-  object EmptyClasspath extends ClassPathImpl[AbstractFile] {
-    /**
-     * The short name of the package (without prefix)
-     */
-    def name              = ""
-    def asURLs            = Nil
-    def asClasspathString = ""
-
-    val context     = DefaultJavaContext
-    val classes     = IndexedSeq()
-    val packages    = IndexedSeq()
-    val sourcepaths = IndexedSeq()
+    }
   }
 }
 
@@ -183,9 +168,9 @@ object Main extends Main {
     printPrivates = arguments contains "-private"
     // construct a custom class path
     val cparg = List("-classpath", "-cp") map (arguments getArgument _) reduceLeft (_ orElse _)
-    val path = cparg match {
-      case Some(cp) => new JavaClassPath(DefaultJavaContext.classesInExpandedPath(cp), DefaultJavaContext)
-      case _        => PathResolver.fromPathString(".") // include '.' in the default classpath SI-6669
+    val path: ClassPath = cparg match {
+      case Some(cp) => ClassPath(cp)
+      case _        => ClassPath(".") // include '.' in the default classpath SI-6669
     }
     // print the classpath if output is verbose
     if (verbose)

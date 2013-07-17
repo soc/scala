@@ -7,10 +7,10 @@ package scala
 package tools
 package util
 
-import scala.tools.reflect.WrappedProperties.AccessControl
+import scala.reflect.io.WrappedProperties.AccessControl
 import scala.tools.nsc.{ Settings, GenericRunnerSettings }
 import scala.tools.nsc.util.{ ClassPath, JavaClassPath, ScalaClassLoader }
-import scala.reflect.io.{ File, Directory, Path, AbstractFile, NioAbstractFile }
+import scala.reflect.io.{ File, Directory, Path, AbstractFile }
 import ClassPath.{ JavaContext, DefaultJavaContext, join, split }
 import PartialFunction.condOpt
 import scala.language.postfixOps
@@ -278,25 +278,9 @@ class PathResolver(settings: Settings, context: JavaContext) {
   }
 
   def containers = Calculated.containers
+
   lazy val result = {
-    object cp extends JavaClassPath(containers.toIndexedSeq, context) {
-      import improving.jio._
-
-      val mine = JioClassPath(JioClassPath.app(asClasspathString))
-      val myMap = mine.classMap
-
-      // println(Calculated)
-      // mine.classMap.toList map { case (k, v) => s"%60s   %s".format(k, v) } sortBy (_.trim) foreach println
-
-      override def findClass(name: String) = {
-        (myMap get name).fold(super.findClass(name))(bin => Some(newClassRep(Some(new NioAbstractFile(bin)), None)))
-
-        // myMap.getOrElse(name, super.findClass(name))
-        // println(s"findClass($name)")
-        // println(s"mine($name) == " + mine.classMap.get(name))
-        // super.findClass(name)
-      }
-    }
+    val cp = new JavaClassPath(containers.toIndexedSeq, context)
     if (settings.Ylogcp) {
       Console print f"Classpath built from ${settings.toConciseString} %n"
       Console print s"Defaults: ${PathResolver.Defaults}"

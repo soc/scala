@@ -3,8 +3,9 @@
  * @author  Paul Phillips
  */
 
-package scala.tools
+package scala
 package reflect
+package io
 
 import scala.util.PropertiesTrait
 import java.security.AccessControlException

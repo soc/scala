@@ -16,14 +16,14 @@ package object partest {
   type Directory    = scala.reflect.io.Directory
   type Path         = scala.reflect.io.Path
   type PathResolver = scala.tools.util.PathResolver
-  type ClassPath[T] = scala.tools.nsc.util.ClassPath[T]
+  type ClassPath    = scala.reflect.io.classpath.ClassPath
   type StringWriter = java.io.StringWriter
 
   val SFile        = scala.reflect.io.File
   val Directory    = scala.reflect.io.Directory
   val Path         = scala.reflect.io.Path
   val PathResolver = scala.tools.util.PathResolver
-  val ClassPath    = scala.tools.nsc.util.ClassPath
+  val ClassPath    = scala.reflect.io.classpath.ClassPath
 
   val space                       = "\u0020"
   val EOL                         = scala.compat.Platform.EOL
@@ -67,8 +67,8 @@ package object partest {
     def isScala       = f.isFile && (sf hasExtension "scala")
     def isJavaOrScala = isJava || isScala
 
-    def extension = sf.extension
-    def hasExtension(ext: String) = sf hasExtension ext
+    // def extension = sf.extension
+    // def hasExtension(ext: String) = sf hasExtension ext
     def changeExtension(ext: String): File = (sf changeExtension ext).jfile
 
     /** The group number for this source file, or -1 for no group. */

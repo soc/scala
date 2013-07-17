@@ -8,7 +8,7 @@ package interpreter
 
 import io.VirtualDirectory
 import settings.MutableSettings
-import scala.reflect.io.{ AbstractFile, AbstractFileImpl, PlainDirectory, Directory }
+import scala.reflect.io.{ AbstractFileImpl, PlainDirectory, Directory }
 import scala.collection.generic.Clearable
 
 /** Directory to save .class files to. */
