@@ -354,6 +354,9 @@ TODO:
        </or></not>
     </condition>
 
+    <!-- This sets the property if java.nio.file.Path is on the boot classpath. -->
+    <available classname="java.nio.file.Path" classpath="${sun.boot.class.path}" property="java.nio.path.available"/>
+
     <fail if="has.unsupported.jdk" message="JDK ${ant.java.version} is not supported by this build!"/>
 
     <if><isset property="has.java7"/><then>
