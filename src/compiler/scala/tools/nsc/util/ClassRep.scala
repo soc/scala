@@ -3,6 +3,22 @@ package util
 
 import java.net.URL
 
+object ClassRep {
+  private type Path = java.io.File
+
+  final class SourceFileRep(val path: Path) extends AnyVal
+  final class BinaryFileRep(val path: Path) extends AnyVal
+
+  implicit class SourceFileRepOps(
+
+  def apply(bin: AbstractFile, src: AbstractFile): ClassRep = (
+    if (bin eq NoAbstractFile)
+      if (src eq NoAbstractFile) NoClassRep else SourceClassRep(src)
+    else
+      if (src eq NoAbstractFile) BinaryClassRep(bin) else DualClassRep(bin, src)
+  )
+}
+
 /**
  * Represents classes which can be loaded with a ClassfileLoader and/or SourcefileLoader.
  */
@@ -27,14 +43,6 @@ sealed abstract class ClassRep {
   def updateSource(src: AbstractFile): ClassRep = ClassRep(bin, src)
 
   override def toString = s"ClassRep(bin=$bin, src=$src)"
-}
-object ClassRep {
-  def apply(bin: AbstractFile, src: AbstractFile): ClassRep = (
-    if (bin eq NoAbstractFile)
-      if (src eq NoAbstractFile) NoClassRep else SourceClassRep(src)
-    else
-      if (src eq NoAbstractFile) BinaryClassRep(bin) else DualClassRep(bin, src)
-  )
 }
 
 case class SourceClassRep(src: AbstractFile) extends ClassRep {
