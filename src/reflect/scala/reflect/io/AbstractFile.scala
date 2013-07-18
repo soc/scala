@@ -3,7 +3,6 @@
  * @author  Martin Odersky
  */
 
-
 package scala
 package reflect
 package io
@@ -13,6 +12,39 @@ import java.io.{ File => JFile }
 import java.net.URL
 import scala.collection.mutable.ArrayBuffer
 import scala.reflect.internal.util.Statistics
+
+trait AbstractFile extends Iterable[AbstractFile] {
+  def name: String
+  def path: String
+  def canonicalPath: String
+  def hasExtension(other: String): Boolean
+  def extension: String
+  def absolute: AbstractFile
+  def container: AbstractFile
+  def file: java.io.File
+  def underlyingSource: Option[AbstractFile]
+  def exists: Boolean
+  def isClassContainer: Boolean
+  def create(): Unit
+  def delete(): Unit
+  def isDirectory: Boolean
+  def isVirtual: Boolean
+  def lastModified: Long
+  def input: InputStream
+  def output: OutputStream
+  def bufferedOutput: BufferedOutputStream
+  def sizeOption: Option[Int]
+  def toURL: URL
+  def toCharArray: Array[Char]
+  def toByteArray: Array[Byte]
+  def iterator: Iterator[AbstractFile]
+  def lookupName(name: String, directory: Boolean): AbstractFile
+  def lookupNameUnchecked(name: String, directory: Boolean): AbstractFile
+  def lookupPathUnchecked(path: String, directory: Boolean): AbstractFile
+  def fileNamed(name: String): AbstractFile
+  def subdirectoryNamed(name: String): AbstractFile
+  def orElse(alt: => AbstractFile): AbstractFile
+}
 
 /**
  * An abstraction over files for use in the reflection/compiler libraries.
@@ -86,7 +118,7 @@ object AbstractFile {
  *
  * ''Note:  This library is considered experimental and should not be used unless you know what you are doing.''
  */
-abstract class AbstractFile extends Iterable[AbstractFile] {
+abstract class AbstractFileImpl extends AbstractFile with Iterable[AbstractFile] {
 
   /** Returns the name of this abstract file. */
   def name: String
@@ -99,7 +131,7 @@ abstract class AbstractFile extends Iterable[AbstractFile] {
 
   /** Checks extension case insensitively. */
   def hasExtension(other: String) = extension == other.toLowerCase
-  private lazy val extension: String = Path.extension(name)
+  lazy val extension: String = Path.extension(name)
 
   /** The absolute file, if this is a relative file. */
   def absolute: AbstractFile
@@ -150,6 +182,8 @@ abstract class AbstractFile extends Iterable[AbstractFile] {
   def sizeOption: Option[Int] = None
 
   def toURL: URL = if (file == null) null else file.toURI.toURL
+
+  def orElse(alt: => AbstractFile): AbstractFile = this
 
   /** Returns contents of file (if applicable) in a Char array.
    *  warning: use `Global.getSourceFile()` to use the proper
@@ -217,7 +251,7 @@ abstract class AbstractFile extends Iterable[AbstractFile] {
     val path: String = if (path0.last == separator) path0 dropRight 1 else path0
     val length = path.length()
     assert(length > 0 && !(path.last == separator), path)
-    var file = this
+    var file: AbstractFile = this
     var start = 0
     while (true) {
       val index = path.indexOf(separator, start)

@@ -8,11 +8,11 @@ package interpreter
 
 import io.VirtualDirectory
 import settings.MutableSettings
-import scala.reflect.io.{ AbstractFile, PlainDirectory, Directory }
+import scala.reflect.io.{ AbstractFileImpl, PlainDirectory, Directory }
 import scala.collection.generic.Clearable
 
 /** Directory to save .class files to. */
-trait ReplDir extends AbstractFile with Clearable { }
+trait ReplDir extends AbstractFileImpl with Clearable { }
 
 private class ReplVirtualDir() extends VirtualDirectory("(memory)", None) with ReplDir { }
 private class ReplRealDir(dir: Directory) extends PlainDirectory(dir) with ReplDir {

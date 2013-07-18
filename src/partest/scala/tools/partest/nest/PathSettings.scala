@@ -5,11 +5,10 @@
 package scala.tools.partest
 package nest
 
-import scala.tools.nsc.util.ClassPath
-import scala.tools.nsc.io.{ Path, File, Directory }
 import Path._
 
 object PathSettings {
+  private type File = scala.reflect.io.File
   import PartestDefaults.{ testRootDir, srcDirName }
 
   private def cwd = Directory.Current getOrElse sys.error("user.dir property not set")

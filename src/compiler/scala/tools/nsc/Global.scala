@@ -12,9 +12,10 @@ import java.nio.charset.{ Charset, CharsetDecoder, IllegalCharsetNameException, 
 import java.util.UUID._
 import scala.compat.Platform.currentTime
 import scala.collection.{ mutable, immutable }
-import io.{ SourceReader, AbstractFile, Path }
+import io.{ SourceReader, Path }
 import reporters.{ Reporter, ConsoleReporter }
-import util.{ ClassPath, MergedClassPath, StatisticsInfo, returning, stackTraceString, stackTraceHeadString }
+import scala.reflect.io.classpath._
+import util.{ StatisticsInfo, returning, stackTraceString, stackTraceHeadString }
 import scala.reflect.internal.util.{ OffsetPosition, SourceFile, NoSourceFile, BatchSourceFile, ScriptSourceFile }
 import scala.reflect.internal.pickling.{ PickleBuffer, PickleFormat }
 import scala.reflect.io.VirtualFile
@@ -85,10 +86,7 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
   lazy val platform: ThisPlatform =
     new { val global: Global.this.type = Global.this } with JavaPlatform
 
-  type PlatformClassPath = ClassPath[platform.BinaryRepr]
-  type OptClassPath = Option[PlatformClassPath]
-
-  def classPath: PlatformClassPath = platform.classPath
+  def classPath: ClassPath = platform.classPath
 
   // sub-components --------------------------------------------------
 
@@ -846,11 +844,11 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
   def invalidateClassPathEntries(paths: String*): (List[ClassSymbol], List[ClassSymbol]) = {
     val invalidated, failed = new mutable.ListBuffer[ClassSymbol]
     classPath match {
-      case cp: MergedClassPath[_] =>
-        def assoc(path: String): List[(PlatformClassPath, PlatformClassPath)] = {
+      case cp: MergedClassPath =>
+        def assoc(path: String): List[(ClassPath, ClassPath)] = {
           val dir = AbstractFile getDirectory path
           val canonical = dir.canonicalPath
-          def matchesCanonical(e: ClassPath[_]) = e.origin match {
+          def matchesCanonical(e: ClassPath) = e.origin match {
             case Some(opath) =>
               (AbstractFile getDirectory opath).canonicalPath == canonical
             case None =>
@@ -869,12 +867,12 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
         if (subst.nonEmpty) {
           platform updateClassPath subst
           informProgress(s"classpath updated on entries [${subst.keys mkString ","}]")
-          def mkClassPath(elems: Iterable[PlatformClassPath]): PlatformClassPath =
+          def mkClassPath(elems: Iterable[ClassPath]): ClassPath =
             if (elems.size == 1) elems.head
             else new MergedClassPath(elems, classPath.context)
           val oldEntries = mkClassPath(subst.keys)
           val newEntries = mkClassPath(subst.values)
-          reSync(RootClass, Some(classPath), Some(oldEntries), Some(newEntries), invalidated, failed)
+          reSync(RootClass, classPath, oldEntries, newEntries, invalidated, failed)
         }
     }
     def show(msg: String, syms: scala.collection.Traversable[Symbol]) =
@@ -911,22 +909,23 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
    *  Note that new <= all and old <= sym, so the matrix above covers all possibilities.
    */
   private def reSync(root: ClassSymbol,
-             allEntries: OptClassPath, oldEntries: OptClassPath, newEntries: OptClassPath,
+             allEntries: ClassPath, oldEntries: ClassPath, newEntries: ClassPath,
              invalidated: mutable.ListBuffer[ClassSymbol], failed: mutable.ListBuffer[ClassSymbol]) {
     ifDebug(informProgress(s"syncing $root, $oldEntries -> $newEntries"))
 
-    val getName: ClassPath[platform.BinaryRepr] => String = (_.name)
-    def hasClasses(cp: OptClassPath) = cp.isDefined && cp.get.classes.nonEmpty
+    val getName: ClassPath => String = (_.name)
+    def hasClasses(cp: ClassPath) = cp.classes.nonEmpty
     def invalidateOrRemove(root: ClassSymbol) = {
-      allEntries match {
-        case Some(cp) => root setInfo new loaders.PackageLoader(cp)
-        case None => root.owner.info.decls unlink root.sourceModule
-      }
+      if (allEntries.isEmpty)
+        root.owner.info.decls unlink root.sourceModule
+      else
+        root setInfo new loaders.PackageLoader(allEntries)
+
       invalidated += root
     }
-    def packageNames(cp: PlatformClassPath): Set[String] = cp.packages.toSet map getName
-    def subPackage(cp: PlatformClassPath, name: String): OptClassPath =
-      cp.packages find (cp1 => getName(cp1) == name)
+    def packageNames(cp: ClassPath): Set[String] = cp.packages.toSet map getName
+    def subPackage(cp: ClassPath, name: String): ClassPath =
+      cp.packages find (cp1 => getName(cp1) == name) getOrElse ClassPath.empty
 
     val classesFound = hasClasses(oldEntries) || hasClasses(newEntries)
     if (classesFound && !isSystemPackageClass(root)) {
@@ -936,26 +935,29 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
         if (root.isRoot) invalidateOrRemove(EmptyPackageClass)
         else failed += root
       }
-      (oldEntries, newEntries) match {
-        case (Some(oldcp) , Some(newcp)) =>
+      val oldcp = oldEntries
+      val newcp = newEntries
+
+      if (!oldcp.isEmpty) {
+        if (newcp.isEmpty)
+          invalidateOrRemove(root)
+        else {
           for (pstr <- packageNames(oldcp) ++ packageNames(newcp)) {
             val pname = newTermName(pstr)
             val pkg = (root.info decl pname) orElse {
               // package was created by external agent, create symbol to track it
-              assert(!subPackage(oldcp, pstr).isDefined)
-              loaders.enterPackage(root, pstr, new loaders.PackageLoader(allEntries.get))
+              assert(subPackage(oldcp, pstr).isEmpty)
+              loaders.enterPackage(root, pstr, new loaders.PackageLoader(allEntries))
             }
             reSync(
                 pkg.moduleClass.asInstanceOf[ClassSymbol],
-                subPackage(allEntries.get, pstr), subPackage(oldcp, pstr), subPackage(newcp, pstr),
+                subPackage(allEntries, pstr), subPackage(oldcp, pstr), subPackage(newcp, pstr),
                 invalidated, failed)
           }
-        case (Some(oldcp), None) =>
-          invalidateOrRemove(root)
-        case (None, Some(newcp)) =>
-          invalidateOrRemove(root)
-        case (None, None) =>
+        }
       }
+      else if (!newcp.isEmpty)
+        invalidateOrRemove(root)
     }
   }
 
@@ -1266,12 +1268,13 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
       }
       for (fullname <- toReload)
         classPath.findClass(fullname) match {
-          case Some(classRep) =>
+          case NoClassRep =>
+          case classRep   =>
             if (settings.verbose) inform("[reset] reinit "+fullname)
             loaders.initializeFromClassPath(root, classRep)
-          case _ =>
         }
-    } catch {
+    }
+    catch {
       case ex: Throwable =>
         // this handler should not be nessasary, but it seems that `fsc`
         // eats exceptions if they appear here. Need to find out the cause for

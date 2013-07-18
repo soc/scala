@@ -14,7 +14,7 @@ import java.io.InputStream
  *
  *  ''Note:  This library is considered experimental and should not be used unless you know what you are doing.''
  */
-object NoAbstractFile extends AbstractFile {
+object NoAbstractFile extends AbstractFileImpl {
   def absolute: AbstractFile = this
   def container: AbstractFile = this
   def create(): Unit = ???
@@ -30,5 +30,6 @@ object NoAbstractFile extends AbstractFile {
   def name: String = ""
   def output: java.io.OutputStream = null
   def path: String = ""
+  override def orElse(alt: => AbstractFile): AbstractFile = alt
   override def toByteArray = Array[Byte]()
 }

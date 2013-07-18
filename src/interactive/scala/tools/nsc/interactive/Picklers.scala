@@ -7,7 +7,7 @@ package interactive
 
 import util.InterruptReq
 import scala.reflect.internal.util.{ SourceFile, BatchSourceFile }
-import io.{ AbstractFile, PlainFile }
+import io.PlainFile
 import util.EmptyAction
 import scala.reflect.internal.util.{ RangePosition, OffsetPosition, TransparentPosition }
 import Pickler._
