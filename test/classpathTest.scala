@@ -10,9 +10,10 @@ object Test {
     override def toString = "Loaded " + success + " classes from " + megabytes + " of bytecode, " + failed + " failed to load."
 
     def make(rep: PathRep): Option[Class[_]] = {
-      val bytes = cp findBytes rep
-      try Some(defineClass(rep.className, bytes, 0, bytes.length)) catch { case t: Throwable =>
-        messages ::= "%-80s  %s".format(rep.className, t)
+      val bytes     = cp findBytes rep
+      val className = (rep.path stripSuffix ".class").replace('/', '.')
+      try Some(defineClass(className, bytes, 0, bytes.length)) catch { case t: Throwable =>
+        messages ::= "%-80s  %s".format(className, t)
         None
       }
     }
@@ -45,7 +46,7 @@ object Test {
     println("\nInitiated class loading bonanza:")
     val loader = new AmbitiousLoader(cp)
     Debug.timed((x: AmbitiousLoader) => x.toString) {
-      try loader makeAll cp.paths.filter(_.isClass)
+      try loader makeAll cp.paths.filter(_ hasExtension "class")
       finally println("")
     }
     println("")

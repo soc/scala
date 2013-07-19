@@ -70,7 +70,6 @@ object ClassPath {
 
   implicit final class ClassPathOps(val cp: ClassPath) extends AnyVal {
     import cp._
-    def classes = paths filter (_.isClass)
     def stats: String = cp match {
       case x: SingleError => ""
       case _              => "%5s files  %4s packages".format(paths.length, packages.length)

@@ -11,18 +11,20 @@ final class PackageRep private (val name: String) extends AnyVal with Ordered[Pa
 }
 
 object PackageRep {
+  val NoPackageRep = new PackageRep("")
   final val isCache = Debug.isCache
   if (isCache && Debug.isDebug)
     scala.sys addShutdownHook trace("PackageRep cache")(cache.stats())
 
-  val NoPackageRep = new PackageRep("")
   def apply(path: String): PackageRep = (
     if (path eq null) NoPackageRep
     else path lastIndexOf '/' match {
       case -1    => NoPackageRep
-      case until => if (isCache) cache.getOrElseUpdate(path, until) else create(path, until)
+      case until => apply(path, until)
     }
   )
+  def apply(path: String, until: Int): PackageRep =
+    if (isCache) cache.getOrElseUpdate(path, until) else create(path, until)
 
   // It's surprisingly expensive to naively obtain the package of a few tens
   // of thousands of class names. This cache has about a 98% hit rate and avoids
