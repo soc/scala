@@ -16,38 +16,36 @@ final class PathRep private (val path: String) extends AnyVal {
 
   // Derived names
   def baseFileName = dropExtensionOf(filename)
-  def className    = path.substring(0, path.length - 6).replace('/', '.') // assumes it's already known to be a class, for performance
   def extension    = extensionOf(filename)
   def filename     = file.getName
-  def packageName  = PackageRep(path)
 
   // Other derived values
-  def contents       = contentsOf(path)
-  def file           = new jFile(path)
-  def listContainers = contents filter (_.isJarOrZip)
+  def listContents   = contentsOf(path)
+  def listContainers = listContents filter (_.isJarOrZip)
   def parent         = PathRep(file.getParent)
   def pathLength     = path.length
   def uri            = file.toURI
+  def file           = new jFile(path)
 
   // Boolean tests
-  def isDirectory   = !isEmpty && (lastChar == '/' || lastChar == '\\')
-  def isEmpty       = pathLength == 0
-  def isClass       = (extension equalsIgnoreCase "class")
-  def isJarOrZip    = (extension equalsIgnoreCase "jar") || (extension equalsIgnoreCase "zip")
-  def isJavaOrScala = (extension equalsIgnoreCase "scala") || (extension equalsIgnoreCase "java")
+  def isDirectory                              = !isEmpty && (lastChar == '/' || lastChar == '\\')
+  def isEmpty                                  = pathLength == 0
+  def isJarOrZip                               = hasExtension("jar", "zip")
+  def hasExtension(ext: String)                = extension equalsIgnoreCase ext
+  def hasExtension(ext1: String, ext2: String) = (extension equalsIgnoreCase ext1) || (extension equalsIgnoreCase ext2)
 
   // Means to obtain associated Bytes
   def bytesFromFile(): Bytes = file match {
-    case f if f.canRead => PathRep.readFromStream(new FileInputStream(f), f.length.toInt)
+    case f if f.canRead => readFromStream(new FileInputStream(f), f.length.toInt)
     case _              => NoBytes
   }
   def bytesFromZip(zipFile: ZipFile): Bytes = zipFile getEntry path match {
     case null  => NoBytes
-    case entry => PathRep.readFromStream(zipFile getInputStream entry, entry.getSize.toInt)
+    case entry => readFromStream(zipFile getInputStream entry, entry.getSize.toInt)
   }
-
-  private def lastChar = path charAt pathLength - 1
-  override def toString = path
+  private def firstChar: Char = if (isEmpty) 0.toChar else path charAt 0
+  private def lastChar: Char  = if (isEmpty) 0.toChar else path charAt pathLength - 1
+  override def toString       = path
 }
 
 object PathRep {
