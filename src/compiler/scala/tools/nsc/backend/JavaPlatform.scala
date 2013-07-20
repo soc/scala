@@ -16,7 +16,7 @@ trait JavaPlatform extends Platform {
 
   type BinaryRepr = AbstractFile
 
-  private var currentClassPath: Option[MergedClassPath[BinaryRepr]] = None
+  private var currentClassPath: Option[ClassPath[BinaryRepr]] = None
 
   def classPath: ClassPath[BinaryRepr] = {
     if (currentClassPath.isEmpty) currentClassPath = Some(new PathResolver(settings).result)
@@ -25,7 +25,7 @@ trait JavaPlatform extends Platform {
 
   /** Update classpath with a substituted subentry */
   def updateClassPath(subst: Map[ClassPath[BinaryRepr], ClassPath[BinaryRepr]]) =
-    currentClassPath = Some(new DeltaClassPath(currentClassPath.get, subst))
+    currentClassPath = Some(new DeltaClassPath(currentClassPath.get.asInstanceOf[MergedClassPath[BinaryRepr]], subst))
 
   def rootLoader = new loaders.PackageLoader(classPath.asInstanceOf[ClassPath[platform.BinaryRepr]])
     // [Martin] Why do we need a cast here?

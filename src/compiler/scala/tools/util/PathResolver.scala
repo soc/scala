@@ -14,6 +14,7 @@ import scala.reflect.io.{ File, Directory, Path, AbstractFile }
 import ClassPath.{ JavaContext, DefaultJavaContext, join, split }
 import PartialFunction.condOpt
 import scala.language.postfixOps
+import improving.paths._
 
 // Loosely based on the draft specification at:
 // https://wiki.scala-lang.org/display/SIW/Classpath
@@ -164,7 +165,7 @@ object PathResolver {
   }
 
   // called from scalap
-  def fromPathString(path: String, context: JavaContext = DefaultJavaContext): JavaClassPath = {
+  def fromPathString(path: String, context: JavaContext = DefaultJavaContext): ClassPath[AbstractFile] = {
     val s = new Settings()
     s.classpath.value = path
     new PathResolver(s, context) result
@@ -185,7 +186,7 @@ object PathResolver {
       val pr = new PathResolver(settings)
       println(" COMMAND: 'scala %s'".format(args.mkString(" ")))
       println("RESIDUAL: 'scala %s'\n".format(rest.mkString(" ")))
-      pr.result.show()
+      // pr.result.show()
     }
   }
 }
@@ -249,6 +250,12 @@ class PathResolver(settings: Settings, context: JavaContext) {
 
     import context._
 
+    def newClassPath = improving.paths.ClassPath(
+      boot = javaBootClassPath,
+      ext  = javaExtDirs,
+      app  = join(javaUserClassPath, scalaBootClassPath, userClassPath)
+    )
+
     // Assemble the elements!
     def basis = List[Traversable[ClassPath[AbstractFile]]](
       classesInPath(javaBootClassPath),             // 1. The Java bootstrap class path.
@@ -279,8 +286,14 @@ class PathResolver(settings: Settings, context: JavaContext) {
 
   def containers = Calculated.containers
 
-  lazy val result = {
+  private def classpathNew = {
+    val cp = Calculated.newClassPath
+    val pathMap = cp.buildHierarchy()
+    new scala.tools.nsc.util.CompatClassPath(cp, pathMap)
+  }
+  private def classpathOld = {
     val cp = new JavaClassPath(containers.toIndexedSeq, context)
+
     if (settings.Ylogcp) {
       Console print f"Classpath built from ${settings.toConciseString} %n"
       Console print s"Defaults: ${PathResolver.Defaults}"
@@ -291,6 +304,8 @@ class PathResolver(settings: Settings, context: JavaContext) {
     }
     cp
   }
+
+  lazy val result: ClassPath[AbstractFile] = if (sys.props contains "cp.new") classpathNew else classpathOld
 
   def asURLs = result.asURLs
 }

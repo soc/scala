@@ -135,7 +135,7 @@ object ClassPath {
       assert(endsClass(name), name)
       name.substring(0, name.length - 6)
     }
-    def newClassPath(dir: AbstractFile) = new DirectoryClassPath(dir, this)
+    def newClassPath(dir: AbstractFile): ClassPath[AbstractFile] = new DirectoryClassPath(dir, this)
   }
 
   object DefaultJavaContext extends JavaContext {
