@@ -287,9 +287,7 @@ class PathResolver(settings: Settings, context: JavaContext) {
   def containers = Calculated.containers
 
   private def classpathNew = {
-    val cp = Calculated.newClassPath
-    val pathMap = cp.buildHierarchy()
-    new scala.tools.nsc.util.CompatClassPath(cp, pathMap)
+    new scala.tools.nsc.util.CompatClassPath(Calculated.newClassPath)
   }
   private def classpathOld = {
     val cp = new JavaClassPath(containers.toIndexedSeq, context)
