@@ -59,7 +59,9 @@ trait Variances {
     )
 
     private object ValidateVarianceMap extends TypeMap(trackVariance = true) {
-      private var base: Symbol = _
+      // private var base: Symbol = _
+      private var bases: List[Symbol] = Nil
+      private def base = bases.head
 
       /** The variance of a symbol occurrence of `tvar` seen at the level of the definition of `base`.
        *  The search proceeds from `base` to the owner of `tvar`.
@@ -71,17 +73,29 @@ trait Variances {
        *  because there may be references to the type parameter that are not checked.
        */
       def relativeVariance(tvar: Symbol): Variance = {
-        def nextVariance(sym: Symbol, v: Variance): Variance = (
-          if (shouldFlip(sym, tvar)) v.flip
+        // def nextVariance(sym: Symbol, v: Variance): Variance = (
+        //   if (shouldFlip(sym, tvar)) v.flip
+        //   else if (isLocalOnly(sym)) Bivariant
+        //   else if (sym.isAliasType) Invariant
+        //   else v
+        // )
+        // def loop(sym: Symbol, v: Variance): Variance = (
+        //   if (sym == tvar.owner || v.isBivariant) v
+        //   else loop(sym.owner, nextVariance(sym, v))
+        // )
+        val inflections = bases map (sym =>
+          if (sym.isParameter) Contravariant
           else if (isLocalOnly(sym)) Bivariant
           else if (sym.isAliasType) Invariant
-          else v
+          else printResult(s"vint for $sym (${sym.tpe_*})($tvar)")(varianceInType(sym.tpe_*)(tvar))
         )
-        def loop(sym: Symbol, v: Variance): Variance = (
-          if (sym == tvar.owner || v.isBivariant) v
-          else loop(sym.owner, nextVariance(sym, v))
-        )
-        loop(base, Covariant)
+        val recorded = withVariance(Covariant) { apply(tvar.info) ; variance }
+        // val recorded = variance
+        val multiplier = inflections.foldLeft(Bivariant)(_ & _)
+        val result = multiplier * recorded
+        println(s"inflections=${inflections map (_.longString)}, recorded=$recorded, multiplier=$multiplier, result=$result")
+        result
+        // loop(base, Covariant)
       }
       def isUncheckedVariance(tp: Type) = tp match {
         case AnnotatedType(annots, _, _) => annots exists (_ matches definitions.uncheckedVarianceClass)
@@ -89,9 +103,9 @@ trait Variances {
       }
 
       private def checkVarianceOfSymbol(sym: Symbol) {
-        val relative = relativeVariance(sym)
-        val required = relative * variance
-        if (!relative.isBivariant) {
+        val required = relativeVariance(sym)
+        // val required = relative * variance
+        if (!required.isBivariant) {
           log(s"verifying $sym (${sym.variance}${sym.locationString}) is $required at $base in ${base.owner}")
           if (sym.variance != required)
             issueVarianceError(base, sym, required)
@@ -123,10 +137,13 @@ trait Variances {
         case _                                               => mapOver(tp)
       }
       def validateDefinition(base: Symbol) {
-        val saved = this.base
-        this.base = base
-        try apply(base.info)
-        finally this.base = saved
+        bases ::= base
+        try apply(base.info) finally bases = bases.tail
+
+        // val saved = this.base
+        // this.base = base
+        // try apply(base.info)
+        // finally this.base = saved
       }
     }
 
@@ -188,8 +205,10 @@ trait Variances {
       case RefinedType(parents, defs)                   => inTypes(parents)            & inSyms(defs.toList)
       case MethodType(params, restpe)                   => inSyms(params).flip         & inType(restpe)
       case PolyType(tparams, restpe)                    => inSyms(tparams).flip        & inType(restpe)
-      case ExistentialType(tparams, restpe)             => inSyms(tparams)             & inType(restpe)
+      // case ExistentialType(tparams, restpe)             => inSyms(tparams)             & inType(restpe)
+      case et: ExistentialType                          => inType(et.skolemizeExistential)
       case AnnotatedType(annots, tp, _)                 => inTypes(annots map (_.atp)) & inType(tp)
+      case ClassInfoType(parents, decls, clazz)         => inTypes(parents)
     }
 
     inType(tp)

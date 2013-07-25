@@ -65,6 +65,7 @@ final class Variance private (val flags: Int) extends AnyVal {
     else if (isContravariant) "-"
     else ""
   )
+  def longString = if (isBivariant) "bivariant" else toString
 
   override def toString = (
     if (isContravariant) "contravariant"
