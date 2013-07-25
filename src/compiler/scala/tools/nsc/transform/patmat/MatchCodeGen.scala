@@ -94,13 +94,18 @@ trait MatchCodeGen extends Interface {
     val matchStrategy: Tree
 
     def inMatchMonad(tp: Type): Type = appliedType(oneSig, List(tp)).finalResultType
-    def pureType(tp: Type): Type     = appliedType(oneSig, List(tp)).paramTypes.headOption getOrElse NoType // fail gracefully (otherwise we get crashes)
+    def pureType(tp: Type): Type = (
+      if (tp.typeConstructor =:= repTypeConstructor) tp                         // don't lift Rep[T] to Rep[Rep[T]]
+      else appliedType(oneSig, List(tp)).paramTypes.headOption getOrElse NoType // fail gracefully (otherwise we get crashes)
+    )
+
     protected def matchMonadSym      = oneSig.finalResultType.typeSymbol
 
     import CODE._
     def _match(n: Name): SelectStart = matchStrategy DOT n
 
     private lazy val oneSig: Type = typer.typedOperator(_match(vpmName.one)).tpe  // TODO: error message
+    private lazy val repTypeConstructor = oneSig.paramTypes.head.typeConstructor
   }
 
   trait PureCodegen extends CodegenCore with PureMatchMonadInterface {
