@@ -2468,7 +2468,24 @@ trait Types
   private final class ClassNoArgsTypeRef(pre: Type, sym: Symbol) extends NoArgsTypeRef(pre, sym) with ClassTypeRef
 
   object TypeRef extends TypeRefExtractor {
-    def apply(pre: Type, sym: Symbol, args: List[Type]): Type = unique({
+    private def pre_s(pre: Type): String         = if (pre eq NoPrefix) "" else pre + ", "
+    private def sym_s(sym: Symbol): String       = "" + sym
+    private def args_s(args: List[Type]): String = if (args.isEmpty) "" else args.mkString(", ", ", ", "")
+
+    def apply(pre: Type, sym: Symbol, args: List[Type]): Type = {
+      if (sym.isInitialized)
+        applyInternal(pre, sym, args)
+      else {
+        val ph = phaseOf(currentPeriod)
+        lateLogIf(pre, sym, args)(applyInternal(pre, sym, args)) {
+          case ((p, s, as), res) if (p ne NoPrefix) && as.nonEmpty =>
+            val args1 = pre_s(p) + sym_s(s) + args_s(as)
+            f"[ph:$ph%13s] ($args1)  =>  $res"
+        }
+      }
+    }
+
+    private def applyInternal(pre: Type, sym: Symbol, args: List[Type]): Type = unique({
       if (args.nonEmpty) {
         if (sym.isAliasType)              new AliasArgsTypeRef(pre, sym, args)
         else if (sym.isAbstractType)      new AbstractArgsTypeRef(pre, sym, args)

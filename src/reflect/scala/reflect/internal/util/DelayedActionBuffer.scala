@@ -5,35 +5,30 @@
 
 package scala.reflect.internal.util
 
+import scala.annotation.tailrec
 import java.util.concurrent.LinkedBlockingQueue
 
+/** A buffer for collecting code which can't be run yet.
+ */
 class DelayedActionBuffer(onErr: Throwable => Unit) {
-  private val errHandler: PartialFunction[Throwable, Unit] = { case t => onErr(t) }
-  @volatile private[this] var closed = false
+  def this() = this(Console.err println _)
+
   private[this] val queue = new LinkedBlockingQueue[() => Unit]
 
-  def close(): Unit            = closed = true
-  def  run(body: => Any): Unit = if (!closed) queue.put(() => body)
+  def  run(body: => Any): Unit = queue.put(() => body)
   def show(body: => Any): Unit = run(Console.err println body)
-  def maybe(value: T)(pf: PartialFunction[T, Any]): T = {
-    if (pf isDefinedAt value)
-      run(pf(value))
 
-    value
-  }
-  @tailrec final def purge() = queue.poll() match {
-    case null =>
-    case f    => try f() catch errHandler ; purge()
-  }
-  /** Queue an entry to run, print, or conditionally print the
-   *  given body.
-   */
-  def add(action: => Unit) = maybe(actions += (() => action))
-  def show(msg: => Any)    = maybe(add(Console.err println msg))
   def showIf[T](value: T)(pf: PartialFunction[T, Any]): T =
-    try value finally maybe(if (pf isDefinedAt value) show(pf(value)))
+    try value finally if (pf isDefinedAt value) show(pf(value))
 
-  // Set a shutdown hook to purge the queue.
-  // Close it first in case the actions will try to enqueue more.
-  def purgeAtShutdown(): Unit = scala.sys addShutdownHook { close() ; purge() }
+  @tailrec private def drain(): Unit = queue.poll() match {
+    case null =>
+    case f    => try f() catch { case t: Exception => onErr(t) } ; drain()
+  }
+  def purge() = {
+    if (!queue.isEmpty)
+      Console.err.println(s"\nShutdown signal received, now performing ${queue.size} delayed actions.\n")
+
+    drain()
+  }
 }

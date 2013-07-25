@@ -61,9 +61,12 @@ abstract class SymbolTable extends macros.Universe
   @deprecated("Use devWarning if this is really a warning; otherwise use log", "2.11.0")
   def debugwarn(msg: => String): Unit = devWarning(msg)
 
-  /** Override with final implementation for inlining. */
+  /** Overridden in Global with final implementation to enable inlining. */
   def debuglog(msg:  => String): Unit = if (settings.debug) log(msg)
-  def devWarning(msg: => String): Unit = if (settings.debug) Console.err.println(msg)
+  def devWarning(msg: => String): Unit = if (settings.developer) warning("!!! " + msg)
+  def lateLogIf[T, R](args: T)(result: R)(pf: PartialFunction[(T, R), String]): R = result
+  def lateLogResult[T](msg: => String)(value: T): T = value
+  def lateLog(body: => Any): Unit = ()
   def throwableAsString(t: Throwable): String = "" + t
 
   /** Prints a stack trace if -Ydebug or equivalent was given, otherwise does nothing. */

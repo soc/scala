@@ -95,13 +95,35 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
   /** Generate ASTs */
   type TreeGen = scala.tools.nsc.ast.TreeGen
 
+  /** Have you ever struggled with figuring out what is happening during the early,
+   *  cycle-happy portion of the compiler's life? If even sidelong glances upset
+   *  the apple cart, you may be ready for atShutdown. Apply it to anything; it
+   *  will bide its time until jvm shutdown, then it will run the queue evaluating
+   *  and printing.
+   */
   object atShutdown extends DelayedActionBuffer {
-    /** An apply prints the result, evaluating it after typer. */
-    def apply(op: => Any): Unit = show(exitingTyper(op))
     def inPhase(ph: Phase)(op: => Any): Unit = show(atPhase(ph)(op))
-
     if (settings.developer)
-      purgeAtShutdown()
+      scala.sys addShutdownHook purge()
+  }
+
+  @inline final override def lateLogIf[T, R](args: T)(result: R)(pf: PartialFunction[(T, R), String]): R = {
+    atShutdown run {
+      val pair = ((args, result))
+      if (pf isDefinedAt pair)
+        atShutdown show pf(pair)
+    }
+    result
+  }
+  @inline final override def lateLogResult[T](msg: => String)(value: T): T = {
+    lateLog(s"$msg $value")
+    value
+  }
+  @inline final override def lateLog(body: => Any) {
+    if (settings.developer) {
+      val ph = globalPhase
+      atShutdown show f"[$ph%13s] $body"
+    }
   }
 
   /** Tree generation, usually based on existing symbols. */
