@@ -62,10 +62,53 @@ private[internal] trait TypeMaps {
   //   This is the specified behavior.
   protected def etaExpandKeepsStar = false
 
+  trait TraverseSingleTypes extends TypeMap {
+    // case SingleType(pre, sym) =>
+    //   if (sym.isPackage || sym.isPackageObject) tp
+    //   // if (sym.isPackageClass) tp // short path
+    //   else {
+    //     val info0 = sym.tpe_*
+    //     val info1 = info0.dealiasWiden
+    //     val info2 = this(info1)
+    //     if (info1 ne info2) {
+    //       println(s"Alert: ${sym.defStringSeenAs(info0)} will not be transformed to $info2 in $this")
+    //       // println(s"initialized=${sym.isInitialized} SingleType($pre, ${sym.debugFlagString} ${sym.shortSymbolClass} ${sym.fullName}) / tpe=${sym.tpe_*}")
+    //     }
+    //     val pre1 = this(pre)
+    //     if (pre1 eq pre) tp
+    //     else singleType(pre1, sym)
+    //   }
+
+    def onSingleTypeDifference(incomingType: SingleType, tpe0: Type, tpe1: Type): Type = super.mapOver(incomingType)
+
+    override def mapOver(tp: Type): Type = tp match {
+      case st @ SingleType(pre, sym) =>
+        val pre1 = mapOver(pre)
+        val tpe0 = pre1 memberType sym
+        val tpe1 = apply(tpe0)
+        if (tpe0 eq tpe1) super.mapOver(tp)
+        else onSingleTypeDifference(st, tpe0, tpe1)
+      case _ =>
+        super.mapOver(tp)
+    }
+  }
+
   /** Turn any T* types into Seq[T] except when
     *  in method parameter position.
     */
-  object dropIllegalStarTypes extends TypeMap {
+  object dropIllegalStarTypes extends TypeMap with TraverseSingleTypes {
+    override def onSingleTypeDifference(incomingType: SingleType, tpe0: Type, tpe1: Type): Type = {
+      val SingleType(pre, sym) = incomingType
+      if (sym.owner.isMethod)
+        return super.onSingleTypeDifference(incomingType, tpe0, tpe1)
+
+      def pre_s = if (pre eq NoPrefix) "" else s" in prefix $pre"
+      def own_s = sym.ownerChain take 3 mkString " -> "
+      println(s"\n>>> Warning: ${own_s}$pre_s skated through $this without its type transforming from $tpe0 => $tpe1")
+      sym setInfo tpe1
+      super.onSingleTypeDifference(incomingType, tpe0, tpe1)
+    }
+
     def apply(tp: Type): Type = tp match {
       case MethodType(params, restpe) =>
         // Not mapping over params
@@ -78,6 +121,22 @@ private[internal] trait TypeMaps {
         if (etaExpandKeepsStar) tp else mapOver(tp)
     }
   }
+  // object dropAllStarTypes extends TypeMap with TraverseSingleTypes {
+  //   def apply(tp: Type): Type = tp match {
+  //     // If we don't break down the singleton type, the varargs star will
+  //     // soldier onward hiden from view. This seems like a problem.
+  //     // case SingleType(pre, sym) =>
+  //     //   val tpe0 = pre memberType sym
+  //     //   val tpe1 = this(tpe0)
+  //     //   if (tpe0 eq tpe1) tp
+  //     //   else printResult(s"Dropping varargs star after widening $tp")(tpe1)
+  //     case TypeRef(_, RepeatedParamClass, arg :: Nil) =>
+  //       seqType(arg)
+  //     case tp =>
+  //       mapOver(tp)
+  //   }
+  // }
+
 
   trait AnnotationFilter extends TypeMap {
     def keepAnnotation(annot: AnnotationInfo): Boolean
@@ -97,6 +156,9 @@ private[internal] trait TypeMaps {
   /** A prototype for mapping a function over all possible types
     */
   abstract class TypeMap(trackVariance: Boolean) extends (Type => Type) {
+    protected def kind = util.shortClassOfInstance(this) stripSuffix "$"
+    override def toString = kind
+
     def this() = this(trackVariance = false)
     def apply(tp: Type): Type
 
@@ -105,9 +167,52 @@ private[internal] trait TypeMaps {
     def variance_=(x: Variance) = { assert(trackVariance, this) ; _variance = x }
     def variance = _variance
 
+    protected def shouldReportOnSingleton = true
+    private[this] var reportingAlready = false
+    private def reportOnSingleType(sym: Symbol) {
+      def showme(tpe: Type) = self.asInstanceOf[{ def typeDeconstruct: AnyRef { def show(tpe: Type): String } }].typeDeconstruct.show(tpe)
+      if (!shouldReportOnSingleton || reportingAlready) return
+      reportingAlready = true
+      try {
+        val info0 = sym.tpe_*
+        val info1 = info0.dealiasWiden
+        val info2 = this(info1)
+
+        if (info1 ne info2) {
+          val str1 = sym defStringSeenAs info0
+          val str2 = sym defStringSeenAs info2
+          val str3 = if (str1 != str2) "" else {
+            val saved = settings.uniqid.value
+            settings.uniqid.value = true
+            try {
+              val str3 = sym defStringSeenAs info0
+              val str4 = sym defStringSeenAs info2
+              if (str3 != str4) List(str3, str4).mkString("\n", "\n", "\n") else ""
+            }
+            finally settings.uniqid.value = saved
+          }
+          val str4 = (
+            if (str1 == str2 && str3 == "")
+              List(showme(info0), showme(info2)).mkString("\n", "\n", "\n")
+            else
+              ""
+          )
+          println(s"""|No transformation in $this for ${sym.shortSymbolClass}
+                      |  owners: ${sym.ownerChain take 4 mkString " -> "}
+                      |  before: $str1
+                      |   after: $str2$str3$str4
+                      |""".stripMargin)
+        }
+      }
+      finally reportingAlready = false
+    }
+
     /** Map this function over given type */
     def mapOver(tp: Type): Type = tp match {
       case tr @ TypeRef(pre, sym, args) =>
+        if (sym.isRefinementClass)
+          reportOnSingleType(sym)
+
         val pre1 = this(pre)
         val args1 = (
           if (trackVariance && args.nonEmpty && !variance.isInvariant && sym.typeParams.nonEmpty)
@@ -117,10 +222,16 @@ private[internal] trait TypeMaps {
           )
         if ((pre1 eq pre) && (args1 eq args)) tp
         else copyTypeRef(tp, pre1, tr.coevolveSym(pre1), args1)
-      case ThisType(_) => tp
-      case SingleType(pre, sym) =>
-        if (sym.isPackageClass) tp // short path
+      case ThisType(sym) =>
+        if (sym.isPackageClass) tp
         else {
+          reportOnSingleType(sym)
+          tp
+        }
+      case SingleType(pre, sym) =>
+        if (sym.isPackage || sym.isPackageObject) tp
+        else {
+          reportOnSingleType(sym)
           val pre1 = this(pre)
           if (pre1 eq pre) tp
           else singleType(pre1, sym)

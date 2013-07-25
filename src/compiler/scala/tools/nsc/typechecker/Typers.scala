@@ -3350,7 +3350,7 @@ trait Typers extends Adaptations with Tags {
                     if (isByNameParamType(remainingParams.head)) POLYmode
                     else POLYmode | BYVALmode
                   if (remainingParams.tail.nonEmpty) remainingParams = remainingParams.tail
-                  val arg1 = typedArg(arg, forArgMode(fun, mode), newmode, lenientPt)
+                  val arg1 = typedArg(arg, forArgMode(fun, mode), newmode, lenientPt) //modifyType dropAllStarTypes
                   val argtparams = context.extractUndetparams()
                   if (!argtparams.isEmpty) {
                     val strictPt = formal.instantiateTypeParams(tparams, strictTargs)

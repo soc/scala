@@ -21,7 +21,11 @@ trait UnCurry {
    */
   private def expandAlias(tp: Type): Type = if (!tp.isHigherKinded) tp.normalize else tp
 
-  val uncurry: TypeMap = new TypeMap {
+  val uncurry: TypeMap = new UncurryTypeMap
+
+  private class UncurryTypeMap extends TypeMap {
+    override protected def shouldReportOnSingleton = false
+
     def apply(tp0: Type): Type = {
       val tp = expandAlias(tp0)
       tp match {
@@ -47,6 +51,14 @@ trait UnCurry {
         case TypeRef(pre, JavaRepeatedParamClass, arg :: Nil) =>
           apply(arrayType(
             if (isUnboundedGeneric(arg)) ObjectTpe else arg))
+        case ThisType(_) => tp
+        case SingleType(pre, sym) =>
+          if (sym.isPackage || sym.isPackageObject) tp
+          else {
+            val pre1 = this(pre)
+            if (pre1 eq pre) tp
+            else singleType(pre1, sym)
+          }
         case _ =>
           expandAlias(mapOver(tp))
       }
