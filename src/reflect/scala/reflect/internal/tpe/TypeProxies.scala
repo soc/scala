@@ -30,7 +30,17 @@ trait TypeProxies {
     defs mkString "\n"
   }
 
-  class TypeProxy[T <: Type](wrapped: T) extends Type {
+  def lazyProxy[T <: Type](wrappedFn: => T): TypeProxy[T] = new LazyTypeProxy[T](wrappedFn)
+  def eagerProxy[T <: Type](wrapped: T): TypeProxy[T] = new EagerTypeProxy[T](wrapped)
+
+  class LazyTypeProxy[+T <: Type](wrappedFn: => T) extends TypeProxy[T] {
+    lazy val wrapped = wrappedFn
+  }
+  class EagerTypeProxy[+T <: Type](val wrapped: T) extends TypeProxy[T] {
+  }
+
+  abstract class TypeProxy[+T <: Type] extends Type {
+    def wrapped: T
 
     override def isComplete: Boolean             = wrapped.isComplete
     override def isDependentMethodType: Boolean  = wrapped.isDependentMethodType

@@ -85,6 +85,11 @@ trait Types
   import definitions._
   import TypesStats._
 
+  object typeProxies extends {
+    val global: self.type = self
+  } with tpe.TypeProxies {
+  }
+
   private var explainSwitch = false
   private final val emptySymbolSet = immutable.Set.empty[Symbol]
 

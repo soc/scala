@@ -1295,7 +1295,16 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
     /** Get type info associated with symbol at current phase, after
      *  ensuring that symbol is initialized (i.e. type is completed).
      */
-    def info: Type = try {
+    def info: Type = {
+      try infoInternal
+      catch {
+        case ex: CyclicReference =>
+          devWarning("... hit cycle trying to complete " + this.fullLocationString)
+          typeProxies.lazyProxy(this.info)
+      }
+    }
+
+    private def infoInternal: Type = {
       var cnt = 0
       while (validTo == NoPeriod) {
         //if (settings.debug.value) System.out.println("completing " + this);//DEBUG
@@ -1329,11 +1338,6 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
         if (cnt == 3) abort(s"no progress in completing $this: $tp")
       }
       rawInfo
-    }
-    catch {
-      case ex: CyclicReference =>
-        devWarning("... hit cycle trying to complete " + this.fullLocationString)
-        throw ex
     }
 
     def info_=(info: Type) {
