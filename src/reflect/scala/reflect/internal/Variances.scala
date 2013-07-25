@@ -59,7 +59,9 @@ trait Variances {
     )
 
     private object ValidateVarianceMap extends TypeMap(trackVariance = true) {
-      private var base: Symbol = _
+      private var basePairs: List[(Symbol, Type)] = Nil
+      private def base = basePairs.head._1
+      private def typeBase = basePairs.head._2
 
       /** The variance of a symbol occurrence of `tvar` seen at the level of the definition of `base`.
        *  The search proceeds from `base` to the owner of `tvar`.
@@ -70,7 +72,7 @@ trait Variances {
        *  However if it does override a type in a base class, we must assume Invariant
        *  because there may be references to the type parameter that are not checked.
        */
-      def relativeVariance(tvar: Symbol): Variance = {
+      def relativeVariance(tvar: Symbol): Variance = printResult(s"relative variance of $tvar (${tvar.variance} in owner=${tvar.owner}) in base $base") {
         def nextVariance(sym: Symbol, v: Variance): Variance = (
           if (shouldFlip(sym, tvar)) v.flip
           else if (isLocalOnly(sym)) Bivariant
@@ -81,7 +83,15 @@ trait Variances {
           if (sym == tvar.owner || v.isBivariant) v
           else loop(sym.owner, nextVariance(sym, v))
         )
-        loop(base, Covariant)
+
+        val inflectionPoints = base.ownerChain takeWhile (_ != tvar.owner)
+        println(s"inflectionPoints=$inflectionPoints")
+        println(s"basePairs = $basePairs")
+
+        if (base == tvar.owner)
+          tvar.variance
+        else
+          loop(base, Covariant) * variance
       }
       def isUncheckedVariance(tp: Type) = tp match {
         case AnnotatedType(annots, _, _) => annots exists (_ matches definitions.uncheckedVarianceClass)
@@ -89,9 +99,10 @@ trait Variances {
       }
 
       private def checkVarianceOfSymbol(sym: Symbol) {
-        val relative = relativeVariance(sym)
-        val required = relative * variance
-        if (!relative.isBivariant) {
+        // val relative = relativeVariance(sym)
+        // val required = relative * variance
+        val required = relativeVariance(sym)
+        if (!required.isBivariant) {
           log(s"verifying $sym (${sym.variance}${sym.locationString}) is $required at $base in ${base.owner}")
           if (sym.variance != required)
             issueVarianceError(base, sym, required)
@@ -123,10 +134,12 @@ trait Variances {
         case _                                               => mapOver(tp)
       }
       def validateDefinition(base: Symbol) {
-        val saved = this.base
-        this.base = base
+        basePairs ::= ((base, base.info))
+        // val saved = this.basePair
+        // this.basePair = ((base, base.info))
         try apply(base.info)
-        finally this.base = saved
+        finally basePairs = basePairs.tail
+        // this.basePair = saved
       }
     }
 
