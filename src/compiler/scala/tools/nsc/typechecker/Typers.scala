@@ -1431,8 +1431,8 @@ trait Typers extends Adaptations with Tags {
               implRestriction(tree, "nested object")
             //see https://issues.scala-lang.org/browse/SI-6444
             //see https://issues.scala-lang.org/browse/SI-6463
-            case _: ClassDef =>
-              implRestriction(tree, "nested class")
+            case cd: ClassDef if !cd.symbol.isAnonymousClass => // Don't warn about partial functions, etc. SI-7571
+              implRestriction(tree, "nested class") // avoiding Type Tests that might check the $outer pointer.
             case Select(sup @ Super(qual, mix), selector) if selector != nme.CONSTRUCTOR && qual.symbol == clazz && mix != tpnme.EMPTY =>
               //see https://issues.scala-lang.org/browse/SI-6483
               implRestriction(sup, "qualified super reference")
@@ -1573,9 +1573,9 @@ trait Typers extends Adaptations with Tags {
         }
         typedType(decodedtpt)
       } else {
-        var supertpt = typedTypeConstructor(decodedtpt)
+        val supertpt = typedTypeConstructor(decodedtpt)
         val supertparams = if (supertpt.hasSymbolField) supertpt.symbol.typeParams else Nil
-        if (supertparams.nonEmpty) {
+        def inferParentTypeArgs: Tree = {
           typedPrimaryConstrBody(templ) {
             val supertpe = PolyType(supertparams, appliedType(supertpt.tpe, supertparams map (_.tpeHK)))
             val supercall = New(supertpe, mmap(argss)(_.duplicate))
@@ -1583,14 +1583,17 @@ trait Typers extends Adaptations with Tags {
             ctor setType supertpe // this is an essential hack, otherwise it will occasionally fail to typecheck
             atPos(supertpt.pos.focus)(supercall)
           } match {
-            case EmptyTree => MissingTypeArgumentsParentTpeError(supertpt)
-            case tpt => supertpt = TypeTree(tpt.tpe) setPos supertpt.pos  // SI-7224: don't .focus positions of the TypeTree of a parent that exists in source
+            case EmptyTree => MissingTypeArgumentsParentTpeError(supertpt); supertpt
+            case tpt       => TypeTree(tpt.tpe) setPos supertpt.pos  // SI-7224: don't .focus positions of the TypeTree of a parent that exists in source
           }
         }
+
+        val supertptWithTargs = if (supertparams.isEmpty || context.unit.isJava) supertpt else inferParentTypeArgs
+
         // this is the place where we tell the typer what argss should be used for the super call
         // if argss are nullary or empty, then (see the docs for `typedPrimaryConstrBody`)
         // the super call dummy is already good enough, so we don't need to do anything
-        if (argssAreTrivial) supertpt else supertpt updateAttachment SuperArgsAttachment(argss)
+        if (argssAreTrivial) supertptWithTargs else supertptWithTargs updateAttachment SuperArgsAttachment(argss)
       }
     }
 
@@ -2794,16 +2797,11 @@ trait Typers extends Adaptations with Tags {
       if (numVparams > definitions.MaxFunctionArity)
         return MaxFunctionArityError(fun)
 
-      def decompose(pt: Type): (Symbol, List[Type], Type) =
-        if ((isFunctionType(pt) || (pt.typeSymbol == PartialFunctionClass && numVparams == 1 && fun.body.isInstanceOf[Match])) && // see bug901 for a reason why next conditions are needed
-            (  pt.dealiasWiden.typeArgs.length - 1 == numVparams
-            || fun.vparams.exists(_.tpt.isEmpty)
-            ))
-          (pt.typeSymbol, pt.dealiasWiden.typeArgs.init, pt.dealiasWiden.typeArgs.last)
-        else
-          (FunctionClass(numVparams), fun.vparams map (x => NoType), WildcardType)
-
-      val (clazz, argpts, respt) = decompose(pt)
+      val FunctionSymbol = FunctionClass(numVparams)
+      val (argpts, respt) = pt baseType FunctionSymbol match {
+        case TypeRef(_, FunctionSymbol, args :+ res) => (args, res)
+        case _                                       => (fun.vparams map (_ => NoType), WildcardType)
+      }
       if (argpts.lengthCompare(numVparams) != 0)
         WrongNumberOfParametersError(fun, argpts)
       else {
@@ -2853,7 +2851,7 @@ trait Typers extends Adaptations with Tags {
             val formals = vparamSyms map (_.tpe)
             val body1 = typed(fun.body, respt)
             val restpe = packedType(body1, fun.symbol).deconst.resultType
-            val funtpe  = appliedType(clazz, formals :+ restpe: _*)
+            val funtpe  = appliedType(FunctionSymbol, formals :+ restpe: _*)
 
             treeCopy.Function(fun, vparams, body1) setType funtpe
         }
@@ -3382,8 +3380,9 @@ trait Typers extends Adaptations with Tags {
           if (!tree.isErrorTyped) setError(tree) else tree
           // @H change to setError(treeCopy.Apply(tree, fun, args))
 
-        case otpe if mode.inPatternMode && unapplyMember(otpe).exists =>
-          doTypedUnapply(tree, fun0, fun, args, mode, pt)
+        case ExtractorType(unapply) if mode.inPatternMode =>
+          if (unapply == QuasiquoteClass_api_unapply) macroExpandUnapply(this, tree, fun, unapply, args, mode, pt)
+          else doTypedUnapply(tree, fun0, fun, args, mode, pt)
 
         case _ =>
           if (treeInfo.isMacroApplication(tree)) duplErrorTree(MacroTooManyArgumentListsError(tree, fun.symbol))
@@ -5111,7 +5110,7 @@ trait Typers extends Adaptations with Tags {
             if (mode.inPatternMode) {
               val uncheckedTypeExtractor = extractorForUncheckedType(tpt.pos, tptTyped.tpe)
               // make fully defined to avoid bounded wildcard types that may be in pt from calling dropExistential (SI-2038)
-              val ptDefined = ensureFullyDefined(pt)
+              val ptDefined = ensureFullyDefined(pt) // FIXME this is probably redundant now that we don't dropExistenial in pattern mode.
               val ownType = inferTypedPattern(tptTyped, tptTyped.tpe, ptDefined, canRemedy = uncheckedTypeExtractor.nonEmpty)
               treeTyped setType ownType
 
@@ -5345,7 +5344,12 @@ trait Typers extends Adaptations with Tags {
               "context.owner"    -> context.owner
             )
           )
-          typed1(tree, mode, dropExistential(ptPlugins))
+          val ptWild = if (mode.inPatternMode)
+            ptPlugins // SI-5022 don't widen pt for patterns as types flow from it to the case body.
+          else
+            dropExistential(ptPlugins) // FIXME: document why this is done.
+
+          typed1(tree, mode, ptWild)
         }
         // Can happen during erroneous compilation - error(s) have been
         // reported, but we need to avoid causing an NPE with this tree

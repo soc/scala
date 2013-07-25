@@ -5,14 +5,14 @@
 package scala.tools.nsc
 package ast.parser
 
-import scala.tools.nsc.util.CharArrayReader
+import scala.tools.nsc.util.{ CharArrayReader, CharArrayReaderData }
 import scala.reflect.internal.util._
 import scala.reflect.internal.Chars._
 import Tokens._
 import scala.annotation.{ switch, tailrec }
 import scala.collection.{ mutable, immutable }
 import mutable.{ ListBuffer, ArrayBuffer }
-import scala.xml.Utility.{ isNameStart }
+import scala.tools.nsc.ast.parser.xml.Utility.isNameStart
 import scala.language.postfixOps
 
 /** See Parsers.scala / ParsersCommon for some explanation of ScannersCommon.
@@ -71,17 +71,37 @@ trait Scanners extends ScannersCommon {
     /** the base of a number */
     var base: Int = 0
 
-    def copyFrom(td: TokenData) = {
+    def copyFrom(td: TokenData): this.type = {
       this.token = td.token
       this.offset = td.offset
       this.lastOffset = td.lastOffset
       this.name = td.name
       this.strVal = td.strVal
       this.base = td.base
+      this
     }
   }
 
-  abstract class Scanner extends CharArrayReader with TokenData with ScannerCommon {
+  /** An interface to most of mutable data in Scanner defined in TokenData
+   *  and CharArrayReader (+ next, prev fields) with copyFrom functionality
+   *  to backup/restore data (used by quasiquotes' lookingAhead).
+   */
+  trait ScannerData extends TokenData with CharArrayReaderData {
+    /** we need one token lookahead and one token history
+     */
+    val next: TokenData = new TokenData{}
+    val prev: TokenData = new TokenData{}
+
+    def copyFrom(sd: ScannerData): this.type = {
+      this.next copyFrom sd.next
+      this.prev copyFrom sd.prev
+      super[CharArrayReaderData].copyFrom(sd)
+      super[TokenData].copyFrom(sd)
+      this
+    }
+  }
+
+  abstract class Scanner extends CharArrayReader with TokenData with ScannerData with ScannerCommon {
     private def isDigit(c: Char) = java.lang.Character isDigit c
 
     private var openComments = 0
@@ -193,13 +213,6 @@ trait Scanners extends ScannersCommon {
       strVal = cbuf.toString
       cbuf.clear()
     }
-
-    private class TokenData0 extends TokenData
-
-    /** we need one token lookahead and one token history
-     */
-    val next : TokenData = new TokenData0
-    val prev : TokenData = new TokenData0
 
     /** a stack of tokens which indicates whether line-ends can be statement separators
      *  also used for keeping track of nesting levels.
@@ -792,6 +805,7 @@ trait Scanners extends ScannersCommon {
       if (ch == '\\') {
         nextChar()
         if ('0' <= ch && ch <= '7') {
+          val start = charOffset - 2
           val leadch: Char = ch
           var oct: Int = digit2int(ch, 8)
           nextChar()
@@ -803,6 +817,12 @@ trait Scanners extends ScannersCommon {
               nextChar()
             }
           }
+          val alt = if (oct == LF) "\\n" else "\\u%04x" format oct
+          def msg(what: String) = s"Octal escape literals are $what, use $alt instead."
+          if (settings.future)
+            syntaxError(start, msg("unsupported"))
+          else
+            deprecationWarning(start, msg("deprecated"))
           putChar(oct.toChar)
         } else {
           ch match {

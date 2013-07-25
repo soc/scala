@@ -28,6 +28,7 @@ import transform.patmat.PatternMatching
 import transform._
 import backend.icode.{ ICodes, GenICode, ICodeCheckers }
 import backend.{ ScalaPrimitives, Platform, JavaPlatform }
+import backend.jvm.GenBCode
 import backend.jvm.GenASM
 import backend.opt.{ Inliners, InlineExceptionHandlers, ConstantOptimization, ClosureElimination, DeadCodeElimination }
 import backend.icode.analysis._
@@ -102,16 +103,8 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
       typer.typed(mkCast(tree, pt))
   }
 
-  /** Trees fresh from the oven, mostly for use by the parser. */
-  object treeBuilder extends {
-    val global: Global.this.type = Global.this
-  } with TreeBuilder {
-    def freshName(prefix: String): Name               = freshTermName(prefix)
-    def freshTermName(prefix: String): TermName       = currentUnit.freshTermName(prefix)
-    def freshTypeName(prefix: String): TypeName       = currentUnit.freshTypeName(prefix)
-    def o2p(offset: Int): Position                    = new OffsetPosition(currentUnit.source, offset)
-    def r2p(start: Int, mid: Int, end: Int): Position = rangePos(currentUnit.source, start, mid, end)
-  }
+  /** A spare instance of TreeBuilder left for backwards compatibility. */
+  lazy val treeBuilder: TreeBuilder { val global: Global.this.type } = new syntaxAnalyzer.ParserTreeBuilder
 
   /** Fold constants */
   object constfold extends {
@@ -619,6 +612,13 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
     val runsRightAfter = None
   } with GenASM
 
+  // phaseName = "bcode"
+  object genBCode extends {
+    val global: Global.this.type = Global.this
+    val runsAfter = List("dce")
+    val runsRightAfter = None
+  } with GenBCode
+
   // phaseName = "terminal"
   object terminal extends {
     val global: Global.this.type = Global.this
@@ -1057,6 +1057,7 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
   @inline final def enteringMixin[T](op: => T): T         = enteringPhase(currentRun.mixinPhase)(op)
   @inline final def enteringPickler[T](op: => T): T       = enteringPhase(currentRun.picklerPhase)(op)
   @inline final def enteringRefchecks[T](op: => T): T     = enteringPhase(currentRun.refchecksPhase)(op)
+  @inline final def enteringSpecialize[T](op: => T): T    = enteringPhase(currentRun.specializePhase)(op)
   @inline final def enteringTyper[T](op: => T): T         = enteringPhase(currentRun.typerPhase)(op)
   @inline final def enteringUncurry[T](op: => T): T       = enteringPhase(currentRun.uncurryPhase)(op)
 
