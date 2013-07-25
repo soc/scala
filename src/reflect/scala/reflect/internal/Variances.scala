@@ -59,9 +59,11 @@ trait Variances {
     )
 
     private object ValidateVarianceMap extends TypeMap(trackVariance = true) {
-      private var basePairs: List[(Symbol, Type)] = Nil
-      private def base = basePairs.head._1
-      private def typeBase = basePairs.head._2
+      private var bases: List[Symbol] = Nil
+      private def base = bases.head
+      // private var basePairs: List[(Symbol, Type)] = Nil
+      // private def base = basePairs.head._1
+      // private def typeBase = basePairs.head._2
 
       /** The variance of a symbol occurrence of `tvar` seen at the level of the definition of `base`.
        *  The search proceeds from `base` to the owner of `tvar`.
@@ -84,14 +86,31 @@ trait Variances {
           else loop(sym.owner, nextVariance(sym, v))
         )
 
-        val inflectionPoints = base.ownerChain takeWhile (_ != tvar.owner)
-        println(s"inflectionPoints=$inflectionPoints")
-        println(s"basePairs = $basePairs")
+        // val inflectionPoints = base.ownerChain takeWhile (_ != tvar.owner)
+        val inflections = bases map (sym =>
+          if (sym.isParameter) Contravariant
+          else if (isLocalOnly(sym)) Bivariant
+          else if (sym.isAliasType) Invariant
+          else varianceInType(sym.tpe_*)(tvar)
+        )
+        val multiplier = inflections.foldLeft(Bivariant)(_ * _)
+        println(s"inflections=$inflections, multiplier=$multiplier")
+        multiplier * variance
 
-        if (base == tvar.owner)
-          tvar.variance
-        else
-          loop(base, Covariant) * variance
+        // val multiplier = (
+        //   basePairs.foldLeft(Covariant) {
+        //     case (res, (sym, info)) =>
+        //       if (res.isBivariant || isLocalOnly(sym)) Bivariant
+        //       else nextVariance
+
+        // println(s"inflectionPoints=$inflectionPoints")
+        // println(s"basePairs = $basePairs")
+
+        // loop(base, Covariant) * variance
+        // if (base == tvar.owner)
+        //   tvar.variance
+        // else
+        //   loop(base, Covariant) * variance
       }
       def isUncheckedVariance(tp: Type) = tp match {
         case AnnotatedType(annots, _, _) => annots exists (_ matches definitions.uncheckedVarianceClass)
@@ -134,11 +153,13 @@ trait Variances {
         case _                                               => mapOver(tp)
       }
       def validateDefinition(base: Symbol) {
-        basePairs ::= ((base, base.info))
+        bases ::= base
+        // basePairs ::= ((base, base.info))
         // val saved = this.basePair
         // this.basePair = ((base, base.info))
         try apply(base.info)
-        finally basePairs = basePairs.tail
+        finally bases = bases.tail
+        // basePairs = basePairs.tail
         // this.basePair = saved
       }
     }
