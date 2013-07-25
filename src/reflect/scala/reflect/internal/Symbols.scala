@@ -37,6 +37,55 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
     nextexid += 1
     newTypeName("_" + nextexid + suffix)
   }
+  private def isSpecialized(s: Symbol)     = s.name.toString endsWith "$sp"
+  private def isImplClass(s: Symbol)       = s.name.toString endsWith "$class"
+  private def isExcludedAsBogus(s: Symbol) = (
+       (s eq NoSymbol)
+    || (s.isAnonOrRefinementClass)
+    || isSpecialized(s)
+    || isImplClass(s)
+  )
+
+  private val bogusChildMap = mutable.Map[Symbol, List[Symbol]]() withDefaultValue Nil
+  if (self.isCompilerUniverse) sys addShutdownHook {
+    def loop(ph: Phase): Phase = (
+      if (ph == null || ph.prev == null) {
+        println("Giving up, using " + phase)
+        phase
+      }
+      else ph.prev.name match {
+        case "typer" => Console.println("Found typer phase.") ; ph
+        case n       => Console.println("Skipping phase " + n) ; loop(ph.prev)
+      }
+    )
+    val runAt = loop(phase)
+    def phop[T](body: => T): T = atPhase(runAt)(body)
+    def nameOf(s: Symbol) = phop(s.fullNameString)
+    def sp(depth: Int) = "  " * depth
+    def unnest(root: Symbol, segment: String, depth: Int): List[Symbol] = {
+      val ss      = sp(depth)
+      val c1      = phop(root.info member (segment: TermName))
+      val c2      = phop(root.info member (segment: TypeName))
+      val results = List(c1, c2) filterNot isExcludedAsBogus
+      // map (s => phop(if (s.isModule) s.moduleClass else s)) filterNot isExcludedAsBogus
+
+      results foreach (s => Console.println(ss + phop(s.fullLocationString)))
+      results
+    }
+
+    for ((owner, children) <- bogusChildMap.toList.filterNot(x => isExcludedAsBogus(x._1)).sortBy(_._1.fullName)) { // ; if !owner.isJavaDefined) {
+      Console.println(nameOf(owner))
+      children filterNot isExcludedAsBogus foreach { c =>
+        Console.println("  " + nameOf(c))
+        var depth = 2
+        val results = c.nestedNameSegments.foldLeft(owner :: Nil) { (roots, segment) =>
+          val rootsNext = roots flatMap (r => unnest(r, segment, depth))
+          depth = depth + 1
+          rootsNext
+        }
+      }
+    }
+  }
 
   // Set the fields which point companions at one another.  Returns the module.
   def connectModuleToClass(m: ModuleSymbol, moduleClass: ClassSymbol): ModuleSymbol = {
@@ -134,6 +183,19 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
              with Annotatable[Symbol]
              with Attachable {
 
+    def nestedNameSegments: List[String] = {
+      val name0 = if (rawname ne null) rawname else initName
+      val s0 = name0.toString
+      val s1 = s0 indexOf "$anon" match {
+        case -1  => s0
+        case idx => s0.substring(0, idx)
+      }
+      val s2 = scala.reflect.NameTransformer.decode(s1)
+      val segs0 = s2 split '$' toList;
+      val segs1 = if (s0 endsWith "$") segs0.init :+ (segs0.last + "$") else segs0
+
+      segs1
+    }
     type AccessBoundaryType = Symbol
     type AnnotationType     = AnnotationInfo
 
@@ -163,6 +225,20 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
 
     val id = nextId() // identity displayed when -uniqid
     //assert(id != 3390, initName)
+
+    if ((rawowner ne null) && !rawowner.isTerm && (initName ne nme.NO_NAME) && (initName.isTypeName)) {
+      nestedNameSegments match {
+        case xs if xs.tail.nonEmpty && xs.last.exists(ch => !ch.isDigit) =>
+          val o   = initOwner.fullName
+          val c   = o + "." + shortClassOfInstance(this)
+          val id2 = if (settings.uniqid.value) "@" + System.identityHashCode(this) else ""
+          val s   = xs.mkString("$")
+          // Console.println(f"$c%50s  $s%-40s  $idString%-10s  $id2%s".trim)
+          bogusChildMap(rawowner) ::= this
+
+        case _ =>
+      }
+    }
 
     private[this] var _validTo: Period = NoPeriod
 
