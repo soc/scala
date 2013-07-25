@@ -10,6 +10,7 @@ package internal
 import Variance._
 import scala.collection.{ mutable, immutable }
 import scala.annotation.tailrec
+import util.shortClassOfInstance
 
 /** See comments at scala.reflect.internal.Variance.
  */
@@ -70,7 +71,7 @@ trait Variances {
        *  However if it does override a type in a base class, we must assume Invariant
        *  because there may be references to the type parameter that are not checked.
        */
-      def relativeVariance(tvar: Symbol): Variance = {
+      def relativeVariance(tvar: Symbol): Variance = printResult(s"relative variance of $tvar (${tvar.variance} in owner=${tvar.owner}) in base $base") {
         def nextVariance(sym: Symbol, v: Variance): Variance = (
           if (shouldFlip(sym, tvar)) v.flip
           else if (isLocalOnly(sym)) Bivariant
@@ -81,7 +82,11 @@ trait Variances {
           if (sym == tvar.owner || v.isBivariant) v
           else loop(sym.owner, nextVariance(sym, v))
         )
-        loop(base, Covariant)
+
+        if (base == tvar.owner)
+          tvar.variance
+        else
+          loop(base, Covariant) * variance
       }
       def isUncheckedVariance(tp: Type) = tp match {
         case AnnotatedType(annots, _, _) => annots exists (_ matches definitions.uncheckedVarianceClass)
@@ -89,9 +94,10 @@ trait Variances {
       }
 
       private def checkVarianceOfSymbol(sym: Symbol) {
-        val relative = relativeVariance(sym)
-        val required = relative * variance
-        if (!relative.isBivariant) {
+        println(s"check variance of symbol $sym (${sym.variance} in owner=${sym.owner}) (base=$base)")
+        // val relative = relativeVariance(sym)
+        val required = relativeVariance(sym)
+        if (!required.isBivariant) {
           log(s"verifying $sym (${sym.variance}${sym.locationString}) is $required at $base in ${base.owner}")
           if (sym.variance != required)
             issueVarianceError(base, sym, required)
@@ -106,22 +112,47 @@ trait Variances {
         case pt: PolyType   => true
         case _              => false
       }
+      private def applyParent(p: Type) = {
+        println("Checking parent " + p)
+        apply(p)
+      }
+      private def checkClassInfo(tp: ClassInfoType): Type = {
+        val ClassInfoType(parents, _, clazz) = tp
+        println(s"checkClassInfo of $clazz")
+        parents foreach { p =>
+          println(s"check parent $p")
+          apply(p)
+        }
+        tp
+      }
 
       /** For PolyTypes, type parameters are skipped because they are defined
        *  explicitly (their TypeDefs will be passed here.) For MethodTypes, the
        *  same is true of the parameters (ValDefs) unless we are inside a
        *  refinement, in which case they are checked from here.
        */
-      def apply(tp: Type): Type = tp match {
-        case _ if isUncheckedVariance(tp)                    => tp
-        case _ if resultTypeOnly(tp)                         => this(tp.resultType)
-        case TypeRef(_, sym, _) if sym.isAliasType           => this(tp.normalize)
-        case TypeRef(_, sym, _) if !sym.variance.isInvariant => checkVarianceOfSymbol(sym) ; mapOver(tp)
-        case RefinedType(_, _)                               => withinRefinement(mapOver(tp))
-        case ClassInfoType(parents, _, _)                    => parents foreach this ; tp
-        case mt @ MethodType(_, result)                      => flipped(mt.paramTypes foreach this) ; this(result)
+      def apply(tp: Type): Type = /*printResult(s"VarianceValidator($tp)")*/(tp match {
+        case _ if isUncheckedVariance(tp)                         => tp
+        case PolyType(_, restpe)                                  => this(restpe)
+        case TypeRef(_, sym, _) if sym.isAliasType                => this(tp.dealias)
+        case TypeRef(pre, sym, args) =>
+          if (!sym.variance.isInvariant)
+            checkVarianceOfSymbol(sym)
+
+          mapOver(tp)
+
+        case RefinedType(_, _)                                    => withinRefinement(mapOver(tp))
+        case tp @ ClassInfoType(_, _, _)                          => checkClassInfo(tp)
+        case mt @ MethodType(_, result)                           => if (inRefinement) flipped(mt.paramTypes foreach this) ; this(result)
+        // case TypeRef(pre, sym, args)                              => println(s"Map over TypeRef($pre, $sym, $args)") ; mapOver(tp)
+        case ExistentialType(tparams, result)                     => println(s"Map over ExistentialType($tparams, $result)") ; mapOver(tp)
+        case TypeBounds(lo, hi)                                   =>
+          println(s"Map over TypeBounds($lo, $hi)")
+          mapOver(tp)
+          // flipped(apply(lo))
+          // apply(hi)
         case _                                               => mapOver(tp)
-      }
+      })
       def validateDefinition(base: Symbol) {
         val saved = this.base
         this.base = base
@@ -132,6 +163,13 @@ trait Variances {
 
     /** Validate variance of info of symbol `base` */
     private def validateVariance(base: Symbol) {
+      println(s"validateVariance($base)")
+      val tparams = base.info collect { case t if t.typeSymbolDirect.isAbstractType => t.typeSymbolDirect }
+      tparams foreach { tparam =>
+        base.info foreach { tp =>
+          varianceInType(tp)(tparam)
+        }
+      }
       ValidateVarianceMap validateDefinition base
     }
 
@@ -170,12 +208,24 @@ trait Variances {
 
   /** Compute variance of type parameter `tparam` in type `tp`. */
   def varianceInType(tp: Type)(tparam: Symbol): Variance = {
+    // println(s"Calculating variance of $tparam (owned by ${tparam.owner}) in $tp (${shortClassOfInstance(tp)})")
+    var depth = 1
     def inArgs(sym: Symbol, args: List[Type]): Variance = fold(map2(args, sym.typeParams)((a, p) => inType(a) * p.variance))
     def inSyms(syms: List[Symbol]): Variance            = fold(syms map inSym)
     def inTypes(tps: List[Type]): Variance              = fold(tps map inType)
 
     def inSym(sym: Symbol): Variance = if (sym.isAliasType) inType(sym.info).cut else inType(sym.info)
-    def inType(tp: Type): Variance   = tp match {
+    def logop(in: Type, out: => Variance): Variance = { return out
+      val sp = "| " * depth
+      val msg = sp + s"$in (${shortClassOfInstance(in)})"
+      println(msg)
+
+      depth += 1
+      val res = try out finally depth -= 1
+      println(sp + "\\- " + res)
+      res
+    }
+    def inType(tp: Type): Variance   = logop(tp, tp match {
       case ErrorType | WildcardType | NoType | NoPrefix => Bivariant
       case ThisType(_) | ConstantType(_)                => Bivariant
       case TypeRef(_, `tparam`, _)                      => Covariant
@@ -190,8 +240,11 @@ trait Variances {
       case PolyType(tparams, restpe)                    => inSyms(tparams).flip        & inType(restpe)
       case ExistentialType(tparams, restpe)             => inSyms(tparams)             & inType(restpe)
       case AnnotatedType(annots, tp, _)                 => inTypes(annots map (_.atp)) & inType(tp)
-    }
+      case tp                                           => devWarning(s"Unexpected ${tp.getClass} received in varianceInType($tp)($tparam)") ; Invariant
+    })
 
-    inType(tp)
+    val result = inType(tp)
+    // println(s"Variance is: $result\n")
+    result
   }
 }
