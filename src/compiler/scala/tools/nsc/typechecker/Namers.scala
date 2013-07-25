@@ -1408,11 +1408,20 @@ trait Namers extends MethodSynthesis {
         if (!annotated.isInitialized) tree match {
           case defn: MemberDef =>
             val ainfos = defn.mods.annotations filterNot (_ eq null) map { ann =>
+              val ctx    = typer.context
+              val annCtx = ctx.make(ann)
+              annCtx.setReportErrors()
               // need to be lazy, #1782. beforeTyper to allow inferView in annotation args, SI-5892.
               AnnotationInfo lazily {
-                val context1 = typer.context.make(ann)
-                context1.setReportErrors()
-                enteringTyper(newTyper(context1) typedAnnotation ann)
+                if (typer.context ne ctx)
+                  log(sm"""|The var `typer.context` in ${Namer.this} was mutated before the annotation ${ann} was forced.
+                           |
+                           |current value  = ${typer.context}
+                           |original value = $ctx
+                           |
+                           |This confirms the hypothesis for the cause of SI-7603. If you see this message, please comment on that ticket.""")
+
+                enteringTyper(newTyper(annCtx) typedAnnotation ann)
               }
             }
             if (ainfos.nonEmpty) {
@@ -1686,8 +1695,13 @@ trait Namers extends MethodSynthesis {
    *  call this method?
    */
   def companionSymbolOf(original: Symbol, ctx: Context): Symbol = {
+    val owner = original.owner
+    // SI-7264 Force the info of owners from previous compilation runs.
+    //         Doing this generally would trigger cycles; that's what we also
+    //         use the lower-level scan through the current Context as a fall back.
+    if (!currentRun.compiles(owner)) owner.initialize
     original.companionSymbol orElse {
-      ctx.lookup(original.name.companionName, original.owner).suchThat(sym =>
+      ctx.lookup(original.name.companionName, owner).suchThat(sym =>
         (original.isTerm || sym.hasModuleFlag) &&
         (sym isCoDefinedWith original)
       )

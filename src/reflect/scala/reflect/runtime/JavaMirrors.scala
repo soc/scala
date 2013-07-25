@@ -581,15 +581,10 @@ private[reflect] trait JavaMirrors extends internal.SymbolTable with api.JavaUni
             loadBytes[Array[String]]("scala.reflect.ScalaLongSignature") match {
               case Some(slsig) =>
                 info(s"unpickling Scala $clazz and $module with long Scala signature")
-                val byteSegments = slsig map (_.getBytes)
-                val lens = byteSegments map ByteCodecs.decode
-                val bytes = Array.ofDim[Byte](lens.sum)
-                var len = 0
-                for ((bs, l) <- byteSegments zip lens) {
-                  bs.copyToArray(bytes, len, l)
-                  len += l
-                }
-                unpickler.unpickle(bytes, 0, clazz, module, jclazz.getName)
+                val encoded = slsig flatMap (_.getBytes)
+                val len = ByteCodecs.decode(encoded)
+                val decoded = encoded.take(len)
+                unpickler.unpickle(decoded, 0, clazz, module, jclazz.getName)
               case None =>
                 // class does not have a Scala signature; it's a Java class
                 info("translating reflection info for Java " + jclazz) //debug
@@ -972,8 +967,8 @@ private[reflect] trait JavaMirrors extends internal.SymbolTable with api.JavaUni
             javaTypeToValueClass(jclazz) orElse lookupClass
 
         assert (cls.isType,
-          sm"""${if (cls == NoSymbol) "not a type: symbol" else "no symbol could be"}
-              | loaded from $jclazz in $owner with name $simpleName and classloader $classLoader""")
+          (if (cls != NoSymbol) s"not a type: symbol $cls" else "no symbol could be") +
+          s" loaded from $jclazz in $owner with name $simpleName and classloader $classLoader")
 
         cls.asClass
       }

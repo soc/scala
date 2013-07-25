@@ -98,7 +98,7 @@ abstract class TreeInfo {
    */
   def isStableIdentifier(tree: Tree, allowVolatile: Boolean): Boolean =
     tree match {
-      case Ident(_)        => symOk(tree.symbol) && tree.symbol.isStable && !tree.symbol.hasVolatileType // TODO SPEC: not required by spec
+      case i @ Ident(_)    => isStableIdent(i)
       case Select(qual, _) => isStableMemberOf(tree.symbol, qual, allowVolatile) && isPath(qual, allowVolatile)
       case Apply(Select(free @ Ident(_), nme.apply), _) if free.symbol.name endsWith nme.REIFY_FREE_VALUE_SUFFIX =>
         // see a detailed explanation of this trick in `GenSymbols.reifyFreeTerm`
@@ -117,6 +117,13 @@ abstract class TreeInfo {
   def isStableMemberOf(sym: Symbol, tree: Tree, allowVolatile: Boolean): Boolean = (
     symOk(sym)       && (!sym.isTerm   || (sym.isStable && (allowVolatile || !sym.hasVolatileType))) &&
     typeOk(tree.tpe) && (allowVolatile || !hasVolatileType(tree)) && !definitions.isByNameParamType(tree.tpe)
+  )
+
+  private def isStableIdent(tree: Ident): Boolean = (
+       symOk(tree.symbol)
+    && tree.symbol.isStable
+    && !definitions.isByNameParamType(tree.tpe)
+    && !tree.symbol.hasVolatileType // TODO SPEC: not required by spec
   )
 
   /** Is `tree`'s type volatile? (Ignored if its symbol has the @uncheckedStable annotation.)
@@ -201,7 +208,7 @@ abstract class TreeInfo {
       }
       def isWarnableSymbol = {
         val sym = tree.symbol
-        (sym == null) || !(sym.isModule || sym.isLazy) || {
+        (sym == null) || !(sym.isModule || sym.isLazy || definitions.isByNameParamType(sym.tpe_*)) || {
           debuglog("'Pure' but side-effecting expression in statement position: " + tree)
           false
         }
@@ -553,6 +560,12 @@ abstract class TreeInfo {
     })
   )
 
+  /** Is this CaseDef synthetically generated, e.g. by `MatchTranslation.translateTry`? */
+  def isSyntheticCase(cdef: CaseDef) = cdef.pat.exists {
+    case dt: DefTree => dt.symbol.isSynthetic
+    case _           => false
+  }
+
   /** Is this pattern node a catch-all or type-test pattern? */
   def isCatchCase(cdef: CaseDef) = cdef match {
     case CaseDef(Typed(Ident(nme.WILDCARD), tpt), EmptyTree, _) =>
@@ -836,8 +849,18 @@ abstract class TreeInfo {
     }
 
     def unapply(tree: Tree) = refPart(tree) match {
-      case ref: RefTree => Some((ref.qualifier.symbol, ref.symbol, dissectApplied(tree).targs))
-      case _            => None
+      case ref: RefTree => {
+        val qual = ref.qualifier
+        val isBundle = definitions.isMacroBundleType(qual.tpe)
+        val owner =
+          if (isBundle) qual.tpe.typeSymbol
+          else {
+            val sym = if (qual.hasSymbolField) qual.symbol else NoSymbol
+            if (sym.isModule) sym.moduleClass else sym
+          }
+        Some((isBundle, owner, ref.symbol, dissectApplied(tree).targs))
+      }
+      case _  => None
     }
   }
 

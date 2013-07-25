@@ -16,7 +16,7 @@ import scala.reflect.internal.util.shortClassOfInstance
  */
 trait Contexts { self: Analyzer =>
   import global._
-  import definitions.{ JavaLangPackage, ScalaPackage, PredefModule }
+  import definitions.{ JavaLangPackage, ScalaPackage, PredefModule, ScalaXmlTopScope, ScalaXmlPackage }
   import ContextMode._
 
   object NoContext
@@ -93,9 +93,22 @@ trait Contexts { self: Analyzer =>
     else RootImports.completeList
   }
 
+
   def rootContext(unit: CompilationUnit, tree: Tree = EmptyTree, erasedTypes: Boolean = false): Context = {
     val rootImportsContext = (startContext /: rootImports(unit))((c, sym) => c.make(gen.mkWildcardImport(sym)))
-    val c = rootImportsContext.make(tree, unit = unit)
+
+    // there must be a scala.xml package when xml literals were parsed in this unit
+    if (unit.hasXml && ScalaXmlPackage == NoSymbol)
+      unit.error(unit.firstXmlPos, "To compile XML syntax, the scala.xml package must be on the classpath.\nPlease see https://github.com/scala/scala/wiki/Scala-2.11#xml.")
+
+    // scala-xml needs `scala.xml.TopScope` to be in scope globally as `$scope`
+    // We detect `scala-xml` by looking for `scala.xml.TopScope` and
+    // inject the equivalent of `import scala.xml.{TopScope => $scope}`
+    val contextWithXML =
+      if (!unit.hasXml || ScalaXmlTopScope == NoSymbol) rootImportsContext
+      else rootImportsContext.make(gen.mkImport(ScalaXmlPackage, nme.TopScope, nme.dollarScope))
+
+    val c = contextWithXML.make(tree, unit = unit)
     if (erasedTypes) c.setThrowErrors() else c.setReportErrors()
     c(EnrichmentEnabled | ImplicitsEnabled) = !erasedTypes
     c

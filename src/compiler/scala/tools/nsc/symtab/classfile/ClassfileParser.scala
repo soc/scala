@@ -39,7 +39,7 @@ abstract class ClassfileParser {
   protected var isScala: Boolean = _        // does class file describe a scala class?
   protected var isScalaAnnot: Boolean = _   // does class file describe a scala class with its pickled info in an annotation?
   protected var isScalaRaw: Boolean = _     // this class file is a scala class with no pickled info
-  protected var busy: Option[Symbol] = None // lock to detect recursive reads
+  protected var busy: Symbol = _            // lock to detect recursive reads
   protected var currentClass: Name = _      // JVM name of the current class
   protected var classTParams = Map[Name,Symbol]()
   protected var srcfile0 : Option[AbstractFile] = None
@@ -90,16 +90,15 @@ abstract class ClassfileParser {
     case e: RuntimeException        => handleError(e)
   }
   @inline private def pushBusy[T](sym: Symbol)(body: => T): T = {
-    busy match {
-      case Some(`sym`)  => throw new IOException(s"unsatisfiable cyclic dependency in '$sym'")
-      case Some(sym1)   => throw new IOException(s"illegal class file dependency between '$sym' and '$sym1'")
-      case _            => ()
-    }
+    if (busy eq sym)
+      throw new IOException(s"unsatisfiable cyclic dependency in '$sym'")
+    else if ((busy ne null) && (busy ne NoSymbol))
+      throw new IOException(s"illegal class file dependency between '$sym' and '$busy'")
 
-    busy = Some(sym)
+    busy = sym
     try body
     catch parseErrorHandler
-    finally busy = None
+    finally busy = NoSymbol
   }
   @inline private def raiseLoaderLevel[T](body: => T): T = {
     loaders.parentsLevel += 1
@@ -491,8 +490,10 @@ abstract class ClassfileParser {
       }
     }
 
-    val c = if (currentIsTopLevel) pool.getClassSymbol(nameIdx) else clazz
-    if (currentIsTopLevel) {
+    val isTopLevel = !(currentClass containsChar '$') // Java class name; *don't* try to to use Scala name decoding (SI-7532)
+
+    val c = if (isTopLevel) pool.getClassSymbol(nameIdx) else clazz
+    if (isTopLevel) {
       if (c != clazz) {
         if ((clazz eq NoSymbol) && (c ne NoSymbol)) clazz = c
         else mismatchError(c)
@@ -516,7 +517,7 @@ abstract class ClassfileParser {
     skipMembers() // methods
     if (!isScala) {
       clazz setFlag sflags
-      propagatePackageBoundary(jflags, clazz, staticModule)
+      propagatePackageBoundary(jflags, clazz, staticModule, staticModule.moduleClass)
       clazz setInfo classInfo
       moduleClass setInfo staticInfo
       staticModule setInfo moduleClass.tpe
@@ -586,10 +587,14 @@ abstract class ClassfileParser {
       // sealed java enums
       if (jflags.isEnum) {
         val enumClass = sym.owner.linkedClassOfClass
-        if (!enumClass.isSealed)
-          enumClass setFlag (SEALED | ABSTRACT)
-
-        enumClass addChild sym
+        enumClass match {
+          case NoSymbol =>
+            devWarning(s"no linked class for java enum $sym in ${sym.owner}. A referencing class file might be missing an InnerClasses entry.")
+          case linked =>
+            if (!linked.isSealed)
+              linked setFlag (SEALED | ABSTRACT)
+            linked addChild sym
+        }
       }
     }
   }

@@ -234,23 +234,19 @@ abstract class SymbolLoaders {
         }
       }
       if (!root.isEmptyPackageClass) {
-        // Only enter packages which contain a class or a non-empty package
         for (pkg <- classpath.packages) {
-          if (pkg.isEmptyOfClassfiles) {
-            log(s"Discarding $root/$pkg as it contains no classfiles.")
-          }
-          else
-            enterPackage(root, pkg.name, new PackageLoader(pkg))
+          enterPackage(root, pkg.name, new PackageLoader(pkg))
         }
+
         openPackageModule(root)
       }
     }
   }
 
   class ClassfileLoader(val classfile: AbstractFile) extends SymbolLoader with FlagAssigningCompleter {
-    private object classfileParser extends ClassfileParser {
+    private object classfileParser extends {
       val global: SymbolLoaders.this.global.type = SymbolLoaders.this.global
-    }
+    } with ClassfileParser
 
     protected def description = "class file "+ classfile.toString
 

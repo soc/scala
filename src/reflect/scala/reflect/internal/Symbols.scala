@@ -759,7 +759,9 @@ trait Symbols extends api.Symbols with SymbolIdAssignments {
     final def isMonomorphicType =
       isType && {
         val info = originalInfo
-        info.isComplete && !info.isHigherKinded
+        (    (info eq null)
+          || (info.isComplete && !info.isHigherKinded)
+        )
       }
 
     def isStrictFP          = hasAnnotation(ScalaStrictFPAttr) || (enclClass hasAnnotation ScalaStrictFPAttr)
@@ -3447,6 +3449,9 @@ trait Symbols extends api.Symbols with SymbolIdAssignments {
    */
   def mapParamss[T](sym: Symbol)(f: Symbol => T): List[List[T]] = mmap(sym.info.paramss)(f)
 
+  def existingSymbols(syms: List[Symbol]): List[Symbol] =
+    syms filter (s => (s ne null) && (s ne NoSymbol))
+
   /** Return closest enclosing method, unless shadowed by an enclosing class. */
   // TODO Move back to ExplicitOuter when the other call site is removed.
   // no use of closures here in the interest of speed.
@@ -3462,7 +3467,7 @@ trait Symbols extends api.Symbols with SymbolIdAssignments {
   }
 
   /** A class for type histories */
-  private sealed case class TypeHistory(var validFrom: Period, info: Type, prev: TypeHistory) {
+  private case class TypeHistory(var validFrom: Period, info: Type, prev: TypeHistory) {
     assert((prev eq null) || phaseId(validFrom) > phaseId(prev.validFrom), this)
     assert(validFrom != NoPeriod, this)
 
