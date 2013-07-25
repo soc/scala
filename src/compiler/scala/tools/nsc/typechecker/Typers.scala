@@ -908,7 +908,7 @@ trait Typers extends Adaptations with Tags {
         // but this needs additional investigation, because it crashes t5228, gadts1 and maybe something else
         if (mode.inFunMode)
           tree
-        else if (properTypeRequired && tree.symbol.typeParams.nonEmpty)  // (7)
+        else if (properTypeRequired && tree.tpe.typeParams.nonEmpty)  // (7)
           MissingTypeParametersError(tree)
         else if (kindArityMismatch && !kindArityMismatchOk)  // (7.1) @M: check kind-arity
           KindArityMismatchError(tree, pt)
@@ -4054,7 +4054,7 @@ trait Typers extends Adaptations with Tags {
         else lookupInOwner(qual.tpe.typeSymbol, name) orElse {
           NotAMemberError(tree, qual, name)
           NoSymbol
-      }
+        }
       )
 
       def typedAnnotated(atd: Annotated): Tree = {

@@ -306,7 +306,7 @@ trait ContextErrors {
       //typedSelect
       def NotAMemberError(sel: Tree, qual: Tree, name: Name) = {
         def errMsg = {
-          val owner            = qual.tpe.typeSymbol
+          val owner            = qual.tpe.typeSymbolDirect
           val target           = qual.tpe.widen
           def targetKindString = if (owner.isTypeParameterOrSkolem) "type parameter " else ""
           def nameString       = decodeWithKind(name, owner)

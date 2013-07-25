@@ -2168,9 +2168,9 @@ trait Types
     override def isVolatile = normalize.isVolatile
     override def narrow     = normalize.narrow
     override def thisInfo   = normalize
-    override def prefix     = if (this ne normalize) normalize.prefix else pre
-    override def termSymbol = if (this ne normalize) normalize.termSymbol else super.termSymbol
-    override def typeSymbol = if (this ne normalize) normalize.typeSymbol else sym
+    override def prefix     = if (typeParamsMatchArgs) normalize.prefix else pre
+    override def termSymbol = if (typeParamsMatchArgs) normalize.termSymbol else super.termSymbol
+    override def typeSymbol = if (typeParamsMatchArgs) normalize.typeSymbol else sym
 
     // beta-reduce, but don't do partial application -- cycles have been checked in typeRef
     override protected def normalizeImpl =
