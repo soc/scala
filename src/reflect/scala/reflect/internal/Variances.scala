@@ -93,7 +93,7 @@ trait Variances {
           else if (sym.isAliasType) Invariant
           else varianceInType(sym.tpe_*)(tvar)
         )
-        val multiplier = inflections.foldLeft(Bivariant)(_ * _)
+        val multiplier = inflections.foldLeft(Bivariant)(_ & _)
         println(s"inflections=$inflections, multiplier=$multiplier")
         multiplier * variance
 
