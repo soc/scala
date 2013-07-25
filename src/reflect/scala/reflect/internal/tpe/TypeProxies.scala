@@ -12,11 +12,11 @@ trait TypeProxies {
   import global._
   import definitions._
 
-  // class TypeProxy[T <: Type](underlying: T) extends Type {
+  class TypeProxy[T <: Type](underlying: T) extends Type {
   trait TypeProxy extends Type {
     def <:<(that: Type): Boolean
     def =:=(that: Type): Boolean
-    def addThrowsAnnotation(throwableSym: Symbol): Self
+    def addThrowsAnnotation(throwableSym: Symbol): Type
     def annotations: List[AnnotationInfo]
     def asSeenFrom(pre: Type,clazz: Symbol): Type
     def atOwner(owner: Symbol): Type
@@ -102,7 +102,7 @@ trait TypeProxies {
     def prefix: Type
     def prefixChain: List[Type]
     def prefixString: String
-    def removeAnnotation(cls: Symbol): Self
+    def removeAnnotation(cls: Symbol): Type
     def resultApprox: Type
     def resultType(actuals: List[Type]): Type
     def resultType: Type
