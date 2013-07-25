@@ -2,7 +2,7 @@ package scala
 package reflect
 package internal
 
-import scala.collection.mutable.WeakHashMap
+import scala.collection.mutable.{ WeakHashMap, ListBuffer }
 import scala.ref.WeakReference
 
 // SI-6241: move importers to a mirror
@@ -39,7 +39,7 @@ trait Importers extends api.Importers { to: SymbolTable =>
     // fixups and maps prevent stackoverflows in importer
     var pendingSyms = 0
     var pendingTpes = 0
-    lazy val fixups = scala.collection.mutable.MutableList[Function0[Unit]]()
+    lazy val fixups = ListBuffer[Function0[Unit]]()
     def addFixup(fixup: => Unit): Unit = fixups += (() => fixup)
     def tryFixup(): Unit = {
       if (pendingSyms == 0 && pendingTpes == 0) {
