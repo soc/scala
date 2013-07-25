@@ -85,16 +85,29 @@ trait Variances {
         // )
         val inflections = bases map (sym =>
           if (sym.isParameter) Contravariant
-          else if (isLocalOnly(sym)) Bivariant
           else if (sym.isAliasType) Invariant
-          else printResult(s"vint for $sym (${sym.tpe_*})($tvar)")(varianceInType(sym.tpe_*)(tvar))
+          else varianceInType(sym.info)(sym)
+          // if (sym.isParameter) Contravariant
+          // else if (isLocalOnly(sym)) Bivariant
+          // else if (sym.isAliasType) Invariant
+          // else printResult(s"vint for $sym (${sym.tpe_*})($tvar)")(varianceInType(sym.tpe_*)(tvar))
         )
-        val recorded = withVariance(Covariant) { apply(tvar.info) ; variance }
+        // val recorded = withVariance(Covariant) { apply(tvar.tpe_*) ; variance }
         // val recorded = variance
-        val multiplier = inflections.foldLeft(Bivariant)(_ & _)
-        val result = multiplier * recorded
-        println(s"inflections=${inflections map (_.longString)}, recorded=$recorded, multiplier=$multiplier, result=$result")
-        result
+        println("bases: " + bases.map(_.defString))
+        println("tvar: " + tvar)
+        for (sym <- List(tvar, base) ; tpe <- List(sym.info, sym.tpe_*, base.info, base.tpe_*)) {
+          val res = varianceInType(tpe)(sym).longString
+          println(f"[$res%13s] $sym%-10s    $tpe%-40s   (symbol owner is ${sym.owner})")
+        }
+
+        val multiplier = inflections.foldLeft(Covariant)(_ * _)
+        val result = multiplier * tvar.variance
+        println(s"inflections=${inflections map (_.longString)}, multiplier=$multiplier, result=$result")
+
+
+        printResult(s"punting and returning ")(varianceInType(base.tpe_*)(tvar))
+        // result
         // loop(base, Covariant)
       }
       def isUncheckedVariance(tp: Type) = tp match {
@@ -205,10 +218,10 @@ trait Variances {
       case RefinedType(parents, defs)                   => inTypes(parents)            & inSyms(defs.toList)
       case MethodType(params, restpe)                   => inSyms(params).flip         & inType(restpe)
       case PolyType(tparams, restpe)                    => inSyms(tparams).flip        & inType(restpe)
-      // case ExistentialType(tparams, restpe)             => inSyms(tparams)             & inType(restpe)
-      case et: ExistentialType                          => inType(et.skolemizeExistential)
+      case ExistentialType(tparams, restpe)             => inSyms(tparams).flip        & inType(restpe)
+      // case et: ExistentialType                          => inType(et.skolemizeExistential)
       case AnnotatedType(annots, tp, _)                 => inTypes(annots map (_.atp)) & inType(tp)
-      case ClassInfoType(parents, decls, clazz)         => inTypes(parents)
+      case ClassInfoType(parents, decls, clazz)         => inTypes(parents) & inSyms(decls.toList)
     }
 
     inType(tp)
