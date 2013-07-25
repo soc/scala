@@ -15,7 +15,7 @@ import scala.collection.{ mutable, immutable }
 import io.{ SourceReader, AbstractFile, Path }
 import reporters.{ Reporter, ConsoleReporter }
 import util.{ ClassPath, MergedClassPath, StatisticsInfo, returning, stackTraceString, stackTraceHeadString }
-import scala.reflect.internal.util.{ OffsetPosition, SourceFile, NoSourceFile, BatchSourceFile, ScriptSourceFile }
+import scala.reflect.internal.util.{ OffsetPosition, SourceFile, NoSourceFile, BatchSourceFile, ScriptSourceFile, DelayedActionBuffer }
 import scala.reflect.internal.pickling.{ PickleBuffer, PickleFormat }
 import scala.reflect.io.VirtualFile
 import symtab.{ Flags, SymbolTable, SymbolLoaders, SymbolTrackers }
@@ -94,6 +94,15 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
 
   /** Generate ASTs */
   type TreeGen = scala.tools.nsc.ast.TreeGen
+
+  object atShutdown extends DelayedActionBuffer {
+    /** An apply prints the result, evaluating it after typer. */
+    def apply(op: => Any): Unit = show(exitingTyper(op))
+    def inPhase(ph: Phase)(op: => Any): Unit = show(atPhase(ph)(op))
+
+    if (settings.developer)
+      purgeAtShutdown()
+  }
 
   /** Tree generation, usually based on existing symbols. */
   override object gen extends {
