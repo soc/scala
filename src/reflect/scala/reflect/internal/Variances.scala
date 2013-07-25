@@ -91,7 +91,7 @@ trait Variances {
           if (sym.isParameter) Contravariant
           else if (isLocalOnly(sym)) Bivariant
           else if (sym.isAliasType) Invariant
-          else varianceInType(sym.tpe_*)(tvar)
+          else varianceInType(sym.info)(tvar)
         )
         val multiplier = inflections.foldLeft(Bivariant)(_ & _)
         println(s"inflections=$inflections, multiplier=$multiplier")
@@ -204,7 +204,13 @@ trait Variances {
 
   /** Compute variance of type parameter `tparam` in type `tp`. */
   def varianceInType(tp: Type)(tparam: Symbol): Variance = {
-    def inArgs(sym: Symbol, args: List[Type]): Variance = fold(map2(args, sym.typeParams)((a, p) => inType(a) * p.variance))
+    def inArgs(sym: Symbol, args: List[Type]): Variance = printResult(s"inArgs($sym, $args)/tps=${sym.typeParams}")(
+      fold(map2(args, sym.typeParams) { (a, p) =>
+        val v1 = printResult(s"v1 = inType($a)")(inType(a))
+        val v2 = printResult(s"v2 = $p.variance")(p.initialize.variance)
+        v1 * v2
+      })
+    )
     def inSyms(syms: List[Symbol]): Variance            = fold(syms map inSym)
     def inTypes(tps: List[Type]): Variance              = fold(tps map inType)
 
@@ -222,8 +228,10 @@ trait Variances {
       case RefinedType(parents, defs)                   => inTypes(parents)            & inSyms(defs.toList)
       case MethodType(params, restpe)                   => inSyms(params).flip         & inType(restpe)
       case PolyType(tparams, restpe)                    => inSyms(tparams).flip        & inType(restpe)
-      case ExistentialType(tparams, restpe)             => inSyms(tparams)             & inType(restpe)
+      case et: ExistentialType                          => inType(et.skolemizeExistential)
+      // case ExistentialType(tparams, restpe)             => inSyms(tparams).flip        & inType(restpe)
       case AnnotatedType(annots, tp, _)                 => inTypes(annots map (_.atp)) & inType(tp)
+      case ClassInfoType(parents, decls, clazz)         => inTypes(parents)
     }
 
     inType(tp)

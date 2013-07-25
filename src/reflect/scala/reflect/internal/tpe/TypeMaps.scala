@@ -159,7 +159,8 @@ private[internal] trait TypeMaps {
         val decls1 = mapOver(decls)
         copyRefinedType(rtp, parents1, decls1)
       case ExistentialType(tparams, result) =>
-        val tparams1 = mapOver(tparams)
+        val tparams1 = flipped(mapOver(tparams))
+        // val tparams1 = mapOver(tparams)
         val result1 = this(result)
         if ((tparams1 eq tparams) && (result1 eq result)) tp
         else newExistentialType(tparams1, result1.substSym(tparams, tparams1))
