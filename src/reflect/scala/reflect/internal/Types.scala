@@ -2410,8 +2410,8 @@ trait Types
       else rest
     )
     private def customToString = sym match {
-      case RepeatedParamClass => args.head + "*"
-      case ByNameParamClass   => "=> " + args.head
+      case RepeatedParamClass => if (args.isEmpty) "<???>*" else args.head + "*"
+      case ByNameParamClass   => if (args.isEmpty) "=> <???>" else "=> " + args.head
       case _                  =>
         def targs = dealiasWiden.typeArgs
 
