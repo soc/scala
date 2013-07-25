@@ -25,7 +25,7 @@ import mutable.{ Builder, SetBuilder }
  *  @define coll immutable bitset
  */
 @SerialVersionUID(1611436763290191562L)
-abstract class BitSet extends scala.collection.AbstractSet[Int]
+abstract class BitSet extends scala.collection.Set[Int] // AbstractSet[Int]
                          with SortedSet[Int]
                          with scala.collection.BitSet
                          with BitSetLike[BitSet]

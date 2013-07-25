@@ -44,7 +44,7 @@ self =>
   }
 
   /** Explicit instantiation of the `Transformed` trait to reduce class file size in subclasses. */
-  private[collection] abstract class AbstractTransformed[B] extends super.AbstractTransformed[B] with Transformed[B]
+  abstract class AbstractTransformed[B] extends super.AbstractTransformed[B] with Transformed[B]
 
   // pre: until <= self.length
   trait Sliced extends super.Sliced with Transformed[A] {
