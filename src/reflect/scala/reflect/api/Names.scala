@@ -29,18 +29,6 @@ import scala.language.implicitConversions
  *  @group ReflectionAPI
  */
 trait Names {
-  /** An implicit conversion from String to TermName.
-   *  Enables an alternative notation `"map": TermName` as opposed to `newTermName("map")`.
-   *  @group Names
-   */
-  implicit def stringToTermName(s: String): TermName = newTermName(s)
-
-  /** An implicit conversion from String to TypeName.
-   *  Enables an alternative notation `"List": TypeName` as opposed to `newTypeName("List")`.
-   *  @group Names
-   */
-  implicit def stringToTypeName(s: String): TypeName = newTypeName(s)
-
   /** The abstract type of names.
    *  @group Names
    */
@@ -112,6 +100,16 @@ trait Names {
    *  @group Extractors
    */
   abstract class TermNameExtractor {
+    /** An implicit conversion from String to TermName.
+     *  Enables an alternative notation `"map": TermName` as opposed to `TermName("map")`.
+     *
+     *  @note This must be defined in the TermName companion and not in the general scope
+     *  to prevent methods on TermName from coming into conflict with methods defined
+     *  on other classes for which there is an implicit String -> T, such as StringOps.
+     *
+     *  @group Names
+     */
+    implicit def createTermName(s: String): TermName = apply(s)
     def apply(s: String): TermName
     def unapply(name: TermName): Option[String]
   }
@@ -125,7 +123,17 @@ trait Names {
    *  @group Extractors
    */
   abstract class TypeNameExtractor {
+    /** An implicit conversion from String to TypeName.
+     *  @note  See note in TermNameExtractor regarding placement.
+     *  @group Names
+     */
+    implicit def createTypeName(s: String): TypeName = apply(s)
     def apply(s: String): TypeName
     def unapply(name: TypeName): Option[String]
   }
+
+  @deprecated("Use TermName#createTermName", "2.11.0")
+  def stringToTermName(s: String): TermName = newTermName(s)
+  @deprecated("Use TypeName#createTypeName", "2.11.0")
+  def stringToTypeName(s: String): TypeName = newTypeName(s)
 }
