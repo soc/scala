@@ -298,6 +298,7 @@ trait Definitions extends api.StandardDefinitions {
     // bottom types
     lazy val RuntimeNothingClass  = getClassByName(fulltpnme.RuntimeNothing)
     lazy val RuntimeNullClass     = getClassByName(fulltpnme.RuntimeNull)
+    lazy val TypeVarCycleMarker   = enterNewClass(ScalaPackageClass, "$TypeVarCycleMarker", AnyTpe :: Nil, ABSTRACT | TRAIT | FINAL).tpe
 
     sealed abstract class BottomClassSymbol(name: TypeName, parent: Symbol) extends ClassSymbol(ScalaPackageClass, NoPosition, name) {
       locally {

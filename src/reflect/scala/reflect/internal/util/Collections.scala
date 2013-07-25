@@ -162,6 +162,20 @@ trait Collections {
       ys3 = ys3.tail
     }
   }
+  def fold3[R, A, B, C](zero: R)(xs1: List[A], xs2: List[B], xs3: List[C])(f: (R, A, B, C) =>  R): R = {
+    var ys1 = xs1
+    var ys2 = xs2
+    var ys3 = xs3
+    var res = zero
+    while (!ys1.isEmpty && !ys2.isEmpty && !ys3.isEmpty) {
+      res = f(res, ys1.head, ys2.head, ys3.head)
+      ys1 = ys1.tail
+      ys2 = ys2.tail
+      ys3 = ys3.tail
+    }
+    res
+  }
+
   final def exists2[A, B](xs1: List[A], xs2: List[B])(f: (A, B) => Boolean): Boolean = {
     var ys1 = xs1
     var ys2 = xs2

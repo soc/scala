@@ -176,15 +176,24 @@ private[internal] trait TypeConstraints {
         (numlo == NoType || (numlo weak_<:< tp)) &&
         (numhi == NoType || (tp weak_<:< numhi))
 
-    var inst: Type = NoType // @M reduce visibility?
-
-    def instValid = (inst ne null) && (inst ne NoType)
-
-    def cloneInternal = {
-      val tc = new TypeConstraint(lobounds, hibounds, numlo, numhi, avoidWidening)
-      tc.inst = inst
-      tc
+    private[this] var currentInst: Type = NoType // @M reduce visibility?
+    def setInst(tp: Type): this.type = {
+      tp match {
+        case tv: TypeVar => devWarning(s"$this.setInst($tv) but that's a TypeVar!")
+        case _           => currentInst = tv
+      }
+      this
     }
+    def inst: Type = currentInst
+    def instValid = inst match {
+      case null | NoType => false
+      case _: TypeVar    => false // happens during erroneous compilation at least; stack overflow
+      case _             => true
+    }
+    def cloneInternal = (
+      new TypeConstraint(lobounds, hibounds, numlo, numhi, avoidWidening)
+        setInst inst
+    )
 
     override def toString = {
       val boundsStr = {
@@ -208,76 +217,186 @@ private[internal] trait TypeConstraints {
     *                    solution direction for all contravariant variables.
     *  @param upper      When `true` search for max solution else min.
     */
-  def solve(tvars: List[TypeVar], tparams: List[Symbol],
-            variances: List[Variance], upper: Boolean): Boolean =
+  def solve(tvars: List[TypeVar], tparams: List[Symbol], variances: List[Variance], upper: Boolean): Boolean =
     solve(tvars, tparams, variances, upper, AnyDepth)
 
-  def solve(tvars: List[TypeVar], tparams: List[Symbol],
-            variances: List[Variance], upper: Boolean, depth: Int): Boolean = {
+
+  def solveUpper(tvars: List[TypeVar], tparams: List[Symbol], variances: List[Variance]): Boolean = {
+  }
+
+  def solveLower(tvars: List[TypeVar], tparams: List[Symbol], variances: List[Variance]): Boolean = {
+  }
+
+  def solve(tvars: List[TypeVar], tparams: List[Symbol], variances: List[Variance], upper: Boolean, depth: Int): Boolean = {
+    def instantiate(tp: Type) = logResult(s"$tp.instantiate($tparams, $tvars)")(tp.instantiateTypeParams(tparams, tvars))
+
+    def solveOne(tvar: TypeVar, tparam: Symbol, v: Variance): Boolean = {
+      val up =
+    }
+
+    def tparamBound(tparam: Symbol, variance: Variance): Type = (
+      if (variance.isContravariant == !upper)
+        tparam.info.bounds.hi.dealias
+      else
+        tparam.info.bounds.lo.dealias
+    )
+
+    def opposingBound(other: Symbol)
+
+    def ignoreBound(tparam: Symbol) = tparamBound(tparam, variance) match {
+      case `tparam`            => true
+      case AnyClass if up      => true
+      case NothingClass if !up => true
+      case _                   => false
+    }
+
+    def instantiateUp(tvar: TypeVar, tparam: Symbol): Type = {
+      def add(tp: Type) = tvar addHiBound logResult(s"$tvar addHiBound")(instantiate(tp))
+
+      tparams foreach (other =>
+        other.info.bounds.lo.dealias match {
+          case tp @ TypeRef(_, `tparam`, _) => add(other.tpeHK)
+          case _                            =>
+        }
+      )
+    }
+    def instantiateDown(tvar: TypeVar, tparam: Symbol): Type = {
+      def add(tp: Type) = tvar addLoBound logResult(s"$tvar addLoBound")(instantiate(tp))
+
+      tparams foreach (other =>
+        other.info.bounds.hi.dealias match {
+          case tp @ TypeRef(_, `tparam`, _) => add(other.tpeHK)
+          case _                            =>
+        }
+      )
+    }
+    def glbOf(tvar: TypeVar) = depth match {
+      case AnyDepth => glb(tvar.constr.hiBounds)
+      case _        => glb(tvar.constr.hiBounds, depth)
+    }
+    def lubOf(tvar: TypeVar) = depth match {
+      case AnyDepth => lub(tvar.constr.loBounds)
+      case _        => lub(tvar.constr.loBounds, depth
+    }
+
+    for (tparam1 <- tparams ; tparam2 <- tparams ; if tparam1 ne tparam2) yield {
+      val tpe1  = tparam1.tpeHK
+      val bound = tparam2.info.bounds
+
+    def cycleAmongParamsAndBounds(tparam: Symbol, tparam2: Symbol) = {
+      def tpe1 = tparam.tpeHK
+      val bound = if (up) tparam2.info.bounds.lo else tparam2.info.bounds.hi
+
+      (    (bound contains tparam2)
+        || (bound =:= tpe1)
+      )
+    }
+
+      val cycleResults = map3(tvars, tparams, variances)((tvar2, tparam2, variance2) =>
+           (tparam2 != tparam)
+        && compareBoundToParmams(tparam, tparam2)
+        && try tvar2.cycleCheck() finally solveOne(tvar2, tparam2, variance2)
+      )
+    }
+
+    def solveOne(tvar: TypeVar, tparam: Symbol, v: Variance): Boolean = (
+      if (tvar.instValid) true
+      else if (cycleAmongParamsAndBounds(tvar, tparam)) false
+      else if (v.isContravariant == upper) instantiateUp(tvar, tparam)
+      else instantiateDown(tvar, tparam)
+    )
+
+    // Checking whether each type parameter fits within the bounds of
+    // the type parameter under consideration.
+    def isOneWithinBounds(tparam: Symbol, other: Symbol) = (
+         (bound contains tparam)
+      || (other.info.bounds.
+
+    val solutions = map3(tvars, tparams, variances)(solveOne)
+    val ok = tvars forall (_.boundsCheck())
+
+    var caughtCycle = false
+    def cycleGuard[T](tvar: TypeVar)(body: => T): T = {
+      tvar.cycleMark()
+      try body
+      finally if (tvar2.cycleCheck()) caughtCycle = true
+    }
+
 
     def solveOne(tvar: TypeVar, tparam: Symbol, variance: Variance) {
-      if (tvar.constr.inst == NoType) {
-        val up = if (variance.isContravariant) !upper else upper
-        tvar.constr.inst = null
-        val bound: Type = if (up) tparam.info.bounds.hi else tparam.info.bounds.lo
-        //Console.println("solveOne0(tv, tp, v, b)="+(tvar, tparam, variance, bound))
-        var cyclic = bound contains tparam
-        foreach3(tvars, tparams, variances)((tvar2, tparam2, variance2) => {
-          val ok = (tparam2 != tparam) && (
-            (bound contains tparam2)
-              ||  up && (tparam2.info.bounds.lo =:= tparam.tpeHK)
-              || !up && (tparam2.info.bounds.hi =:= tparam.tpeHK)
-            )
-          if (ok) {
-            if (tvar2.constr.inst eq null) cyclic = true
-            solveOne(tvar2, tparam2, variance2)
-          }
-        })
-        if (!cyclic) {
-          if (up) {
-            if (bound.typeSymbol != AnyClass) {
-              log(s"$tvar addHiBound $bound.instantiateTypeParams($tparams, $tvars)")
-              tvar addHiBound bound.instantiateTypeParams(tparams, tvars)
-            }
-            for (tparam2 <- tparams)
-              tparam2.info.bounds.lo.dealias match {
-                case TypeRef(_, `tparam`, _) =>
-                  log(s"$tvar addHiBound $tparam2.tpeHK.instantiateTypeParams($tparams, $tvars)")
-                  tvar addHiBound tparam2.tpeHK.instantiateTypeParams(tparams, tvars)
-                case _ =>
-              }
-          } else {
-            if (bound.typeSymbol != NothingClass && bound.typeSymbol != tparam) {
-              log(s"$tvar addLoBound $bound.instantiateTypeParams($tparams, $tvars)")
-              tvar addLoBound bound.instantiateTypeParams(tparams, tvars)
-            }
-            for (tparam2 <- tparams)
-              tparam2.info.bounds.hi.dealias match {
-                case TypeRef(_, `tparam`, _) =>
-                  log(s"$tvar addLoBound $tparam2.tpeHK.instantiateTypeParams($tparams, $tvars)")
-                  tvar addLoBound tparam2.tpeHK.instantiateTypeParams(tparams, tvars)
-                case _ =>
-              }
-          }
-        }
-        tvar.constr.inst = NoType // necessary because hibounds/lobounds may contain tvar
+      cycleGuard {
 
-        //println("solving "+tvar+" "+up+" "+(if (up) (tvar.constr.hiBounds) else tvar.constr.loBounds)+((if (up) (tvar.constr.hiBounds) else tvar.constr.loBounds) map (_.widen)))
-        val newInst = (
-          if (up) {
-            if (depth != AnyDepth) glb(tvar.constr.hiBounds, depth) else glb(tvar.constr.hiBounds)
-          } else {
-            if (depth != AnyDepth) lub(tvar.constr.loBounds, depth) else lub(tvar.constr.loBounds)
-          }
-          )
-        log(s"$tvar setInst $newInst")
-        tvar setInst newInst
-        //Console.println("solving "+tvar+" "+up+" "+(if (up) (tvar.constr.hiBounds) else tvar.constr.loBounds)+((if (up) (tvar.constr.hiBounds) else tvar.constr.loBounds) map (_.widen))+" = "+tvar.constr.inst)//@MDEBUG
+
+      if (tvar.instValid) return
+      val TypeBounds(lo, hi) = tparam.info.bounds
+      val up                 = if (variance.isContravariant) !upper else upper
+      tvar.cycleMark()
+
+      val bound: Type = if (up) hi else lo
+
+      //Console.println("solveOne0(tv, tp, v, b)="+(tvar, tparam, variance, bound))
+
+      def compareBoundToParmams(tparam: Symbol, tparam2: Symbol) = {
+        def tpe1 = tparam.tpeHK
+        val TypeBounds(lo2, hi2) = tparam2.info.bounds
+
+        (    (bound contains tparam2)
+          || up && lo =:= tpe1
+          || !up && hi =:= tpe1
+        )
       }
+
+      val cycleResults = map3(tvars, tparams, variances)((tvar2, tparam2, variance2) =>
+           (tparam2 != tparam)
+        && compareBoundToParmams(tparam, tparam2)
+        && try tvar2.cycleCheck() finally solveOne(tvar2, tparam2, variance2)
+      )
+      val cyclic = (bound contains tparam) || (cycleResults exists (x => x))
+
+      if (!cyclic) {
+        if (up) {
+          if (bound.typeSymbol != AnyClass) {
+            log(s"$tvar addHiBound $bound.instantiateTypeParams($tparams, $tvars)")
+            tvar addHiBound instantiate(bound)
+          }
+          for (tparam2 <- tparams)
+            tparam2.info.bounds.lo.dealias match {
+              case TypeRef(_, `tparam`, _) =>
+                log(s"$tvar addHiBound $tparam2.tpeHK.instantiateTypeParams($tparams, $tvars)")
+                tvar addHiBound instantiate(tparam2.tpeHK)
+              case _ =>
+            }
+        } else {
+          if (bound.typeSymbol != NothingClass && bound.typeSymbol != tparam) {
+            log(s"$tvar addLoBound $bound.instantiateTypeParams($tparams, $tvars)")
+            tvar addLoBound instantiate(bound)
+          }
+          for (tparam2 <- tparams)
+            tparam2.info.bounds.hi.dealias match {
+              case TypeRef(_, `tparam`, _) =>
+                log(s"$tvar addLoBound $tparam2.tpeHK.instantiateTypeParams($tparams, $tvars)")
+                tvar addLoBound instantiate(tparam2.tpeHK)
+              case _ =>
+            }
+        }
+      }
+      tvar.clearInst() // necessary because hibounds/lobounds may contain tvar
+
+      //println("solving "+tvar+" "+up+" "+(if (up) (tvar.constr.hiBounds) else tvar.constr.loBounds)+((if (up) (tvar.constr.hiBounds) else tvar.constr.loBounds) map (_.widen)))
+      val newInst = (
+        if (up) {
+          if (depth != AnyDepth) glb(tvar.constr.hiBounds, depth) else glb(tvar.constr.hiBounds)
+        } else {
+          if (depth != AnyDepth) lub(tvar.constr.loBounds, depth) else lub(tvar.constr.loBounds)
+        }
+        )
+      log(s"$tvar setInst $newInst")
+      tvar setInst newInst
+      //Console.println("solving "+tvar+" "+up+" "+(if (up) (tvar.constr.hiBounds) else tvar.constr.loBounds)+((if (up) (tvar.constr.hiBounds) else tvar.constr.loBounds) map (_.widen))+" = "+tvar.constr.inst)//@MDEBUG
     }
 
     // println("solving "+tvars+"/"+tparams+"/"+(tparams map (_.info)))
     foreach3(tvars, tparams, variances)(solveOne)
-    tvars forall (tvar => tvar.constr.isWithinBounds(tvar.constr.inst))
+    tvars forall (tvar => tvar.constr.isWithinBounds(tvar.inst))
   }
 }

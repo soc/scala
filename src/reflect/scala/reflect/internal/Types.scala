@@ -2787,7 +2787,7 @@ trait Types
       val underlying1 = underlying.instantiateTypeParams(quantified, tvars) // fuse subst quantified -> quantifiedFresh -> tvars
       op(underlying1) && {
         solve(tvars, quantifiedFresh, quantifiedFresh map (_ => Invariant), upper = false, depth) &&
-        isWithinBounds(NoPrefix, NoSymbol, quantifiedFresh, tvars map (_.constr.inst))
+        isWithinBounds(NoPrefix, NoSymbol, quantifiedFresh, tvars map (_.inst))
       }
     }
   }
@@ -2988,7 +2988,8 @@ trait Types
      *  or `encounteredHigherLevel` or `suspended` accesses should be necessary.
      */
     def instValid = constr.instValid
-    override def isGround = instValid && constr.inst.isGround
+    def inst = constr.inst
+    override def isGround = instValid && inst.isGround
 
     /** The variable's skolemization level */
     val level = skolemizationLevel
@@ -3040,6 +3041,10 @@ trait Types
     // <region name="constraint mutators + undoLog">
     // invariant: before mutating constr, save old state in undoLog
     // (undoLog is used to reset constraints to avoid piling up unrelated ones)
+    def boundsCheck() = constr isWithinBounds inst
+    def cycleCheck() = inst eq TypeVarCycleMarker
+    def cycleMark(): this.type = this setInst TypeVarCycleMarker
+    def clearInst(): this.type = this setInst NoType
     def setInst(tp: Type): this.type = {
       if (tp eq this) {
         log(s"TypeVar cycle: called setInst passing $this to itself.")
@@ -3049,7 +3054,7 @@ trait Types
       // if we were compared against later typeskolems, repack the existential,
       // because skolems are only compatible if they were created at the same level
       val res = if (shouldRepackType) repackExistential(tp) else tp
-      constr.inst = TypeVar.trace("setInst", "In " + originLocation + ", " + originName + "=" + res)(res)
+      constr setInst = TypeVar.trace("setInst", s"In $originLocation, $originName=$res")(res)
       this
     }
 
@@ -3175,8 +3180,8 @@ trait Types
       // AM: I think we could use the `suspended` flag to avoid side-effecting during unification
       if (suspended)         // constraint accumulation is disabled
         checkSubtype(tp, origin)
-      else if (constr.instValid)  // type var is already set
-        checkSubtype(tp, constr.inst)
+      else if (instValid)  // type var is already set
+        checkSubtype(tp, inst)
       else isRelatable(tp) && {
         unifySimple || unifyFull(tp) || (
           // only look harder if our gaze is oriented toward Any
@@ -3194,12 +3199,12 @@ trait Types
     def registerTypeEquality(tp: Type, typeVarLHS: Boolean): Boolean = {
 //      println("regTypeEq: "+(safeToString, debugString(tp), tp.getClass, if (typeVarLHS) "in LHS" else "in RHS", if (suspended) "ZZ" else if (constr.instValid) "IV" else "")) //@MDEBUG
       def checkIsSameType(tp: Type) = (
-        if (typeVarLHS) constr.inst =:= tp
-        else            tp          =:= constr.inst
+        if (typeVarLHS) inst =:= tp
+        else            tp   =:= inst
       )
 
       if (suspended) tp =:= origin
-      else if (constr.instValid) checkIsSameType(tp)
+      else if (instValid) checkIsSameType(tp)
       else isRelatable(tp) && {
         val newInst = wildcardToTypeVarMap(tp)
         (constr isWithinBounds newInst) && {
@@ -3238,7 +3243,7 @@ trait Types
     )
 
     override def normalize: Type = (
-      if (constr.instValid) constr.inst
+      if (instValid) inst
       // get here when checking higher-order subtyping of the typevar by itself
       // TODO: check whether this ever happens?
       else if (isHigherKinded) logResult("Normalizing HK $this")(typeFun(params, applyArgs(params map (_.typeConstructor))))
@@ -3269,8 +3274,8 @@ trait Types
     }
     private def levelString = if (settings.explaintypes) level else ""
     override def safeToString = (
-      if ((constr eq null) || (constr.inst eq null)) "TVar<" + originName + "=null>"
-      else if (constr.inst ne NoType) "=?" + constr.inst
+      if ((constr eq null) || (inst eq null)) "TVar<" + originName + "=null>"
+      else if (inst ne NoType) "=?" + inst
       else (if(untouchable) "!?" else "?") + levelString + originName
     )
     override def kind = "TypeVar"
@@ -4010,7 +4015,7 @@ trait Types
     case SingleType(pre, sym) =>
       !(sym hasFlag PACKAGE) && beginsWithTypeVarOrIsRefined(pre)
     case tv@TypeVar(_, constr) =>
-      !tv.instValid || beginsWithTypeVarOrIsRefined(constr.inst)
+      !tv.instValid || beginsWithTypeVarOrIsRefined(tv.inst)
     case RefinedType(_, _) =>
       true
     case _ =>
