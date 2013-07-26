@@ -1352,7 +1352,30 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
       if (syms0.isEmpty) this
       else modifyInfo(_.substSym(syms0, syms1))
 
-    def setInfoOwnerAdjusted(info: Type): this.type = setInfo(info atOwner this)
+    /** Weaken the type of the symbol's info such that it doesn't contain
+     *  symbols with tighter access restriction than the symbol itself.
+     *  Since lubs are calculated without considering these requirements,
+     *  they tend to include inaccessible types.
+     */
+    private def weakenInfoUntilVisible(info: Type): Type = {
+      val info1 = new WeakenToVisible(this) apply info
+      if (info1 ne info)
+        log("Weakened inaccessible info on %s: %s becomes %s".format(this, info, info1))
+
+      info1
+    }
+    def setInfoOwnerAdjusted(info: Type): this.type = {
+      val info1 = info atOwner this
+      if (info ne info1) {
+        val addendum = info.typeSymbol match {
+          case NoSymbol                 => ""
+          case sym if sym.owner eq this => ""
+          case sym                      => " was (" + sym.owner + ")"
+        }
+        log("setInfoOwnerAdjusted cloned info %s: owner now %s%s".format(info1, this, addendum))
+      }
+      this setInfo weakenInfoUntilVisible(info1)
+    }
 
     /** Set the info and enter this symbol into the owner's scope. */
     def setInfoAndEnter(info: Type): this.type = {

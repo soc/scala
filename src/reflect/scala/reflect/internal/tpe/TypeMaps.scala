@@ -92,6 +92,35 @@ private[internal] trait TypeMaps {
     def keepAnnotation(annot: AnnotationInfo) = annot matches TypeConstraintClass
   }
 
+  /** Weaken the type of the symbol's info such that it doesn't contain
+   *  symbols with tighter access restriction than the symbol itself.
+   *  Since lubs are calculated without considering these requirements,
+   *  they tend to include inaccessible types.
+   */
+  class WeakenToVisible(owner: Symbol) extends TypeMap {
+    def isTighter(tp: Type) = (
+         (tp.typeSymbol isLessAccessibleThan owner)
+      && (tp.typeSymbolDirect isLessAccessibleThan owner)
+    )
+    def visibleParents(tps: List[Type]): List[Type] = {
+      val tps1 = tps flatMap (tp =>
+        if (isTighter(tp)) visibleParents(tp.parents)
+        else List(tp)
+      )
+      // "flatMapConserve" to avoid new refined types.
+      if ((tps corresponds tps1)(_ eq _)) tps
+      else elimSuper(tps1)
+    }
+    def apply(tp: Type): Type = tp match {
+      case rt @ RefinedType(ps, decls)       => copyRefinedType(rt, visibleParents(ps), mapOver(decls))
+      case PolyType(_, _)                    => mapOver(tp)
+      case MethodType(_, _)                  => mapOver(tp)
+      case ExistentialType(_, _)             => mapOver(tp)
+      case TypeRef(_, sym, _) if sym.isClass => mapOver(tp)
+      case _                                 => tp
+    }
+  }
+
   // todo. move these into scala.reflect.api
 
   /** A prototype for mapping a function over all possible types
