@@ -20,7 +20,7 @@ import scala.collection.mutable.{ HashMap, ListBuffer }
 import internal.Flags._
 import ReflectionUtils.{staticSingletonInstance, innerSingletonInstance}
 import scala.language.existentials
-import scala.runtime.{ScalaRunTime, BoxesRunTime}
+import scala.runtime.{ScalaRunTime, Boxes}
 
 private[reflect] trait JavaMirrors extends internal.SymbolTable with api.JavaUniverse { thisUniverse: SymbolTable =>
 
@@ -413,7 +413,7 @@ private[reflect] trait JavaMirrors extends internal.SymbolTable with api.JavaUni
         def fail(msg: String) = abort(msg + ", it cannot be invoked with mirrors")
 
         def invokePrimitiveMethod = {
-          val jmeths = classOf[BoxesRunTime].getDeclaredMethods.filter(_.getName == nme.primitiveMethodName(symbol.name).toString)
+          val jmeths = Boxes.getClass.getDeclaredMethods.filter(_.getName == nme.primitiveMethodName(symbol.name).toString)
           assert(jmeths.length == 1, jmeths.toList)
           jinvoke(jmeths.head, null, objReceiver +: objArgs)
         }

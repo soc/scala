@@ -874,8 +874,7 @@ trait Definitions extends api.StandardDefinitions {
     lazy val ObjectRefClass         = requiredClass[scala.runtime.ObjectRef[_]]
     lazy val VolatileObjectRefClass = requiredClass[scala.runtime.VolatileObjectRef[_]]
     lazy val RuntimeStaticsModule   = getRequiredModule("scala.runtime.Statics")
-    lazy val BoxesRunTimeModule     = getRequiredModule("scala.runtime.BoxesRunTime")
-    lazy val BoxesRunTimeClass      = BoxesRunTimeModule.moduleClass
+    lazy val BoxesClass             = getRequiredModule("scala.runtime.Boxes")
     lazy val BoxedNumberClass       = getClassByName(sn.BoxedNumber)
     lazy val BoxedCharacterClass    = getClassByName(sn.BoxedCharacter)
     lazy val BoxedBooleanClass      = getClassByName(sn.BoxedBoolean)
@@ -886,8 +885,8 @@ trait Definitions extends api.StandardDefinitions {
     lazy val BoxedFloatClass        = requiredClass[java.lang.Float]
     lazy val BoxedDoubleClass       = requiredClass[java.lang.Double]
 
-    lazy val Boxes_isNumberOrBool  = getDecl(BoxesRunTimeClass, nme.isBoxedNumberOrBoolean)
-    lazy val Boxes_isNumber        = getDecl(BoxesRunTimeClass, nme.isBoxedNumber)
+    lazy val Boxes_isNumberOrBool  = getDecl(BoxesClass, nme.isBoxedNumberOrBoolean)
+    lazy val Boxes_isNumber        = getDecl(BoxesClass, nme.isBoxedNumber)
 
     lazy val BoxedUnitClass         = requiredClass[scala.runtime.BoxedUnit]
     lazy val BoxedUnitModule        = getRequiredModule("scala.runtime.BoxedUnit")

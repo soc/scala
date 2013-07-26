@@ -17,17 +17,18 @@ trait SuperG[T] {
 class BaseG[T](val arr: Array[T]) extends SuperG[T] { }
 
 object Test {
+  val runtime = new scala.runtime.InstrumentedScalaRunTime
+  scala.runtime.ScalaRunTime.setRunTime(runtime)
+
   def main(args: Array[String]) {
     (new BaseS(new Array[String](1)): SuperS[String]).foo
-    println(arrayApplyCount)
+    runtime.printArrayCounts()
     (new BaseS(new Array[String](1)): SuperS[String]).bar(new Array[String](1))
-    println(arrayApplyCount)
-    println(arrayUpdateCount)
-    
+    runtime.printArrayCounts()
+
     (new BaseG(new Array[String](1)): SuperG[String]).foo
-    println(arrayApplyCount)
+    runtime.printArrayCounts()
     (new BaseG(new Array[String](1)): SuperG[String]).bar(new Array[String](1))
-    println(arrayApplyCount)
-    println(arrayUpdateCount)
+    runtime.printArrayCounts()
   }
 }

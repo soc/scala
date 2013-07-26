@@ -16,15 +16,104 @@ import scala.collection.generic.{ Sorted }
 import scala.reflect.{ ClassTag, classTag }
 import scala.util.control.ControlThrowable
 import java.lang.{ Class => jClass }
-
 import java.lang.Double.doubleToLongBits
 import java.lang.reflect.{ Modifier, Method => JMethod }
+
+object ScalaRunTimeHelper {
+  // Avoiding boxing which messes up the specialized tests.  Don't ask.
+  val tupleNames = {
+    var i = 22
+    var names: List[String] = Nil
+    while (i >= 1) {
+      names ::= ("scala.Tuple" + String.valueOf(i))
+      i -= 1
+    }
+    names.toSet
+  }
+}
+import ScalaRunTimeHelper._
 
 /** The object ScalaRunTime provides support methods required by
  *  the scala runtime.  All these methods should be considered
  *  outside the API and subject to change or removal without notice.
  */
-object ScalaRunTime {
+object ScalaRunTime extends ScalaRunTimeInterface {
+  private[this] var _impl: ScalaRunTimeInterface = null
+  private def newRunTimeInstance() = sys.props("scala.runtime.class") match {
+    case null => new StandardScalaRunTime
+    case name =>
+      Console.err.println(s"Creating instance of $name for ScalaRunTime.")
+      Class.forName(name).newInstance().asInstanceOf[ScalaRunTimeInterface]
+  }
+  private def impl = {
+    if (_impl eq null)
+      _impl = newRunTimeInstance()
+
+    _impl
+  }
+  def setRunTime(impl: ScalaRunTimeInterface) = {
+    _impl = impl
+  }
+
+  // Arrays
+  def isArray(x: Any, atLevel: Int): Boolean           = impl.isArray(x, atLevel)
+  def toArray[T](xs: collection.Seq[T]): Array[AnyRef] = impl.toArray(xs)
+  def toObjectArray(src: AnyRef): Array[Object]        = impl.toObjectArray(src)
+  def arrayClass(clazz: jClass[_]): jClass[_]          = impl.arrayClass(clazz)
+  def arrayElementClass(schematic: Any): jClass[_]     = impl.arrayElementClass(schematic)
+  def array_apply(xs: AnyRef, idx: Int): Any           = impl.array_apply(xs, idx)
+  def array_clone(xs: AnyRef): AnyRef                  = impl.array_clone(xs)
+  def array_length(xs: AnyRef): Int                    = impl.array_length(xs)
+  def array_update(xs: AnyRef, idx: Int, value: Any)   = impl.array_update(xs, idx, value)
+
+  // Any
+  def _equals(x: Product, y: Any): Boolean = impl._equals(x, y)
+  def _hashCode(x: Product): Int = impl._hashCode(x)
+  def _toString(x: Product): String = impl._toString(x)
+
+  // AnyVal
+  def box[T](clazz: jClass[T]): jClass[_]    = impl.box(clazz)
+  def isAnyVal(x: Any): Boolean              = impl.isAnyVal(x)
+  def isValueClass(clazz: Class[_]): Boolean = impl.isValueClass(clazz)
+  def hash(dv: Double): Int                  = impl.hash(dv)
+  def hash(fv: Float): Int                   = impl.hash(fv)
+  def hash(lv: Long): Int                    = impl.hash(lv)
+  def hash(x: Any): Int                      = impl.hash(x)
+  def hash(x: Boolean): Int                  = impl.hash(x)
+  def hash(x: Byte): Int                     = impl.hash(x)
+  def hash(x: Char): Int                     = impl.hash(x)
+  def hash(x: Int): Int                      = impl.hash(x)
+  def hash(x: Number): Int                   = impl.hash(x)
+  def hash(x: Short): Int                    = impl.hash(x)
+  def hash(x: Unit): Int                     = impl.hash(x)
+
+  // Products / Collections
+  def isTuple(x: Any): Boolean = impl.isTuple(x)
+  def sameElements(xs1: collection.Seq[Any], xs2: collection.Seq[Any]): Boolean = impl.sameElements(xs1, xs2)
+  def typedProductIterator[T](x: Product): Iterator[T] = impl.typedProductIterator(x)
+
+  // Strings
+  def replStringOf(arg: Any, maxElements: Int): String = impl.replStringOf(arg, maxElements)
+  def stringOf(arg: Any): String = impl.stringOf(arg)
+  def stringOf(arg: Any, maxElements: Int): String = impl.stringOf(arg, maxElements)
+
+  // Helpers
+  def checkInitialized[T <: AnyRef](x: T): T = impl.checkInitialized(x)
+  def ensureAccessible(m: JMethod): JMethod = impl.ensureAccessible(m)
+  def inlinedEquals(x: Object, y: Object): Boolean = impl.inlinedEquals(x, y)
+
+  // Misc
+  private[scala] def checkZip(what: String, coll1: TraversableOnce[_], coll2: TraversableOnce[_]) {
+    impl.checkZip(what, coll1, coll2)
+  }
+}
+
+
+/** The object ScalaRunTime provides support methods required by
+ *  the scala runtime.  All these methods should be considered
+ *  outside the API and subject to change or removal without notice.
+ */
+class StandardScalaRunTime extends ScalaRunTimeInterface {
   def isArray(x: Any, atLevel: Int = 1): Boolean =
     x != null && isArrayClass(x.getClass, atLevel)
 
@@ -36,16 +125,6 @@ object ScalaRunTime {
   def isAnyVal(x: Any) = x match {
     case _: Byte | _: Short | _: Char | _: Int | _: Long | _: Float | _: Double | _: Boolean | _: Unit => true
     case _                                                                                             => false
-  }
-  // Avoiding boxing which messes up the specialized tests.  Don't ask.
-  private val tupleNames = {
-    var i = 22
-    var names: List[String] = Nil
-    while (i >= 1) {
-      names ::= ("scala.Tuple" + String.valueOf(i))
-      i -= 1
-    }
-    names.toSet
   }
 
   /** Return the class object representing an array with element class `clazz`.

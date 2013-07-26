@@ -47,10 +47,10 @@ trait JavaPlatform extends Platform {
     classEmitPhase  // generate .class files
   )
 
-  lazy val externalEquals          = getDecl(BoxesRunTimeClass, nme.equals_)
-  lazy val externalEqualsNumNum    = getDecl(BoxesRunTimeClass, nme.equalsNumNum)
-  lazy val externalEqualsNumChar   = getDecl(BoxesRunTimeClass, nme.equalsNumChar)
-  lazy val externalEqualsNumObject = getDecl(BoxesRunTimeClass, nme.equalsNumObject)
+  lazy val externalEquals          = getDecl(BoxesClass, nme.equals_)
+  lazy val externalEqualsNumNum    = getDecl(BoxesClass, nme.equalsNumNum)
+  lazy val externalEqualsNumChar   = getDecl(BoxesClass, nme.equalsNumChar)
+  lazy val externalEqualsNumObject = getDecl(BoxesClass, nme.equalsNumObject)
 
   /** We could get away with excluding BoxedBooleanClass for the
    *  purpose of equality testing since it need not compare equal

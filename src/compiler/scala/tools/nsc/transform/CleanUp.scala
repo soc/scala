@@ -200,7 +200,7 @@ abstract class CleanUp extends Transform with ast.TreeDSL {
             else if (params.tail.isEmpty) nme.primitiveInfixMethodName(name)
             else nme.NO_NAME
           )
-          getDeclIfDefined(BoxesRunTimeClass, methodName) match {
+          getDeclIfDefined(BoxesClass, methodName) match {
             case NoSymbol => None
             case sym      => assert(!sym.isOverloaded, sym) ; Some((sym, testForName(name)))
           }
@@ -291,7 +291,7 @@ abstract class CleanUp extends Transform with ast.TreeDSL {
               fixResult(TRY (invocation) CATCH { CASE (catchVar) ==> catchBody } ENDTRY)
             }
 
-            /* A possible primitive method call, represented by methods in BoxesRunTime. */
+            /* A possible primitive method call, represented by methods in Boxes. */
             def genValueCall(operator: Symbol) = fixResult(REF(operator) APPLY args)
             def genValueCallWithTest = {
               getPrimitiveReplacementForStructuralCall(methSym.name) match {

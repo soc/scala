@@ -1254,7 +1254,7 @@ abstract class GenASM extends SubComponent with BytecodeWriters with GenJVMASM {
     val MIN_SWITCH_DENSITY = 0.7
 
     val StringBuilderClassName = javaName(definitions.StringBuilderClass)
-    val BoxesRunTime = "scala/runtime/BoxesRunTime"
+    val Boxes = "scala/runtime/Boxes$"
 
     val StringBuilderType = asm.Type.getObjectType(StringBuilderClassName)
     val mdesc_toString    = "()Ljava/lang/String;"
@@ -2426,11 +2426,11 @@ abstract class GenASM extends SubComponent with BytecodeWriters with GenJVMASM {
           def genObjsInstr() = (instr: @unchecked) match {
             case BOX(kind) =>
               val MethodNameAndType(mname, mdesc) = jBoxTo(kind)
-              jcode.invokestatic(BoxesRunTime, mname, mdesc)
+              jcode.invokestatic(Boxes, mname, mdesc)
 
             case UNBOX(kind) =>
               val MethodNameAndType(mname, mdesc) = jUnboxTo(kind)
-              jcode.invokestatic(BoxesRunTime, mname, mdesc)
+              jcode.invokestatic(Boxes, mname, mdesc)
 
             case NEW(REFERENCE(cls)) =>
               val className = javaName(cls)

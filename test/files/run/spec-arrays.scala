@@ -1,37 +1,31 @@
-
-
-
-import runtime.ScalaRunTime._
-
-
 class Generic[T](a: Array[T]) {
   def apply() = a(0)
 }
-
 
 class Spec[@specialized(AnyRef) T](a: Array[T]) {
   def apply() = a(0)
 }
 
-
 object Test {
-  
+  val runtime = new scala.runtime.InstrumentedScalaRunTime
+  scala.runtime.ScalaRunTime.setRunTime(runtime)
+
   def main(args: Array[String]) {
     val len = 50
-    
+
     testSpec(new Array[String](len))
-    println(arrayApplyCount)
-    
+    runtime.printArrayCounts()
+
     (new Spec(new Array[String](len)))()
-    println(arrayApplyCount)
-    
+    runtime.printArrayCounts()
+
     testGeneric(new Array[String](len))
-    println(arrayApplyCount)
-    
+    runtime.printArrayCounts()
+
     (new Generic(new Array[String](len)))()
-    println(arrayApplyCount)
+    runtime.printArrayCounts()
   }
-  
+
   def testGeneric[T](a: Array[T]) = {
     var i = 0
     var sum = 0
@@ -41,7 +35,7 @@ object Test {
     }
     sum
   }
-  
+
   def testSpec[@specialized(AnyRef) T](a: Array[T]) = {
     var i = 0
     var sum = 0
@@ -51,5 +45,5 @@ object Test {
     }
     sum
   }
-  
+
 }
