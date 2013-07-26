@@ -360,12 +360,59 @@ trait TypeComparers {
   private def isSubType2(tp1: Type, tp2: Type, depth: Int): Boolean = {
     def retry(lhs: Type, rhs: Type) = ((lhs ne tp1) || (rhs ne tp2)) && isSubType(lhs, rhs, depth)
 
+    def requiresEquivalence(tp: Type) = (
+         isConstantType(tp)
+      || isSingleType(tp)
+      // || (tp eq NoPrefix)
+    )
+    def annotatedConforms = (
+         annotationsConform(tp1, tp2)
+      && isSubType(tp1.withoutAnnotations, tp2.withoutAnnotations, depth)
+    )
+    def subTypeVars() = tp2 match {
+      case tv @ TypeVar(_,_) if tv.registerBound(tp1, isLowerBound = true) => true
+      case _                                                               =>
+        tp1 match {
+          case tv @ TypeVar(_,_) => tv.registerBound(tp2, isLowerBound = false)
+          case _                 => false
+        }
+    }
+    def prepare(tp: Type): Type = tp match {
+      case TypeRef(_, sym, _) if sym.isRefinementClass     => prepare(sym.info)
+      case TypeRef(_, sym, Nil) if isRawIfWithoutArgs(sym) => prepare(rawToExistential(tp))
+      case st @ SingleType(_, sym) if sym.isModule         => prepare(st.underlying)
+      case _                                               => tp
+    }
+
     if (isSingleType(tp1) && isSingleType(tp2) || isConstantType(tp1) && isConstantType(tp2))
       return (tp1 =:= tp2) || retry(tp1.underlying, tp2)
 
     if (tp1.isHigherKinded || tp2.isHigherKinded)
       return isHKSubType(tp1, tp2, depth)
 
+    if (tp1.isInstanceOf[AnnotatedType] || tp2.isInstanceOf[AnnotatedType])
+      return annotatedConforms
+
+    tp2 match {
+      case BoundedWildcardType(bounds) => return isSubType(tp1, bounds.hi, depth)
+      case tv2 @ TypeVar(_, _) =>
+        tp1 match {
+          case AnnotatedType(_, _, _) | BoundedWildcardType(_) =>
+          case _                                               => return tv2.registerBound(tp1, isLowerBound = true)
+        }
+      case _  =>
+    }
+    tp1 match {
+      case BoundedWildcardType(bounds) => return isSubType(bounds.lo, tp2, depth)
+      case tv @ TypeVar(_,_)           => return tv.registerBound(tp2, isLowerBound = false)
+      case _                           =>
+    }
+
+    isSubType3(prepare(tp1), prepare(tp2), depth)
+  }
+
+  /** Does type `tp1` conform to `tp2`? */
+  private def isSubType3(tp1: Type, tp2: Type, depth: Int): Boolean = {
     /* First try, on the right:
      *   - unwrap Annotated types, BoundedWildcardTypes,
      *   - bind TypeVars  on the right, if lhs is not Annotated nor BoundedWildcard
@@ -399,18 +446,6 @@ trait TypeComparers {
           case _ =>
             secondTry
         }
-      case AnnotatedType(_, _, _) =>
-        isSubType(tp1.withoutAnnotations, tp2.withoutAnnotations, depth) &&
-          annotationsConform(tp1, tp2)
-      case BoundedWildcardType(bounds) =>
-        isSubType(tp1, bounds.hi, depth)
-      case tv2 @ TypeVar(_, constr2) =>
-        tp1 match {
-          case AnnotatedType(_, _, _) | BoundedWildcardType(_) =>
-            secondTry
-          case _ =>
-            tv2.registerBound(tp1, isLowerBound = true)
-        }
       case _ =>
         secondTry
     }
@@ -421,13 +456,6 @@ trait TypeComparers {
      *   - handle existential types by skolemization.
      */
     def secondTry = tp1 match {
-      case AnnotatedType(_, _, _) =>
-        isSubType(tp1.withoutAnnotations, tp2.withoutAnnotations, depth) &&
-          annotationsConform(tp1, tp2)
-      case BoundedWildcardType(bounds) =>
-        isSubType(tp1.bounds.lo, tp2, depth)
-      case tv @ TypeVar(_,_) =>
-        tv.registerBound(tp2, isLowerBound = false)
       case ExistentialType(_, _) =>
         try {
           skolemizationLevel += 1
@@ -440,20 +468,15 @@ trait TypeComparers {
     }
 
     def thirdTryRef(tp1: Type, tp2: TypeRef): Boolean = {
-      val sym2 = tp2.sym
       def retry(lhs: Type, rhs: Type)   = isSubType(lhs, rhs, depth)
       def abstractTypeOnRight(lo: Type) = isDifferentTypeConstructor(tp2, lo) && retry(tp1, lo)
-      def classOnRight                  = (
-        if (isRawType(tp2)) retry(tp1, rawToExistential(tp2))
-        else if (sym2.isRefinementClass) retry(tp1, sym2.info)
-        else fourthTry
-      )
-      sym2 match {
-        case SingletonClass                   => tp1.isStable || fourthTry
-        case _: ClassSymbol                   => classOnRight
-        case _: TypeSymbol if sym2.isDeferred => abstractTypeOnRight(tp2.bounds.lo) || fourthTry
-        case _: TypeSymbol                    => retry(tp1.normalize, tp2.normalize)
-        case _                                => fourthTry
+
+      tp2.sym match {
+        case SingletonClass                      => tp1.isStable || fourthTry
+        case _: ClassSymbol                      => fourthTry
+        case _: TypeSymbol if tp2.sym.isDeferred => abstractTypeOnRight(tp2.bounds.lo) || fourthTry
+        case _: TypeSymbol                       => retry(tp1.normalize, tp2.normalize)
+        case _                                   => fourthTry
       }
     }
 
@@ -515,19 +538,10 @@ trait TypeComparers {
             case TypeRef(_, sym2, _) => sym1 isBottomSubClass sym2
             case _                   => isSingleType(tp2) && retry(tp1, tp2.widen)
           }
-          def moduleOnLeft = tp2 match {
-            case SingleType(pre2, sym2) => equalSymsAndPrefixes(sym1.sourceModule, pre1, sym2, pre2)
-            case _                      => false
-          }
-          def classOnLeft = (
-            if (isRawType(tp1)) retry(rawToExistential(tp1), tp2)
-            else if (sym1.isModuleClass) moduleOnLeft
-            else sym1.isRefinementClass && retry(sym1.info, tp2)
-          )
           sym1 match {
             case NothingClass                     => true
             case NullClass                        => nullOnLeft
-            case _: ClassSymbol                   => classOnLeft
+            case _: ClassSymbol                   => false // classOnLeft
             case _: TypeSymbol if sym1.isDeferred => abstractTypeOnLeft(tp1.bounds.hi)
             case _: TypeSymbol                    => retry(tp1.normalize, tp2.normalize)
             case _                                => false
