@@ -9,6 +9,7 @@
 package scala
 package runtime
 
+import scala.{ collection => coll }
 import scala.collection.{ Seq, IndexedSeq, TraversableView, AbstractIterator }
 import scala.collection.mutable.WrappedArray
 import scala.collection.immutable.{ StringLike, NumericRange, List, Stream, Nil, :: }
@@ -24,7 +25,7 @@ import java.lang.reflect.{ Modifier, Method => JMethod }
  *  the scala runtime.  All these methods should be considered
  *  outside the API and subject to change or removal without notice.
  */
-object ScalaRunTime {
+object ScalaRunTime extends api.Runtime {
   def isArray(x: Any, atLevel: Int = 1): Boolean =
     x != null && isArrayClass(x.getClass, atLevel)
 
@@ -72,8 +73,20 @@ object ScalaRunTime {
   def anyValClass[T <: AnyVal : ClassTag](value: T): jClass[T] =
     classTag[T].runtimeClass.asInstanceOf[jClass[T]]
 
+  def array_apply(xs: AnyRef, idx: Int): Any               = arrayApply(xs, idx)
+  def array_update(xs: AnyRef, idx: Int, value: Any): Unit = arrayUpdate(xs, idx, value)
+  def array_length(xs: AnyRef): Int                        = arrayLength(xs)
+  def array_clone(xs: AnyRef): AnyRef                      = arrayClone(xs)
+  def _hashCode(x: Product): Int                           = hash(x)
+  def _equals(x: Product, y: Any): Boolean                 = y match {
+    case y: Product => isSameProduct(x, y)
+    case _          => false
+  }
+  def box[T](clazz: jClass[T]): jClass[_] = boxedClass(clazz)
+  def typedProductIterator[T](x: Product): Iterator[T] = typedIterator(x)
+
   /** Retrieve generic array element */
-  def array_apply(xs: AnyRef, idx: Int): Any = xs match {
+  def arrayApply(xs: AnyRef, idx: Int): Any = xs match {
     case x: Array[AnyRef]  => x(idx).asInstanceOf[Any]
     case x: Array[Int]     => x(idx).asInstanceOf[Any]
     case x: Array[Double]  => x(idx).asInstanceOf[Any]
@@ -88,7 +101,7 @@ object ScalaRunTime {
   }
 
   /** update generic array element */
-  def array_update(xs: AnyRef, idx: Int, value: Any): Unit = xs match {
+  def arrayUpdate(xs: AnyRef, idx: Int, value: Any): Unit = xs match {
     case x: Array[AnyRef]  => x(idx) = value.asInstanceOf[AnyRef]
     case x: Array[Int]     => x(idx) = value.asInstanceOf[Int]
     case x: Array[Double]  => x(idx) = value.asInstanceOf[Double]
@@ -103,7 +116,7 @@ object ScalaRunTime {
   }
 
   /** Get generic array length */
-  def array_length(xs: AnyRef): Int = xs match {
+  def arrayLength(xs: AnyRef): Int = xs match {
     case x: Array[AnyRef]  => x.length
     case x: Array[Int]     => x.length
     case x: Array[Double]  => x.length
@@ -117,7 +130,7 @@ object ScalaRunTime {
     case null => throw new NullPointerException
   }
 
-  def array_clone(xs: AnyRef): AnyRef = xs match {
+  def arrayClone(xs: AnyRef): AnyRef = xs match {
     case x: Array[AnyRef]  => ArrayRuntime.cloneArray(x)
     case x: Array[Int]     => ArrayRuntime.cloneArray(x)
     case x: Array[Double]  => ArrayRuntime.cloneArray(x)
@@ -145,7 +158,7 @@ object ScalaRunTime {
       dest
   }
 
-  def toArray[T](xs: scala.collection.Seq[T]) = {
+  def toArray(xs: scala.collection.Seq[Any]) = {
     val arr = new Array[AnyRef](xs.length)
     var i = 0
     for (x <- xs) {
@@ -165,19 +178,16 @@ object ScalaRunTime {
   def _toString(x: Product): String =
     x.productIterator.mkString(x.productPrefix + "(", ",", ")")
 
-  def _hashCode(x: Product): Int = scala.util.hashing.MurmurHash3.productHash(x)
-
   /** A helper for case classes. */
-  def typedProductIterator[T](x: Product): Iterator[T] = {
-    new AbstractIterator[T] {
-      private var c: Int = 0
-      private val cmax = x.productArity
-      def hasNext = c < cmax
-      def next() = {
-        val result = x.productElement(c)
-        c += 1
-        result.asInstanceOf[T]
-      }
+
+  def typedIterator[T](x: Product): Iterator[T] = new AbstractIterator[T] {
+    private var c: Int = 0
+    private val cmax = x.productArity
+    def hasNext = c < cmax
+    def next() = {
+      val result = x.productElement(c)
+      c += 1
+      result.asInstanceOf[T]
     }
   }
 
@@ -190,10 +200,11 @@ object ScalaRunTime {
     else if (x.isInstanceOf[java.lang.Character]) BoxesRunTime.equalsCharObject(x.asInstanceOf[java.lang.Character], y)
     else x.equals(y)
 
-  def _equals(x: Product, y: Any): Boolean = y match {
-    case y: Product if x.productArity == y.productArity => x.productIterator sameElements y.productIterator
-    case _                                              => false
-  }
+  def isSameProduct(x: Product, y: Product) = (
+       (x.productArity == y.productArity)
+    && (x.productIterator sameElements y.productIterator)
+  )
+  def isSameSeq(xs1: coll.Seq[Any], xs2: coll.Seq[Any]) = xs1 sameElements xs2
 
   // hashcode -----------------------------------------------------------
   //
@@ -204,6 +215,8 @@ object ScalaRunTime {
     if (x == null) 0
     else if (x.isInstanceOf[java.lang.Number]) BoxesRunTime.hashFromNumber(x.asInstanceOf[java.lang.Number])
     else x.hashCode
+
+  def hash(x: Product): Int = scala.util.hashing.MurmurHash3.productHash(x)
 
   def hash(dv: Double): Int = {
     val iv = dv.toInt
@@ -350,16 +363,16 @@ object ScalaRunTime {
     }
   }
 
-  def box[T](clazz: jClass[T]): jClass[_] = clazz match {
-    case java.lang.Byte.TYPE => classOf[java.lang.Byte]
-    case java.lang.Short.TYPE => classOf[java.lang.Short]
+  def boxedClass(clazz: jClass[_]): jClass[_] = clazz match {
+    case java.lang.Byte.TYPE      => classOf[java.lang.Byte]
+    case java.lang.Short.TYPE     => classOf[java.lang.Short]
     case java.lang.Character.TYPE => classOf[java.lang.Character]
-    case java.lang.Integer.TYPE => classOf[java.lang.Integer]
-    case java.lang.Long.TYPE => classOf[java.lang.Long]
-    case java.lang.Float.TYPE => classOf[java.lang.Float]
-    case java.lang.Double.TYPE => classOf[java.lang.Double]
-    case java.lang.Void.TYPE => classOf[scala.runtime.BoxedUnit]
-    case java.lang.Boolean.TYPE => classOf[java.lang.Boolean]
-    case _ => clazz
+    case java.lang.Integer.TYPE   => classOf[java.lang.Integer]
+    case java.lang.Long.TYPE      => classOf[java.lang.Long]
+    case java.lang.Float.TYPE     => classOf[java.lang.Float]
+    case java.lang.Double.TYPE    => classOf[java.lang.Double]
+    case java.lang.Void.TYPE      => classOf[scala.runtime.BoxedUnit]
+    case java.lang.Boolean.TYPE   => classOf[java.lang.Boolean]
+    case _                        => clazz
   }
 }
