@@ -43,6 +43,8 @@ abstract class SymbolTable extends macros.Universe
                               with PrivateWithin
 {
 
+  import definitions.ObjectClass
+
   val gen = new TreeGen { val global: SymbolTable.this.type = SymbolTable.this }
   lazy val treeBuild = gen
 
@@ -244,28 +246,22 @@ abstract class SymbolTable extends macros.Universe
     }
   }
 
-  def openPackageModule(container: Symbol, dest: Symbol) {
+  def openPackageModule(packageObject: Symbol, packageClass: Symbol) {
+    def packagableMembers = packageObject.info.decls filterNot (m => m.isPrivate || m.isConstructor)
+
     // unlink existing symbols in the package
-    for (member <- container.info.decls.iterator) {
-      if (!member.isPrivate && !member.isConstructor) {
-        // todo: handle overlapping definitions in some way: mark as errors
-        // or treat as abstractions. For now the symbol in the package module takes precedence.
-        for (existing <- dest.info.decl(member.name).alternatives)
-          dest.info.decls.unlink(existing)
-      }
-    }
-    // enter non-private decls the class
-    for (member <- container.info.decls.iterator) {
-      if (!member.isPrivate && !member.isConstructor) {
-        dest.info.decls.enter(member)
-      }
-    }
+    packagableMembers foreach (member =>
+      // todo: handle overlapping definitions in some way: mark as errors
+      // or treat as abstractions. For now the symbol in the package module takes precedence.
+      (packageClass.info decl member.name).alternatives foreach (existing =>
+        packageClass.info.decls unlink existing
+      )
+    )
+    // enter non-private decls into the package class
+    packagableMembers foreach (packageClass.info.decls enter _)
+
     // enter decls of parent classes
-    for (p <- container.parentSymbols) {
-      if (p != definitions.ObjectClass) {
-        openPackageModule(p, dest)
-      }
-    }
+    packageObject.parentSymbols filterNot (_ == ObjectClass) foreach (p => openPackageModule(p, packageClass))
   }
 
   /** Convert array parameters denoting a repeated parameter of a Java method
@@ -277,7 +273,7 @@ abstract class SymbolTable extends macros.Universe
       assert(formals.last.typeSymbol == definitions.ArrayClass, formals)
       val method = params.last.owner
       val elemtp = formals.last.typeArgs.head match {
-        case RefinedType(List(t1, t2), _) if (t1.typeSymbol.isAbstractType && t2.typeSymbol == definitions.ObjectClass) =>
+        case RefinedType(List(t1, t2), _) if (t1.typeSymbol.isAbstractType && t2.typeSymbol == ObjectClass) =>
           t1 // drop intersection with Object for abstract types in varargs. UnCurry can handle them.
         case t =>
           t
@@ -292,16 +288,16 @@ abstract class SymbolTable extends macros.Universe
     def fromSource = false
   }
 
+  def packageObjectOf(pkgClass: Symbol): Symbol = pkgClass.info decl nme.PACKAGE
+
   /** if there's a `package` member object in `pkgClass`, enter its members into it. */
   def openPackageModule(pkgClass: Symbol) {
-
-    val pkgModule = pkgClass.info.decl(nme.PACKAGEkw)
+    val pkgModule = packageObjectOf(pkgClass)
     def fromSource = pkgModule.rawInfo match {
       case ltp: SymLoader => ltp.fromSource
-      case _ => false
+      case _              => false
     }
     if (pkgModule.isModule && !fromSource) {
-      // println("open "+pkgModule)//DEBUG
       openPackageModule(pkgModule, pkgClass)
     }
   }

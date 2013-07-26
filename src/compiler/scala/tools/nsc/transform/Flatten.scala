@@ -20,11 +20,22 @@ abstract class Flatten extends InfoTransform {
   /** Updates the owning scope with the given symbol, unlinking any others.
    */
   private def replaceSymbolInCurrentScope(sym: Symbol): Unit = exitingFlatten {
-    val scope = sym.owner.info.decls
-    val old   = (scope lookupUnshadowedEntries sym.name).toList
-    old foreach (scope unlink _)
-    scope enter sym
-    log(s"lifted ${sym.fullLocationString}" + ( if (old.isEmpty) "" else s" after unlinking $old from scope." ))
+    val owners = List(sym.owner, sym.owner.sourceModule, sym.owner.linkedClassOfClass) filterNot (_ eq NoSymbol)
+    log(s"owners = " + owners.map(s => s.accurateKindString + " " + s.name + "#" + s.id).mkString(", "))
+    val scopes  = owners map (_.info.decls)
+    // val entries = scopes flatMap (_ lookupUnshadowedEntries sym.name toList)
+    var old: List[String] = Nil
+
+    scopes foreach { scope =>
+      scope lookupUnshadowedEntries sym.name foreach { entry =>
+        entry.sym andAlso { victim =>
+          old ::= victim.toString
+          scope unlink victim
+        }
+        scope enter sym
+      }
+    }
+    log(s"lifted ${sym.fullLocationString}" + ( if (old.isEmpty) "" else s" after unlinking $old from scope(s)." ))
     old
   }
 

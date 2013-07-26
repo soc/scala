@@ -250,13 +250,17 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
     final def newModule(name: TermName, pos: Position = NoPosition, newFlags0: Long = 0L): ModuleSymbol = {
       val newFlags = newFlags0 | MODULE
       val m = newModuleSymbol(name, pos, newFlags)
-      val clazz = newModuleClass(name.toTypeName, pos, newFlags & ModuleToClassFlags)
+      val clazz = newModuleClass(TypeName(name + "$"), pos, newFlags & ModuleToClassFlags)
       connectModuleToClass(m, clazz)
     }
 
     final def newPackage(name: TermName, pos: Position = NoPosition, newFlags: Long = 0L): ModuleSymbol = {
       assert(name == nme.ROOT || isPackageClass, this)
       newModule(name, pos, PackageFlags | newFlags)
+    }
+
+    def newPackageObject(): ModuleSymbol = {
+      newModule(nme.PACKAGE)
     }
 
     final def newThisSym(name: TermName = nme.this_, pos: Position = NoPosition): TermSymbol =
@@ -283,7 +287,7 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
     final def newModuleAndClassSymbol(name: Name, pos: Position, flags0: FlagSet): (ModuleSymbol, ClassSymbol) = {
       val flags = flags0 | MODULE
       val m = newModuleSymbol(name.toTermName, pos, flags)
-      val c = newModuleClass(name.toTypeName, pos, flags & ModuleToClassFlags)
+      val c = newModuleClass(TypeName(name + "$"), pos, flags & ModuleToClassFlags)
       connectModuleToClass(m, c)
       (m, c)
     }
@@ -3036,7 +3040,7 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
     override def isNestedClass           = !isTopLevel
     override def isNumericValueClass     = definitions.isNumericValueClass(this)
     override def isNumeric               = isNumericValueClass
-    override def isPackageObjectClass    = isModuleClass && (name == tpnme.PACKAGE)
+    override def isPackageObjectClass    = isModuleClass && (sourceModule.name == nme.PACKAGE)
     override def isPrimitiveValueClass   = definitions.isPrimitiveValueClass(this)
     override def isPrimitive             = isPrimitiveValueClass
 

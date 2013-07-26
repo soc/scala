@@ -100,29 +100,156 @@ abstract class SymbolLoaders {
     pkg
   }
 
+  private def sym_s(s: Symbol) = s"${s.accurateKindString} ${s.fullName}#${s.id} (${s.shortSymbolClass})"
+  private def showme(label: Any, owner: Symbol, name: String) {
+    val names = List(name, name + "$") flatMap (n => List(n: TermName, n: TypeName))
+    val pairs = names map (n => (n.longString, owner.info member n)) filterNot (_._2 eq NoSymbol)
+    val str   = pairs.map({ case (k, v) => f"$k%15s -> ${sym_s(v)}" }).mkString("\n        ")
+    log(s"$label) in $owner I see\n        $str")
+  }
+
+  private def coordinateClassEntry(root: Symbol, name: String, completer: SymbolLoader) {
+    val className  = TypeName( if (name endsWith "$") name.init else name )
+    val moduleName = className.toTermName
+    val mclassName = TypeName( if (name endsWith "$") name else name + "$" )
+
+    val existingClass  = root.info.decls lookup className
+    val existingModule = root.info.decls lookup moduleName
+    val existingMClass = root.info.decls lookup mclassName
+
+    def check(label: String, from: Symbol, op: Symbol => Symbol, expected: Symbol) {
+      val outcome = op(from)
+      if (outcome eq expected) return
+      def from_s     = sym_s(from)
+      def outcome_s  = sym_s(outcome)
+      def expected_s = sym_s(expected)
+      log(s"Inconsistent $label: arrow from $from_s goes to $outcome_s instead of $expected_s")
+    }
+
+    if (existingClass ne NoSymbol) {
+      check("companionSymbol", existingClass, _.companionSymbol, existingModule)
+      check("linkedClassOfClass", existingClass, _.linkedClassOfClass, existingMClass)
+    }
+    if (existingModule ne NoSymbol) {
+      check("companionSymbol", existingModule, _.companionSymbol, existingClass)
+      check("moduleClass", existingModule, _.moduleClass, existingMClass)
+    }
+    if (existingMClass ne NoSymbol) {
+      check("linkedClassOfClass", existingMClass, _.linkedClassOfClass, existingClass)
+      check("sourceModule", existingMClass, _.sourceModule, existingModule)
+    }
+  }
+
+  private def enterViaModuleClass(root: Symbol, name: String, completer: SymbolLoader) {
+    require(name endsWith "$", name)
+    // showme("1", root, name.init)
+    coordinateClassEntry(root, name, completer)
+    val clazz = root.info.decls lookup (name: TypeName) orElse enterClass(root, name, completer)
+    coordinateClassEntry(root, name, completer)
+
+    // showme("2", root, name.init)
+    // clazz match {
+    //   case m: ModuleClassSymbol =>
+    //     log(s"Leaving ModuleClassSymbol ${sym_s(m)} for $root")
+    //   case mclass: ClassSymbol  =>
+    //     log(s"(Not) Unlinking non-module ClassSymbol ${sym_s(mclass)} for $root")
+    //     // root.info.decls unlink mclass
+    //     // root.info.decls enter mclass.cloneSymbol(mclass.owner, mclass.flags | Flags.MODULE)
+    //   case _ =>
+    // }
+    val module = root.info.decls lookup (name.init: TermName) orElse enterModule(root, name.init, completer)
+    // showme("3", root, name.init)
+    coordinateClassEntry(root, name, completer)
+    println("")
+  }
+
+  // private def enterPackageClassAndObject(root: Symbol, name: String, completer: SymbolLoader) {
+  //   log(s"enterPackageClassAndObject($root, $name, $completer)")
+  //   showme(1)
+  //   val clazz = root.info.decls lookup (name: TypeName) orElse enterClass(root, name, completer)
+  //   showme(2)
+  //   if (name endsWith "$") clazz match {
+  //     case m: ModuleClassSymbol =>
+  //       log(s"Leaving ModuleClassSymbol ${sym_s(m)} for $root")
+  //     case mclass: ClassSymbol  =>
+  //       log(s"Unlinking non-module ClassSymbol ${sym_s(mclass)} for $root")
+  //       root.info.decls unlink mclass
+  //     case _ =>
+  //   }
+  //   val module = (
+  //     root.info.decls lookup (name: TermName) orElse enterModule(root, name, completer)
+  //   )
+  //   showme(3)
+  //   println("")
+  // }
+
   /** Enter class and module with given `name` into scope of `root`
    *  and give them `completer` as type.
    */
   def enterClassAndModule(root: Symbol, name: String, completer: SymbolLoader) {
-    val clazz = enterClass(root, name, completer)
-    if (name endsWith "$") {
-      saved += 1
-      // Nice, have to replicate the side effects unless we love crashes
-      root.info
-    }
-    else {
-      val module = enterModule(root, name, completer)
-      if (!clazz.isAnonymousClass) {
-        // Diagnostic for SI-7147
-        def msg: String = {
-          def symLocation(sym: Symbol) = if (sym == null) "null" else s"${clazz.fullLocationString} (from ${clazz.associatedFile})"
-          sm"""Inconsistent class/module symbol pair for `$name` loaded from ${symLocation(root)}.
-              |clazz = ${symLocation(clazz)}; clazz.companionModule = ${clazz.companionModule}
-              |module = ${symLocation(module)}; module.companionClass = ${module.companionClass}"""
+    log(s"enterClassAndModule(${sym_s(root)}, $name, $completer)")
+
+    val isModClass = name endsWith "$"
+    if (isModClass)
+      return enterViaModuleClass(root, name, completer)
+
+    // if (name == "package")
+    //   return enterPackageClassAndObject(root, name, completer)
+
+    val modClass = root.info.decls lookup newTypeName(name + "$")
+    val clazz    = enterClass(root, name, completer)
+    val module: Symbol = modClass match {
+      case mclass: ModuleClassSymbol =>
+        val module = root.newModuleSymbol(newTermName(name), NoPosition, Flags.MODULE)
+        println(s"Exciting: clazz=$clazz module=$module modClass=$modClass")
+        connectModuleToClass(module, mclass)
+        module
+      case mclass: ClassSymbol =>
+        root.info.decls unlink mclass
+        val module   = root.info.decls lookup (name: TermName) orElse enterModule(root, name, completer)
+        val modClass = module.moduleClass
+        // class, module, moduleClass
+        val strings  = List(clazz, module, modClass) map (s => s"${s.shortSymbolClass}#${s.id}") mkString ", "
+        val classIs  = List(clazz, module.companionSymbol, modClass.linkedClassOfClass)
+        val moduleIs = List(clazz.companionSymbol, module, modClass.sourceModule)
+        val mclassIs = List(clazz.linkedClassOfClass, module.moduleClass, modClass)
+        val ownerIs  = List(clazz.owner, module.owner, modClass.owner)
+        def pairs = List(
+          "class"        -> classIs,
+          "module"       -> moduleIs,
+          "module class" -> mclassIs,
+          "owner"        -> ownerIs
+        )
+
+        if (List(classIs, moduleIs, mclassIs, ownerIs) forall (_.distinct.size == 1)) () else {
+          log(s"Inconsistent symbol group: $strings in $root")
+          log(List(clazz, module, modClass).map(s => s"${s.id}=${root.info.decls.lookup(s.name).alternatives.contains(s)}").mkString(s"In $root's info? ", ", ", ""))
+          pairs foreach {
+            case (what, List(classThinks, moduleThinks, mclassThinks)) =>
+              if (classThinks != moduleThinks)
+                log(s"The class thinks the $what is ${sym_s(classThinks)}, but the module says ${sym_s(moduleThinks)}")
+              if (classThinks != mclassThinks)
+                log(s"The class thinks the $what is ${sym_s(classThinks)}, but the module class says ${sym_s(mclassThinks)}")
+              if (mclassThinks != moduleThinks)
+                log(s"The module class thinks the $what is ${sym_s(mclassThinks)}, but the module says ${sym_s(moduleThinks)}")
+          }
         }
-        assert(clazz.companionModule == module, msg)
-        assert(module.companionClass == clazz, msg)
+
+        module
+      case _ =>
+        enterModule(root, name, completer)
+    }
+
+    if (!clazz.isAnonymousClass) {
+      // Diagnostic for SI-7147
+      def msg: String = {
+        def symLocation(sym: Symbol) = if (sym == null) "null" else s"${clazz.fullLocationString} (from ${clazz.associatedFile})"
+        sm"""Inconsistent class/module symbol pair for `$name` loaded from ${symLocation(root)}.
+            |clazz = ${symLocation(clazz)}; clazz.companionModule = ${clazz.companionModule}
+            |module = ${symLocation(module)}; module.companionClass = ${module.companionClass}"""
       }
+      assert(clazz.companionModule == module, msg)
+      assert(module.companionClass == clazz, msg)
     }
   }
 
