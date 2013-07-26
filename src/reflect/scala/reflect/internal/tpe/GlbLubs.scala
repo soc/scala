@@ -18,6 +18,11 @@ private[internal] trait GlbLubs {
   /** In case anyone wants to turn off lub verification without reverting anything. */
   private final val verifyLubs = true
 
+  lazy val guidance = scala.reflect.api.Guidance.inferenceGuidance()
+  def verifyInferredType(tpe: Type) {
+    if (guidance inferrable tpe) ()
+    else throw new TypeError(s"Inference guidance prohibits inference of $tpe")
+  }
 
   private def printLubMatrix(btsMap: Map[Type, List[Type]], depth: Int) {
     import util.TableDef
@@ -271,7 +276,13 @@ private[internal] trait GlbLubs {
     }
   }
 
-  def lub(ts: List[Type]): Type = ts match {
+  def lub(ts: List[Type]): Type = {
+    val res = lubInternal(ts)
+    verifyInferredType(res)
+    res
+  }
+
+  private def lubInternal(ts: List[Type]): Type = ts match {
     case Nil      => NothingTpe
     case t :: Nil => t
     case _        =>
