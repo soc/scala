@@ -119,6 +119,11 @@ trait Types
     }
   }
 
+  var asSeenFromThis: Type = _
+  var lastPre: Type        = _
+  var lastClazz: Symbol    = _
+  var lastResult: Type     = _
+
   /** The current skolemization level, needed for the algorithms
    *  in isSameType, isSubType that do constraint solving under a prefix.
    */
@@ -658,23 +663,37 @@ trait Types
      *      = Int
      */
     def asSeenFrom(pre: Type, clazz: Symbol): Type = {
-      val start = if (Statistics.canEnable) Statistics.pushTimer(typeOpsStack, asSeenFromNanos)  else null
-      try {
-        val trivial = (
+      def body: Type = {
+        def trivial = (
              this.isTrivial
           || phase.erasedTypes && pre.typeSymbol != ArrayClass
           || skipPrefixOf(pre, clazz)
         )
         if (trivial) this
         else {
-          val m     = newAsSeenFromMap(pre.normalize, clazz)
-          val tp    = m(this)
-          val tp1   = existentialAbstraction(m.capturedParams, tp)
+          val pre1 = pre.normalize
+          val m    = newAsSeenFromMap(pre1, clazz)
+          val tp   = m(this)
+          val tp1  = existentialAbstraction(m.capturedParams, tp)
 
-          if (m.capturedSkolems.isEmpty) tp1
-          else deriveType(m.capturedSkolems, _.cloneSymbol setFlag CAPTURED)(tp1)
+          if (m.capturedSkolems.isEmpty) {
+            asSeenFromThis = this
+            lastPre        = pre
+            lastClazz      = clazz
+            lastResult     = tp1
+            tp1
+          }
+          else {
+            asSeenFromThis = null
+            deriveType(m.capturedSkolems, _.cloneSymbol setFlag CAPTURED)(tp1)
+          }
         }
-      } finally if (Statistics.canEnable) Statistics.popTimer(typeOpsStack, start)
+      }
+      val start = if (Statistics.canEnable) Statistics.pushTimer(typeOpsStack, asSeenFromNanos) else null
+      try
+        if ((asSeenFromThis eq this) && (lastPre eq pre) && (lastClazz eq clazz)) lastResult else body
+      finally
+        if (Statistics.canEnable) Statistics.popTimer(typeOpsStack, start)
     }
 
     /** The info of `sym`, seen as a member of this type.
