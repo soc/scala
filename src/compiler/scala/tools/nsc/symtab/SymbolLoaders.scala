@@ -24,6 +24,9 @@ abstract class SymbolLoaders {
   import global._
   import SymbolLoadersStats._
 
+  private var saved = 0
+  sys addShutdownHook println(s"Saved $saved symbols")
+
   protected def enterIfNew(owner: Symbol, member: Symbol, completer: SymbolLoader): Symbol = {
     assert(owner.info.decls.lookup(member.name) == NoSymbol, owner.fullName + "." + member.name)
     owner.info.decls enter member
@@ -102,17 +105,24 @@ abstract class SymbolLoaders {
    */
   def enterClassAndModule(root: Symbol, name: String, completer: SymbolLoader) {
     val clazz = enterClass(root, name, completer)
-    val module = enterModule(root, name, completer)
-    if (!clazz.isAnonymousClass) {
-      // Diagnostic for SI-7147
-      def msg: String = {
-        def symLocation(sym: Symbol) = if (sym == null) "null" else s"${clazz.fullLocationString} (from ${clazz.associatedFile})"
-        sm"""Inconsistent class/module symbol pair for `$name` loaded from ${symLocation(root)}.
-            |clazz = ${symLocation(clazz)}; clazz.companionModule = ${clazz.companionModule}
-            |module = ${symLocation(module)}; module.companionClass = ${module.companionClass}"""
+    if (name endsWith "$") {
+      saved += 1
+      // Nice, have to replicate the side effects unless we love crashes
+      root.info
+    }
+    else {
+      val module = enterModule(root, name, completer)
+      if (!clazz.isAnonymousClass) {
+        // Diagnostic for SI-7147
+        def msg: String = {
+          def symLocation(sym: Symbol) = if (sym == null) "null" else s"${clazz.fullLocationString} (from ${clazz.associatedFile})"
+          sm"""Inconsistent class/module symbol pair for `$name` loaded from ${symLocation(root)}.
+              |clazz = ${symLocation(clazz)}; clazz.companionModule = ${clazz.companionModule}
+              |module = ${symLocation(module)}; module.companionClass = ${module.companionClass}"""
+        }
+        assert(clazz.companionModule == module, msg)
+        assert(module.companionClass == clazz, msg)
       }
-      assert(clazz.companionModule == module, msg)
-      assert(module.companionClass == clazz, msg)
     }
   }
 
