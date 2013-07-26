@@ -3,12 +3,12 @@
  * @author  Martin Odersky
  */
 
-
 package scala.tools.nsc
 package backend
 package icode
 
-import scala.collection._
+import scala.collection.{ mutable, immutable }
+import java.io.IOException
 
 /**
  *  @author Iulian Dragos
@@ -30,17 +30,19 @@ trait Repository {
   def load(sym: Symbol): Boolean = {
     try {
       val (c1, c2) = icodeReader.readClass(sym)
-
-      assert(c1.symbol == sym || c2.symbol == sym, "c1.symbol = %s, c2.symbol = %s, sym = %s".format(c1.symbol, c2.symbol, sym))
-      loaded += (c1.symbol -> c1)
-      loaded += (c2.symbol -> c2)
-
+      assert(c1.symbol == sym || c2.symbol == sym, s"c1.symbol=${c1.symbol}, c2.symbol=${c2.symbol}, sym=$sym")
+      loaded(c1.symbol) = c1
+      loaded(c2.symbol) = c2
       true
-    } catch {
-      case e: Throwable => // possible exceptions are MissingRequirementError, IOException and TypeError -> no better common supertype
-        log("Failed to load %s. [%s]".format(sym.fullName, e.getMessage))
+    }
+    catch {
+      case e @ (_: MissingRequirementError | _: IOException | _: TypeError) =>
+        devWarning(s"Failed to load ${sym.fullName}. [${e.getMessage}]")
         if (settings.debug) { e.printStackTrace }
-
+        false
+      case t: Throwable =>
+        devWarning(s"Here's a nice exception I like to catch! $t")
+        t.printStackTrace
         false
     }
   }

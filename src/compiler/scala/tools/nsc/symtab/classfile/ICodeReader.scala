@@ -622,13 +622,17 @@ abstract class ICodeReader extends ClassfileParser {
    *  synthetic method from one of the fake companion classes of the primitive types,
    *  such as Int.box(5).
    */
-  def isBox(m: Symbol): Boolean =
-    (m.owner == definitions.BoxesRunTimeClass
-        && m.name.startsWith("boxTo"))
+  def isBox(m: Symbol): Boolean = (
+       (m ne NoSymbol)
+    && (m.owner == definitions.BoxesRunTimeClass)
+    && (m.name startsWith "boxTo")
+  )
 
-  def isUnbox(m: Symbol): Boolean =
-    (m.owner == definitions.BoxesRunTimeClass
-        && m.name.startsWith("unboxTo"))
+  def isUnbox(m: Symbol): Boolean = (
+       (m ne NoSymbol)
+    && (m.owner == definitions.BoxesRunTimeClass)
+    && (m.name startsWith "unboxTo")
+  )
 
   /** Return the icode class that should include members with the given flags.
    *  There are two possible classes, the static part and the instance part.

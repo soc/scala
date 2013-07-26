@@ -265,11 +265,9 @@ abstract class ClassfileParser {
             }
           }
         }
-        assert(f != NoSymbol,
-          s"could not find $name: $tpe in $ownerTpe" + (
-            if (settings.debug.value) ownerTpe.members.mkString(", members are:\n  ", "\n  ", "") else ""
-          )
-        )
+        if (f eq NoSymbol)
+          devWarning(s"Could not find $name: $tpe among ${ownerTpe.members}")
+
         values(index) = f
       }
       f
