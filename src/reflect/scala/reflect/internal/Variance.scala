@@ -52,6 +52,15 @@ final class Variance private (val flags: Int) extends AnyVal {
     else this.cut
   )
 
+  /** Conformance relation: if v1 <:< v2, a symbol with variance v1
+   *  can be used in a position where variance v2 is required.
+   */
+  def <:< (other: Variance): Boolean = (
+       (this == other)
+    || this.isInvariant
+    || other.isBivariant
+  )
+
   /** Flip between covariant and contravariant. I chose not to use unary_- because it doesn't stand out enough. */
   def flip = if (isCovariant) Contravariant else if (isContravariant) Covariant else this
 

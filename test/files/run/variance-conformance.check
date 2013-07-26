@@ -1,0 +1,16 @@
+    invariant <:< invariant      ==  true
+    invariant <:< contravariant  ==  true
+    invariant <:< covariant      ==  true
+    invariant <:< bivariant      ==  true
+contravariant <:< invariant      ==  false
+contravariant <:< contravariant  ==  true
+contravariant <:< covariant      ==  false
+contravariant <:< bivariant      ==  true
+    covariant <:< invariant      ==  false
+    covariant <:< contravariant  ==  false
+    covariant <:< covariant      ==  true
+    covariant <:< bivariant      ==  true
+    bivariant <:< invariant      ==  false
+    bivariant <:< contravariant  ==  false
+    bivariant <:< covariant      ==  false
+    bivariant <:< bivariant      ==  true
