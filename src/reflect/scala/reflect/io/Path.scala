@@ -3,13 +3,13 @@
  * @author Paul Phillips
  */
 
-package scala.reflect
+package scala
+package reflect
 package io
 
 import java.io.{
   FileInputStream, FileOutputStream, BufferedReader, BufferedWriter, InputStreamReader, OutputStreamWriter,
-  BufferedInputStream, BufferedOutputStream, RandomAccessFile }
-import java.io.{ File => JFile }
+  BufferedInputStream, BufferedOutputStream, RandomAccessFile, File => JFile }
 import java.net.{ URI, URL }
 import scala.util.Random.alphanumeric
 import scala.language.implicitConversions
@@ -209,7 +209,7 @@ class Path private[io] (val jfile: JFile) {
   }
   def isDirectory = {
     if (Statistics.canEnable) Statistics.incCounter(IOStats.fileIsDirectoryCount)
-    try jfile.isDirectory() catch { case ex: SecurityException => false }
+    try jfile.isDirectory() catch { case ex: SecurityException => jfile.getPath == "." }
   }
   def isAbsolute = jfile.isAbsolute()
   def isEmpty = path.length == 0

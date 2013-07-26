@@ -3,7 +3,8 @@
  * @author  Martin Odersky
  */
 
-package scala.reflect
+package scala
+package reflect
 package internal
 
 import pickling.ByteCodecs
@@ -39,8 +40,7 @@ trait AnnotationInfos extends api.Annotations { self: SymbolTable =>
         // monomorphic one by introducing existentials, see SI-7009 for details
         existentialAbstraction(throwableSym.typeParams, throwableSym.tpe)
       }
-      val throwsAnn = AnnotationInfo(appliedType(definitions.ThrowsClass, throwableTpe), List(Literal(Constant(throwableTpe))), Nil)
-      withAnnotations(List(throwsAnn))
+      this withAnnotation AnnotationInfo(appliedType(ThrowsClass, throwableTpe), List(Literal(Constant(throwableTpe))), Nil)
     }
 
     /** Tests for, get, or remove an annotation */
@@ -73,7 +73,7 @@ trait AnnotationInfos extends api.Annotations { self: SymbolTable =>
    *  - arrays of constants
    *  - or nested classfile annotations
    */
-  abstract class ClassfileAnnotArg extends Product
+  sealed abstract class ClassfileAnnotArg extends Product
   implicit val JavaArgumentTag = ClassTag[ClassfileAnnotArg](classOf[ClassfileAnnotArg])
   case object UnmappableAnnotArg extends ClassfileAnnotArg
 

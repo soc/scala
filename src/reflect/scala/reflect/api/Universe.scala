@@ -1,4 +1,5 @@
-package scala.reflect
+package scala
+package reflect
 package api
 
 /**
@@ -71,10 +72,12 @@ abstract class Universe extends Symbols
                            with ImplicitTags
                            with StandardDefinitions
                            with StandardNames
+                           with StandardLiftables
                            with BuildUtils
                            with Mirrors
                            with Printers
                            with Importers
+                           with Quasiquotes
 {
   /** Use `refiy` to produce the abstract syntax tree representing a given Scala expression.
    *
@@ -93,5 +96,5 @@ abstract class Universe extends Symbols
    */
   // implementation is hardwired to `scala.reflect.reify.Taggers`
   // using the mechanism implemented in `scala.tools.reflect.FastTrack`
-  def reify[T](expr: T): Expr[T] = ??? // macro
+  def reify[T](expr: T): Expr[T] = macro ???
 }

@@ -126,7 +126,7 @@ abstract class RefChecks extends InfoTransform with scala.reflect.internal.trans
       val defaultMethodNames = defaultGetters map (sym => nme.defaultGetterToMethod(sym.name))
 
       defaultMethodNames.toList.distinct foreach { name =>
-        val methods      = clazz.info.findMember(name, 0L, METHOD, false).alternatives
+        val methods      = clazz.info.findMember(name, 0L, METHOD, stableOnly = false).alternatives
         def hasDefaultParam(tpe: Type): Boolean = tpe match {
           case MethodType(params, restpe) => (params exists (_.hasDefault)) || hasDefaultParam(restpe)
           case _ => false
@@ -406,7 +406,7 @@ abstract class RefChecks extends InfoTransform with scala.reflect.internal.trans
             overrideError("cannot be used here - classes can only override abstract types")
           } else if (other.isEffectivelyFinal) { // (1.2)
             overrideError("cannot override final member")
-          } else if (!other.isDeferred && !member.isAnyOverride && !member.isSynthetic) { // (*)
+          } else if (!other.isDeferred && !other.hasFlag(DEFAULTMETHOD) && !member.isAnyOverride && !member.isSynthetic) { // (*)
             // (*) Synthetic exclusion for (at least) default getters, fixes SI-5178. We cannot assign the OVERRIDE flag to
             // the default getter: one default getter might sometimes override, sometimes not. Example in comment on ticket.
               if (isNeitherInClass && !(other.owner isSubClass member.owner))
@@ -511,7 +511,10 @@ abstract class RefChecks extends InfoTransform with scala.reflect.internal.trans
             }
 
             if (member.isStable && !otherTp.isVolatile) {
-	            if (memberTp.isVolatile)
+              // (1.4), pt 2 -- member.isStable && memberTp.isVolatile started being possible after SI-6815
+              // (before SI-6815, !symbol.tpe.isVolatile was implied by symbol.isStable)
+              // TODO: allow overriding when @uncheckedStable?
+              if (memberTp.isVolatile)
                 overrideError("has a volatile type; cannot override a member with non-volatile type")
               else memberTp.dealiasWiden.resultType match {
                 case rt: RefinedType if !(rt =:= otherTp) && !(checkedCombinations contains rt.parents) =>
@@ -601,8 +604,10 @@ abstract class RefChecks extends InfoTransform with scala.reflect.internal.trans
           def stubImplementations: List[String] = {
             // Grouping missing methods by the declaring class
             val regrouped = missingMethods.groupBy(_.owner).toList
-            def membersStrings(members: List[Symbol]) =
-              members.sortBy("" + _.name) map (m => m.defStringSeenAs(clazz.tpe memberType m) + " = ???")
+            def membersStrings(members: List[Symbol]) = {
+              members foreach fullyInitializeSymbol
+              members.sortBy(_.name) map (m => m.defStringSeenAs(clazz.tpe_* memberType m) + " = ???")
+            }
 
             if (regrouped.tail.isEmpty)
               membersStrings(regrouped.head._2)
@@ -745,7 +750,7 @@ abstract class RefChecks extends InfoTransform with scala.reflect.internal.trans
           // Have to use matchingSymbol, not a method involving overridden symbols,
           // because the scala type system understands that an abstract method here does not
           // override a concrete method in Object. The jvm, however, does not.
-          val overridden = decl.matchingSymbol(ObjectClass, ObjectClass.tpe)
+          val overridden = decl.matchingSymbol(ObjectClass, ObjectTpe)
           if (overridden.isFinal)
             unit.error(decl.pos, "trait cannot redefine final method from class AnyRef")
         }
@@ -942,9 +947,14 @@ abstract class RefChecks extends InfoTransform with scala.reflect.internal.trans
       case _ =>
     }
 
+    private def isObjectOrAnyComparisonMethod(sym: Symbol) = sym match {
+      case Object_eq | Object_ne | Object_== | Object_!= | Any_== | Any_!= => true
+      case _                                                               => false
+    }
     def checkSensible(pos: Position, fn: Tree, args: List[Tree]) = fn match {
-      case Select(qual, name @ (nme.EQ | nme.NE | nme.eq | nme.ne)) if args.length == 1 =>
-        def isReferenceOp = name == nme.eq || name == nme.ne
+      case Select(qual, name @ (nme.EQ | nme.NE | nme.eq | nme.ne)) if args.length == 1 && isObjectOrAnyComparisonMethod(fn.symbol) =>
+        // Make sure the 'eq' or 'ne' method is the one in AnyRef.
+        def isReferenceOp = fn.symbol == Object_eq || fn.symbol == Object_ne
         def isNew(tree: Tree) = tree match {
           case Function(_, _)
              | Apply(Select(New(_), nme.CONSTRUCTOR), _) => true
@@ -988,7 +998,7 @@ abstract class RefChecks extends InfoTransform with scala.reflect.internal.trans
         // equals method inherited from Object or a case class synthetic equals (for
         // which we know the logic.)
         def isWarnable           = isReferenceOp || (isUsingDefaultScalaOp && isUsingWarnableEquals)
-        def isEitherNullable     = (NullClass.tpe <:< receiver.info) || (NullClass.tpe <:< actual.info)
+        def isEitherNullable     = (NullTpe <:< receiver.info) || (NullTpe <:< actual.info)
         def isEitherValueClass   = actual.isDerivedValueClass || receiver.isDerivedValueClass
         def isBoolean(s: Symbol) = unboxedValueClass(s) == BooleanClass
         def isUnit(s: Symbol)    = unboxedValueClass(s) == UnitClass
@@ -1073,7 +1083,7 @@ abstract class RefChecks extends InfoTransform with scala.reflect.internal.trans
           // better to have lubbed and lost
           def warnIfLubless(): Unit = {
             val common = global.lub(List(actual.tpe, receiver.tpe))
-            if (ObjectClass.tpe <:< common)
+            if (ObjectTpe <:< common)
               unrelatedTypes()
           }
           // warn if actual has a case parent that is not same as receiver's;
@@ -1525,7 +1535,7 @@ abstract class RefChecks extends InfoTransform with scala.reflect.internal.trans
     private def transformIf(tree: If): Tree = {
       val If(cond, thenpart, elsepart) = tree
       def unitIfEmpty(t: Tree): Tree =
-        if (t == EmptyTree) Literal(Constant(())).setPos(tree.pos).setType(UnitClass.tpe) else t
+        if (t == EmptyTree) Literal(Constant(())).setPos(tree.pos).setType(UnitTpe) else t
 
       cond.tpe match {
         case ConstantType(value) =>

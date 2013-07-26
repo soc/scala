@@ -3,7 +3,8 @@
  * @author  Martin Odersky
  */
 
-package scala.tools.nsc
+package scala
+package tools.nsc
 package backend.jvm
 
 import scala.collection.{ mutable, immutable }
@@ -414,7 +415,7 @@ abstract class GenASM extends SubComponent with BytecodeWriters with GenJVMASM {
 
     val INNER_CLASSES_FLAGS =
       (asm.Opcodes.ACC_PUBLIC    | asm.Opcodes.ACC_PRIVATE | asm.Opcodes.ACC_PROTECTED |
-       asm.Opcodes.ACC_STATIC    | asm.Opcodes.ACC_INTERFACE | asm.Opcodes.ACC_ABSTRACT)
+       asm.Opcodes.ACC_STATIC    | asm.Opcodes.ACC_INTERFACE | asm.Opcodes.ACC_ABSTRACT | asm.Opcodes.ACC_FINAL)
 
     // -----------------------------------------------------------------------------------------
     // factory methods
@@ -647,11 +648,12 @@ abstract class GenASM extends SubComponent with BytecodeWriters with GenJVMASM {
 
         // sort them so inner classes succeed their enclosing class to satisfy the Eclipse Java compiler
         for (innerSym <- allInners sortBy (_.name.length)) { // TODO why not sortBy (_.name.toString()) ??
-          val flags = mkFlags(
+          val flagsWithFinal: Int = mkFlags(
             if (innerSym.rawowner.hasModuleFlag) asm.Opcodes.ACC_STATIC else 0,
             javaFlags(innerSym),
             if(isDeprecated(innerSym)) asm.Opcodes.ACC_DEPRECATED else 0 // ASM pseudo-access flag
           ) & (INNER_CLASSES_FLAGS | asm.Opcodes.ACC_DEPRECATED)
+          val flags = if (innerSym.isModuleClass) flagsWithFinal & ~asm.Opcodes.ACC_FINAL else flagsWithFinal // For SI-5676, object overriding.
           val jname = javaName(innerSym)  // never null
           val oname = outerName(innerSym) // null when method-enclosed
           val iname = innerName(innerSym) // null for anonymous inner class
@@ -930,7 +932,7 @@ abstract class GenASM extends SubComponent with BytecodeWriters with GenJVMASM {
     def emitArgument(av:   asm.AnnotationVisitor,
                      name: String,
                      arg:  ClassfileAnnotArg) {
-      arg match {
+      (arg: @unchecked) match {
 
         case LiteralAnnotArg(const) =>
           if(const.isNonUnitAnyVal) { av.visit(name, const.value) }
@@ -1269,9 +1271,9 @@ abstract class GenASM extends SubComponent with BytecodeWriters with GenJVMASM {
     private def getSuperInterfaces(c: IClass): Array[String] = {
 
         // Additional interface parents based on annotations and other cues
-        def newParentForAttr(attr: Symbol): Option[Symbol] = attr match {
-          case RemoteAttr       => Some(RemoteInterfaceClass)
-          case _                => None
+        def newParentForAttr(ann: AnnotationInfo): Symbol = ann.symbol match {
+          case RemoteAttr       => RemoteInterfaceClass
+          case _                => NoSymbol
         }
 
         /* Drop redundant interfaces (ones which are implemented by some other parent) from the immediate parents.
@@ -1294,7 +1296,7 @@ abstract class GenASM extends SubComponent with BytecodeWriters with GenJVMASM {
 
       val ps = c.symbol.info.parents
       val superInterfaces0: List[Symbol] = if(ps.isEmpty) Nil else c.symbol.mixinClasses
-      val superInterfaces = (superInterfaces0 ++ c.symbol.annotations.flatMap(ann => newParentForAttr(ann.symbol))).distinct
+      val superInterfaces = existingSymbols(superInterfaces0 ++ c.symbol.annotations.map(newParentForAttr)).distinct
 
       if(superInterfaces.isEmpty) EMPTY_STRING_ARRAY
       else mkArray(minimizeInterfaces(superInterfaces) map javaName)
@@ -1660,8 +1662,8 @@ abstract class GenASM extends SubComponent with BytecodeWriters with GenJVMASM {
 
         case BooleanTag => jcode.boolconst(const.booleanValue)
 
-        case ByteTag    => jcode.iconst(const.byteValue)
-        case ShortTag   => jcode.iconst(const.shortValue)
+        case ByteTag    => jcode.iconst(const.byteValue.toInt)
+        case ShortTag   => jcode.iconst(const.shortValue.toInt)
         case CharTag    => jcode.iconst(const.charValue)
         case IntTag     => jcode.iconst(const.intValue)
 
@@ -1708,6 +1710,7 @@ abstract class GenASM extends SubComponent with BytecodeWriters with GenJVMASM {
 
       final def boolconst(b: Boolean) { iconst(if(b) 1 else 0) }
 
+      def iconst(cst: Char) { iconst(cst.toInt) }
       def iconst(cst: Int) {
         if (cst >= -1 && cst <= 5) {
           jmethod.visitInsn(Opcodes.ICONST_0 + cst)
@@ -1858,7 +1861,7 @@ abstract class GenASM extends SubComponent with BytecodeWriters with GenJVMASM {
         val isDenseEnough: Boolean = {
           /* Calculate in long to guard against overflow. TODO what overflow??? */
           val keyRangeD: Double = (keyMax.asInstanceOf[Long] - keyMin + 1).asInstanceOf[Double]
-          val klenD:     Double = keys.length
+          val klenD:     Double = keys.length.toDouble
           val kdensity:  Double = (klenD / keyRangeD)
 
           kdensity >= minDensity

@@ -1,4 +1,5 @@
-package scala.reflect
+package scala
+package reflect
 package internal
 package transform
 
@@ -45,7 +46,7 @@ trait UnCurry {
           apply(seqType(arg))
         case TypeRef(pre, JavaRepeatedParamClass, arg :: Nil) =>
           apply(arrayType(
-            if (isUnboundedGeneric(arg)) ObjectClass.tpe else arg))
+            if (isUnboundedGeneric(arg)) ObjectTpe else arg))
         case _ =>
           expandAlias(mapOver(tp))
       }

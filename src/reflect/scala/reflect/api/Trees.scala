@@ -2,7 +2,8 @@
  * Copyright 2005-2013 LAMP/EPFL
  * @author  Martin Odersky
  */
-package scala.reflect
+package scala
+package reflect
 package api
 
 /**
@@ -293,6 +294,20 @@ trait Trees { self: Universe =>
 
     /** @inheritdoc */
     def name: Name
+  }
+
+  /** The constructor/extractor for `RefTree` instances.
+   *  @group Extractors
+   */
+  val RefTree: RefTreeExtractor
+
+  /** An extractor class to create and pattern match with syntax `RefTree(qual, name)`.
+   *  This AST node corresponds to either Ident, Select or SelectFromTypeTree.
+   *  @group Extractors
+   */
+  abstract class RefTreeExtractor {
+    def apply(qualifier: Tree, name: Name): RefTree
+    def unapply(refTree: RefTree): Option[(Tree, Name)]
   }
 
   /** A tree which defines a symbol-carrying entity.

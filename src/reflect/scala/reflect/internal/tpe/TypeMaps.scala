@@ -1,4 +1,5 @@
-package scala.reflect
+package scala
+package reflect
 package internal
 package tpe
 
@@ -29,10 +30,10 @@ private[internal] trait TypeMaps {
     def apply(tp: Type): Type = {
       tp match {
         case TypeRef(_, SingletonClass, _) =>
-          AnyClass.tpe
+          AnyTpe
         case tp1 @ RefinedType(parents, decls) =>
           parents filter (_.typeSymbol != SingletonClass) match {
-            case Nil                       => AnyClass.tpe
+            case Nil                       => AnyTpe
             case p :: Nil if decls.isEmpty => mapOver(p)
             case ps                        => mapOver(copyRefinedType(tp1, ps, decls))
           }
@@ -326,7 +327,7 @@ private[internal] trait TypeMaps {
     private var expanded = immutable.Set[Symbol]()
     def apply(tp: Type): Type = tp match {
       case TypeRef(pre, sym, List()) if isRawIfWithoutArgs(sym) =>
-        if (expanded contains sym) AnyRefClass.tpe
+        if (expanded contains sym) AnyRefTpe
         else try {
           expanded += sym
           val eparams = mapOver(typeParamsToExistentials(sym))
@@ -793,8 +794,7 @@ private[internal] trait TypeMaps {
   }
 
   /** A map to implement the `subst` method. */
-  class SubstTypeMap(from: List[Symbol], to: List[Type])
-    extends SubstMap(from, to) {
+  class SubstTypeMap(val from: List[Symbol], val to: List[Type]) extends SubstMap(from, to) {
     protected def toType(fromtp: Type, tp: Type) = tp
 
     override def mapOver(tree: Tree, giveup: () => Nothing): Tree = {

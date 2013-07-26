@@ -9,8 +9,7 @@ import java.io.{ PrintWriter, StringWriter, FileReader, FileWriter }
 import scala.collection.mutable
 import mutable.{LinkedHashMap, SynchronizedMap, HashSet, SynchronizedSet}
 import scala.util.control.ControlThrowable
-import scala.tools.nsc.io.{ AbstractFile, LogReplay, Logger, NullLogger, Replayer }
-import scala.tools.nsc.util.MultiHashMap
+import scala.tools.nsc.io.AbstractFile
 import scala.reflect.internal.util.{ SourceFile, BatchSourceFile, Position, NoPosition }
 import scala.tools.nsc.reporters._
 import scala.tools.nsc.symtab._
@@ -181,7 +180,8 @@ class Global(settings: Settings, _reporter: Reporter, projectName: String = "") 
   protected val toBeRemovedAfterRun: mutable.Set[AbstractFile] =
     new HashSet[AbstractFile] with SynchronizedSet[AbstractFile]
 
-  class ResponseMap extends MultiHashMap[SourceFile, Response[Tree]] {
+  class ResponseMap extends mutable.HashMap[SourceFile, Set[Response[Tree]]] {
+    override def default(key: SourceFile): Set[Response[Tree]] = Set()
     override def += (binding: (SourceFile, Set[Response[Tree]])) = {
       assert(interruptsEnabled, "delayed operation within an ask")
       super.+=(binding)
@@ -925,14 +925,14 @@ class Global(settings: Settings, _reporter: Reporter, projectName: String = "") 
   }
 
   def stabilizedType(tree: Tree): Type = tree match {
-    case Ident(_) if tree.symbol.isStable =>
+    case Ident(_) if treeInfo.admitsTypeSelection(tree) =>
       singleType(NoPrefix, tree.symbol)
-    case Select(qual, _) if qual.tpe != null && tree.symbol.isStable =>
+    case Select(qual, _) if treeInfo.admitsTypeSelection(tree) =>
       singleType(qual.tpe, tree.symbol)
     case Import(expr, selectors) =>
       tree.symbol.info match {
         case analyzer.ImportType(expr) => expr match {
-          case s@Select(qual, name) => singleType(qual.tpe, s.symbol)
+          case s@Select(qual, name) if treeInfo.admitsTypeSelection(expr) => singleType(qual.tpe, s.symbol)
           case i : Ident => i.tpe
           case _ => tree.tpe
         }
@@ -1089,7 +1089,7 @@ class Global(settings: Settings, _reporter: Reporter, projectName: String = "") 
       val applicableViews: List[SearchResult] =
         if (ownerTpe.isErroneous) List()
         else new ImplicitSearch(
-          tree, functionType(List(ownerTpe), AnyClass.tpe), isView = true,
+          tree, functionType(List(ownerTpe), AnyTpe), isView = true,
           context0 = context.makeImplicit(reportAmbiguousErrors = false)).allImplicits
       for (view <- applicableViews) {
         val vtree = viewApply(view)
