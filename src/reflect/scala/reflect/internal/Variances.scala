@@ -59,7 +59,8 @@ trait Variances {
     )
 
     private object ValidateVarianceMap extends TypeMap(trackVariance = true) {
-      private var base: Symbol = _
+      private var bases: List[Symbol] = Nil
+      private def base = bases.head
 
       /** The variance of a symbol occurrence of `tvar` seen at the level of the definition of `base`.
        *  The search proceeds from `base` to the owner of `tvar`.
@@ -123,10 +124,9 @@ trait Variances {
         case _                                               => mapOver(tp)
       }
       def validateDefinition(base: Symbol) {
-        val saved = this.base
-        this.base = base
+        bases ::= base
         try apply(base.info)
-        finally this.base = saved
+        finally bases = bases.tail
       }
     }
 
