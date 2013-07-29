@@ -11,12 +11,10 @@ import scala.tools.nsc.backend.icode.analysis.LubException
 /**
  *  @author Iulian Dragos
  */
-abstract class ClosureElimination extends SubComponent {
+abstract class ClosureElimination extends { val phaseName = "closelim" } with SubComponent {
   import global._
   import icodes._
   import icodes.opcodes._
-
-  val phaseName = "closelim"
 
   /** Create a new phase */
   override def newPhase(p: Phase) = new ClosureEliminationPhase(p)

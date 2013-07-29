@@ -9,7 +9,7 @@ import scala.tools.nsc.plugins._
 /**
  * In methods marked @cps, explicitly name results of calls to other @cps methods
  */
-abstract class SelectiveANFTransform extends PluginComponent with Transform with
+abstract class SelectiveANFTransform extends { val phaseName: String = "selectiveanf" } with PluginComponent with Transform with
   TypingTransformers with CPSUtils {
   // inherits abstract value `global` and class `Phase` from Transform
 
@@ -18,9 +18,6 @@ abstract class SelectiveANFTransform extends PluginComponent with Transform with
   import typer.atOwner             // methods to type trees
 
   override def description = "ANF pre-transform for @cps"
-
-  /** the following two members override abstract members in Transform */
-  val phaseName: String = "selectiveanf"
 
   protected def newTransformer(unit: CompilationUnit): Transformer =
     new ANFTransformer(unit)

@@ -12,7 +12,6 @@ import scala.ref.WeakReference
  *  @author Martin Odersky
  */
 abstract class SubComponent {
-
   /** The global environment; overridden by instantiation in Global. */
   val global: Global
 

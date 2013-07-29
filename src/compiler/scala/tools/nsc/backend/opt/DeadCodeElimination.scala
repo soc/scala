@@ -11,7 +11,7 @@ import scala.collection.{ mutable, immutable }
 
 /**
  */
-abstract class DeadCodeElimination extends SubComponent {
+abstract class DeadCodeElimination extends { val phaseName = "dce" } with SubComponent {
   import global._
   import icodes._
   import icodes.opcodes._
@@ -19,8 +19,6 @@ abstract class DeadCodeElimination extends SubComponent {
 
   /** The block and index where an instruction is located */
   type InstrLoc = (BasicBlock, Int)
-
-  val phaseName = "dce"
 
   /** Create a new phase */
   override def newPhase(p: Phase) = new DeadCodeEliminationPhase(p)

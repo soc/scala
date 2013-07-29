@@ -47,12 +47,10 @@ package backend.opt
   *
   * @author Vlad Ureche
   */
-abstract class InlineExceptionHandlers extends SubComponent {
+abstract class InlineExceptionHandlers extends { val phaseName = "inlinehandlers" } with SubComponent {
   import global._
   import icodes._
   import icodes.opcodes._
-
-  val phaseName = "inlinehandlers"
 
   /** Create a new phase */
   override def newPhase(p: Phase) = new InlineExceptionHandlersPhase(p)

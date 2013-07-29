@@ -11,14 +11,11 @@ import Flags._
 import scala.collection._
 import scala.language.postfixOps
 
-abstract class CleanUp extends Transform with ast.TreeDSL {
+abstract class CleanUp extends { val phaseName = "cleanup" } with Transform with ast.TreeDSL {
   import global._
   import definitions._
   import CODE._
   import treeInfo.StripCast
-
-  /** the following two members override abstract members in Transform */
-  val phaseName: String = "cleanup"
 
   /* used in GenBCode: collects ClassDef symbols owning a main(Array[String]) method */
   private var entryPoints: List[Symbol] = null

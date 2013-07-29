@@ -28,13 +28,10 @@ import symtab.Flags._
  *  @author  Martin Odersky
  *  @version 1.0
  */
-abstract class SuperAccessors extends transform.Transform with transform.TypingTransformers {
+abstract class SuperAccessors extends { val phaseName: String = "superaccessors" } with transform.Transform with transform.TypingTransformers {
   import global._
   import definitions._
   import analyzer.{ restrictionError }
-
-  /** the following two members override abstract members in Transform */
-  val phaseName: String = "superaccessors"
 
   /** The following flags may be set by this phase: */
   override def phaseNewFlags: Long = notPRIVATE

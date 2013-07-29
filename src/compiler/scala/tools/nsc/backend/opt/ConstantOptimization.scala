@@ -24,12 +24,10 @@ import scala.annotation.tailrec
  * - eliminate unnecessary stores and loads
  * - propagate knowledge gathered from conditionals for further optimization
  */
-abstract class ConstantOptimization extends SubComponent {
+abstract class ConstantOptimization extends { val phaseName = "constopt" } with SubComponent {
   import global._
   import icodes._
   import icodes.opcodes._
-
-  val phaseName = "constopt"
 
   /** Create a new phase */
   override def newPhase(p: Phase) = new ConstantOptimizationPhase(p)

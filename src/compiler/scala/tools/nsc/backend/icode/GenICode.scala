@@ -19,7 +19,7 @@ import PartialFunction._
  *  @author  Iulian Dragos
  *  @version 1.0
  */
-abstract class GenICode extends SubComponent  {
+abstract class GenICode extends { val phaseName = "icode" } with SubComponent  {
   import global._
   import icodes._
   import icodes.opcodes._
@@ -29,8 +29,6 @@ abstract class GenICode extends SubComponent  {
     isUniversalEqualityOp, isReferenceEqualityOp
   }
   import platform.isMaybeBoxed
-
-  val phaseName = "icode"
 
   override def newPhase(prev: Phase) = new ICodePhase(prev)
 

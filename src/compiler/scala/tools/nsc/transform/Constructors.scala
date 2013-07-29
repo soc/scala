@@ -13,12 +13,9 @@ import symtab.Flags._
 /** This phase converts classes with parameters into Java-like classes with
  *  fields, which are assigned to from constructors.
  */
-abstract class Constructors extends Transform with ast.TreeDSL {
+abstract class Constructors extends { val phaseName = "constructors" } with Transform with ast.TreeDSL {
   import global._
   import definitions._
-
-  /** the following two members override abstract members in Transform */
-  val phaseName: String = "constructors"
 
   protected def newTransformer(unit: CompilationUnit): Transformer =
     new ConstructorTransformer(unit)
@@ -77,15 +74,9 @@ abstract class Constructors extends Transform with ast.TreeDSL {
         constrBody: Block             // ... and its body
       )
       // decompose primary constructor into the three entities above.
-      val constrInfo: ConstrInfo = {
-        stats find (_.symbol.isPrimaryConstructor) match {
-          case Some(ddef @ DefDef(_, _, _, List(vparams), _, rhs @ Block(_, _))) =>
-            ConstrInfo(ddef, vparams map (_.symbol), rhs)
-          case x =>
-            // AnyVal constructor is OK
-            assert(clazz eq AnyValClass, "no constructor in template: impl = " + impl)
-            return impl
-        }
+      val constrInfo: ConstrInfo = stats find (s => (s.symbol ne null) && s.symbol.isPrimaryConstructor) match {
+        case Some(ddef @ DefDef(_, _, _, vparams :: Nil, _, rhs: Block)) => ConstrInfo(ddef, vparams map (_.symbol), rhs)
+        case _                                                           => return impl // trait with no constructor body - nothing to transform
       }
       import constrInfo._
 

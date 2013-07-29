@@ -23,10 +23,8 @@ import Flags._
  * @author Martin Odersky
  * @version 1.0
  */
-abstract class Pickler extends SubComponent {
+abstract class Pickler extends { val phaseName = "pickler" } with SubComponent {
   import global._
-
-  val phaseName = "pickler"
 
   def newPhase(prev: Phase): StdPhase = new PicklePhase(prev)
 

@@ -1,0 +1,38 @@
+empty-trait-constructors.scala:11: warning: a pure expression does nothing in statement position; you may be omitting necessary parentheses
+trait Foo8 { 55 }                     // init (we could look for purity, but there is no motivation)
+             ^
+Foo1$class
+  f
+
+Foo2$class
+  g
+
+Foo3$class
+  $init$
+
+Foo4$class
+  h1
+
+Foo5$class
+
+Foo6$class
+  $init$
+
+Foo7$class
+  $init$
+
+Foo8$class
+  $init$
+
+Foo9$class
+  <no impl class>
+
+Foo$InOb
+Test$$anon$1
+Foo$Finish
+Test$$anon$2
+Test$$anon$3
+Dingo$Finish
+Dongle$InClass
+Test$$anon$4
+Dongle$Finish

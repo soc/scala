@@ -44,9 +44,8 @@ trait ReplGlobal extends Global {
     }
   }
 
-  object replPhase extends SubComponent {
+  object replPhase extends { val phaseName = "repl" } with SubComponent {
     val global: ReplGlobal.this.type = ReplGlobal.this
-    val phaseName = "repl"
     val runsAfter = List[String]("typer")
     val runsRightAfter = None
     def newPhase(_prev: Phase): StdPhase = new StdPhase(_prev) {

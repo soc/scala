@@ -12,7 +12,8 @@ import symtab._
 import Flags._
 import scala.reflect.internal.Mode._
 
-abstract class Erasure extends AddInterfaces
+abstract class Erasure extends { val phaseName = "erasure" }
+                          with AddInterfaces
                           with scala.reflect.internal.transform.Erasure
                           with typechecker.Analyzer
                           with TypingTransformers
@@ -21,8 +22,6 @@ abstract class Erasure extends AddInterfaces
   import global._
   import definitions._
   import CODE._
-
-  val phaseName: String = "erasure"
 
   def newTransformer(unit: CompilationUnit): Transformer =
     new ErasureTransformer(unit)

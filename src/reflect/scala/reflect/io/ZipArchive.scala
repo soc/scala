@@ -125,8 +125,9 @@ abstract class ZipArchive(override val file: JFile) extends AbstractFile with Eq
 }
 /** ''Note:  This library is considered experimental and should not be used unless you know what you are doing.'' */
 final class FileZipArchive(file: JFile) extends ZipArchive(file) {
+  private[this] val zipFile = new ZipFile(file)
+
   def iterator: Iterator[Entry] = {
-    val zipFile = new ZipFile(file)
     val root    = new DirEntry("/")
     val dirs    = mutable.HashMap[String, DirEntry]("/" -> root)
     val enum    = zipFile.entries()

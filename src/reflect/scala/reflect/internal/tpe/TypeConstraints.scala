@@ -11,10 +11,6 @@ private[internal] trait TypeConstraints {
   self: SymbolTable =>
   import definitions._
 
-  /** A log of type variable with their original constraints. Used in order
-    *  to undo constraints in the case of isSubType/isSameType failure.
-    */
-  lazy val undoLog = newUndoLog
 
   protected def newUndoLog = new UndoLog
 

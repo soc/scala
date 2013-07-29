@@ -43,8 +43,16 @@ abstract class SymbolTable extends macros.Universe
                               with PrivateWithin
 {
 
-  val gen = new TreeGen { val global: SymbolTable.this.type = SymbolTable.this }
-  lazy val treeBuild = gen
+  protected def makeNoSymbol: NoSymbol = new NoSymbol
+
+  val NoSymbol: NoSymbol = makeNoSymbol
+  val gen                = new TreeGen { val global: SymbolTable.this.type = SymbolTable.this }
+  val treeBuild          = gen
+
+  /** A log of type variable with their original constraints. Used in order
+    *  to undo constraints in the case of isSubType/isSameType failure.
+    */
+  val undoLog = newUndoLog
 
   def log(msg: => AnyRef): Unit
   def warning(msg: String): Unit     = Console.err.println(msg)

@@ -210,8 +210,11 @@ trait TypeComparers {
     /*  Those false cases certainly are ugly. There's a proposed SIP to deuglify it.
      *    https://docs.google.com/a/improving.org/document/d/1onPrzSqyDpHScc9PS_hpxJwa3FlPtthxw-bAuuEe8uA
      */
-    def sameTypeAndSameCaseClass = tp1 match {
-      case tp1: TypeRef               => tp2 match { case tp2: TypeRef               => isSameTypeRef(tp1, tp2)                              ; case _ => false }
+    def sameTypeRefs(tp1: TypeRef) = tp2 match {
+      case tp2: TypeRef => isSameTypeRef(tp1, tp2)
+      case _            => false
+    }
+    def sameOther = tp1 match {
       case tp1: MethodType            => tp2 match { case tp2: MethodType            => isSameMethodType(tp1, tp2)                           ; case _ => false }
       case RefinedType(ps1, decls1)   => tp2 match { case RefinedType(ps2, decls2)   => isSameTypes(ps1, ps2) && (decls1 isSameScope decls2) ; case _ => false }
       case SingleType(pre1, sym1)     => tp2 match { case SingleType(pre2, sym2)     => equalSymsAndPrefixes(sym1, pre1, sym2, pre2)         ; case _ => false }
@@ -222,6 +225,10 @@ trait TypeComparers {
       case NullaryMethodType(res1)    => tp2 match { case NullaryMethodType(res2)    => res1 =:= res2                                        ; case _ => false }
       case TypeBounds(lo1, hi1)       => tp2 match { case TypeBounds(lo2, hi2)       => lo1 =:= lo2 && hi1 =:= hi2                           ; case _ => false }
       case _                          => false
+    }
+    def sameTypeAndSameCaseClass = tp1 match {
+      case tp1: TypeRef => sameTypeRefs(tp1)
+      case _            => sameOther
     }
 
     (    sameTypeAndSameCaseClass

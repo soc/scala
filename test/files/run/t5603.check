@@ -1,9 +1,6 @@
 [[syntax trees at end of                    parser]] // newSource1.scala
 [0:241]package [0:0]<empty> {
   [0:82]abstract trait Greeting extends [15:82][83]scala.AnyRef {
-    [15]def $init$() = [15]{
-      [15]()
-    };
     [23:39]val name: [33:39]String;
     [46:76]val msg = [56:76][56:72][56:71]"How are you, ".$plus([72:76]name)
   };

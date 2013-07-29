@@ -10,10 +10,9 @@ import javac._
 
 /** An nsc sub-component.
  */
-abstract class SyntaxAnalyzer extends SubComponent with Parsers with MarkupParsers with Scanners with JavaParsers with JavaScanners {
+abstract class SyntaxAnalyzer extends { val phaseName = "parser" } with SubComponent with Parsers with MarkupParsers with Scanners with JavaParsers with JavaScanners {
   import global._
 
-  val phaseName = "parser"
   def newPhase(prev: Phase): StdPhase = new ParserPhase(prev)
 
   abstract class MemberDefTraverser extends Traverser {

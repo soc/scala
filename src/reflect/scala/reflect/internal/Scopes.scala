@@ -289,19 +289,12 @@ trait Scopes extends api.Scopes { self: SymbolTable =>
      *  change to use iterators as too costly.
      */
     def lookupEntry(name: Name): ScopeEntry = {
-      var e: ScopeEntry = null
-      if (hashtable ne null) {
-        e = hashtable(name.start & HASHMASK)
-        while ((e ne null) && e.sym.name != name) {
-          e = e.tail
-        }
-      } else {
-        e = elems
-        while ((e ne null) && e.sym.name != name) {
-          e = e.next
-        }
-      }
-      e
+      def matches(e: ScopeEntry) = (e eq null) || (e.sym.name == name)
+      @tailrec def loopTail(e: ScopeEntry): ScopeEntry = if (matches(e)) e else loopTail(e.tail)
+      @tailrec def loopNext(e: ScopeEntry): ScopeEntry = if (matches(e)) e else loopNext(e.next)
+
+      if (hashtable eq null) loopNext(elems)
+      else loopTail(hashtable(name.start & HASHMASK))
     }
 
     /** lookup next entry with same name as this one

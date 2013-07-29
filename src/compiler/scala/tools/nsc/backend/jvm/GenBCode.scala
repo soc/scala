@@ -31,10 +31,8 @@ import scala.tools.asm
  *  @version 1.0
  *
  */
-abstract class GenBCode extends BCodeSyncAndTry {
+abstract class GenBCode extends { val phaseName = "jvm" } with BCodeSyncAndTry {
   import global._
-
-  val phaseName = "jvm"
 
   override def newPhase(prev: Phase) = new BCodePhase(prev)
 

@@ -598,8 +598,13 @@ trait Infer extends Checkable {
     def methTypeArgs(tparams: List[Symbol], formals: List[Type], restpe: Type,
                      argtpes: List[Type], pt: Type): AdjustedTypeArgs.Result = {
       val tvars = tparams map freshVar
-      if (!sameLength(formals, argtpes))
+      def devwarn(msg: String) {
+        devWarning(s"methTypeArgs($tparams, formals=$formals, $restpe, argtpes=$argtpes, $pt) $msg")
+      }
+      if (!sameLength(formals, argtpes)) {
+        devwarn("has mismatched formals/argtpes")
         throw new NoInstance("parameter lists differ in length")
+      }
 
       val restpeInst = restpe.instantiateTypeParams(tparams, tvars)
 
@@ -631,6 +636,11 @@ trait Infer extends Checkable {
         // Note that isCompatible side-effects: subtype checks involving typevars
         // are recorded in the typevar's bounds (see TypeConstraint)
         if (!isCompatible(tp1, pt1)) {
+          devwarn(sm"""|argument type incompatible with formal parameter
+                       |   arg: $argtpe ($tp1)
+                       |formal: $formal ($pt1)
+                       |  tree: ${analyzer.lastTreeToTyper} @ ${analyzer.lastTreeToTyper.pos}"""
+                 )
           throw new DeferredNoInstance(() =>
             "argument expression's type is not compatible with formal parameter type" + foundReqMsg(tp1, pt1))
         }
@@ -763,7 +773,7 @@ trait Infer extends Checkable {
         case 2 => varargsTarget
         case _ => false
       }
-      canSendTuple && canReceiveTuple
+      !settings.noAdaptedArgs && canSendTuple && canReceiveTuple
     }
     def eligibleForTupleConversion(formals: List[Type], argsCount: Int): Boolean = formals match {
       case p :: Nil                                     => eligibleForTupleConversion(1, argsCount, varargsTarget = isScalaRepeatedParamType(p))

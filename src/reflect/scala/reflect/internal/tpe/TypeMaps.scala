@@ -104,6 +104,7 @@ private[internal] trait TypeMaps {
 
     def variance_=(x: Variance) = { assert(trackVariance, this) ; _variance = x }
     def variance = _variance
+    private[this] def flip() { if (trackVariance) variance = variance.flip }
 
     /** Map this function over given type */
     def mapOver(tp: Type): Type = tp match {
@@ -199,9 +200,8 @@ private[internal] trait TypeMaps {
       try body finally variance = saved
     }
     @inline final def flipped[T](body: => T): T = {
-      if (trackVariance) variance = variance.flip
-      try body
-      finally if (trackVariance) variance = variance.flip
+      flip()
+      try body finally flip()
     }
     protected def mapOverArgs(args: List[Type], tparams: List[Symbol]): List[Type] = (
       if (trackVariance)

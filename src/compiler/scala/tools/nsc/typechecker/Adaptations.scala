@@ -41,11 +41,14 @@ trait Adaptations {
       def givenString = if (args.isEmpty) "<none>" else args.mkString(", ")
       def adaptedArgs = if (args.isEmpty) "(): Unit" else args.mkString("(", ", ", "): " + applyArg.tpe)
 
-      def adaptWarning(msg: String) = context.warning(t.pos, msg +
-        "\n        signature: " + sigString +
-        "\n  given arguments: " + givenString +
-        "\n after adaptation: " + callString + "(" + adaptedArgs + ")"
-      )
+      def addendum(): String = sm"""
+        |       signature: $sigString
+        | given arguments: $givenString
+        |after adaptation: $callString($adaptedArgs)"""
+
+      def adaptWarning(msg: String) = context.warning(t.pos, msg + addendum)
+      def adaptError(msg: String)   = context.error(t.pos, msg + addendum)
+
       // A one-argument method accepting Object (which may look like "Any"
       // at this point if the class is java defined) is a "leaky target" for
       // which we should be especially reluctant to insert () or auto-tuple.
@@ -67,7 +70,7 @@ trait Adaptations {
       }
 
       if (settings.noAdaptedArgs)
-        adaptWarning("No automatic adaptation here: use explicit parentheses.")
+        adaptError("No automatic adaptation here: use explicit parentheses.")
       else if (settings.warnAdaptedArgs)
         adaptWarning(
           if (args.isEmpty) "Adapting argument list by inserting (): " + (

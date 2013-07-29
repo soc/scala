@@ -6,11 +6,11 @@
 **                          |/                                          **
 \*                                                                      */
 
-
-
 package scala
 package collection
 package mutable
+
+import scala.annotation.tailrec
 
 /** This class can be used to construct data structures that are based
  *  on hashtables. Class `HashTable[A]` implements a hashtable
@@ -130,10 +130,13 @@ trait HashTable[A, Entry >: Null <: HashEntry[A, Entry]] extends HashTable.HashU
   protected def findEntry(key: A): Entry =
     findEntry0(key, index(elemHashCode(key)))
 
+
   private[this] def findEntry0(key: A, h: Int): Entry = {
-    var e = table(h).asInstanceOf[Entry]
-    while (e != null && !elemEquals(e.key, key)) e = e.next
-    e
+    @tailrec def loop(e: Entry): Entry = (
+      if ((e eq null) || elemEquals(e.key, key)) e
+      else loop(e.next)
+    )
+    loop(table(h).asInstanceOf[Entry])
   }
 
   /** Add entry to table
@@ -152,6 +155,8 @@ trait HashTable[A, Entry >: Null <: HashEntry[A, Entry]] extends HashTable.HashU
       resize(2 * table.length)
   }
 
+  private[this] def keyIndex(key: A): Int = index(elemHashCode(key))
+
   /** Find entry with given key in table, or add new one if not found.
    *  May be somewhat faster then `findEntry`/`addEntry` pair as it
    *  computes entry's hash index only once.
@@ -159,9 +164,12 @@ trait HashTable[A, Entry >: Null <: HashEntry[A, Entry]] extends HashTable.HashU
    *  New entries are created by calling `createNewEntry` method.
    */
   protected def findOrAddEntry[B](key: A, value: B): Entry = {
-    val h = index(elemHashCode(key))
+    val h = keyIndex(key)
     val e = findEntry0(key, h)
-    if (e ne null) e else { addEntry0(createNewEntry(key, value), h); null }
+    if (e eq null)
+      addEntry0(createNewEntry(key, value), h)
+
+    e
   }
 
   /** Creates new entry to be immediately inserted into the hashtable.
@@ -345,7 +353,7 @@ trait HashTable[A, Entry >: Null <: HashEntry[A, Entry]] extends HashTable.HashU
 
   /* End of size map handling code */
 
-  protected def elemEquals(key1: A, key2: A): Boolean = (key1 == key2)
+  protected def elemEquals(key1: A, key2: A): Boolean = key1 == key2
 
   // Note:
   // we take the most significant bits of the hashcode, not the lower ones

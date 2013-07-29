@@ -48,7 +48,7 @@ trait TypeDebugging {
       case Block(stmt :: Nil, expr)                            => skip(stmt) && skip(expr)
       case DefDef(_, nme.CONSTRUCTOR, Nil, Nil :: Nil, _, rhs) => skip(rhs)
       case Literal(Constant(()))                               => true
-      case tt @ TypeTree()                                     => skipType(tt.tpe)
+      case tt @ TypeTree()                                     => (tt.tpe eq null) || skipType(tt.tpe)
       case _                                                   => skipSym(t.symbol)
     }
     def apply(t: Tree) = skip(t)

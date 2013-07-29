@@ -47,5 +47,5 @@ private[internal] trait CommonOwners {
     }
   }
 
-  private lazy val commonOwnerMapObj = new CommonOwnerMap
+  private val commonOwnerMapObj = new CommonOwnerMap
 }

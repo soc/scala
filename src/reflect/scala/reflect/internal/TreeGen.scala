@@ -326,7 +326,6 @@ abstract class TreeGen extends macros.TreeBuilder {
    */
   def mkTemplate(parents: List[Tree], self: ValDef, constrMods: Modifiers, vparamss: List[List[ValDef]], body: List[Tree], superPos: Position): Template = {
     /* Add constructor to template */
-
     // create parameters for <init> as synthetic trees.
     var vparamss1 = mmap(vparamss) { vd =>
       atPos(vd.pos.focus) {
@@ -348,31 +347,47 @@ abstract class TreeGen extends macros.TreeBuilder {
     }
     val lvdefs = evdefs collect { case vdef: ValDef => copyValDef(vdef)(mods = vdef.mods | PRESUPER) }
 
-    val constrs = {
-      if (constrMods hasFlag TRAIT) {
-        if (body forall treeInfo.isInterfaceMember) List()
-        else List(
-          atPos(wrappingPos(superPos, lvdefs)) (
-            DefDef(NoMods, nme.MIXIN_CONSTRUCTOR, List(), List(Nil), TypeTree(), Block(lvdefs, Literal(Constant())))))
-      } else {
-        // convert (implicit ... ) to ()(implicit ... ) if its the only parameter section
-        if (vparamss1.isEmpty || !vparamss1.head.isEmpty && vparamss1.head.head.mods.isImplicit)
-          vparamss1 = List() :: vparamss1
-        val superRef: Tree = atPos(superPos)(mkSuperInitCall)
-        val superCall = pendingSuperCall // we can't know in advance which of the parents will end up as a superclass
-                                         // this requires knowing which of the parents is a type macro and which is not
-                                         // and that's something that cannot be found out before typer
-                                         // (the type macros aren't in the trunk yet, but there is a plan for them to land there soon)
-                                         // this means that we don't know what will be the arguments of the super call
-                                         // therefore here we emit a dummy which gets populated when the template is named and typechecked
-        List(
-          // TODO: previously this was `wrappingPos(superPos, lvdefs ::: argss.flatten)`
-          // is it going to be a problem that we can no longer include the `argss`?
-          atPos(wrappingPos(superPos, lvdefs)) (
-            DefDef(constrMods, nme.CONSTRUCTOR, List(), vparamss1, TypeTree(), Block(lvdefs ::: List(superCall), Literal(Constant())))))
+    def mkClassConstructor() = {
+      // convert (implicit ... ) to ()(implicit ... ) if its the only parameter section
+      val vps = vparamss1 match {
+        case Nil                                  => Nil :: Nil
+        case (hd :: _) :: _ if hd.mods.isImplicit => Nil :: vparamss1
+        case _                                    => vparamss1
       }
+      val superRef: Tree = atPos(superPos)(mkSuperInitCall)
+      // we can't know in advance which of the parents will end up as a superclass
+      // this requires knowing which of the parents is a type macro and which is not
+      // and that's something that cannot be found out before typer
+      // (the type macros aren't in the trunk yet, but there is a plan for them to land there soon)
+      // this means that we don't know what will be the arguments of the super call
+      // therefore here we emit a dummy `pendingSuperCall` which is populated when
+      // the template is named and typechecked
+      DefDef(constrMods, nme.CONSTRUCTOR, Nil, vps, TypeTree(), Block(lvdefs :+ pendingSuperCall, Literal(Constant())))
     }
-    constrs foreach (ensureNonOverlapping(_, parents ::: gvdefs, focus=false))
+
+    // No trait constructor without need
+    val noConstructor = constrMods.isTrait && (body forall {
+      case _: DefDef | _: ImplDef | _: TypeDef | _: Import => true
+      case ValDef(mods, _, _, _)                           => mods.isLazy // lazy vals are like defs from a constructor's standpoint
+      case stat                                            => false       // not much sense in checking for purity, given that it implies programmer error
+    })
+    if (noConstructor)
+      log("No trait constructor at " + superPos)
+
+    // TODO: previously this was `wrappingPos(superPos, lvdefs ::: argss.flatten)`
+    // is it going to be a problem that we can no longer include the `argss`?
+    val constrs: List[Tree] = (
+      if (noConstructor) Nil else {
+        val constructorDef = atPos(wrappingPos(superPos, lvdefs))(
+          if (constrMods.isTrait)
+            DefDef(NoMods, nme.MIXIN_CONSTRUCTOR, Nil, Nil :: Nil, TypeTree(), Block(lvdefs, Literal(Constant())))
+          else
+            mkClassConstructor()
+        )
+        ensureNonOverlapping(constructorDef, parents ::: gvdefs, focus = false)
+        constructorDef :: Nil
+      }
+    )
     // Field definitions for the class - remove defaults.
     val fieldDefs = vparamss.flatten map (vd => copyValDef(vd)(mods = vd.mods &~ DEFAULTPARAM, rhs = EmptyTree))
 

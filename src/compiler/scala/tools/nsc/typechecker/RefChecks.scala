@@ -41,7 +41,7 @@ import scala.tools.nsc.settings.NoScalaVersion
  *
  *  @todo    Check whether we always check type parameter bounds.
  */
-abstract class RefChecks extends InfoTransform with scala.reflect.internal.transform.RefChecks {
+abstract class RefChecks extends { val phaseName: String = "refchecks" } with InfoTransform with scala.reflect.internal.transform.RefChecks {
 
   val global: Global               // need to repeat here because otherwise last mixin defines global as
                                    // SymbolTable. If we had DOT this would not be an issue
@@ -50,8 +50,6 @@ abstract class RefChecks extends InfoTransform with scala.reflect.internal.trans
   import definitions._
   import typer.{typed, typedOperator, atOwner}
 
-  /** the following two members override abstract members in Transform */
-  val phaseName: String = "refchecks"
   override def phaseNewFlags: Long = lateMETHOD
 
   def newTransformer(unit: CompilationUnit): RefCheckTransformer =

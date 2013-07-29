@@ -9,8 +9,8 @@ import scala.tools.nsc.ast._
 /**
  * In methods marked @cps, CPS-transform assignments introduced by ANF-transform phase.
  */
-abstract class SelectiveCPSTransform extends PluginComponent with
-  InfoTransform with TypingTransformers with CPSUtils with TreeDSL {
+abstract class SelectiveCPSTransform extends { val phaseName: String = "selectivecps" }
+    with PluginComponent with InfoTransform with TypingTransformers with CPSUtils with TreeDSL {
   // inherits abstract value `global` and class `Phase` from Transform
 
   import global._                  // the global environment
@@ -18,9 +18,6 @@ abstract class SelectiveCPSTransform extends PluginComponent with
   import typer.atOwner             // methods to type trees
 
   override def description = "@cps-driven transform of selectiveanf assignments"
-
-  /** the following two members override abstract members in Transform */
-  val phaseName: String = "selectivecps"
 
   protected def newTransformer(unit: CompilationUnit): Transformer =
     new CPSTransformer(unit)

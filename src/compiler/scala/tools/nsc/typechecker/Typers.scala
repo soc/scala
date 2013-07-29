@@ -2882,6 +2882,7 @@ trait Typers extends Adaptations with Tags with TypersTracking {
         tree.pos.isRange && context.unit.exists && (tree.pos includes context.unit.targetPos)
       val localTarget = stats exists includesTargetPos
       def typedStat(stat: Tree): Tree = {
+        log(s"Typing stat $stat")
         if (context.owner.isRefinementClass && !treeInfo.isDeclarationOrTypeDef(stat))
           OnlyDeclarationsError(stat)
         else

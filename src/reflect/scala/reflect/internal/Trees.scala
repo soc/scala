@@ -1157,53 +1157,83 @@ trait Trees extends api.Trees { self: SymbolTable =>
 
   override protected def itraverse(traverser: Traverser, tree: Tree): Unit = {
     import traverser._
+
+    def traverseLabelDef(defn: LabelDef) {
+      import defn._
+      traverseTrees(params)
+      traverse(rhs)
+    }
+    def traverseClassDef(defn: ClassDef) {
+      import defn._
+      atOwner(defn.symbol) {
+        traverseTrees(mods.annotations)
+        traverseTrees(tparams)
+        traverse(impl)
+      }
+    }
+    def traverseDefDef(defn: DefDef) {
+      import defn._
+      atOwner(defn.symbol) {
+        traverseTrees(mods.annotations)
+        traverseTrees(tparams)
+        traverseTreess(vparamss)
+        traverse(tpt, rhs)
+      }
+    }
+    def traverseModuleDef(defn: ModuleDef) {
+      import defn._
+      atOwner(mclass(defn.symbol)) {
+        traverseTrees(mods.annotations)
+        traverse(impl)
+      }
+    }
+    def traversePackageDef(defn: PackageDef) {
+      import defn._
+      traverse(pid)
+      atOwner(mclass(defn.symbol))(traverseTrees(stats))
+    }
+    def traverseValDef(defn: ValDef) {
+      import defn._
+      atOwner(defn.symbol) {
+        traverseTrees(mods.annotations)
+        traverse(tpt, rhs)
+      }
+    }
+    def traverseTypeDef(defn: TypeDef) {
+      import defn._
+      atOwner(defn.symbol) {
+        traverseTrees(mods.annotations)
+        traverseTrees(tparams)
+        traverse(rhs)
+      }
+    }
+    def traverseMemberDef(defn: MemberDef): Unit = defn match {
+      case defn: ValDef     => traverseValDef(defn)
+      case defn: DefDef     => traverseDefDef(defn)
+      case defn: TypeDef    => traverseTypeDef(defn)
+      case defn: ClassDef   => traverseClassDef(defn)
+      case defn: ModuleDef  => traverseModuleDef(defn)
+      case defn: PackageDef => traversePackageDef(defn)
+    }
+
     tree match {
-      case EmptyTree =>
-        ;
-      case PackageDef(pid, stats) =>
-        traverse(pid)
-        atOwner(mclass(tree.symbol)) {
-          traverseTrees(stats)
-        }
-      case ClassDef(mods, name, tparams, impl) =>
-        atOwner(tree.symbol) {
-          traverseTrees(mods.annotations); traverseTrees(tparams); traverse(impl)
-        }
-      case ModuleDef(mods, name, impl) =>
-        atOwner(mclass(tree.symbol)) {
-          traverseTrees(mods.annotations); traverse(impl)
-        }
-      case ValDef(mods, name, tpt, rhs) =>
-        atOwner(tree.symbol) {
-          traverseTrees(mods.annotations); traverse(tpt); traverse(rhs)
-        }
-      case DefDef(mods, name, tparams, vparamss, tpt, rhs) =>
-        atOwner(tree.symbol) {
-          traverseTrees(mods.annotations); traverseTrees(tparams); traverseTreess(vparamss); traverse(tpt); traverse(rhs)
-        }
-      case TypeDef(mods, name, tparams, rhs) =>
-        atOwner(tree.symbol) {
-          traverseTrees(mods.annotations); traverseTrees(tparams); traverse(rhs)
-        }
-      case LabelDef(name, params, rhs) =>
-        traverseTrees(params); traverse(rhs)
-      case Import(expr, selectors) =>
-        traverse(expr)
-      case Annotated(annot, arg) =>
-        traverse(annot); traverse(arg)
+      case EmptyTree                     =>
+      case defn: MemberDef               => traverseMemberDef(defn)
+      case defn: LabelDef                => traverseLabelDef(defn)
+      case CaseDef(pat, guard, body)     => traverse(pat, guard, body)
+      case Import(expr, _)               => traverse(expr)
+      case Annotated(annot, arg)         => traverse(annot, arg)
       case Template(parents, self, body) =>
         traverseTrees(parents)
         if (self ne emptyValDef) traverse(self)
         traverseStats(body, tree.symbol)
       case Block(stats, expr) =>
         traverseTrees(stats); traverse(expr)
-      case CaseDef(pat, guard, body) =>
-        traverse(pat); traverse(guard); traverse(body)
       case Alternative(trees) =>
         traverseTrees(trees)
       case Star(elem) =>
         traverse(elem)
-      case Bind(name, body) =>
+      case Bind(_, body) =>
         traverse(body)
       case UnApply(fun, args) =>
         traverse(fun); traverseTrees(args)
@@ -1214,11 +1244,11 @@ trait Trees extends api.Trees { self: SymbolTable =>
           traverseTrees(vparams); traverse(body)
         }
       case Assign(lhs, rhs) =>
-        traverse(lhs); traverse(rhs)
+        traverse(lhs, rhs)
       case AssignOrNamedArg(lhs, rhs) =>
-        traverse(lhs); traverse(rhs)
+        traverse(lhs, rhs)
       case If(cond, thenp, elsep) =>
-        traverse(cond); traverse(thenp); traverse(elsep)
+        traverse(cond, thenp, elsep)
       case Match(selector, cases) =>
         traverse(selector); traverseTrees(cases)
       case Return(expr) =>
@@ -1230,7 +1260,7 @@ trait Trees extends api.Trees { self: SymbolTable =>
       case New(tpt) =>
         traverse(tpt)
       case Typed(expr, tpt) =>
-        traverse(expr); traverse(tpt)
+        traverse(expr, tpt)
       case TypeApply(fun, args) =>
         traverse(fun); traverseTrees(args)
       case Apply(fun, args) =>
@@ -1241,7 +1271,7 @@ trait Trees extends api.Trees { self: SymbolTable =>
         traverse(qual)
       case This(_) =>
         ;
-      case Select(qualifier, selector) =>
+      case Select(qualifier, _) =>
         traverse(qualifier)
       case Ident(_) =>
         ;
@@ -1260,7 +1290,7 @@ trait Trees extends api.Trees { self: SymbolTable =>
       case AppliedTypeTree(tpt, args) =>
         traverse(tpt); traverseTrees(args)
       case TypeBoundsTree(lo, hi) =>
-        traverse(lo); traverse(hi)
+        traverse(lo, hi)
       case ExistentialTypeTree(tpt, whereClauses) =>
         traverse(tpt); traverseTrees(whereClauses)
       case _ => xtraverse(traverser, tree)

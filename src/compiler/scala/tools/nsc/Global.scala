@@ -443,6 +443,7 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
 
   // phaseName = "patmat"
   object patmat extends {
+    val phaseName = "patmat"
     val global: Global.this.type = Global.this
     val runsAfter = List("typer")
     // patmat doesn't need to be right after typer, as long as we run before supperaccesors

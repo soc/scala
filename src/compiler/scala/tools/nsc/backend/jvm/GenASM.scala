@@ -20,7 +20,7 @@ import scala.annotation.tailrec
  *
  * Documentation at http://lamp.epfl.ch/~magarcia/ScalaCompilerCornerReloaded/2012Q2/GenASM.pdf
  */
-abstract class GenASM extends SubComponent with BytecodeWriters with GenJVMASM {
+abstract class GenASM extends { val phaseName = "jvm" } with SubComponent with BytecodeWriters with GenJVMASM {
   import global._
   import icodes._
   import icodes.opcodes._
@@ -29,8 +29,6 @@ abstract class GenASM extends SubComponent with BytecodeWriters with GenJVMASM {
   // Strangely I can't find this in the asm code
   // 255, but reserving 1 for "this"
   final val MaximumJvmParameters = 254
-
-  val phaseName = "jvm"
 
   /** Create a new phase */
   override def newPhase(p: Phase): Phase = new AsmPhase(p)

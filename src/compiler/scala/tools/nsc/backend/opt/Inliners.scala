@@ -37,7 +37,7 @@ import scala.reflect.internal.util.NoSourceFile
  *
  *  @author Iulian Dragos
  */
-abstract class Inliners extends SubComponent {
+abstract class Inliners extends { val phaseName = "inliner" } with SubComponent {
   import global._
   import icodes._
   import icodes.opcodes._
@@ -46,8 +46,6 @@ abstract class Inliners extends SubComponent {
     PredefModule, RuntimePackage, ScalaInlineClass, ScalaNoInlineClass,
     isFunctionType, isByNameParamType
   }
-
-  val phaseName = "inliner"
 
   /** Debug - for timing the inliner. */
   /****

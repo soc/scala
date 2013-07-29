@@ -139,12 +139,12 @@ abstract class AddInterfaces extends InfoTransform { self: Erasure =>
 
       val decls = newScope
       if ((ifaceDecls lookup nme.MIXIN_CONSTRUCTOR) == NoSymbol) {
-        log("Adding mixin constructor to " + implClass)
+        log("NOT Adding mixin constructor to " + implClass)
 
-        decls enter (
-          implClass.newMethod(nme.MIXIN_CONSTRUCTOR, implClass.pos)
-            setInfo MethodType(Nil, UnitTpe)
-        )
+        // decls enter (
+        //   implClass.newMethod(nme.MIXIN_CONSTRUCTOR, implClass.pos)
+        //     setInfo MethodType(Nil, UnitTpe)
+        // )
       }
 
       for (sym <- ifaceDecls) {
@@ -274,9 +274,9 @@ abstract class AddInterfaces extends InfoTransform { self: Erasure =>
    *    def $init$(): Unit = ()
    *  to `stats` unless there is already one.
    */
-  private def addMixinConstructorDef(clazz: Symbol, stats: List[Tree]): List[Tree] =
-    if (treeInfo.firstConstructor(stats) != EmptyTree) stats
-    else DefDef(clazz.primaryConstructor, Block(List(), Literal(Constant(())))) :: stats
+  private def addMixinConstructorDef(clazz: Symbol, stats: List[Tree]): List[Tree] = stats
+    // if (treeInfo.firstConstructor(stats) != EmptyTree) stats
+    // else DefDef(clazz.primaryConstructor, Block(List(), Literal(Constant(())))) :: stats
 
   private def implTemplate(clazz: Symbol, templ: Template): Template = atPos(templ.pos) {
     val templ1 = (
@@ -300,14 +300,16 @@ abstract class AddInterfaces extends InfoTransform { self: Erasure =>
    *  to tree, which is assumed to be the body of a constructor of class clazz.
    */
   private def addMixinConstructorCalls(tree: Tree, clazz: Symbol): Tree = {
-    def mixinConstructorCall(impl: Symbol): Tree = atPos(tree.pos) {
-      Apply(Select(This(clazz), impl.primaryConstructor), List())
+    def mixinConstructorCall(impl: Symbol): Tree = impl.primaryConstructor match {
+      case NoSymbol => EmptyTree
+      case primary  => atPos(tree.pos)(Apply(Select(This(clazz), primary), Nil))
     }
-    val mixinConstructorCalls: List[Tree] = {
-      for (mc <- clazz.mixinClasses.reverse
-           if mc.hasFlag(lateINTERFACE))
-      yield mixinConstructorCall(implClass(mc))
-    }
+    val mixinConstructorCalls: List[Tree] = (
+      clazz.mixinClasses.reverse
+        filter (_ hasFlag lateINTERFACE)
+        map (mc => mixinConstructorCall(implClass(mc)))
+        filterNot (_ eq EmptyTree)
+    )
     tree match {
       case Block(Nil, expr) =>
         // AnyVal constructor - have to provide a real body so the

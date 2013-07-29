@@ -60,9 +60,10 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
    */
   protected def shouldTriggerCompleter(symbol: Symbol, completer: Type, isFlagRelated: Boolean, mask: Long) =
     completer match {
-      case null => false
+      case null                     => false
+      case NoType                   => false
       case _: FlagAgnosticCompleter => !isFlagRelated
-      case _ => abort(s"unsupported completer: $completer of class ${if (completer != null) completer.getClass else null} for symbol ${symbol.fullName}")
+      case _                        => abort(s"unsupported completer: $completer of class ${if (completer != null) completer.getClass else null} for symbol ${symbol.fullName}")
     }
 
   /** The original owner of a class. Used by the backend to generate
@@ -1295,46 +1296,51 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
     /** Get type info associated with symbol at current phase, after
      *  ensuring that symbol is initialized (i.e. type is completed).
      */
-    def info: Type = try {
-      var cnt = 0
-      while (validTo == NoPeriod) {
-        //if (settings.debug.value) System.out.println("completing " + this);//DEBUG
-        assert(infos ne null, this.name)
-        assert(infos.prev eq null, this.name)
-        val tp = infos.info
-        //if (settings.debug.value) System.out.println("completing " + this.rawname + tp.getClass());//debug
+    def info: Type = if (rawowner eq null) NoType else infoInternal(0)
+    // private
+    //   catch { case ex: CyclicReference => devWarning("... hit cycle trying to complete " + this.fullLocationString) ; throw ex }
 
-        if ((_rawflags & LOCKED) != 0L) { // rolled out once for performance
-          lock {
-            setInfo(ErrorType)
-            throw CyclicReference(this, tp)
-          }
-        } else {
-          _rawflags |= LOCKED
-//          activeLocks += 1
- //         lockedSyms += this
+    private def obtainLock() {
+      if ((_rawflags & LOCKED) != 0L) {
+        lock {
+          setInfo(ErrorType)
+          throw CyclicReference(this, infos.info)
         }
-        val current = phase
-        try {
+      }
+      else _rawflags |= LOCKED
+    }
+
+    @inline private def savingPhase[T](body: => T): T = {
+      val current = phase
+      try body finally phase = current
+    }
+    @inline private def obtainingLock[T](body: => T): T = {
+      obtainLock()
+      try body finally unlock()
+    }
+    @inline private def completeRawInfo(): Unit = {
+      val tp = infos.info
+      obtainingLock {
+        savingPhase {
           assertCorrectThread()
           phase = phaseOf(infos.validFrom)
-          tp.complete(this)
-        } finally {
-          unlock()
-          phase = current
+          tp complete this
         }
-        cnt += 1
-        // allow for two completions:
-        //   one: sourceCompleter to LazyType, two: LazyType to completed type
-        if (cnt == 3) abort(s"no progress in completing $this: $tp")
       }
-      rawInfo
     }
-    catch {
-      case ex: CyclicReference =>
-        devWarning("... hit cycle trying to complete " + this.fullLocationString)
-        throw ex
-    }
+    private def infoInternal(cnt: Int): Type = (
+      if (cnt >= 3)
+        abort(s"no progress in completing $this: ${infos.info}")
+      else if (validTo != NoPeriod)
+        rawInfo
+      else {
+        completeRawInfo()
+        // allow for two completions:
+        //   one: sourceCompleter to LazyType
+        //   two: LazyType to completed type
+        infoInternal(cnt + 1)
+      }
+    )
 
     def info_=(info: Type) {
       assert(info ne null)
@@ -1375,13 +1381,30 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
     def hasCompleteInfo = hasRawInfo && rawInfo.isComplete
 
     /** Return info without checking for initialization or completing */
-    def rawInfo: Type = {
+    def rawInfo: Type = if (rawowner eq null) NoType else rawInfoInternal
+    private def rawInfoInternal: Type = {
       var infos = this.infos
-      assert(infos != null)
+      assert(infos != null, this)
       val curPeriod = currentPeriod
       val curPid = phaseId(curPeriod)
 
-      if (validTo != NoPeriod) {
+      def adaptCurrent(currentId: Int) {
+        var itr = infoTransformers.nextFrom(phaseId(validTo))
+        infoTransformers = itr; // caching optimization
+        while (itr.pid != NoPhase.id && itr.pid < currentId) {
+          phase = phaseWithId(itr.pid)
+          val info1 = itr.transform(this, infos.info)
+          if (info1 ne infos.info) {
+            infos = TypeHistory(currentPeriod + 1, info1, infos)
+            this.infos = infos
+          }
+          _validTo = currentPeriod + 1 // to enable reads from same symbol during info-transform
+          itr = itr.next
+        }
+        _validTo = if (itr.pid == NoPhase.id) curPeriod
+                   else period(currentRunId, itr.pid)
+      }
+      def adaptOldInfos() {
         // skip any infos that concern later phases
         while (curPid < phaseId(infos.validFrom) && infos.prev != null)
           infos = infos.prev
@@ -1392,31 +1415,16 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
           val current = phase
           try {
             infos = adaptInfos(infos)
-
-            //assert(runId(validTo) == currentRunId, name)
-            //assert(runId(infos.validFrom) == currentRunId, name)
-
-            if (validTo < curPeriod) {
-              var itr = infoTransformers.nextFrom(phaseId(validTo))
-              infoTransformers = itr; // caching optimization
-              while (itr.pid != NoPhase.id && itr.pid < current.id) {
-                phase = phaseWithId(itr.pid)
-                val info1 = itr.transform(this, infos.info)
-                if (info1 ne infos.info) {
-                  infos = TypeHistory(currentPeriod + 1, info1, infos)
-                  this.infos = infos
-                }
-                _validTo = currentPeriod + 1 // to enable reads from same symbol during info-transform
-                itr = itr.next
-              }
-              _validTo = if (itr.pid == NoPhase.id) curPeriod
-                         else period(currentRunId, itr.pid)
-            }
-          } finally {
-            phase = current
+            if (validTo < curPeriod)
+              adaptCurrent(current.id)
           }
+          finally phase = current
         }
       }
+
+      if (validTo != NoPeriod)
+        adaptOldInfos()
+
       infos.info
     }
 
@@ -3306,7 +3314,7 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
   implicit val FreeTypeSymbolTag = ClassTag[FreeTypeSymbol](classOf[FreeTypeSymbol])
 
   /** An object representing a missing symbol */
-  class NoSymbol protected[Symbols]() extends Symbol(null, NoPosition, nme.NO_NAME) {
+  class NoSymbol protected[internal]() extends Symbol(null, NoPosition, nme.NO_NAME) {
     final type NameType = TermName
     type TypeOfClonedSymbol = NoSymbol
 
@@ -3344,9 +3352,7 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
     override def ownersIterator: Iterator[Symbol] = Iterator.empty
     override def alternatives: List[Symbol] = List()
     override def reset(completer: Type): this.type = this
-    override def info: Type = NoType
     override def existentialBound: Type = NoType
-    override def rawInfo: Type = NoType
     override def accessBoundary(base: Symbol): Symbol = enclosingRootClass
     def cloneSymbolImpl(owner: Symbol, newFlags: Long) = abort("NoSymbol.clone()")
     override def originalEnclosingMethod = this
@@ -3354,10 +3360,6 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
     override def owner: Symbol =
       abort("no-symbol does not have an owner")
   }
-
-  protected def makeNoSymbol: NoSymbol = new NoSymbol
-
-  lazy val NoSymbol: NoSymbol = makeNoSymbol
 
   /** Derives a new list of symbols from the given list by mapping the given
    *  list across the given function.  Then fixes the info of all the new symbols

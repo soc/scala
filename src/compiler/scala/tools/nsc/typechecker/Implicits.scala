@@ -199,9 +199,9 @@ trait Implicits {
       tpeCache
     }
 
-    def isCyclicOrErroneous =
-      try sym.hasFlag(LOCKED) || containsError(tpe)
-      catch { case _: CyclicReference => true }
+    private def unsafeIsCyclicOrErroneous = (sym hasFlag LOCKED) || containsError(tpe)
+
+    def isCyclicOrErroneous = try unsafeIsCyclicOrErroneous catch { case _: CyclicReference => true }
 
     var useCountArg: Int = 0
     var useCountView: Int = 0
@@ -263,8 +263,11 @@ trait Implicits {
    */
   object HasMember {
     private val hasMemberCache = perRunCaches.newMap[Name, Type]()
-    def apply(name: Name): Type = hasMemberCache.getOrElseUpdate(name, memberWildcardType(name, WildcardType))
-    }
+    def apply(name: Name): Type = hasMemberCache.getOrElseUpdate(name, {
+      log(s"HasMember($name)")
+      memberWildcardType(name, WildcardType)
+    })
+  }
 
   /** An extractor for types of the form ? { name: (? >: argtpe <: Any*)restp }
    */
