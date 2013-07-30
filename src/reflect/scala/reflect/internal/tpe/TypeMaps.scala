@@ -106,26 +106,33 @@ private[internal] trait TypeMaps {
     def variance = _variance
     private[this] def flip() { if (trackVariance) variance = variance.flip }
 
+    private def mapOverTypeRef(tp: TypeRef): Type = {
+      import tp._
+      val pre1 = this(pre)
+      val args1 = (
+        if (trackVariance && args.nonEmpty && !variance.isInvariant && sym.typeParams.nonEmpty)
+          mapOverArgs(args, sym.typeParams)
+        else
+          args mapConserve this
+        )
+      if ((pre1 eq pre) && (args1 eq args)) tp
+      else copyTypeRef(tp, pre1, tr.coevolveSym(pre1), args1)
+    }
+    private def mapOverSingleType(tp: SingleType): Type = {
+      import tp._
+      if (sym.isPackageClass) tp // short path
+      else {
+        val pre1 = this(pre)
+        if (pre1 eq pre) tp
+        else singleType(pre1, sym)
+      }
+    }
+
     /** Map this function over given type */
     def mapOver(tp: Type): Type = tp match {
-      case tr @ TypeRef(pre, sym, args) =>
-        val pre1 = this(pre)
-        val args1 = (
-          if (trackVariance && args.nonEmpty && !variance.isInvariant && sym.typeParams.nonEmpty)
-            mapOverArgs(args, sym.typeParams)
-          else
-            args mapConserve this
-          )
-        if ((pre1 eq pre) && (args1 eq args)) tp
-        else copyTypeRef(tp, pre1, tr.coevolveSym(pre1), args1)
-      case ThisType(_) => tp
-      case SingleType(pre, sym) =>
-        if (sym.isPackageClass) tp // short path
-        else {
-          val pre1 = this(pre)
-          if (pre1 eq pre) tp
-          else singleType(pre1, sym)
-        }
+      case tp: TypeRef                => mapOverTypeRef(tp)
+      case ThisType(_)                => tp
+      case tp: SingleType             => mapOverSingleType(tp)
       case MethodType(params, result) =>
         val params1 = flipped(mapOver(params))
         val result1 = this(result)
