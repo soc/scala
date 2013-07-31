@@ -14,6 +14,18 @@ trait ClassPath {
   def findBytes(path: PathRep): Bytes
 }
 
+class PathRepSeq(private[classpath] val arr: Array[String]) extends immutable.IndexedSeq[PathRep] {
+  def length = arr.length
+  def apply(idx: Int): PathRep = PathRep(arr(idx))
+  def iterator = arr.iterator map (s => PathRep(s))
+}
+
+class PackageRepSeq(private[classpath] val arr: Array[String]) extends immutable.IndexedSeq[PackageRep] {
+  def length = arr.length
+  def apply(idx: Int): PackageRep = PackageRep(arr(idx))
+  def iterator = arr.iterator map (s => PackageRep(s))
+}
+
 object ClassPath {
   private def bootProp = System.getProperty("sun.boot.class.path", "")
   private def extProp  = System.getProperty("java.ext.dirs", "")

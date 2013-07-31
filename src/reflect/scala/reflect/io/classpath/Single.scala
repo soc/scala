@@ -7,6 +7,42 @@ import scala.collection.mutable
 import java.util.zip.ZipEntry
 import java.lang.Character.isJavaIdentifierStart
 
+object SerializedJars {
+  import java.io._
+
+  val cacheDir = new java.io.File(sys.props("user.home") + "/.scala/cache")
+  cacheDir.mkdirs()
+
+  // def paths: Seq[PathRep]
+  // def packages: Seq[PackageRep]
+  // def findBytes(path: PathRep): Bytes
+
+  // val pathsMap = mutable.Map[PathRep, PathRepSeq]()
+  // val packagesMap = mutable.Map[PathRep, PackageRepSeq]()
+
+  def record(rep: PathRep, paths: Array[String], packages: Array[String]) {
+    pathsMap(rep)    = new PathRepSeq(paths)
+    packagesMap(rep) = new PackageRepSeq(packages)
+  }
+
+  def write(n: Int) {
+    val out = new ObjectOutputStream(new FileOutputStream("arr.ser"))
+    val arr = 1 to n map (_ => "0123456789") toArray
+
+    out writeObject arr
+    out.close()
+  }
+
+  def read() {
+    val in = new ObjectInputStream(new FileInputStream("arr.ser"))
+    val arr = in.readObject().asInstanceOf[Array[String]]
+    arr foreach println
+  }
+
+  def main(args: Array[String]): Unit = if (args.isEmpty) read() else write(args(0).toInt)
+
+}
+
 /** A set of paths associated with a single basis, typically a
  *  jar file or a directory containing classes. All classpath
  *  expansion must be performed prior to creating a Single.
@@ -59,12 +95,14 @@ object Single {
   }
 
   abstract class SingleCollector {
-    protected val paths = Vector.newBuilder[PathRep]
-    protected val pkgs  = mutable.HashSet[PackageRep]()
+    protected val paths = Array.newBuilder[String]
+    protected val pkgs  = mutable.HashSet[String]()
+    // protected val paths = Vector.newBuilder[PathRep]
+    // protected val pkgs  = mutable.HashSet[PackageRep]()
 
     def collect(basis: PathRep): Single
 
-    def addEnclosingPackage(rep: PathRep): Unit = pkgs += PackageRep(rep.path)
+    def addEnclosingPackage(rep: PathRep): Unit = pkgs += PackageRep(rep.path).name
     def addFile(rep: PathRep): Unit             = { paths += rep ; addEnclosingPackage(rep) }
     def addDir(dir: PathRep): Unit              = dir.listContents foreach add
     def addZip(rep: PathRep): Unit              = foreachZipEntry(rep)(e => if (!e.isDirectory) addZipEntry(e))
@@ -75,6 +113,9 @@ object Single {
   class SingleZipCollector extends SingleCollector {
     def collect(basis: PathRep): SingleZip = {
       addZip(basis)
+      val pathsRes = paths.result
+      val pkgRes   = pkgs.toVector.sorted
+      SerializedJars.record(pathsRes, pkgRes)
       SingleZip(basis, paths.result, pkgs.toVector.sorted)
     }
   }
