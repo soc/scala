@@ -384,6 +384,7 @@ trait Definitions extends api.StandardDefinitions {
       def arrayCloneMethod = getMemberMethod(ScalaRunTimeModule, nme.array_clone)
       def ensureAccessibleMethod = getMemberMethod(ScalaRunTimeModule, nme.ensureAccessible)
       def arrayClassMethod = getMemberMethod(ScalaRunTimeModule, nme.arrayClass)
+      def traversableDropMethod = getMemberMethod(ScalaRunTimeModule, nme.drop)
 
     // classes with special meanings
     lazy val StringAddClass             = requiredClass[scala.runtime.StringAdd]
@@ -422,6 +423,15 @@ trait Definitions extends api.StandardDefinitions {
     def isScalaVarArgs(params: Seq[Symbol]) = params.nonEmpty && isScalaRepeatedParamType(params.last.tpe)
     def isVarArgsList(params: Seq[Symbol])  = params.nonEmpty && isRepeatedParamType(params.last.tpe)
     def isVarArgTypes(formals: Seq[Type])   = formals.nonEmpty && isRepeatedParamType(formals.last)
+
+    def firstParamType(tpe: Type): Type = tpe.paramTypes match {
+      case p :: _ => p
+      case _      => NoType
+    }
+    def isImplicitParamss(paramss: List[List[Symbol]]) = paramss match {
+      case (p :: _) :: _ => p.isImplicit
+      case _             => false
+    }
 
     def hasRepeatedParam(tp: Type): Boolean = tp match {
       case MethodType(formals, restpe) => isScalaVarArgs(formals) || hasRepeatedParam(restpe)
@@ -695,6 +705,29 @@ trait Definitions extends api.StandardDefinitions {
     def optionType(tp: Type)         = appliedType(OptionClass, tp)
     def scalaRepeatedType(arg: Type) = appliedType(RepeatedParamClass, arg)
     def seqType(arg: Type)           = appliedType(SeqClass, arg)
+
+    def typeOfMemberNamedGet(tp: Type) = resultOfMatchingMethod(tp, nme.get)()
+
+    def unapplySeqElementType(seqType: Type) = (
+             resultOfMatchingMethod(seqType, nme.apply)(IntTpe)
+      orElse resultOfMatchingMethod(seqType, nme.head)()
+    )
+
+    /** If `tp` has a term member `name`, the first parameter list of which
+     *  matches `paramTypes`, and which either has no further parameter
+     *  lists or only an implicit one, then the result type of the matching
+     *  method. Otherwise, NoType.
+     */
+    def resultOfMatchingMethod(tp: Type, name: TermName)(paramTypes: Type*): Type = {
+      def matchesParams(member: Symbol) = member.paramss match {
+        case Nil        => paramTypes.isEmpty
+        case ps :: rest => (rest.isEmpty || isImplicitParamss(rest)) && (ps corresponds paramTypes)(_.tpe =:= _)
+      }
+      tp member name filter matchesParams match {
+        case NoSymbol => NoType
+        case member   => (tp memberType member).finalResultType
+      }
+    }
 
     def ClassType(arg: Type) = if (phase.erasedTypes) ClassClass.tpe else appliedType(ClassClass, arg)
 
