@@ -201,6 +201,16 @@ trait MatchTreeMaking extends MatchCodeGen with Debugging {
 
       def extraStoredBinders: Set[Symbol] = Set()
 
+      debug.patmat(s"""
+        |ExtractorTreeMaker($extractor, $extraCond, $nextBinder) {
+        |  $subPatBinders
+        |  $subPatRefs
+        |  $extractorReturnsBoolean
+        |  $checkedLength
+        |  $prevBinder
+        |  $ignoredSubPatBinders
+        |}""".stripMargin)
+
       def chainBefore(next: Tree)(casegen: Casegen): Tree = {
         val condAndNext = extraCond match {
           case Some(cond) =>

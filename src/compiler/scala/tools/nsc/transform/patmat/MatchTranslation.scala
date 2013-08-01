@@ -221,11 +221,13 @@ trait MatchTranslation { self: PatternMatching  =>
       *    a function that will take care of binding and substitution of the next ast (to the right).
       *
       */
-    def translateCase(scrutSym: Symbol, pt: Type)(caseDef: CaseDef) = caseDef match { case CaseDef(pattern, guard, body) =>
+    def translateCase(scrutSym: Symbol, pt: Type)(caseDef: CaseDef) = {
+      val CaseDef(pattern, guard, body) = caseDef
       translatePattern(scrutSym, pattern) ++ translateGuard(guard) :+ translateBody(body, pt)
     }
 
     def translatePattern(patBinder: Symbol, patTree: Tree): List[TreeMaker] = {
+      patBinder modifyInfo repeatedToSeq
       // a list of TreeMakers that encode `patTree`, and a list of arguments for recursive invocations of `translatePattern` to encode its subpatterns
       type TranslationStep = (List[TreeMaker], List[(Symbol, Tree)])
       def withSubPats(treeMakers: List[TreeMaker], subpats: (Symbol, Tree)*): TranslationStep = (treeMakers, subpats.toList)
@@ -244,7 +246,7 @@ trait MatchTranslation { self: PatternMatching  =>
         // (it will later result in a type test when `tp` is not a subtype of `b.info`)
         // TODO: can we simplify this, together with the Bound case?
         (extractor.subPatBinders, extractor.subPatTypes).zipped foreach { case (b, tp) =>
-          debug.patmat("changing "+ b +" : "+ b.info +" -> "+ tp)
+          debug.patmat(s"changing $b: ${b.info} -> $tp")
           b setInfo tp
         }
 
@@ -291,7 +293,7 @@ trait MatchTranslation { self: PatternMatching  =>
           case Bound(subpatBinder, typed@Typed(Ident(_), tpt)) if typed.tpe ne null => Some((subpatBinder, typed.tpe))
           case Bind(_, typed@Typed(Ident(_), tpt))             if typed.tpe ne null => Some((patBinder, typed.tpe))
           case Typed(Ident(_), tpt)                            if tree.tpe ne null  => Some((patBinder, tree.tpe))
-          case _  => None
+          case _                                                                    => None
         }
       }
 
@@ -401,21 +403,43 @@ trait MatchTranslation { self: PatternMatching  =>
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     object ExtractorCall {
-      def apply(unfun: Tree, args: List[Tree]): ExtractorCall = new ExtractorCallRegular(unfun, args)
-      def fromCaseClass(fun: Tree, args: List[Tree]): Option[ExtractorCall] =  Some(new ExtractorCallProd(fun, args))
+      def apply(unfun: Tree, args: List[Tree]): ExtractorCall = {
+        val Some(Apply(fun, applyArgs)) = unfun find {
+          case Apply(fun, Ident(nme.SELECTOR_DUMMY) :: Nil) => true
+          case _                                            => false
+        }
+        val funType = fun.tpe.finalResultType
+        val hasProductSelectors = (
+          1 to applyArgs.size forall (n =>
+            funType member TermName("_" + n) filter (_.paramss.isEmpty) exists
+          )
+        )
+        if (hasProductSelectors)
+          new ExtractorCallProd(unfun, args)
+        else
+          new ExtractorCallRegular(unfun, args)
+      }
+      def fromCaseClass(fun: Tree, args: List[Tree]): Option[ExtractorCall] = Some(new ExtractorCallProd(fun, args))
     }
 
     abstract class ExtractorCall(val args: List[Tree]) {
-      val nbSubPats = args.length
+      import CODE._
+
+      val nbSubPats     = args.length
+      val starLength    = if (hasStar) 1 else 0
+      val nonStarLength = args.length - starLength
 
       // everything okay, captain?
-      def isTyped    : Boolean
-
+      def isTyped: Boolean
       def isSeq: Boolean
-      lazy val lastIsStar = (nbSubPats > 0) && treeInfo.isStar(args.last)
+
+      private def hasStar       = nbSubPats > 0 && (treeInfo isStar args.last)
+      private def isNonEmptySeq = nbSubPats > 0 && isSeq
 
       // to which type should the previous binder be casted?
       def paramType  : Type
+
+      protected def rawSubPatTypes: List[Type]
 
       /** Create the TreeMaker that embodies this extractor call
        *
@@ -429,77 +453,92 @@ trait MatchTranslation { self: PatternMatching  =>
       // subPatBinders are replaced by references to the relevant part of the extractor's result (tuple component, seq element, the result as-is)
       lazy val subPatBinders = args map {
         case Bound(b, p) => b
-        case p => freshSym(p.pos, prefix = "p")
+        case p           => freshSym(p.pos, prefix = "p")
       }
+      lazy val subBindersAndPatterns: List[(Symbol, Tree)] = subPatBinders zip unboundArgs
 
-      lazy val subBindersAndPatterns: List[(Symbol, Tree)] = (subPatBinders zip args) map {
-        case (b, Bound(_, p)) => (b, p)
-        case bp => bp
+      private def unboundArgs = args map unBound
+      private def unBound(t: Tree): Tree = t match {
+        case Bound(_, p) => p
+        case _           => t
       }
 
       // never store these in local variables (for PreserveSubPatBinders)
-      lazy val ignoredSubPatBinders = (subPatBinders zip args).collect{
-        case (b, PatternBoundToUnderscore()) => b
-      }.toSet
+      lazy val ignoredSubPatBinders: Set[Symbol] = subPatBinders zip args collect { case (b, PatternBoundToUnderscore()) => b } toSet
 
-      def subPatTypes: List[Type] =
-        if(isSeq) {
-          val TypeRef(pre, SeqClass, args) = seqTp
+      def subPatTypes: List[Type] = rawSubPatTypes match {
+        case tps if !isSeq => tps
+        case init :+ last  =>
+          val elem = unapplySeqElementType(last)
           // do repeated-parameter expansion to match up with the expected number of arguments (in casu, subpatterns)
-          val formalsWithRepeated = rawSubPatTypes.init :+ typeRef(pre, RepeatedParamClass, args)
+          val formalsWithRepeated = init :+ scalaRepeatedType(elem)
+          val appendStarPattern   = if (hasStar) last :: Nil else Nil
+          formalTypes(formalsWithRepeated, nonStarLength) ::: appendStarPattern
+      }
 
-          if (lastIsStar) formalTypes(formalsWithRepeated, nbSubPats - 1) :+ seqTp
-          else formalTypes(formalsWithRepeated, nbSubPats)
-        } else rawSubPatTypes
+      protected def seqTp: Type = rawSubPatTypes match {
+        case Nil => NothingTpe
+        case xs  => repeatedToSeq(xs.last)
+      }
+      // rawSubPatTypes.last is the Seq, thus there are `rawSubPatTypes.length - 1` non-seq elements in the tuple
+      protected def firstIndexingBinder = rawSubPatTypes.length - 1
+      protected def lastIndexingBinder  = nbSubPats - 1 - starLength
+      protected def expectedLength      = lastIndexingBinder - firstIndexingBinder + 1
 
-      protected def rawSubPatTypes: List[Type]
+      private def productElemsToN(binder: Symbol, n: Int): List[Tree] = 1 to n map tupleSel(binder) toList
+      private def genTake(binder: Symbol, n: Int): List[Tree]         = (0 until n).toList map (codegen index seqTree(binder))
+      private def genDrop(binder: Symbol, n: Int): List[Tree]         = codegen.drop(seqTree(binder))(expectedLength) :: Nil
 
-      protected def seqTp = rawSubPatTypes.last baseType SeqClass
-      protected def seqLenCmp                = rawSubPatTypes.last member nme.lengthCompare
-      protected lazy val firstIndexingBinder = rawSubPatTypes.length - 1 // rawSubPatTypes.last is the Seq, thus there are `rawSubPatTypes.length - 1` non-seq elements in the tuple
-      protected lazy val lastIndexingBinder  = if(lastIsStar) nbSubPats-2 else nbSubPats-1
-      protected lazy val expectedLength      = lastIndexingBinder - firstIndexingBinder + 1
-      protected lazy val minLenToCheck       = if(lastIsStar) 1 else 0
-      protected def seqTree(binder: Symbol)  = tupleSel(binder)(firstIndexingBinder+1)
+      // codegen.drop(seqTree(binder))(nbIndexingIndices)))).toList
+      protected def seqTree(binder: Symbol)                = tupleSel(binder)(firstIndexingBinder + 1)
       protected def tupleSel(binder: Symbol)(i: Int): Tree = codegen.tupleSel(binder)(i)
 
-      // the trees that select the subpatterns on the extractor's result, referenced by `binder`
-      // require isSeq
+      // the trees that select the subpatterns on the extractor's result,
+      // referenced by `binder`
       protected def subPatRefsSeq(binder: Symbol): List[Tree] = {
-        val indexingIndices   = (0 to (lastIndexingBinder-firstIndexingBinder))
-        val nbIndexingIndices = indexingIndices.length
-
+        def lastTrees: List[Tree] = (
+          if (!hasStar) Nil
+          else if (expectedLength == 0) seqTree(binder) :: Nil
+          else genDrop(binder, expectedLength)
+        )
         // this error-condition has already been checked by checkStarPatOK:
         //   if(isSeq) assert(firstIndexingBinder + nbIndexingIndices + (if(lastIsStar) 1 else 0) == nbSubPats, "(resultInMonad, ts, subPatTypes, subPats)= "+(resultInMonad, ts, subPatTypes, subPats))
-        // there are `firstIndexingBinder` non-seq tuple elements preceding the Seq
-        (((1 to firstIndexingBinder) map tupleSel(binder)) ++
-        // then we have to index the binder that represents the sequence for the remaining subpatterns, except for...
-        (indexingIndices map codegen.index(seqTree(binder))) ++
-        // the last one -- if the last subpattern is a sequence wildcard: drop the prefix (indexed by the refs on the line above), return the remainder
-        (if(!lastIsStar) Nil else List(
-          if(nbIndexingIndices == 0) seqTree(binder)
-          else codegen.drop(seqTree(binder))(nbIndexingIndices)))).toList
+
+        // [1] there are `firstIndexingBinder` non-seq tuple elements preceding the Seq
+        // [2] then we have to index the binder that represents the sequence for the remaining subpatterns, except for...
+        // [3] the last one -- if the last subpattern is a sequence wildcard:
+        //       drop the prefix (indexed by the refs on the preceding line), return the remainder
+        (    productElemsToN(binder, firstIndexingBinder)
+          ++ genTake(binder, expectedLength)
+          ++ lastTrees
+        ).toList
       }
 
       // the trees that select the subpatterns on the extractor's result, referenced by `binder`
       // require (nbSubPats > 0 && (!lastIsStar || isSeq))
       protected def subPatRefs(binder: Symbol): List[Tree] =
-        if (nbSubPats == 0) Nil
-        else if (isSeq) subPatRefsSeq(binder)
-        else ((1 to nbSubPats) map tupleSel(binder)).toList
+        if (isNonEmptySeq) subPatRefsSeq(binder) else productElemsToN(binder, nbSubPats)
+
+      private def compareInts(t1: Tree, t2: Tree) =
+        gen.mkMethodCall(termMember(ScalaPackage, "math"), TermName("signum"), Nil, (t1 INT_- t2) :: Nil)
 
       protected def lengthGuard(binder: Symbol): Option[Tree] =
         // no need to check unless it's an unapplySeq and the minimal length is non-trivially satisfied
-        checkedLength map { expectedLength => import CODE._
+        checkedLength map { expectedLength =>
           // `binder.lengthCompare(expectedLength)`
-          def checkExpectedLength = (seqTree(binder) DOT seqLenCmp)(LIT(expectedLength))
+          // ...if binder has a lengthCompare method, otherwise
+          // `scala.math.signum(binder.length - expectedLength)`
+          def checkExpectedLength = seqTp member nme.lengthCompare match {
+            case NoSymbol => compareInts(Select(seqTree(binder), nme.length), LIT(expectedLength))
+            case lencmp   => (seqTree(binder) DOT lencmp)(LIT(expectedLength))
+          }
 
           // the comparison to perform
           // when the last subpattern is a wildcard-star the expectedLength is but a lower bound
           // (otherwise equality is required)
           def compareOp: (Tree, Tree) => Tree =
-            if (lastIsStar)  _ INT_>= _
-            else             _ INT_== _
+            if (hasStar) _ INT_>= _
+            else         _ INT_== _
 
           // `if (binder != null && $checkExpectedLength [== | >=] 0) then else zero`
           (seqTree(binder) ANY_!= NULL) AND compareOp(checkExpectedLength, ZERO)
@@ -507,14 +546,12 @@ trait MatchTranslation { self: PatternMatching  =>
 
       def checkedLength: Option[Int] =
         // no need to check unless it's an unapplySeq and the minimal length is non-trivially satisfied
-        if (!isSeq || (expectedLength < minLenToCheck)) None
+        if (!isSeq || expectedLength < starLength) None
         else Some(expectedLength)
-
     }
 
     // TODO: to be called when there's a def unapplyProd(x: T): U
     // U must have N members _1,..., _N -- the _i are type checked, call their type Ti,
-    //
     // for now only used for case classes -- pretending there's an unapplyProd that's the identity (and don't call it)
     class ExtractorCallProd(fun: Tree, args: List[Tree]) extends ExtractorCall(args) {
       // TODO: fix the illegal type bound in pos/t602 -- type inference messes up before we get here:
@@ -568,12 +605,14 @@ trait MatchTranslation { self: PatternMatching  =>
     }
 
     class ExtractorCallRegular(extractorCallIncludingDummy: Tree, args: List[Tree]) extends ExtractorCall(args) {
-      private lazy val Some(Apply(extractorCall, _)) = extractorCallIncludingDummy.find{ case Apply(_, List(Ident(nme.SELECTOR_DUMMY))) => true case _ => false }
-
+      lazy val Some(Apply(extractorCall, _)) = extractorCallIncludingDummy find {
+        case Apply(_, Ident(nme.SELECTOR_DUMMY) :: Nil) => true
+        case _                                          => false
+      }
       def tpe        = extractorCall.tpe
+      def paramType  = tpe.paramTypes.headOption getOrElse NoType
+      def resultType = extractorCall.tpe.finalResultType
       def isTyped    = (tpe ne NoType) && extractorCall.isTyped && (resultInMonad ne ErrorType)
-      def paramType  = tpe.paramTypes.head
-      def resultType = tpe.finalResultType
       def isSeq      = extractorCall.symbol.name == nme.unapplySeq
 
       /** Create the TreeMaker that embodies this extractor call
@@ -587,10 +626,22 @@ trait MatchTranslation { self: PatternMatching  =>
        *    Perhaps it hasn't reached critical mass, but it would already clean things up a touch.
        */
       def treeMaker(patBinderOrCasted: Symbol, binderKnownNonNull: Boolean, pos: Position): TreeMaker = {
-        // the extractor call (applied to the binder bound by the flatMap corresponding to the previous (i.e., enclosing/outer) pattern)
+        // the extractor call (applied to the binder bound by the flatMap corresponding
+        // to the previous (i.e., enclosing/outer) pattern)
         val extractorApply = atPos(pos)(spliceApply(patBinderOrCasted))
-        val binder         = freshSym(pos, pureType(resultInMonad)) // can't simplify this when subPatBinders.isEmpty, since UnitTpe is definitely wrong when isSeq, and resultInMonad should always be correct since it comes directly from the extractor's result type
-        ExtractorTreeMaker(extractorApply, lengthGuard(binder), binder)(subPatBinders, subPatRefs(binder), resultType.typeSymbol == BooleanClass, checkedLength, patBinderOrCasted, ignoredSubPatBinders)
+        // can't simplify this when subPatBinders.isEmpty, since UnitTpe is definitely
+        // wrong when isSeq, and resultInMonad should always be correct since it comes
+        // directly from the extractor's result type
+        val binder         = freshSym(pos, pureType(resultInMonad))
+
+        ExtractorTreeMaker(extractorApply, lengthGuard(binder), binder)(
+          subPatBinders,
+          subPatRefs(binder),
+          resultType =:= BooleanTpe,
+          checkedLength,
+          patBinderOrCasted,
+          ignoredSubPatBinders
+        )
       }
 
       override protected def seqTree(binder: Symbol): Tree =
@@ -607,22 +658,24 @@ trait MatchTranslation { self: PatternMatching  =>
         object splice extends Transformer {
           override def transform(t: Tree) = t match {
             case Apply(x, List(i @ Ident(nme.SELECTOR_DUMMY))) =>
-              treeCopy.Apply(t, x, List(CODE.REF(binder).setPos(i.pos)))
-            case _ => super.transform(t)
+              treeCopy.Apply(t, x, List(CODE.REF(binder) setPos i.pos))
+            case _ =>
+              super.transform(t)
           }
         }
-        splice.transform(extractorCallIncludingDummy)
+        splice transform extractorCallIncludingDummy
       }
 
       // what's the extractor's result type in the monad?
       // turn an extractor's result type into something `monadTypeToSubPatTypesAndRefs` understands
-      protected lazy val resultInMonad: Type = if(!hasLength(tpe.paramTypes, 1)) ErrorType else {
-        if (resultType.typeSymbol == BooleanClass) UnitTpe
-        else matchMonadResult(resultType)
-      }
+      protected lazy val resultInMonad: Type = (
+        if (paramType eq NoType) ErrorType
+        else if (resultType =:= BooleanTpe) UnitTpe
+        else matchMonadResult(resultType) // the type of "get"
+      )
 
       protected lazy val rawSubPatTypes =
-        if (resultInMonad.typeSymbol eq UnitClass) Nil
+        if (resultInMonad =:= UnitTpe) Nil
         else if(!isSeq && nbSubPats == 1)          List(resultInMonad)
         else getProductArgs(resultInMonad) match {
           case Nil => List(resultInMonad)

@@ -36,7 +36,6 @@ trait Typers extends Adaptations with Tags with TypersTracking {
   final def forArgMode(fun: Tree, mode: Mode) =
     if (treeInfo.isSelfOrSuperConstrCall(fun)) mode | SCCmode else mode
 
-    // printResult(s"forArgMode($fun, $mode) gets SCCmode")(mode | SCCmode)
   // namer calls typer.computeType(rhs) on DefDef / ValDef when tpt is empty. the result
   // is cached here and re-used in typedDefDef / typedValDef
   // Also used to cache imports type-checked by namer.
@@ -3757,11 +3756,15 @@ trait Typers extends Adaptations with Tags with TypersTracking {
 
     /** convert local symbols and skolems to existentials */
     def packedType(tree: Tree, owner: Symbol): Type = {
-      def defines(tree: Tree, sym: Symbol) =
-        sym.isExistentialSkolem && sym.unpackLocation == tree ||
-        tree.isDef && tree.symbol == sym
-      def isVisibleParameter(sym: Symbol) =
-        sym.isParameter && (sym.owner == owner) && (sym.isType || !owner.isAnonymousFunction)
+      def defines(tree: Tree, sym: Symbol) = (
+           sym.isExistentialSkolem && sym.unpackLocation == tree
+        || tree.isDef && tree.symbol == sym
+      )
+      def isVisibleParameter(sym: Symbol) = (
+           sym.isParameter
+        && (sym.owner == owner)
+        && (sym.isType || !owner.isAnonymousFunction)
+      )
       def containsDef(owner: Symbol, sym: Symbol): Boolean =
         (!sym.hasPackageFlag) && {
           var o = sym.owner
