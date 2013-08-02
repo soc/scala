@@ -426,9 +426,10 @@ trait MatchTranslation { self: PatternMatching  =>
           case Apply(fun, Ident(nme.SELECTOR_DUMMY) :: Nil) => true
           case _                                            => false
         }
+        val arity = applyArgs.size
         val funType = fun.tpe.finalResultType
-        val hasProductSelectors = (
-          1 to applyArgs.size forall (n =>
+        val hasProductSelectors = (arity > 1) && (
+          1 to arity forall (n =>
             funType member TermName("_" + n) filter (_.paramss.isEmpty) exists
           )
         )
@@ -437,7 +438,7 @@ trait MatchTranslation { self: PatternMatching  =>
         else
           new ExtractorCallRegular(unfun, args)
       }
-      def fromCaseClass(fun: Tree, args: List[Tree]): Option[ExtractorCall] = Some(new ExtractorCallProd(fun, args))
+      def fromCaseClass(fun: Tree, args: List[Tree]): Option[ExtractorCall] = Some(new ExtractorCallCase(fun, args))
     }
 
     abstract class ExtractorCall(val args: List[Tree]) {
@@ -537,7 +538,9 @@ trait MatchTranslation { self: PatternMatching  =>
       // the trees that select the subpatterns on the extractor's result, referenced by `binder`
       // require (nbSubPats > 0 && (!lastIsStar || isSeq))
       protected def subPatRefs(binder: Symbol): List[Tree] =
-        if (isNonEmptySeq) subPatRefsSeq(binder) else productElemsToN(binder, nbSubPats)
+        if (isNonEmptySeq) subPatRefsSeq(binder)
+        // else if (nbSubPats == 1) CODE.REF(binder) :: Nil
+        else productElemsToN(binder, nbSubPats)
 
       private def compareInts(t1: Tree, t2: Tree) =
         gen.mkMethodCall(termMember(ScalaPackage, "math"), TermName("signum"), Nil, (t1 INT_- t2) :: Nil)
@@ -573,7 +576,11 @@ trait MatchTranslation { self: PatternMatching  =>
     // TODO: to be called when there's a def unapplyProd(x: T): U
     // U must have N members _1,..., _N -- the _i are type checked, call their type Ti,
     // for now only used for case classes -- pretending there's an unapplyProd that's the identity (and don't call it)
-    class ExtractorCallProd(fun: Tree, args: List[Tree]) extends ExtractorCall(args) {
+
+    class ExtractorCallProd(fun: Tree, args: List[Tree]) extends ExtractorCallRegular(fun, args) {
+    }
+
+    class ExtractorCallCase(fun: Tree, args: List[Tree]) extends ExtractorCall(args) {
       // TODO: fix the illegal type bound in pos/t602 -- type inference messes up before we get here:
       /*override def equals(x$1: Any): Boolean = ...
              val o5: Option[com.mosol.sl.Span[Any]] =  // Span[Any] --> Any is not a legal type argument for Span!
@@ -630,10 +637,13 @@ trait MatchTranslation { self: PatternMatching  =>
         case _                                          => false
       }
       def tpe        = extractorCall.tpe
-      def paramType  = tpe.paramTypes.headOption getOrElse NoType
-      def resultType = extractorCall.tpe.finalResultType
-      def isTyped    = (tpe ne NoType) && extractorCall.isTyped && (resultInMonad ne ErrorType)
+      def paramType  = firstParamType(tpe)
+      def isTyped    = !isErr && extractorCall.isTyped
       def isSeq      = extractorCall.symbol.name == nme.unapplySeq
+
+      def resultType = tpe.finalResultType
+      def isBool     = resultType =:= BooleanTpe
+      def isErr      = (tpe eq NoType) || (paramType eq NoType)
 
       /** Create the TreeMaker that embodies this extractor call
        *
@@ -657,7 +667,7 @@ trait MatchTranslation { self: PatternMatching  =>
         ExtractorTreeMaker(extractorApply, lengthGuard(binder), binder)(
           subPatBinders,
           subPatRefs(binder),
-          resultType =:= BooleanTpe,
+          isBool,
           checkedLength,
           patBinderOrCasted,
           ignoredSubPatBinders
@@ -671,38 +681,61 @@ trait MatchTranslation { self: PatternMatching  =>
       // the trees that select the subpatterns on the extractor's result, referenced by `binder`
       // require (nbSubPats > 0 && (!lastIsStar || isSeq))
       override protected def subPatRefs(binder: Symbol): List[Tree] =
-        if (!isSeq && nbSubPats == 1) List(CODE.REF(binder)) // special case for extractors
+        if (isSingle) List(CODE.REF(binder)) // special case for extractors
         else super.subPatRefs(binder)
 
       protected def spliceApply(binder: Symbol): Tree = {
         object splice extends Transformer {
           override def transform(t: Tree) = t match {
-            case Apply(x, List(i @ Ident(nme.SELECTOR_DUMMY))) =>
-              treeCopy.Apply(t, x, List(CODE.REF(binder) setPos i.pos))
-            case _ =>
-              super.transform(t)
+            case Apply(x, List(i @ Ident(nme.SELECTOR_DUMMY))) => treeCopy.Apply(t, x, List(CODE.REF(binder) setPos i.pos))
+            case _                                             => super.transform(t)
           }
         }
         splice transform extractorCallIncludingDummy
       }
+      // The types of _1, _2, etc in the monad result type
+      private lazy val productSelectors = (
+        if (isBool) Nil
+        else if (isSingle) resultInMonad :: Nil
+        else getProductSelectors(resultInMonad)
+      )
 
       // what's the extractor's result type in the monad?
       // turn an extractor's result type into something `monadTypeToSubPatTypesAndRefs` understands
       protected lazy val resultInMonad: Type = (
-        if (paramType eq NoType) ErrorType
-        else if (resultType =:= BooleanTpe) UnitTpe
+        if (isErr) ErrorType
+        else if (isBool) UnitTpe
         else matchMonadResult(resultType) // the type of "get"
       )
+      protected lazy val rawSubPatTypes = productSelectors match {
+        case Nil if !isBool => resultInMonad :: Nil
+        case tps            => tps
+      }
+      // private def rawArity = productSelectors match {
+      //   case Nil => if (isBool) 0 else 1
+      //   case xs  => xs.length
+      // }
+      // private def rawTypes = rawArity match {
+      //   case 0 => Nil
+      //   case 1 => resultInMonad :: Nil
+      //   case _ => rawSelectors
+      // }
+      // private def rawArity = (
+      //   if (resultInMonad =:= UnitTpe) 0
+      //   else rawSelectors.length
+      // )
 
-      protected lazy val rawSubPatTypes =
-        if (resultInMonad =:= UnitTpe) Nil
-        else if(!isSeq && nbSubPats == 1)          List(resultInMonad)
-        else getProductArgs(resultInMonad) match {
-          case Nil => List(resultInMonad)
-          case x   => x
-        }
 
-      override def toString() = extractorCall +": "+ extractorCall.tpe +" (symbol= "+ extractorCall.symbol +")."
+      // rawTypes
+
+      //   if (resultInMonad =:= UnitTpe) Nil
+      //   else if(!isSeq && nbSubPats == 1)          List(resultInMonad)
+      //   else getProductSelectors(resultInMonad) match {
+      //     case Nil   => resultInMonad :: Nil
+      //     case types => types
+      //   }
+
+      override def toString = s"$extractorCall: ${extractorCall.tpe} (sym=${extractorCall.symbol})"
     }
 
     /** A conservative approximation of which patterns do not discern anything.

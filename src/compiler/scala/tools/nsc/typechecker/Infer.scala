@@ -114,41 +114,56 @@ trait Infer extends Checkable {
    *   `T_1, ..., T_m, U, ..., U`. Here, `U` is repeated `n-m` times.
    *
    */
+
   def extractorFormalTypes(pos: Position, unapplyResult: Type, subpatternCount: Int, unappSym: Symbol, effectiveCount: Int): (List[Type], List[Type]) = {
-    val typeOfGet = unapplyResult.dealias.typeSymbolDirect match {
-      case BooleanClass => UnitClass.tpe  // aka "Tuple0"
-      case _            => resultOfMatchingMethod(unapplyResult, "get")()
+    def finish(formals: List[Type], formalsExpanded: List[Type]) = {
+      if (formalsExpanded.length != subpatternCount)
+        (null, null)
+      else
+        (formals, formalsExpanded)
     }
-    // product element types when n > 1
-    def productArgs  = getProductArgs(typeOfGet)
-    def productArity = productArgs.size
-    def productLast  = if (productArgs.isEmpty) typeOfGet else productArgs.last
-    def elementType  = unapplySeqElementType(productLast)
-    def isUnapplySeq = unappSym.name == nme.unapplySeq
 
+    if (unapplyResult =:= BooleanTpe) // aka "Tuple0"
+      return (Nil, Nil)
+
+    val typeOfGet = resultOfMatchingMethod(unapplyResult, "get")()
     if (typeOfGet.isErroneous)
-      throw new TypeError(s"result type $unapplyResult of ${unappSym.name} in ${unappSym.fullLocationString} does not have a member `get`")
-    else if (isUnapplySeq && elementType == NoType)
-      throw new TypeError("(the last tuple-component of) the result type of an unapplySeq must have a conformant `head` or `apply` method")
-    if (subpatternCount == 1 && productArity > 1 && productArity != effectiveCount && settings.lint)
-      global.currentUnit.warning(pos, s"extractor pattern binds a single value to a Product${productArity} of type $typeOfGet")
+      throw new TypeError(s"result type $unapplyResult of ${unappSym.fullLocationString} does not have a member `get`")
 
-    val formals = (
-      // Note that dropRight 1 is purposefully Nil-resistant
-      if (isUnapplySeq)
-        (productArgs dropRight 1) :+ scalaRepeatedType(elementType)
-      else subpatternCount match {
-        case 0 => Nil
-        case 1 => typeOfGet :: Nil
-        case _ => productArgs
+    def isUnapplySeq = unappSym.name == nme.unapplySeq
+    def elementType = (
+      if (isUnapplySeq) unapplySeqElementType(typeOfGet)
+      else getProductArgs(typeOfGet) match {
+        case Nil => NoType
+        case xs => xs.last
       }
     )
-    // for unapplySeq, replace last vararg by as many instances as required by nbSubPats
-    val formalsExpanded = if (isUnapplySeq) formalTypes(formals, subpatternCount) else formals
-    if (formalsExpanded.length != subpatternCount)
-      (null, null)
-    else
-      (formals, formalsExpanded)
+    // product element types when n > 1
+    def productArgs  = typeOfGet member TermName("_1") match {
+      case NoSymbol => typeOfGet :: Nil
+      case _        => getProductSelectors(typeOfGet)
+    }
+    def productArity = productArgs.size
+    def productLast  = productArgs.last
+
+    // Have to put anything into a single-spot pattern. Should be an error, but see SI-6675.
+    if (subpatternCount == 1) {
+      if (productArity > 1 && productArity != effectiveCount && settings.lint)
+        global.currentUnit.warning(pos, s"extractor pattern binds a single value to a Product${productArity} of type $typeOfGet")
+
+      return (typeOfGet :: Nil, typeOfGet :: Nil)
+    }
+
+    if (isUnapplySeq) {
+      if (elementType eq NoType)
+        throw new TypeError("(the last tuple-component of) the result type of an unapplySeq must have a conformant `head` or `apply` method")
+
+      // Note that dropRight 1 is purposefully Nil-resistant
+      val formals = (productArgs dropRight 1) :+ scalaRepeatedType(elementType)
+      // for unapplySeq, replace last vararg by as many instances as required by nbSubPats
+      finish(formals, formalTypes(formals, subpatternCount))
+    }
+    else finish(productArgs, productArgs)
   }
 
   /** A fresh type variable with given type parameter as origin.
