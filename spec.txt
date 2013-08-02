@@ -1,0 +1,15 @@
+
+The return type of an unapply:
+
+ - Must have isEmpty
+ - May have get - used if so
+ - May have _1, _2, _3; used if no "get"
+
+ If the match site has fixed/sequence patterns:
+
+  0/0   - boolean (and/or empty sequence?)
+  1/0   - any fixed arity (SI-6675), no sequence
+  n/0   - same fixed arity, optional sequence
+  0/1   - sequence
+  1/1   - any fixed arity, mandatory sequence
+  n/1   - same fixed arity, mandatory sequence
