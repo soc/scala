@@ -169,8 +169,6 @@ trait Interface extends ast.TreeDSL {
     val matchOwner = typer.context.owner
     def pureType(tp: Type): Type = tp
 
-    protected def pack(tp: Type): Type = typer.packedType(TypeTree(tp), matchOwner)
-
     // Extracting from the monad: tp == Option[T], result == T
     def matchMonadResult(tp: Type) = definitions typeOfMemberNamedGet tp
 

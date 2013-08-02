@@ -673,6 +673,14 @@ trait Definitions extends api.StandardDefinitions {
       case Some(x)  => tpe.baseType(x).typeArgs
       case _        => Nil
     }
+    def getProductSelectors(tpe: Type): List[Type] = {
+      def loop(n: Int): List[Symbol] = tpe member TermName("_" + n) match {
+        case NoSymbol                => Nil
+        case m if m.paramss.nonEmpty => Nil
+        case m                       => m :: loop(n + 1)
+      }
+      loop(1) map (s => dropNullaryMethod(tpe memberType s))
+    }
 
     def dropNullaryMethod(tp: Type) = tp match {
       case NullaryMethodType(restpe) => restpe
@@ -707,6 +715,11 @@ trait Definitions extends api.StandardDefinitions {
     def seqType(arg: Type)           = appliedType(SeqClass, arg)
 
     def typeOfMemberNamedGet(tp: Type) = resultOfMatchingMethod(tp, nme.get)()
+
+    def typeOfSeqElementsInLastSelector(typeOfGet: Type) = getProductSelectors(typeOfGet) match {
+      case Nil => NoType
+      case tps => unapplySeqElementType(tps.last)
+    }
 
     def unapplySeqElementType(seqType: Type) = (
              resultOfMatchingMethod(seqType, nme.apply)(IntTpe)

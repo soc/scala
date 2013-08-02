@@ -2509,8 +2509,10 @@ trait Typers extends Adaptations with Tags with TypersTracking {
         // insert a cast if something typechecked under the GADT constraints,
         // but not in real life (i.e., now that's we've reset the method's type skolems'
         //   infos back to their pre-GADT-constraint state)
-        if (isFullyDefined(pt) && !(body1.tpe <:< pt))
+        if (isFullyDefined(pt) && !(body1.tpe <:< pt)) {
+          log(s"Adding cast to pattern because ${body1.tpe} does not conform to expected type $pt")
           body1 = typedPos(body1.pos)(gen.mkCast(body1, pt.dealiasWiden))
+        }
       }
 
 //    body1 = checkNoEscaping.locals(context.scope, pt, body1)

@@ -18,6 +18,24 @@ trait MatchTranslation { self: PatternMatching  =>
   import definitions._
   import global.analyzer.{ErrorUtils, formalTypes}
 
+  case class ExtractorShape(fixedTypes: List[Type], sequenceType: Type) {
+    val fixedArity     = fixedTypes.length
+    def offersSequence = sequenceType ne NoType
+    def offersBool     = fixedArity == 0 && !offersSequence
+    def offersSingle   = fixedArity == 1 && !offersSequence
+  }
+  case class CallSiteShape(fixedTrees: List[Tree], sequenceTree: Tree) {
+    val fixedArity      = fixedTrees.length
+    def acceptsSequence = sequenceTree ne EmptyTree
+    def acceptsBool     = fixedArity == 0 && !acceptsSequence
+    def acceptsSingle   = fixedArity == 1 && !acceptsSequence
+
+    def accepts(extractor: ExtractorShape): Boolean = (
+         fixedArity == extractor.fixedArity
+      && acceptsSequence == extractor.offersSequence
+    )
+  }
+
   trait MatchTranslator extends TreeMakers {
     import typer.context
 
@@ -435,6 +453,8 @@ trait MatchTranslation { self: PatternMatching  =>
 
       private def hasStar       = nbSubPats > 0 && (treeInfo isStar args.last)
       private def isNonEmptySeq = nbSubPats > 0 && isSeq
+
+      def isSingle = nbSubPats == 0 && !isSeq
 
       // to which type should the previous binder be casted?
       def paramType  : Type
