@@ -16,7 +16,7 @@ import scala.reflect.internal.util.shortClassOfInstance
  */
 trait Contexts { self: Analyzer =>
   import global._
-  import definitions.{ JavaLangPackage, ScalaPackage, PredefModule, ScalaXmlTopScope, ScalaXmlPackage }
+  import definitions.{ ScalaPackage, PredefModule, ScalaXmlTopScope, ScalaXmlPackage }
   import ContextMode._
 
   object NoContext
@@ -34,10 +34,82 @@ trait Contexts { self: Analyzer =>
     override def toString = "NoContext"
   }
   private object RootImports {
+    import definitions.{
+      JavaLangPackage, BoxedCharacterClass, BoxedBooleanClass, BoxedByteClass, BoxedShortClass,
+      BoxedIntClass, BoxedLongClass, BoxedFloatClass, BoxedDoubleClass, ClassClass,
+      ComparableClass, JavaCloneableClass, JavaEnumClass, JavaNumberClass, ObjectClass,
+      StringClass, ThrowableClass }
+    
+    val AppendableClass   = rootMirror.getRequiredClass("java.lang.Appendable")
+    val ArithmeticExceptionClass
+                          = rootMirror.getRequiredClass("java.lang.ArithmeticException")
+    val AssertionErrorClass
+                          = rootMirror.getRequiredClass("java.lang.AssertionError")
+    val CharSequenceClass = rootMirror.getRequiredClass("java.lang.CharSequence")
+    val ClassNotFoundExceptionClass
+                          = rootMirror.getRequiredClass("java.lang.ClassNotFoundException")
+    val ClassLoaderClass  = rootMirror.getRequiredClass("java.lang.ClassLoader")
+    val CompilerClass     = rootMirror.getRequiredClass("java.lang.Compiler")
+    val ExceptionInInitializerErrorClass
+                          = rootMirror.getRequiredClass("java.lang.ExceptionInInitializerError")
+    val IllegalStateExceptionClass
+                          = rootMirror.getRequiredClass("java.lang.IllegalStateException")
+    val InheritableThreadLocalClass
+                          = rootMirror.getRequiredClass("java.lang.InheritableThreadLocal")
+    val JavaIterableClass = rootMirror.getRequiredClass("java.lang.Iterable")
+    val LinkageErrorClass = rootMirror.getRequiredClass("java.lang.LinkageError")
+    val NoClassDefFoundErrorClass
+                          = rootMirror.getRequiredClass("java.lang.NoClassDefFoundError")
+    val NoSuchFieldExceptionClass
+                          = rootMirror.getRequiredClass("java.lang.NoSuchFieldException")
+    val NoSuchMethodExceptionClass
+                          = rootMirror.getRequiredClass("java.lang.NoSuchMethodException")
+    val MathClass         = rootMirror.getRequiredClass("java.lang.Math")
+    val PackageClass      = rootMirror.getRequiredClass("java.lang.Package")
+    val ProcessClass      = rootMirror.getRequiredClass("java.lang.Process")
+    val ProcessBuilderClass
+                          = rootMirror.getRequiredClass("java.lang.ProcessBuilder")
+    val ReadableClass     = rootMirror.getRequiredClass("java.lang.Readable")
+    val RunnableClass     = rootMirror.getRequiredClass("java.lang.Runnable")
+    val JavaRuntimeClass  = rootMirror.getRequiredClass("java.lang.Runtime")
+    val JavaRuntimePermissionClass
+                          = rootMirror.getRequiredClass("java.lang.RuntimePermission")
+    val SecurityExceptionClass
+                          = rootMirror.getRequiredClass("java.lang.SecurityException")
+    val SecurityManagerClass
+                          = rootMirror.getRequiredClass("java.lang.SecurityManager")
+    val StackOverflowErrorClass
+                          = rootMirror.getRequiredClass("java.lang.StackOverflowError")
+    val StackTraceElementClass
+                          = rootMirror.getRequiredClass("java.lang.StackTraceElement")
+    val StrictMathClass   = rootMirror.getRequiredClass("java.lang.StrictMath")
+    val StringBufferClass = rootMirror.getRequiredClass("java.lang.StringBuffer")
+    val SystemClass       = rootMirror.getRequiredClass("java.lang.System")
+    val ThreadClass       = rootMirror.getRequiredClass("java.lang.Thread")
+    val ThreadDeathClass  = rootMirror.getRequiredClass("java.lang.ThreadDeath")
+    val ThreadGroupClass  = rootMirror.getRequiredClass("java.lang.ThreadGroup")
+    val ThreadLocalClass  = rootMirror.getRequiredClass("java.lang.ThreadLocal")
+    val VirtualMachineErrorClass
+                          = rootMirror.getRequiredClass("java.lang.VirtualMachineError")
+    val VoidClass         = rootMirror.getRequiredClass("java.lang.Void")
     // Possible lists of root imports
-    val javaList         = JavaLangPackage :: Nil
-    val javaAndScalaList = JavaLangPackage :: ScalaPackage :: Nil
-    val completeList     = JavaLangPackage :: ScalaPackage :: PredefModule :: Nil
+    val javaList: List[ModuleSymbol]   = JavaLangPackage :: Nil
+    val specificJavaList: List[Symbol] =
+      List(AppendableClass, ArithmeticExceptionClass, AssertionErrorClass, BoxedCharacterClass,
+      /*BoxedBooleanClass,*/ /*BoxedByteClass,*/ /*BoxedShortClass,*/ BoxedIntClass,
+      /*BoxedLongClass,*/ /*BoxedFloatClass,*/ /*BoxedDoubleClass,*/ CharSequenceClass,
+      ClassClass, ClassNotFoundExceptionClass, ClassLoaderClass, ComparableClass,
+      CompilerClass, ExceptionInInitializerErrorClass, IllegalStateExceptionClass,
+      InheritableThreadLocalClass, JavaCloneableClass, JavaEnumClass, /*JavaIterableClass,*/
+      JavaNumberClass, JavaRuntimeClass, JavaRuntimePermissionClass, LinkageErrorClass, MathClass,
+      NoClassDefFoundErrorClass, NoSuchFieldExceptionClass, NoSuchMethodExceptionClass,
+      ObjectClass, PackageClass, ProcessClass, ProcessBuilderClass, ReadableClass, RunnableClass,
+      SecurityExceptionClass, SecurityManagerClass, StackOverflowErrorClass,
+      StackTraceElementClass, StrictMathClass, StringClass, StringBufferClass, SystemClass,
+      ThreadClass, ThreadDeathClass, ThreadGroupClass, ThreadLocalClass, ThrowableClass,
+      VirtualMachineErrorClass, VoidClass)
+    val javaAndScalaList: List[ModuleSymbol] = JavaLangPackage :: ScalaPackage :: Nil
+    val completeList: List[Symbol]     = specificJavaList :+ ScalaPackage :+ PredefModule
   }
 
   def ambiguousImports(imp1: ImportInfo, imp2: ImportInfo) =
@@ -93,9 +165,15 @@ trait Contexts { self: Analyzer =>
     else RootImports.completeList
   }
 
+  private def importTermOrType(sym: Symbol): Import =
+    if (sym.isPackage || sym.isModule)
+      gen.mkWildcardImport(sym)
+    else if (sym.isClass)
+      gen.mkImport(sym.enclosingPackage, sym.name.toTermName, sym.name.toTermName)
+    else abort(s"$sym is neither term nor type")
 
   def rootContext(unit: CompilationUnit, tree: Tree = EmptyTree, erasedTypes: Boolean = false): Context = {
-    val rootImportsContext = (startContext /: rootImports(unit))((c, sym) => c.make(gen.mkWildcardImport(sym)))
+    val rootImportsContext = (startContext /: rootImports(unit))((c, sym) => c.make(importTermOrType(sym)))
 
     // there must be a scala.xml package when xml literals were parsed in this unit
     if (unit.hasXml && ScalaXmlPackage == NoSymbol)
@@ -912,7 +990,14 @@ trait Contexts { self: Analyzer =>
           log(s"Suppressing ambiguous import: $mt1 =:= $mt2 && $imp1Symbol and $imp2Symbol are equivalent")
           Some(imp1)
         }
+//        else if (mt1 =:= mt2 && name.isTypeName) {
+//          warning(s"Polymorphic types $imp1Symbol and $imp2Symbol encountered!")
+//          warning(s"imp1Symbol.variance: ${imp1Symbol.variance}, imp2Symbol.variance: ${imp2Symbol.variance}")
+//          None
+//        }
         else {
+          log(s"Polymorphic types $imp1Symbol and $imp2Symbol encountered!")
+          log(s"imp1Symbol.variance: ${imp1Symbol.variance}, imp2Symbol.variance: ${imp2Symbol.variance}")
           log(s"Import is genuinely ambiguous:\n  " + characterize)
           None
         }
