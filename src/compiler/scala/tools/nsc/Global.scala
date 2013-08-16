@@ -18,7 +18,7 @@ import util.{ ClassPath, MergedClassPath, StatisticsInfo, returning, stackTraceS
 import scala.reflect.internal.util.{ OffsetPosition, SourceFile, NoSourceFile, BatchSourceFile, ScriptSourceFile }
 import scala.reflect.internal.pickling.{ PickleBuffer, PickleFormat }
 import scala.reflect.io.VirtualFile
-import symtab.{ Flags, SymbolTable, SymbolLoaders, SymbolTrackers }
+import symtab.{ Flags, SymbolTable, SymbolTrackers }
 import symtab.classfile.Pickler
 import plugins.Plugins
 import ast._
@@ -27,7 +27,7 @@ import typechecker._
 import transform.patmat.PatternMatching
 import transform._
 import backend.icode.{ ICodes, GenICode, ICodeCheckers }
-import backend.{ ScalaPrimitives, Platform, JavaPlatform }
+import backend.{ ScalaPrimitives, JavaPlatform }
 import backend.jvm.GenBCode
 import backend.jvm.GenASM
 import backend.opt.{ Inliners, InlineExceptionHandlers, ConstantOptimization, ClosureElimination, DeadCodeElimination }

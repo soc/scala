@@ -426,9 +426,6 @@ class ScalaSigPrinter(stream: PrintStream, printPrivates: Boolean) {
   private def trimStart(s: String, prefix: String) =
     if (s != null && s.startsWith(prefix)) s.substring(prefix.length) else s
 
-  private def decapitalize(s: String) =
-    java.beans.Introspector.decapitalize(s)
-
   private def cutSubstring(dom: String)(s: String) =
     if (dom != null && s != null) dom.replace(s, "") else dom
 }

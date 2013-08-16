@@ -9,7 +9,6 @@
 package scala
 package xml
 
-import parsing.NoBindingFactoryAdapter
 import factory.XMLLoader
 import java.io.{ File, FileDescriptor, FileInputStream, FileOutputStream }
 import java.io.{ InputStream, Reader, StringReader, Writer }

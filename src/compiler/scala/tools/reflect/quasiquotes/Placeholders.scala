@@ -81,7 +81,7 @@ trait Placeholders { self: Quasiquotes =>
 
   object AnnotPlaceholder {
     def unapply(tree: Tree): Option[(Tree, Location, Cardinality, List[Tree])] = tree match {
-      case Apply(Select(New(Placeholder(tree, loc, card)), nme.CONSTRUCTOR), args) => Some(tree, loc, card, args)
+      case Apply(Select(New(Placeholder(tree, loc, card)), nme.CONSTRUCTOR), args) => Some((tree, loc, card, args))
       case _ => None
     }
   }
