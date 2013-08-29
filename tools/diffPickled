@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/usr/bin/env bash
 #
 # Shows the difference in pickler output between two variations on a class.
 #

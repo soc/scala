@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/usr/bin/env bash
 #
 # Creates a classpath out of the contents of each directory
 # given as an argument.

@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+#
+
+BINDIR=$(dirname $0)/../build/pack/bin
+$BINDIR/scala scala.tools.util.CompilerScript "$*"

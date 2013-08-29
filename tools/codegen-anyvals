@@ -1,5 +1,6 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
 
-THISDIR=`dirname $0`
-$THISDIR/codegen --anyvals --out $THISDIR/../src/library/scala
+. $(dirname $0)/bash-fns.sh
+
+( cd $script_dir && codegen --anyvals --out ../src/library/scala )
