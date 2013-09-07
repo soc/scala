@@ -121,6 +121,9 @@ class BatchSourceFile(val file : AbstractFile, val content0: Array[Char]) extend
   def start = 0
   def isSelfContained = true
 
+  // XXX
+  scala.reflect.position.Source(this)
+
   override def identifier(pos: Position) =
     if (pos.isDefined && pos.source == this && pos.point != -1) {
       def isOK(c: Char) = isIdentifierPart(c) || isOperatorPart(c)
