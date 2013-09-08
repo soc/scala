@@ -236,7 +236,7 @@ abstract class ToolBoxFactory[U <: JavaUniverse](val u: U) { factorySelf =>
 
         val mdef = wrap(expr)
         val pdef = PackageDef(Ident(mdef.name), List(mdef))
-        val unit = new CompilationUnit(NoSourceFile)
+        val unit = CompilationUnit(NoSourceFile)
         unit.body = pdef
 
         val run = new Run
@@ -274,7 +274,7 @@ abstract class ToolBoxFactory[U <: JavaUniverse](val u: U) { factorySelf =>
       def parse(code: String): Tree = {
         reporter.reset()
         val file = new BatchSourceFile("<toolbox>", code)
-        val unit = new CompilationUnit(file)
+        val unit = CompilationUnit(file)
         val parsed = newUnitParser(unit).parseStats()
         throwIfErrors()
         parsed match {

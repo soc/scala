@@ -19,10 +19,12 @@ trait Positioned[T] extends Any {
   def startOrElse(alt: Int): Int
   def pointOrElse(alt: Int): Int
   def endOrElse(alt: Int): Int
+
   def lineContent: String
   def lineCarat: String
+
   def coordinatesString: String
-  def formattedMessage(prefix: String, msg: String): String
+  def show: String
 }
 
 object Positioned {

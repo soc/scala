@@ -370,6 +370,9 @@ abstract class SymbolTable extends macros.Universe
    * Adds the `sm` String interpolator to a [[scala.StringContext]].
    */
   implicit val StringContextStripMarginOps: StringContext => StringContextStripMarginOps = util.StringContextStripMarginOps
+
+  val moduleRefCache  = perRunCaches.newMap[Symbol, RefTree]()
+  val moduleThisCache = perRunCaches.newMap[Symbol, This]()
 }
 
 object SymbolTableStats {

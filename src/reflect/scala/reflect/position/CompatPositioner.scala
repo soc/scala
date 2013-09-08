@@ -45,6 +45,7 @@ final class CompatPositioned[T <: api.Position](val positioner: Positioner[T], v
   def endOrElse(alt: Int): Int   = if (isDefined) end else alt
   def lineContent: String        = source lineAt LineNumber(line)
   def lineCarat: String          = mapToWhitespace(lineContent take column - 1) + "^"
+  def show                       = pos.show
 
   def coordinatesString = "${source.name}:$line:$column"
   def formattedMessage(prefix: String, msg: String): String = s"$prefix:$line: $msg\n$lineContent\n$lineCarat"

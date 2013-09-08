@@ -2,11 +2,11 @@ package scala
 package reflect
 package position
 
-import JoinInts._
+import BitOps._
 
 final class IndexRange private (val bits: Long) extends AnyVal {
-  def start: Index = Index(left(bits))
-  def end: Index   = Index(right(bits))
+  def start: Index = Index(left32(bits))
+  def end: Index   = Index(right32(bits))
   def length: Int  = end.value - start.value
 
   def contains(that: Index): Boolean          = start <= that && that < end
@@ -16,23 +16,37 @@ final class IndexRange private (val bits: Long) extends AnyVal {
   override def toString = s"[$start,$end)"
 }
 
-object JoinInts {
-  final val Int32   = 0xFFFFFFFF
-  final val Long32  = 0xFFFFFFFFL
+object BitOps {
+  final val Int14  = (1 << 14) - 1
+  final val Int16  = 0x0000FFFF
+  final val Int18  = (1 << 18) - 1
+  final val Int32  = 0xFFFFFFFF
+  final val Long32 = 0xFFFFFFFFL
 
-  def join32(lbits: Int, rbits: Int): Long = ((lbits & Long32) << 32) | (rbits & Long32)
-  def left(joined: Long): Int              = (joined >>> 32).toInt & Int32
-  def right(joined: Long): Int             = joined.toInt
-}
+  private def mask(bits: Int): Int = (1 << bits) - 1
 
-object JoinUnsignedShorts {
-  final val Int16 = 0x0000FFFF
+  def join64(lbits: Int, rbits: Int): Long = ((lbits & Long32) << 32) | (rbits & Long32)
+  def left32(joined: Long): Int            = (joined >>> 32).toInt & Int32
+  def right32(joined: Long): Int           = joined.toInt
 
-  def join16(lbits: Int, rbits: Int): Int = ((lbits & Int16) << 32) | (rbits & Int16)
-  def left(joined: Int): Int              = (joined >>> 16) & Int16
-  def right(joined: Int): Int             = joined & Int16
+  def join32(lbits: Int, rbits: Int): Int  = ((lbits & Int16) << 16) | (rbits & Int16)
+  def left16(joined: Int): Int             = (joined >>> 16) & Int16
+  def right16(joined: Int): Int            = joined & Int16
+
+  def joinIntoInt(lsize: Int, lbits: Int, rbits: Int): Int = {
+    assert(1 <= lsize && lsize <= 32, lsize)
+
+    val rsize = 32 - lsize
+    val lmask = (1 << lsize) - 1
+    val rmask = (1 << rsize) - 1
+
+    ((lbits & lmask) << rsize) | (rbits & rmask)
+  }
+
+  def leftN(lsize: Int)(lvalue: Int): Int  = lvalue >>> (32 - lsize)
+  def rightN(rsize: Int)(rvalue: Int): Int = rvalue & mask(rsize)
 }
 
 object IndexRange {
-  def apply(start: Index, end: Index): IndexRange = new IndexRange(join32(start.value, end.value))
+  def apply(start: Index, end: Index): IndexRange = new IndexRange(join64(start.value, end.value))
 }

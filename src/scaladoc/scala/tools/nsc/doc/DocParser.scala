@@ -41,7 +41,7 @@ class DocParser(settings: nsc.Settings, reporter: Reporter) extends Global(setti
   /** A compilation unit containing parsed source.
    */
   def docUnit(code: String) = {
-    val unit    = new CompilationUnit(new BatchSourceFile("<console>", code))
+    val unit    = CompilationUnit(new BatchSourceFile("<console>", code))
     val scanner = newUnitParser(unit)
 
     scanner.compilationUnit()

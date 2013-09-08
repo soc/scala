@@ -1332,7 +1332,15 @@ trait Contexts { self: Analyzer =>
   }
 
   case class ImportType(expr: Tree) extends Type {
-    override def safeToString = "ImportType("+expr+")"
+    // override def =:=(that: Type) = that match {
+    //   case ImportType(thatExpr) => expr eq thatExpr
+    //   case _                    => super.=:=(that)
+    // }
+    // override def equals(that: Any) = that match {
+    //   case ImportType(thatExpr) => expr == thatExpr
+    //   case _                    => super.equals(that)
+    // }
+    override def safeToString = s"ImportType($expr)"
   }
 }
 

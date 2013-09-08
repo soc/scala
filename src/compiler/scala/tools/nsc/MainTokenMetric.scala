@@ -21,7 +21,7 @@ object MainTokenMetric {
     import ast.parser.Tokens.EOF
     var totale = 0
     for (source <- fnames) {
-      val s = new UnitScanner(new CompilationUnit(compiler.getSourceFile(source)))
+      val s = new UnitScanner(CompilationUnit(compiler.getSourceFile(source)))
       s.nextToken()
       var i = 0
       while (s.token != EOF) {

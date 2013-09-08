@@ -59,7 +59,7 @@ trait ScaladocAnalyzer extends Analyzer {
             pos.withSource(context.unit.source, useCase.pos.start)
           }
         }
-        newUnitParser(new CompilationUnit(file))
+        newUnitParser(CompilationUnit(file))
       }
 
       val trees = stringParser(useCase.body+";").nonLocalDefOrDcl

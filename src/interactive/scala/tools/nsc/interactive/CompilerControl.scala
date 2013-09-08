@@ -261,7 +261,7 @@ trait CompilerControl { self: Global =>
    *  compiler thread.
    */
   def parseTree(source: SourceFile): Tree = {
-    newUnitParser(new CompilationUnit(source)).parse()
+    newUnitParser(CompilationUnit(source)).parse()
   }
 
   /** Asks for a computation to be done quickly on the presentation compiler thread */

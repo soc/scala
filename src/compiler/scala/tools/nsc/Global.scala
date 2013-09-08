@@ -410,17 +410,12 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
       if (settings.debug && (settings.verbose || currentRun.size < 5))
         inform("[running phase " + name + " on " + unit + "]")
 
-      val unit0 = currentUnit
-      try {
-        currentRun.currentUnit = unit
+      withCurrentUnit(unit) {
         if (!cancelled(unit)) {
           currentRun.informUnitStarting(this, unit)
           apply(unit)
         }
         currentRun.advanceUnit()
-      } finally {
-        //assert(currentUnit == unit)
-        currentRun.currentUnit = unit0
       }
     }
   }
@@ -1053,6 +1048,13 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
   def currentUnit: CompilationUnit = if (currentRun eq null) NoCompilationUnit else currentRun.currentUnit
   def currentSource: SourceFile    = if (currentUnit.exists) currentUnit.source else lastSeenSourceFile
 
+  @inline final def withCurrentUnit[T](unit: CompilationUnit)(body: => T): T = {
+    val saved = currentUnit
+    currentRun.currentUnit = unit
+    try sources.withActiveSource(unit.sourceId)(body)
+    finally currentRun.currentUnit = saved
+  }
+
   def isGlobalInitialized = (
        definitions.isDefinitionsInitialized
     && rootMirror.isMirrorInitialized
@@ -1159,7 +1161,7 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
         warning("there were %d %s warning(s); re-run with %s for details".format(warnings.size, what, option.name))
   }
 
-  def newCompilationUnit(code: String)                   = new CompilationUnit(newSourceFile(code))
+  def newCompilationUnit(code: String)                   = CompilationUnit(newSourceFile(code))
   def newSourceFile(code: String)                        = new BatchSourceFile("<console>", code)
   def newUnitScanner(unit: CompilationUnit): UnitScanner = new UnitScanner(unit)
   def newUnitParser(unit: CompilationUnit): UnitParser   = new UnitParser(unit)
@@ -1555,7 +1557,7 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
         reportCompileErrors()
       }
 
-      val units = sources map scripted map (new CompilationUnit(_))
+      val units = sources map scripted map (CompilationUnit(_))
 
       units match {
         case Nil => checkDeprecations()   // nothing to compile, report deprecated options
@@ -1673,7 +1675,7 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
      */
     def compileLate(file: AbstractFile) {
       if (!compiledFiles(file.path))
-        compileLate(new CompilationUnit(scripted(getSourceFile(file))))
+        compileLate(CompilationUnit(scripted(getSourceFile(file))))
     }
 
     /** Compile abstract file until `globalPhase`, but at least to phase "namer".
@@ -1703,7 +1705,7 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
       val fakeJfile = new java.io.File(syntheticFileName)
       val virtualFile = new VirtualFile(syntheticFileName) { override def file = fakeJfile }
       val sourceFile = new BatchSourceFile(virtualFile, code.toString)
-      val unit = new CompilationUnit(sourceFile)
+      val unit = CompilationUnit(sourceFile)
       unit.body = code
       compileLate(unit)
     }

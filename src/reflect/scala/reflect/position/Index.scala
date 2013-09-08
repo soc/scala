@@ -6,12 +6,13 @@ package position
 
 final class LineNumber private (val value: Int) extends AnyVal {
   def index: Int = value - 1
-  def next: LineNumber = if (value == Int.MaxValue) illegalArg(s"$this.next") else LineNumber(value + 1)
-  def prev: LineNumber = if (value <= 1) illegalArg(s"$this.prev") else LineNumber(value - 1)
+  def next: LineNumber = LineNumber(value + 1)
+  def prev: LineNumber = LineNumber(value - 1)
   override def toString = s"line $value"
 }
 object LineNumber extends (Int => LineNumber) {
-  def apply(value: Int): LineNumber = if (value <= 0) illegalArg(s"$value <= 0") else new LineNumber(value)
+  final val Max = Int.MaxValue
+  def apply(value: Int): LineNumber = new LineNumber(boundsCheck(1, Max)(value))
 }
 
 final class Index private (val value: Int) extends AnyVal with Ordered[Index] {
@@ -22,8 +23,8 @@ final class Index private (val value: Int) extends AnyVal with Ordered[Index] {
   )
   def min(that: Index) = if (this < that) this else that
   def max(that: Index) = if (this > that) this else that
-  def next: Index = if (value == Int.MaxValue) illegalArg(s"$this.next") else Index(value + 1)
-  def prev: Index = if (value == 0) illegalArg(s"$this.prev") else Index(value - 1)
+  def next: Index = Index(value + 1)
+  def prev: Index = Index(value - 1)
   def add(n: Int): Index = Index(value + n)
 
   def until(end: Index): IndexRange = IndexRange(this, end)
@@ -35,7 +36,8 @@ final class Index private (val value: Int) extends AnyVal with Ordered[Index] {
 }
 
 object Index extends (Int => Index) {
+  final val Max = Int.MaxValue
   final val NoIndex = new Index(-1)
 
-  def apply(value: Int): Index = if (value < 0) illegalArg(s"$value < 0") else new Index(value)
+  def apply(value: Int): Index = new Index(boundsCheck(0, Max)(value))
 }

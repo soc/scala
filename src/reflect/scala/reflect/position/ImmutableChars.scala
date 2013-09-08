@@ -42,6 +42,8 @@ final class ImmutableChars private (underlying: Array[Char]) extends IndexedSeq[
 
 object ImmutableChars {
   def apply(chars: Array[Char]): ImmutableChars      = new ImmutableChars(chars)
-  def apply(is: java.io.InputStream): ImmutableChars = new ImmutableChars((Streamable slurp is).toCharArray)
-  def apply(is: java.io.File): ImmutableChars        = new ImmutableChars((Streamable slurp is.toURI.toURL).toCharArray)
+  def apply(in: java.io.InputStream): ImmutableChars = apply((Streamable slurp in).toCharArray)
+  def apply(url: Url): ImmutableChars                = apply(url.openStream())
+  def apply(uri: Uri): ImmutableChars                = apply(uri.toURL)
+  def apply(file: java.io.File): ImmutableChars      = apply(file.toURI)
 }
