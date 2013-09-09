@@ -41,8 +41,7 @@ package object position {
   def NoPosData  = PosData.None
 
   def newTreePositioner[U <: SymbolTable](u: U): Positioner[u.Tree] = new Positioner[u.Tree] {
-    def positionFor(entity: u.Tree): PosData              = entity.posData
-    def sourceFor(entity: u.Tree): Source                 = u.sources(entity.id.sourceId)
-    def reposition(entity: u.Tree, data: PosData): u.Tree = entity setPosData data
+    def positionFor(entity: u.Tree): PosData = PosData(entity.pos)
+    def sourceFor(entity: u.Tree): Source    = u.sources(entity.id.sourceId)
   }
 }
