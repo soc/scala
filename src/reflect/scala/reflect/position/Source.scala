@@ -86,50 +86,53 @@ object Source {
   def apply(file: java.io.File): Source = if (file eq null) NoSource else apply(file.toURI)
   def apply(file: SourceFile): Source   = if (file.file.file eq null) NoSource else new UriSource(file.file.file.toURI, charsOf(file.content))
   def apply(path: String): Source       = apply(newUri(path))
+}
 
-  implicit final class SourceDebugOps(val source: Source) extends AnyVal {
-    import source._
-    private def ljust(max: Int): String = "%%-%ds" format max.toString.length
-    private def rjust(max: Int): String = "%%%ds" format max.toString.length
 
-    private def lineMarkers = {
-      val lineFmt  = rjust(lines.length)
-      val startFmt = rjust(chars.length)
-      val endFmt   = ljust(chars.length)
-      val fmt      = List("[", lineFmt, "  ", startFmt, "-", endFmt, "]  ").mkString
+final class SourceDebugOps(val source: Source) extends AnyVal {
+  import source._
+  private def ljust(max: Int): String = "%%-%ds" format max.toString.length
+  private def rjust(max: Int): String = "%%%ds" format max.toString.length
 
-      source.lineNumbers map { l =>
-        val start = source lineToOffset l
-        val end   = start add (source lineAt l).length
-        fmt.format(l.value, start, end)
-      }
+  private def lineMarkers = {
+    val lineFmt  = rjust(lines.length)
+    val startFmt = rjust(chars.length)
+    val endFmt   = ljust(chars.length)
+    val fmt      = List("[", lineFmt, "  ", startFmt, "-", endFmt, "]  ").mkString
+
+    source.lineNumbers map { l =>
+      val start = source lineToOffset l
+      val end   = start add (source lineAt l).length
+      fmt.format(l.value, start, end)
     }
-
-    def annotatedLines  = (lineMarkers, lines).zipped map (_ + _)
-    def annotatedSource = annotatedLines mkString "\n"
-    def dump(): Unit = println(s"""
-      |${source.path}
-      |   chars: ${chars.length}
-      |   lines: ${lines.length}
-      |  source:
-      |$annotatedSource
-      |""".stripMargin.trim + "\n"
-    )
   }
-  implicit final class SourceOps(val source: Source) extends AnyVal {
-    import source._
 
-    def url  = uri.toURL
-    def file = new File(uri)
-    def name = file.getName
-    def path = file.getPath
+  def annotatedLines  = (lineMarkers, lines).zipped map (_ + _)
+  def annotatedSource = annotatedLines mkString "\n"
+  def dump(): Unit = println(s"""
+    |${source.path}
+    |   chars: ${chars.length}
+    |   lines: ${lines.length}
+    |  source:
+    |$annotatedSource
+    |""".stripMargin.trim + "\n"
+  )
+}
 
-    def lineToOffset(line: LineNumber): Index   = lineIndices(line.index)
-    def offsetToLine(offset: Index): LineNumber = coordinatesOf(offset).line
-    def offsetToColumn(offset: Index): Int      = coordinatesOf(offset).column
+final class SourceOps(val source: Source) extends AnyVal {
+  import source._
 
-    def charAt(offset: Index): Char      = chars(offset.value)
-    def lineAt(line: LineNumber): String = lines(line.index)
-    def lineNumbers                      = lines.indices map (x => LineNumber(x + 1))
-  }
+  def url        = uri.toURL
+  def file       = new File(uri)
+  def name       = file.getName
+  def path       = file.getPath
+  def sourceFile = new BatchSourceFile(new PlainFile(file))
+
+  def lineToOffset(line: LineNumber): Index   = lineIndices(line.index)
+  def offsetToLine(offset: Index): LineNumber = coordinatesOf(offset).line
+  def offsetToColumn(offset: Index): Int      = coordinatesOf(offset).column
+
+  def charAt(offset: Index): Char      = chars(offset.value)
+  def lineAt(line: LineNumber): String = lines(line.index)
+  def lineNumbers                      = lines.indices map (x => LineNumber(x + 1))
 }
