@@ -27,6 +27,8 @@ final class PosData private (val bits: Long) extends AnyVal {
   def sameRange(pos: PosData): Boolean = (start == pos.start) && (end == pos.end)
 
   def focus: PosData                 = if (isFocused) this else PosData.focused(point)
+  def focusStart: PosData            = PosData.focused(start)
+  def focusEnd: PosData              = PosData.focused(end)
   def makeTransparent: PosData       = if (isTransparent) this else new PosData(bits | TransparentBit)
   def union(pos: PosData): PosData   = PosData(start min pos.start, point, end max pos.end)
   def withStart(start: Int): PosData = PosData(start, point, end, isTransparent)
@@ -59,7 +61,6 @@ object PosData {
     require(start >= 0 && point >= 0 && end >= 0, s"All parameters must be non-negative: " + params)
     require(start <= end, s"Start must not be greater than end: " + params)
   }
-
 
   def focused(point: Int): PosData                           = create(point, point, point, isTransparent = false)
   def opaque(start: Int, point: Int, end: Int): PosData      = create(start, point, end, isTransparent = false)

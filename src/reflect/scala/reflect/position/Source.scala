@@ -64,6 +64,7 @@ object NoSource extends Source {
   val lines                        = Vector()
   val lineIndices                  = Vector()
   def coordinatesOf(offset: Index) = RowAndColumn.Empty
+  override def toString = "NoSource"
 }
 
 class UriSource(val uri: Uri, val chars: ImmutableChars) extends Source {

@@ -25,13 +25,12 @@ object SourcedPosData {
 }
 
 class WrappedSourcedPosData(positioned: SourcedPosData) extends UtilPosition {
-  // (positioned.source.sourceFile, positioned.data.startOrPoint, positioned.data.point, positioned.data.endOrPoint) {
   def data = positioned.data
 
   println(s"new WrappedSourcedPosData($positioned)")
 
-  private implicit def posToPosData(pos: Pos): PosData  = PosData(pos)
-  private implicit def posDataToPos(data: PosData): Pos = new WrappedSourcedPosData(positioned withData data)
+  // private implicit def posToPosData(pos: Pos): PosData  = PosData(pos)
+  private implicit def posDataToPos(data: PosData): Pos = new WrappedSourcedPosData(SourcedPosData(positioned.source, data))
 
   def reposition(entity: api.Position, data: PosData): api.Position = {
     val pos = Position.range(entity.source, data.start, data.point, data.end)
@@ -45,7 +44,7 @@ class WrappedSourcedPosData(positioned: SourcedPosData) extends UtilPosition {
   override def properlyPrecedes(pos: Pos): Boolean = data properlyPrecedes pos
   override def overlaps(pos: Pos): Boolean         = data overlaps pos
   override def sameRange(pos: Pos): Boolean        = data sameRange pos
-  override def union(pos: Pos): Pos                = data union pos
+  override def union(pos: Pos): Pos                = SourcedPosData(positioned.source, data union pos.data)
 
   override def safeLine = positioned.line
 
@@ -56,7 +55,7 @@ class WrappedSourcedPosData(positioned: SourcedPosData) extends UtilPosition {
   override def focusEnd: Pos              = data.focusEnd
   override def focusStart: Pos            = data.focusStart
   override def isDefined: Boolean         = data.isDefined
-  override def isOpaqueRange: Boolean     = data.isOpaqueRange
+  override def isOpaqueRange: Boolean     = data.isRange && !data.isTransparent
   override def isRange: Boolean           = data.isRange
   override def isTransparent: Boolean     = data.isTransparent
   override def line: Int                  = positioned.line

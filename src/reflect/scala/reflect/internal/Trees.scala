@@ -64,12 +64,16 @@ trait Trees extends api.Trees { self: SymbolTable =>
       case t @ Import(Select(thiz @ This(qual), name), _) => "  " + t + s" where selection is $qual.$name and pos=${thiz.pos.show} sym=${thiz.symbol.id} tpe=${thiz.tpe.##}"
       case _                                              => ""
     }
-    if (Sources.dump)
-      Console.err.println(f"$globalPhase%15s  $shortClass%-25s  $id%-15s$safeString")
+    if (Sources.dump) {
+      // Console.err.println(ourPos)
+      // Console.err.println(rawatt.pos)
+      Console.err.println(f"$globalPhase%15s  ${rawatt.getClass}%-25s  $shortClass%-25s  $id%-15s$safeString")
+    }
 
     if (Statistics.canEnable) Statistics.incCounter(TreesStats.nodeByType, getClass)
 
-    final override def pos: Position = rawatt.pos
+    private def ourPos = SourcedPosData(sources(id.sourceId), PosData(rawatt.pos))
+    final override def pos: Position = new WrappedSourcedPosData(SourcedPosData(sources(id.sourceId), PosData(rawatt.pos)))// (rawatt.pos) printResult("pos")(rawatt.pos)
 
     private[this] var rawtpe: Type = _
     final def tpe = rawtpe
