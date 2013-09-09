@@ -5,12 +5,16 @@ package position
 import PosData._
 
 final class PosData private (val bits: Long) extends AnyVal {
-  def start: Int = (bits >>> StartShift).toInt & MaxValue
-  def point: Int = (bits >>> PointShift).toInt & MaxValue
-  def end: Int   = (bits >>> EndShift).toInt & MaxValue
-  def width: Int = end - start
+  def start: Int                 = (bits >>> StartShift).toInt & MaxValue
+  def point: Int                 = (bits >>> PointShift).toInt & MaxValue
+  def end: Int                   = (bits >>> EndShift).toInt & MaxValue
+  def width: Int                 = end - start
+  def endOrElse(alt: Int): Int   = if (isRange) end else alt
+  def startOrElse(alt: Int): Int = if (isRange) start else alt
 
+  def isDefined: Boolean                      = this != NoPosData
   def isFocused: Boolean                      = (start == point) && (point == end)
+  def isRange: Boolean                        = isDefined && (start < end)
   def isTransparent: Boolean                  = (bits & TransparentBit) != 0
   def includes(pos: PosData): Boolean         = start <= pos.start && pos.end <= end
   def properlyIncludes(pos: PosData): Boolean = start < pos.start && pos.end < end
@@ -29,6 +33,8 @@ final class PosData private (val bits: Long) extends AnyVal {
   def withPoint(point: Int): PosData = PosData(start, point, end, isTransparent)
   def withEnd(end: Int): PosData     = PosData(start, point, end, isTransparent)
   def shifted(shift: Int): PosData   = PosData(start + shift, point + shift, end + shift, isTransparent)
+
+  def copy(start: Int = start, point: Int = point, end: Int = end): PosData = PosData(start, point, end)
 
   private def ldelim    = if (isTransparent) "<" else "["
   private def rdelim    = if (isTransparent) ">" else "]"
@@ -54,10 +60,16 @@ object PosData {
     require(start <= end, s"Start must not be greater than end: " + params)
   }
 
+
   def focused(point: Int): PosData                           = create(point, point, point, isTransparent = false)
   def opaque(start: Int, point: Int, end: Int): PosData      = create(start, point, end, isTransparent = false)
   def transparent(start: Int, point: Int, end: Int): PosData = create(start, point, end, isTransparent = true)
 
+  def apply(pos: UtilPosition): PosData = (
+    if (pos.isRange) apply(pos.start, pos.point, pos.end)
+    else if (pos.isDefined) apply(pos.point)
+    else NoPosData
+  )
   def apply(point: Int): PosData                                               = apply(point, point, point)
   def apply(start: Int, end: Int): PosData                                     = apply(start, start, end)
   def apply(start: Int, point: Int, end: Int): PosData                         = apply(start, point, end, isTransparent = false)

@@ -30,7 +30,7 @@ class WrappedSourcedPosData(positioned: SourcedPosData) extends UtilPosition {
 
   println(s"new WrappedSourcedPosData($positioned)")
 
-  private implicit def posToPosData(pos: Pos): PosData  = PosData compat pos
+  private implicit def posToPosData(pos: Pos): PosData  = PosData(pos)
   private implicit def posDataToPos(data: PosData): Pos = new WrappedSourcedPosData(positioned withData data)
 
   def reposition(entity: api.Position, data: PosData): api.Position = {
