@@ -371,8 +371,8 @@ abstract class SymbolTable extends macros.Universe
    */
   implicit val StringContextStripMarginOps: StringContext => StringContextStripMarginOps = util.StringContextStripMarginOps
 
-  val moduleRefCache  = perRunCaches.newMap[Symbol, RefTree]()
-  val moduleThisCache = perRunCaches.newMap[Symbol, This]()
+  val moduleRefCache       = perRunCaches.newMap[Symbol, RefTree]()
+  val moduleThisCache      = perRunCaches.newMap[Symbol, This]()
 }
 
 object SymbolTableStats {

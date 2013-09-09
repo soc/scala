@@ -227,12 +227,10 @@ abstract class UnCurry extends InfoTransform
           val (formals, restpe) = (targs.init, targs.last)
 
           val applyMethodDef = {
-            val methSym = anonClass.newMethod(nme.apply, fun.pos, FINAL)
-            val paramSyms = map2(formals, fun.vparams) {
-              (tp, param) => methSym.newSyntheticValueParam(tp, param.name)
-            }
-            methSym setInfoAndEnter MethodType(paramSyms, restpe)
+            val methSym   = anonClass.newMethod(nme.apply, fun.pos, FINAL)
+            val paramSyms = map2(formals, fun.vparams map (_.name))(methSym.newSyntheticValueParam)
 
+            methSym setInfoAndEnter MethodType(paramSyms, restpe)
             fun.vparams foreach  (_.symbol.owner =  methSym)
             fun.body changeOwner (fun.symbol     -> methSym)
 
@@ -379,7 +377,7 @@ abstract class UnCurry extends InfoTransform
      */
     private def translateSynchronized(tree: Tree) = tree match {
       case dd @ DefDef(_, _, _, _, _, Apply(fn, body :: Nil)) if isSelfSynchronized(dd) =>
-        log("Translating " + dd.symbol.defString + " into synchronized method")
+        log(s"Translating ${dd.symbol.defString} into synchronized method")
         dd.symbol setFlag SYNCHRONIZED
         deriveDefDef(dd)(_ => body)
       case _ => tree
@@ -398,14 +396,13 @@ abstract class UnCurry extends InfoTransform
 
       /* Transform tree `t` to { def f = t; f } where `f` is a fresh name */
       def liftTree(tree: Tree) = {
-        debuglog("lifting tree at: " + (tree.pos))
+        debuglog(s"lifting tree at ${tree.pos.show}")
         val sym = currentOwner.newMethod(unit.freshTermName("liftedTree"), tree.pos)
         sym.setInfo(MethodType(List(), tree.tpe))
         tree.changeOwner(currentOwner -> sym)
-        localTyper.typedPos(tree.pos)(Block(
-          List(DefDef(sym, ListOfNil, tree)),
-          Apply(Ident(sym), Nil)
-        ))
+        localTyper.typedPos(tree.pos) {
+          Block(DefDef(sym, ListOfNil, tree) :: Nil, Apply(Ident(sym), Nil))
+        }
       }
 
       def withInConstructorFlag(inConstructorFlag: Long)(f: => Tree): Tree = {
@@ -422,11 +419,9 @@ abstract class UnCurry extends InfoTransform
         if ((sym ne null) && (sym.elisionLevel.exists (_ < settings.elidebelow.value || settings.noassertions)))
           replaceElidableTree(tree)
         else translateSynchronized(tree) match {
-          case dd @ DefDef(mods, name, tparams, _, tpt, rhs) =>
+          case dd @ DefDef(mods, name, tparams, vparamss, tpt, rhs) =>
             // Remove default argument trees from parameter ValDefs, SI-4812
-            val vparamssNoRhs = dd.vparamss mapConserve (_ mapConserve {p =>
-              treeCopy.ValDef(p, p.mods, p.name, p.tpt, EmptyTree)
-            })
+            val vparamssNoRhs = mmapConserve(vparamss)(p => copyValDef(p)(rhs = EmptyTree))
 
             if (dd.symbol hasAnnotation VarargsClass) saveRepeatedParams(dd)
 
@@ -443,13 +438,10 @@ abstract class UnCurry extends InfoTransform
                       val others = rest drop 1 map transform
                       treeCopy.Block(rhs, presupers ::: supercalls ::: others, transform(expr))
                   }
-                  treeCopy.DefDef(
-                    dd, mods, name, transformTypeDefs(tparams),
-                    transformValDefss(vparamssNoRhs), transform(tpt), rhs1)
+                  copyDefDef(dd)(tparams = transformTypeDefs(tparams), vparamss = transformValDefss(vparamssNoRhs), tpt = transform(tpt), rhs = rhs1)
                 }
-              } else {
-                super.transform(treeCopy.DefDef(dd, mods, name, tparams, vparamssNoRhs, tpt, rhs))
               }
+              else super.transform(copyDefDef(dd)(vparamss = vparamssNoRhs))
             }
           case ValDef(_, _, _, rhs) =>
             if (sym eq NoSymbol) throw new IllegalStateException("Encountered Valdef without symbol: "+ tree + " in "+ unit)
@@ -565,6 +557,8 @@ abstract class UnCurry extends InfoTransform
             if (dependentParamTypeErasure isDependent dd)
               dependentParamTypeErasure erase dd
             else {
+              // Note that in addition to flattening multiple parameter lists, this
+              // inserts a single empty parameter list on nullary methods.
               val vparamss1 = vparamss0 match {
                 case _ :: Nil => vparamss0
                 case _        => vparamss0.flatten :: Nil

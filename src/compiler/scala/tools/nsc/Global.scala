@@ -371,7 +371,9 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
 
 // ------------ Phases -------------------------------------------}
 
-  var globalPhase: Phase = NoPhase
+  private[this] var _globalPhase: Phase = NoPhase
+
+  override def globalPhase: Phase = _globalPhase
 
   val MaxPhases = 64
 
@@ -1576,7 +1578,7 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
 
       reporter.reset()
       checkDeprecatedSettings(unitbuf.head)
-      globalPhase = fromPhase
+      _globalPhase = fromPhase
 
      while (globalPhase.hasNext && !reporter.hasErrors) {
         val startTime = currentTime
@@ -1611,7 +1613,7 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
           treeBrowser browse (phase.name, units)
 
         // move the pointer
-        globalPhase = globalPhase.next
+        _globalPhase = globalPhase.next
 
         // run tree/icode checkers
         if (settings.check containsPhase globalPhase.prev)

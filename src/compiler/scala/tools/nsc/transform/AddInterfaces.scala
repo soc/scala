@@ -343,7 +343,7 @@ abstract class AddInterfaces extends InfoTransform { self: Erasure =>
           val impl = implClass(sym)
           var owner = currentOwner
           while (owner != sym && owner != impl) owner = owner.owner;
-          if (owner == impl) This(impl) setPos tree.pos
+          if (owner == impl) transferIdentity(tree, This(impl))
           else tree
 /* !!!
         case Super(qual, mix) =>

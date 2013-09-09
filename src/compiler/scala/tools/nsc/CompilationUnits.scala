@@ -49,6 +49,10 @@ trait CompilationUnits { self: Global =>
   }
 
   override lazy val perPhaseNodes = mutable.Map[Phase, mutable.Map[String, Int]]()
+  override def recordNode(what: String) {
+    if ((globalPhase ne null) && (perPhaseNodes ne null))
+      perPhaseNodes.getOrElseUpdate(globalPhase, mutable.Map[String, Int]() withDefaultValue 0)(what) += 1
+  }
 
   if (Sources.dump) scala.sys addShutdownHook {
     self.phaseDescriptors map (_.ownPhase) filter perPhaseNodes.contains foreach { p =>

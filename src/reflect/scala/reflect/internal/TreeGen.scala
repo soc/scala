@@ -4,6 +4,7 @@ package internal
 
 import Flags._
 import scala.reflect.position._
+import scala.reflect.internal.util.shortClassOfInstance
 
 abstract class TreeGen extends macros.TreeBuilder {
   val global: SymbolTable
@@ -11,7 +12,11 @@ abstract class TreeGen extends macros.TreeBuilder {
   import global._
   import definitions._
 
-  final def canCache(sym: Symbol) = Sources.cache && sym.isStaticOwner
+  final def canCache(sym: Symbol): Boolean = Sources.cache && (
+       sym.hasPackageFlag
+    || sym.hasAllFlags(MODULE | STATIC)
+    || sym.hasFlag(MODULE) && canCache(sym.owner)
+  )
 
   def rootId(name: Name)             = Select(Ident(nme.ROOTPKG), name)
   def rootScalaDot(name: Name)       = Select(rootId(nme.scala_) setSymbol ScalaPackage, name)
@@ -168,6 +173,7 @@ abstract class TreeGen extends macros.TreeBuilder {
 
   def mkAttributedThis(sym: Symbol): This = {
     def create() = This(sym.name.toTypeName) setSymbol sym setType sym.thisType
+
     if (!canCache(sym)) create()
     else if (moduleThisCache contains sym) moduleThisCache(sym)
     else {

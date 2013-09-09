@@ -54,6 +54,9 @@ trait Collections {
     lb.toList
   }
 
+  final def mmapConserve[A <: AnyRef](xss: List[List[A]])(f: A => A): List[List[A]] =
+    xss mapConserve (_ mapConserve f)
+
   /** like map2, but returns list `xs` itself - instead of a copy - if function
    *  `f` maps all elements to themselves.
    */

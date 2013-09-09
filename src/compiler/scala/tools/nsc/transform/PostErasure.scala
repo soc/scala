@@ -39,8 +39,9 @@ trait PostErasure extends InfoTransform with TypingTransformers {
        * up == on an lhs of type Int, whereas the symbol which has been passed in
        * is from java.lang.Integer.
        */
-      def binop(lhs: Tree, op: Symbol, rhs: Tree) =
-        finish(localTyper typed (Apply(Select(lhs, op.name) setPos tree.pos, rhs :: Nil) setPos tree.pos))
+      def binop(lhs: Tree, op: Symbol, rhs: Tree) = atPos(tree.pos)(
+        finish(localTyper typed Apply(Select(lhs, op.name), rhs :: Nil))
+      )
 
       super.transform(tree) setType elimErasedValueType(tree.tpe) match {
         case AsInstanceOf(v, tpe) if v.tpe <:< tpe => finish(v)          // x.asInstanceOf[X]       ==> x

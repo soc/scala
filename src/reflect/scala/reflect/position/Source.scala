@@ -35,13 +35,13 @@ object SourceId extends (Int => SourceId) {
 object NodeId extends (Int => NodeId) {
   final val Max = Int20
   val None = new NodeId(0)
-  def apply(id: Int): NodeId = new NodeId(boundsCheck(0, Max)(id))
+  def apply(id: Int): NodeId = new NodeId(boundsCheck(0, Max)(id % Int20))
 }
 object TreeId extends ((SourceId, NodeId) => TreeId) {
   val None = new TreeId(0)
   def apply(sourceId: SourceId, nodeId: NodeId): TreeId = (
     if (nodeId == NoNodeId) None
-    else new TreeId(joinIntoInt(lsize = 14, sourceId.id, nodeId.id))
+    else new TreeId(joinIntoInt(lsize = 12, sourceId.id, nodeId.id))
   )
 }
 

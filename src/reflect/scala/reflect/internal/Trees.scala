@@ -34,14 +34,26 @@ trait Trees extends api.Trees { self: SymbolTable =>
     )
   }
 
+  def globalPhase: Phase = NoPhase
   def perPhaseNodes: mutable.Map[Phase, mutable.Map[String, Int]] = mutable.Map()
-  def recordNode(what: String): Unit = if ((phase ne null) && (perPhaseNodes ne null)) {
-    val map = perPhaseNodes.getOrElseUpdate(phase, mutable.Map[String, Int]() withDefaultValue 0)
-    map(what) += 1
+  def recordNode(what: String): Unit = ()
+
+  private var pendingTreeId: TreeId = NoTreeId
+  @inline final def transferIdentity[T <: Tree](oldTree: T, newTree: => T): T = {
+    val saved = pendingTreeId
+    pendingTreeId = oldTree.id
+    try newTree setPos oldTree.pos
+    finally pendingTreeId = saved
   }
 
+  def assignTreeId(tree: Tree): TreeId = (
+    if (pendingTreeId != NoTreeId) try pendingTreeId finally pendingTreeId = NoTreeId
+    else if (tree.canHaveAttrs) sources.getTreeId()
+    else sources.getSourcelessTreeId()
+  )
+
   abstract class Tree extends TreeContextApiImpl with Attachable with Product {
-    val id: TreeId = if (canHaveAttrs) sources.getTreeId() else sources.getSourcelessTreeId()
+    val id: TreeId = assignTreeId(this)
 
     recordNode(shortClass)
 
@@ -50,11 +62,10 @@ trait Trees extends api.Trees { self: SymbolTable =>
       case t: RefTree                                     => "  " + t.name.decoded
       case t: MemberDef                                   => "  " + t.name.decoded
       case t @ Import(Select(thiz @ This(qual), name), _) => "  " + t + s" where selection is $qual.$name and pos=${thiz.pos.show} sym=${thiz.symbol.id} tpe=${thiz.tpe.##}"
-      // case t @ Import(expr, selectors)                    => "  " + t + " expr: " + expr.shortClass + " " + expr + " " + expr.##
       case _                                              => ""
     }
     if (Sources.dump)
-      Console.err.println(f"$phase%15s  $shortClass%-25s  $id%-15s$safeString")
+      Console.err.println(f"$globalPhase%15s  $shortClass%-25s  $id%-15s$safeString")
 
     if (Statistics.canEnable) Statistics.incCounter(TreesStats.nodeByType, getClass)
 
