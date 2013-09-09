@@ -171,27 +171,39 @@ abstract class TreeGen extends macros.TreeBuilder {
   def mkAttributedStableRef(sym: Symbol): Tree =
     stabilize(mkAttributedRef(sym))
 
+
   def mkAttributedThis(sym: Symbol): This = {
     def create() = This(sym.name.toTypeName) setSymbol sym setType sym.thisType
-
-    if (!canCache(sym)) create()
-    else if (moduleThisCache contains sym) moduleThisCache(sym)
-    else {
-      val res = create()
-      moduleThisCache(sym) = res
-      res
+    def maybeCached(tree: This): This = {
+      if (sym.thisType eq tree.tpe) tree
+      else {
+        val res = create()
+        moduleThisCache(sym) = res
+        res
+      }
     }
+
+    if (canCache(sym) && (moduleThisCache contains sym))
+      maybeCached(moduleThisCache(sym))
+    else
+      create()
   }
 
   def mkAttributedIdent(sym: Symbol): RefTree = {
     def create() = Ident(sym.name) setSymbol sym setType sym.tpeHK
-    if (!canCache(sym)) create()
-    else if (moduleRefCache contains sym) moduleRefCache(sym)
-    else {
-      val res = create()
-      moduleRefCache(sym) = res
-      res
+    def maybeCached(tree: RefTree): RefTree = {
+      if (sym.tpeHK eq tree.tpe) tree
+      else {
+        val res = create()
+        moduleRefCache(sym) = res
+        res
+      }
     }
+
+    if (canCache(sym) && (moduleRefCache contains sym))
+      maybeCached(moduleRefCache(sym))
+    else
+      create()
   }
 
   def mkAttributedSelect(qual: Tree, sym: Symbol): RefTree = {
