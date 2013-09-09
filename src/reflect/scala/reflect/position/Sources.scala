@@ -7,7 +7,7 @@ import scala.collection.mutable
 object Sources {
   val dump  = sys.props contains "dump"
   val stats = sys.props contains "stats"
-  val cache = sys.props contains "cache"
+  val cache = true // sys.props contains "cache"
 }
 
 class Sources extends Source {
