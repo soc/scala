@@ -415,7 +415,11 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
       withCurrentUnit(unit) {
         if (!cancelled(unit)) {
           currentRun.informUnitStarting(this, unit)
-          apply(unit)
+          try apply(unit)
+          catch { case ex: Exception => 
+            warning(supplementErrorMessage(s"unhandled $ex while transforming $unit"))
+            throw ex
+          }
         }
         currentRun.advanceUnit()
       }

@@ -143,14 +143,7 @@ trait Trees extends scala.reflect.internal.Trees { self: Global =>
   }
 
   class Transformer extends super.Transformer {
-    def transformUnit(unit: CompilationUnit) {
-      try unit.body = transform(unit.body)
-      catch {
-        case ex: Exception =>
-          log(supplementErrorMessage("unhandled exception while transforming "+unit))
-          throw ex
-      }
-    }
+    def transformUnit(unit: CompilationUnit) { unit.body = transform(unit.body) }
   }
 
   // used when a phase is disabled
