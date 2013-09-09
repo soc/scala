@@ -17,9 +17,11 @@ final class IndexRange private (val bits: Long) extends AnyVal {
 }
 
 object BitOps {
+  final val Int12  = (1 << 12) - 1
   final val Int14  = (1 << 14) - 1
   final val Int16  = 0x0000FFFF
   final val Int18  = (1 << 18) - 1
+  final val Int20  = (1 << 20) - 1
   final val Int32  = 0xFFFFFFFF
   final val Long32 = 0xFFFFFFFFL
 

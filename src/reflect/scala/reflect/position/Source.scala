@@ -21,19 +21,19 @@ final class TreeId private (val bits: Int) extends AnyVal with Ordered[TreeId] {
     case 0 => nodeId compare that.nodeId
     case n => n
   }
-  def sourceId: SourceId = SourceId(leftN(14)(bits))
-  def nodeId: NodeId     = NodeId(rightN(18)(bits))
+  def sourceId: SourceId = SourceId(leftN(12)(bits))
+  def nodeId: NodeId     = NodeId(rightN(20)(bits))
 
   override def toString = s"$sourceId/$nodeId"
 }
 
 object SourceId extends (Int => SourceId) {
-  final val Max = Int14
+  final val Max = Int12
   val None = new SourceId(0)
   def apply(id: Int): SourceId = new SourceId(boundsCheck(0, Max)(id).toShort)
 }
 object NodeId extends (Int => NodeId) {
-  final val Max = Int18
+  final val Max = Int20
   val None = new NodeId(0)
   def apply(id: Int): NodeId = new NodeId(boundsCheck(0, Max)(id))
 }
