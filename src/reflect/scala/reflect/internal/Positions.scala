@@ -42,7 +42,7 @@ trait Positions extends api.Positions { self: SymbolTable =>
     if (useOffsetPositions) default else {
       val ranged = trees filter (_.pos.isRange)
       if (ranged.isEmpty) if (focus) default.focus else default
-      else new RangePosition(default.source, (ranged map (_.pos.start)).min, default.point, (ranged map (_.pos.end)).max)
+      else Position.range(default.source, (ranged map (_.pos.start)).min, default.point, (ranged map (_.pos.end)).max)
     }
   }
 
@@ -80,8 +80,8 @@ trait Positions extends api.Positions { self: SymbolTable =>
   }
 
   def rangePos(source: SourceFile, start: Int, point: Int, end: Int): Position =
-    if (useOffsetPositions) new OffsetPosition(source, point)
-    else new RangePosition(source, start, point, end)
+    if (useOffsetPositions) Position.offset(source, point)
+    else Position.range(source, start, point, end)
 
   def validatePositions(tree: Tree) {
     if (useOffsetPositions) return
@@ -102,7 +102,8 @@ trait Positions extends api.Positions { self: SymbolTable =>
       inform("\nChildren:")
       tree.children map (t => "  " + treeStatus(t, tree)) foreach inform
       inform("=======")
-      throw new ValidateException(msg)
+      Console.err.println(msg)
+      // throw new ValidateException(msg)
     }
 
     def validate(tree: Tree, encltree: Tree): Unit = {
@@ -156,7 +157,7 @@ trait Positions extends api.Positions { self: SymbolTable =>
 
   /** A free range from `lo` to `hi` */
   private def free(lo: Int, hi: Int): Range =
-    Range(new RangePosition(null, lo, lo, hi), EmptyTree)
+    Range(Position.range(null, lo, lo, hi), EmptyTree)
 
   /** The maximal free range */
   private lazy val maxFree: Range = free(0, Int.MaxValue)
@@ -280,7 +281,7 @@ trait Positions extends api.Positions { self: SymbolTable =>
     override def traverse(t: Tree) {
       if (!t.canHaveAttrs) ()
       else if (t.pos == NoPosition) {
-        t.setPos(pos)
+        t setPos pos
         super.traverse(t)   // TODO: bug? shouldn't the traverse be outside of the if?
         // @PP: it's pruning whenever it encounters a node with a
         // position, which I interpret to mean that (in the author's

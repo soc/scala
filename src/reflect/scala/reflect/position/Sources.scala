@@ -7,8 +7,15 @@ import scala.collection.mutable
 object Sources {
   val dump  = sys.props contains "dump"
   val stats = sys.props contains "stats"
-  val cache = true // sys.props contains "cache"
+  val cache = sys.props contains "cache"
+  val ours  = sys.props contains "ours"
 }
+
+// trait Positioner[T] extends Any {
+//   def positionData(pos: T): PosData
+//   def sourceFor(pos: T): Source
+//   def newPosition(source: Source, data: PosData): T
+// }
 
 class Sources extends Source {
   private class Counter[T](create: Int => T) {

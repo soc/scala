@@ -6,7 +6,7 @@ package scala.tools.nsc
 package interactive
 
 import util.InterruptReq
-import scala.reflect.internal.util.{ SourceFile, BatchSourceFile }
+import scala.reflect.internal.util.{ SourceFile, BatchSourceFile, Position }
 import io.{ AbstractFile, PlainFile }
 import util.EmptyAction
 import scala.reflect.internal.util.{ RangePosition, OffsetPosition, TransparentPosition }
@@ -67,17 +67,17 @@ trait Picklers { self: Global =>
 
   lazy val offsetPosition: CondPickler[OffsetPosition] =
     (pkl[SourceFile] ~ pkl[Int])
-      .wrapped { case x ~ y => new OffsetPosition(x, y) } { p => p.source ~ p.point }
+      .wrapped { case x ~ y => Position.offset(x, y) } { p => p.source ~ p.point }
       .asClass (classOf[OffsetPosition])
 
   lazy val rangePosition: CondPickler[RangePosition] =
     (pkl[SourceFile] ~ pkl[Int] ~ pkl[Int] ~ pkl[Int])
-      .wrapped { case source ~ start ~ point ~ end => new RangePosition(source, start, point, end) } { p => p.source ~ p.start ~ p.point ~ p.end }
+      .wrapped { case source ~ start ~ point ~ end => Position.range(source, start, point, end) } { p => p.source ~ p.start ~ p.point ~ p.end }
       .asClass (classOf[RangePosition])
 
   lazy val transparentPosition: CondPickler[TransparentPosition] =
     (pkl[SourceFile] ~ pkl[Int] ~ pkl[Int] ~ pkl[Int])
-      .wrapped { case source ~ start ~ point ~ end => new TransparentPosition(source, start, point, end) } { p => p.source ~ p.start ~ p.point ~ p.end }
+      .wrapped { case source ~ start ~ point ~ end => Position.transparent(source, start, point, end) } { p => p.source ~ p.start ~ p.point ~ p.end }
       .asClass (classOf[TransparentPosition])
 
   lazy val noPosition = singletonPickler(NoPosition)

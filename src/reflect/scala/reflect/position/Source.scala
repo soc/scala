@@ -2,7 +2,6 @@ package scala
 package reflect
 package position
 
-import scala.reflect.internal.util._
 import BitOps._
 
 final class SourceId private (val bits: Short) extends AnyVal with Ordered[SourceId] {

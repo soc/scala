@@ -2,7 +2,6 @@ package scala
 package reflect
 package position
 
-import scala.reflect.internal.util._
 import scala.reflect.internal.Chars._
 import scala.reflect.io.Streamable
 

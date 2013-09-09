@@ -8,6 +8,10 @@ package reflect
 package internal
 package util
 
+import scala.reflect.ClassTag
+import scala.reflect.internal.FatalError
+import scala.reflect.macros.Attachments
+
 /** The Position class and its subclasses represent positions of ASTs and symbols.
  *  Every subclass of DefinedPosition refers to a SourceFile and three character
  *  offsets within it: start, end, and point. The point is where the ^ belongs when

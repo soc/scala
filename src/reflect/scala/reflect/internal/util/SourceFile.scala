@@ -23,7 +23,7 @@ abstract class SourceFile {
   def length : Int
   def position(offset: Int) : Position = {
     assert(offset < length, file + ": " + offset + " >= " + length)
-    new OffsetPosition(this, offset)
+    Position.offset(this, offset)
   }
 
   def offsetToLine(offset: Int): Int
@@ -34,7 +34,7 @@ abstract class SourceFile {
    */
   def positionInUltimateSource(position: Position) = position
   override def toString() = file.name
-  def dbg(offset: Int) = (new OffsetPosition(this, offset)).dbgString
+  def dbg(offset: Int) = (Position.offset(this, offset)).dbgString
   def path = file.path
 
   def lineToString(index: Int): String =

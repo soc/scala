@@ -13,7 +13,7 @@ import scala.collection.{ mutable, immutable }
 import mutable.{ ListBuffer, StringBuilder }
 import scala.reflect.internal.{ ModifierFlags => Flags }
 import scala.reflect.internal.Chars.{ isScalaLetter }
-import scala.reflect.internal.util.{ SourceFile, OffsetPosition }
+import scala.reflect.internal.util.{ Position, SourceFile, OffsetPosition }
 import Tokens._
 import util.FreshNameCreator
 
@@ -38,7 +38,7 @@ trait ParsersCommon extends ScannersCommon { self =>
     def freshName(prefix: String): Name               = freshTermName(prefix)
     def freshTermName(prefix: String): TermName       = currentUnit.freshTermName(prefix)
     def freshTypeName(prefix: String): TypeName       = currentUnit.freshTypeName(prefix)
-    def o2p(offset: Int): Position                    = new OffsetPosition(currentUnit.source, offset)
+    def o2p(offset: Int): Position                    = Position.offset(currentUnit.source, offset)
     def r2p(start: Int, mid: Int, end: Int): Position = rangePos(currentUnit.source, start, mid, end)
   }
 
@@ -176,7 +176,7 @@ self =>
     def freshTermName(prefix: String): TermName = newTermName(globalFresh.newName(prefix))
     def freshTypeName(prefix: String): TypeName = newTypeName(globalFresh.newName(prefix))
 
-    def o2p(offset: Int): Position = new OffsetPosition(source, offset)
+    def o2p(offset: Int): Position = Position.offset(source, offset)
     def r2p(start: Int, mid: Int, end: Int): Position = rangePos(source, start, mid, end)
 
     // suppress warnings; silent abort on errors

@@ -17,15 +17,18 @@ final class IndexRange private (val bits: Long) extends AnyVal {
 }
 
 object BitOps {
-  final val Int12  = (1 << 12) - 1
-  final val Int14  = (1 << 14) - 1
-  final val Int16  = 0x0000FFFF
-  final val Int18  = (1 << 18) - 1
-  final val Int20  = (1 << 20) - 1
+  final val Int4  = mask(4)
+  final val Int12 = mask(12)
+  final val Int14 = mask(14)
+  final val Int16 = mask(16)
+  final val Int18 = mask(18)
+  final val Int20 = mask(20)
+  final val Int24 = mask(24)
+
   final val Int32  = 0xFFFFFFFF
   final val Long32 = 0xFFFFFFFFL
 
-  private def mask(bits: Int): Int = (1 << bits) - 1
+  def mask(bits: Int): Int = (1 << bits) - 1
 
   def join64(lbits: Int, rbits: Int): Long = ((lbits & Long32) << 32) | (rbits & Long32)
   def left32(joined: Long): Int            = (joined >>> 32).toInt & Int32
@@ -39,8 +42,8 @@ object BitOps {
     assert(1 <= lsize && lsize <= 32, lsize)
 
     val rsize = 32 - lsize
-    val lmask = (1 << lsize) - 1
-    val rmask = (1 << rsize) - 1
+    val lmask = mask(lsize)
+    val rmask = mask(rsize)
 
     ((lbits & lmask) << rsize) | (rbits & rmask)
   }

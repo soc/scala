@@ -7,8 +7,10 @@ package scala
 package reflect
 package internal
 
+import scala.language.implicitConversions
 import scala.annotation.elidable
 import scala.collection.{ mutable, immutable }
+import scala.reflect.position._
 import util._
 
 abstract class SymbolTable extends macros.Universe

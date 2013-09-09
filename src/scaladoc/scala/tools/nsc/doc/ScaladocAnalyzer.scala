@@ -9,7 +9,7 @@ package doc
 import scala.tools.nsc.ast.parser.{ SyntaxAnalyzer, BracePatch }
 import typechecker.Analyzer
 import scala.reflect.internal.Chars._
-import scala.reflect.internal.util.{ BatchSourceFile, RangePosition }
+import scala.reflect.internal.util.{ BatchSourceFile, RangePosition, Position }
 import scala.tools.nsc.doc.base.{ CommentFactoryBase, MemberLookupBase, LinkTo, LinkToExternal }
 
 trait ScaladocAnalyzer extends Analyzer {
@@ -216,7 +216,7 @@ abstract class ScaladocSyntaxAnalyzer[G <: Global](val global: G) extends Syntax
       // emit a block comment; if it's double-star, make Doc at this pos
       def foundStarComment(start: Int, end: Int) = try {
         val str = docBuffer.toString
-        val pos = new RangePosition(unit.source, start, start, end)
+        val pos = Position.range(unit.source, start, start, end)
         unit.comment(pos, str)
         if (inDocComment)
           lastDoc = DocComment(str, pos)
