@@ -2257,13 +2257,16 @@ self =>
         }
         if (contextBoundBuf ne null) {
           while (in.token == VIEWBOUND) {
-            val msg = "Use an implicit parameter instead.\nE. g. `def f[A <% Int](a: A)` --> `def f(a: A)(implicit ev: A => Int)`."
-            if (settings.future)
-              syntaxError(in.offset, "View bounds have been removed." + msg)
-            else
-              deprecationWarning(in.offset, "View bounds are deprecated." + msg)
             contextBoundBuf += atPos(in.skipToken()) {
-              makeFunctionTypeTree(List(Ident(pname)), typ())
+              val t = typ()
+              def discourage() = {
+                val msg = "Use an implicit parameter instead."
+                val eg = s"Instead of `def $owner[$pname <% $t](p: $pname)`, use `def $owner(p: $pname)(implicit ev: $pname => $t)`."
+                if (settings.future) syntaxError(in.offset, f"View bounds have been removed. $msg%n$eg")
+                else deprecationWarning(in.offset, f"View bounds are deprecated. $msg%n$eg")
+              }
+              discourage()
+              makeFunctionTypeTree(List(Ident(pname)), t)
             }
           }
           while (in.token == COLON) {

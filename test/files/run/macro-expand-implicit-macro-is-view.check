@@ -1,2 +1,5 @@
-warning: there were 1 deprecation warning(s); re-run with -deprecation for details
+Macros_Test_2.scala:10: warning: View bounds are deprecated. Use an implicit parameter instead.
+Instead of `def bar[T <% Option[Int]](p: T)`, use `def bar(p: T)(implicit ev: T => Option[Int])`.
+  def bar[T <% Option[Int]](x: T) = println(x)
+                          ^
 2

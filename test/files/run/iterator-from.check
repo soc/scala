@@ -1,1 +1,8 @@
-warning: there were 2 deprecation warning(s); re-run with -deprecation for details
+iterator-from.scala:14: warning: View bounds are deprecated. Use an implicit parameter instead.
+Instead of `def testSet[A <% Ordered[A]](p: A)`, use `def testSet(p: A)(implicit ev: A => Ordered[A])`.
+  def testSet[A <% Ordered[A]](set: SortedSet[A], list: List[A]) {
+                             ^
+iterator-from.scala:27: warning: View bounds are deprecated. Use an implicit parameter instead.
+Instead of `def testMap[A <% Ordered[A]](p: A)`, use `def testMap(p: A)(implicit ev: A => Ordered[A])`.
+  def testMap[A <% Ordered[A], B](map: SortedMap[A, B], list: List[(A, B)]) {
+                             ^
