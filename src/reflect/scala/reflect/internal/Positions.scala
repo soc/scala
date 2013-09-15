@@ -65,6 +65,8 @@ trait Positions extends api.Positions { self: SymbolTable =>
   def ensureNonOverlapping(tree: Tree, others: List[Tree]){ ensureNonOverlapping(tree, others, focus = true) }
   def ensureNonOverlapping(tree: Tree, others: List[Tree], focus: Boolean) {
     if (useOffsetPositions) return
+    if (settings.Yposdebug)
+      log(s"ensureNonOverlapping(${tree.pos.show}, ${others.map(_.pos.show)}, $focus)")
 
     def isOverlapping(pos: Position) =
       pos.isRange && (others exists (pos overlaps _.pos))
@@ -102,7 +104,10 @@ trait Positions extends api.Positions { self: SymbolTable =>
       inform("\nChildren:")
       tree.children map (t => "  " + treeStatus(t, tree)) foreach inform
       inform("=======")
-      throw new ValidateException(msg)
+
+      // Let's issue a helpful warning rather than crashing the compiler.
+      // The recipient is more likely to be grateful.
+      warning(msg)
     }
 
     def validate(tree: Tree, encltree: Tree): Unit = {
@@ -207,31 +212,25 @@ trait Positions extends api.Positions { self: SymbolTable =>
   /** Set position of all children of a node
    *  @param  pos   A target position.
    *                Uses the point of the position as the point of all positions it assigns.
-   *                Uses the start of this position as an Offset position for unpositioed trees
+   *                Uses the start of this position as an Offset position for unpositioned trees
    *                without children.
    *  @param  trees  The children to position. All children must be positionable.
    */
   private def setChildrenPos(pos: Position, trees: List[Tree]): Unit = try {
-    for (tree <- trees) {
-      if (!tree.isEmpty && tree.canHaveAttrs && tree.pos == NoPosition) {
-        val children = tree.children
-        if (children.isEmpty) {
-          tree setPos pos.focus
-        } else {
-          setChildrenPos(pos, children)
-          tree setPos wrappingPos(pos, children)
-        }
+    trees filter (t => t.canHaveAttrs && t.pos == NoPosition) foreach (t =>
+      t.children match {
+        case Nil => t setPos pos.focus
+        case cs  => setChildrenPos(pos, cs) ; t setPos wrappingPos(pos, cs)
       }
-    }
+    )
   } catch {
     case ex: Exception =>
-      println("error while set children pos "+pos+" of "+trees)
+      def trees_s = trees map (t => t.shortClass + "/" + t.pos.show) mkString ", "
+      Console.err.println(s"$ex during setChildrenPos(\n    pos=${pos.show}\n  trees=$trees_s\n)\n")
       throw ex
   }
 
-
   class ValidateException(msg : String) extends Exception(msg)
-
 
   /** A locator for trees with given positions.
    *  Given a position `pos`, locator.apply returns
