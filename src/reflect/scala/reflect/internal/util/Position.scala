@@ -8,6 +8,8 @@ package reflect
 package internal
 package util
 
+import scala.sys.SystemProperties.colorsOk
+
 /** The Position class and its subclasses represent positions of ASTs and symbols.
  *  Every subclass of DefinedPosition refers to a SourceFile and three character
  *  offsets within it: start, end, and point. The point is where the ^ belongs when
@@ -196,9 +198,21 @@ private[util] trait InternalPositionImpl {
     case pos           => s"${pos.line}: $msg\n${pos.lineContent}\n${pos.lineCarat}"
   }
   def showDebug: String = toString
+  private def isPointOutsideRange = point < start || end < point
+  private def pointString: String = (
+    if (!colorsOk) "" + point
+    else if (isPointOutsideRange) Console.RED + Console.BOLD + point + Console.RESET
+    else Console.GREEN + Console.BOLD + point + Console.RESET
+  )
+  private def startString: String = (
+    if (colorsOk && isOpaqueRange && start == point)
+      Console.GREEN + Console.BOLD + start + Console.RESET
+    else
+      "" + start
+  )
   def show = (
-    if (isOpaqueRange && start != point) s"[$point/$start:$end]"
-    else if (isOpaqueRange) s"[$start:$end]"
+    if (isOpaqueRange && start != point) s"[$pointString/$start:$end]"
+    else if (isOpaqueRange) s"[$startString:$end]"
     else if (isTransparent) s"<$start:$end>"
     else if (isDefined) s"[$point]"
     else "[NoPosition]"

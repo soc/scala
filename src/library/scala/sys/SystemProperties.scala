@@ -78,5 +78,5 @@ object SystemProperties {
   lazy val preferIPv4Stack     = bool("java.net.preferIPv4Stack", "system should prefer IPv4 sockets")
   lazy val preferIPv6Addresses = bool("java.net.preferIPv6Addresses", "system should prefer IPv6 addresses")
   lazy val noTraceSupression   = bool("scala.control.noTraceSuppression", "scala should not suppress any stack trace creation")
+  lazy val colorsOk            = bool("scala.color", "scala may use ansi color codes in output")
 }
-
