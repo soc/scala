@@ -19,6 +19,7 @@ trait StdAttachments {
     def pos: Position = rawatt.pos
     def pos_=(pos: Position): Unit = rawatt = (rawatt withPos pos)
     def setPos(newpos: Position): this.type = { pos = newpos; this }
+    def unionPos(newpos: Position): this.type = { pos = newpos union pos ; this }
   }
 
   /** When present, indicates that the host `Ident` has been created from a backquoted identifier.

@@ -22,6 +22,4 @@ package object nsc {
 
   type MissingRequirementError = scala.reflect.internal.MissingRequirementError
   val MissingRequirementError = scala.reflect.internal.MissingRequirementError
-
-  val ListOfNil = List(Nil)
 }

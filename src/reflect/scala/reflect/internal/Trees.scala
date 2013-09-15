@@ -39,6 +39,7 @@ trait Trees extends api.Trees { self: SymbolTable =>
     if (Statistics.canEnable) Statistics.incCounter(TreesStats.nodeByType, getClass)
 
     final override def pos: Position = rawatt.pos
+    def makeTransparent: this.type = this setPos pos.makeTransparent
 
     private[this] var rawtpe: Type = _
     final def tpe = rawtpe
@@ -457,14 +458,15 @@ trait Trees extends api.Trees { self: SymbolTable =>
   // copying trees will all too easily forget to distinguish subclasses
   class ApplyImplicitView(fun: Tree, args: List[Tree]) extends Apply(fun, args)
 
-  def ApplyConstructor(tpt: Tree, args: List[Tree]) = Apply(Select(New(tpt), nme.CONSTRUCTOR), args)
+  def SelectConstructor(tpt: Tree): Tree                  = Select(New(tpt), nme.CONSTRUCTOR).makeTransparent
+  def ApplyConstructor(tpt: Tree, args: List[Tree]): Tree = Apply(SelectConstructor(tpt), args)
 
   // Creates a constructor call from the constructor symbol.  This is
   // to avoid winding up with an OverloadedType for the constructor call.
   def NewFromConstructor(constructor: Symbol, args: Tree*) = {
     assert(constructor.isConstructor, constructor)
     val instance = New(TypeTree(constructor.owner.tpe))
-    val init     = Select(instance, nme.CONSTRUCTOR) setSymbol constructor
+    val init     = Select(instance, nme.CONSTRUCTOR).makeTransparent setSymbol constructor
 
     Apply(init, args.toList)
   }
@@ -1100,8 +1102,8 @@ trait Trees extends api.Trees { self: SymbolTable =>
    *  A `New(t, as)` is expanded to: `(new t).<init>(as)`
    */
   def New(tpt: Tree, argss: List[List[Tree]]): Tree = argss match {
-    case Nil        => ApplyConstructor(tpt, Nil)
-    case xs :: rest => rest.foldLeft(ApplyConstructor(tpt, xs): Tree)(Apply.apply)
+    case Nil      => ApplyConstructor(tpt, Nil)
+    case hd :: tl => tl.foldLeft(ApplyConstructor(tpt, hd))((fn, args) => Apply(fn, args))
   }
 
   /** 0-1 argument list new, based on a type.

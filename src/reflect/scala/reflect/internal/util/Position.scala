@@ -47,10 +47,20 @@ import scala.sys.SystemProperties.colorsOk
  *  pos.focus           Converts a range position to an offset position focused on the point
  *  pos.makeTransparent Convert an opaque range into a transparent range
  */
-class Position extends scala.reflect.api.Position with InternalPositionImpl with DeprecatedPosition {
+class Position extends scala.reflect.api.Position with InternalPositionImpl with DeprecatedPosition with Ordered[Position] {
   type Pos = Position
   def pos: Position = this
   def withPos(newPos: Position): macros.Attachments { type Pos = Position.this.Pos } = newPos
+  def compare(that: Position): Int = (
+    if (this == that) 0
+    else if (!this.isDefined) -1
+    else if (!that.isDefined) 1
+    else if (start != that.start) start compare that.start
+    else if (end != that.end) end compare that.end
+    else if (point != that.point) point compare that.point
+    else if (isTransparent) -1
+    else 0
+  )
 
   protected def fail(what: String) = throw new UnsupportedOperationException(s"Position.$what on $this")
 
@@ -172,9 +182,9 @@ private[util] trait InternalPositionImpl {
   def focusEnd: Position   = if (this.isRange) asOffset(end) else this
 
   def union(pos: Position): Position = (
-    if (!pos.isRange) this
-    else if (this.isRange) copyRange(start = start min pos.start, end = end max pos.end)
-    else pos
+    if (!pos.isDefined) this
+    else if (!isDefined) pos
+    else copyRange(start = start min pos.start, end = end max pos.end)
   )
 
   def includes(pos: Position): Boolean         = isRange && pos.isDefined && start <= pos.start && pos.end <= end
@@ -185,7 +195,29 @@ private[util] trait InternalPositionImpl {
   // This works because it's a range position invariant that S1 < E1 and S2 < E2.
   // So if S1 < E2 and S2 < E1, then both starts precede both ends, which is the
   // necessary condition to establish that there is overlap.
-  def overlaps(pos: Position): Boolean         = bothRanges(pos) && start < pos.end && pos.start < end
+  def overlaps(pos: Position) = bothRanges(pos) && start < pos.end && pos.start < end
+
+  def overlapsBadly(pos: Position) = overlaps(pos) && !(this includes pos) && !(pos includes this)
+
+  // def overlaps2(pos: Position): Boolean = (
+  //      bothRanges(pos)
+  //   && !(this includes pos)
+  //   && !(pos includes this)
+  //   && (    pos.start <= start && start <= pos.end && pos.end <= end
+  //        || start <= pos.start && pos.start <= end && end <= pos.end
+  //      )
+  // )
+
+  // def overlaps(pos: Position): Boolean = {
+  //   val res1 = bothRanges(pos) && start < pos.end && pos.start < end
+  //   val res2 = overlaps2(pos)
+  //   if (res1 != res2) {
+  //     println(s"$show overlaps ${pos.show}  res1=$res1  res2=$res2")
+  //   }
+  //   res1
+  // }
+
+  // def overlapsOrIncludes(
 
   def line: Int           = if (hasSource) source.offsetToLine(point) + 1 else 0
   def column: Int         = if (hasSource) calculateColumn() else 0
@@ -215,8 +247,12 @@ private[util] trait InternalPositionImpl {
     else if (isOpaqueRange) s"[$startString:$end]"
     else if (isTransparent) s"<$start:$end>"
     else if (isDefined) s"[$point]"
-    else "[NoPosition]"
+    else "[X]"
   )
+  def showNoPoint        = if (isOpaqueRange && start != point) s"[$start:$end]"else show
+  def showStartAndLength = s"[$start+${end - start}]"
+  def length             = if (isOpaqueRange) end - start else 0
+  def indices: Range     = if (isOpaqueRange) start until end else point until point
 
   private def asOffset(point: Int): Position = Position.offset(source, point)
   private def copyRange(source: SourceFile = source, start: Int = start, point: Int = point, end: Int = end): Position =
@@ -225,7 +261,7 @@ private[util] trait InternalPositionImpl {
   private def calculateColumn(): Int = {
     var idx = source.lineToOffset(source.offsetToLine(point))
     var col = 0
-    while (idx != point) {
+    while (idx != point && idx < source.content.length) {
       col += (if (source.content(idx) == '\t') Position.tabInc - col % Position.tabInc else 1)
       idx += 1
     }

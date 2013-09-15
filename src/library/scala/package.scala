@@ -57,6 +57,7 @@ package object scala {
   val List = scala.collection.immutable.List
 
   val Nil = scala.collection.immutable.Nil
+  val ListOfNil: List[List[Nothing]] = Nil :: Nil
 
   type ::[A] = scala.collection.immutable.::[A]
   val :: = scala.collection.immutable.::
