@@ -9,30 +9,91 @@ import util.FreshNameCreator
 import scala.reflect.internal.util.{ SourceFile, NoSourceFile }
 import scala.collection.mutable
 import scala.collection.mutable.{ LinkedHashSet, ListBuffer }
+import scala.reflect.position._
 
 trait CompilationUnits { self: Global =>
 
-  /** An object representing a missing compilation unit.
-   */
-  object NoCompilationUnit extends CompilationUnit(NoSourceFile) {
-    override lazy val isJava = false
-    override def exists = false
-    override def toString() = "NoCompilationUnit"
+  def NoCompilationUnit = CompilationUnit.None
+
+  // private val perPhaseNodes = mutable.Map[Phase, Int]() withDefaultValue 0
+
+  def sourceStats(): String = {
+    def surviving(unit: CompilationUnit) = (unit.body filter (_ => true) map (_.id)).distinct.size
+
+    val units          = self.currentRun.units.toList
+    val ids            = units map (_.sourceId)
+    val totalSurviving = (units map surviving).sum
+    val totalCreated   = (ids map sources.treeIdsCreated).sum
+
+    val hd = s"${units.size} units where $totalSurviving/$totalCreated ast nodes survived to the finish.\n"
+    val tl = units map { unit =>
+      val id        = unit.sourceId
+      val source    = sources(id)
+      val created   = sources.treeIdsCreated(id)
+      f"${surviving(unit)}%5s/$created%-5s  ${source.name}%s"
+    }
+    (hd :: tl) mkString ("\n", "\n", "\n")
+    // val sources    = ids map sources
+    // val createds   = ids map sources.treeIdsCreated
+    // val survivings = units map (unit => (unit.body filter (_ => true) map (_.id)).distinct.size)
+
+    // val strs = self.currentRun.units.toList map { unit =>
+    //   val id        = unit.sourceId
+    //   val source    = sources(id)
+    //   val created   = sources.treeIdsCreated(id)
+    //   val surviving = unit.body filter (_ => true) map (_.id)
+
+    //   f"${source.name}%-35s  created: $created%-5s  surviving: ${surviving.distinct.size}\n"
+    // }
+    // strs.mkString("")
+  }
+
+  override lazy val perPhaseNodes = mutable.Map[Phase, mutable.Map[String, Int]]()
+  override def recordNode(what: String) {
+    if ((globalPhase ne null) && (perPhaseNodes ne null))
+      perPhaseNodes.getOrElseUpdate(globalPhase, mutable.Map[String, Int]() withDefaultValue 0)(what) += 1
+  }
+
+  if (Sources.dump) scala.sys addShutdownHook {
+    self.phaseDescriptors map (_.ownPhase) filter perPhaseNodes.contains foreach { p =>
+      val pairs = perPhaseNodes(p).toList sortBy (-_._2)
+      val total = perPhaseNodes(p).values.sum
+      println(f"$total%5s nodes created during $p")
+      for ((what, count) <- pairs)
+        println(f"$count%5s  $what%-20s")
+
+      println("")
+    }
+  }
+
+  if (Sources.stats)
+    scala.sys addShutdownHook Console.err.println(sourceStats())
+
+  object CompilationUnit {
+    /** An object representing a missing compilation unit.
+     */
+    object None extends CompilationUnit(NoSourceId, NoSourceFile) {
+      override def isJava   = false
+      override def exists   = false
+      override def toString = "NoCompilationUnit"
+    }
+    def apply(source: SourceFile): CompilationUnit = {
+      new CompilationUnit(sources add Source(source), source)
+    }
   }
 
   /** One unit of compilation that has been submitted to the compiler.
     * It typically corresponds to a single file of source code.  It includes
     * error-reporting hooks.  */
-  class CompilationUnit(val source: SourceFile) extends CompilationUnitContextApi { self =>
+  class CompilationUnit private (val sourceId: SourceId, val source: SourceFile) extends CompilationUnitContextApi { self =>
+    // println(s"new CompilationUnit($sourceId, $source)")
+    def this(source: SourceFile) = this(sources add Source(source), source)
 
     /** the fresh name creator */
     val fresh: FreshNameCreator = new FreshNameCreator.Default
 
     def freshTermName(prefix: String): TermName = newTermName(fresh.newName(prefix))
     def freshTypeName(prefix: String): TypeName = newTypeName(fresh.newName(prefix))
-
-    /** the content of the compilation unit in tree form */
-    var body: Tree = EmptyTree
 
     /** The position of the first xml literal encountered while parsing this compilation unit.
      * NoPosition if there were none. Write-once.
@@ -119,6 +180,9 @@ trait CompilationUnits { self: Global =>
      */
     val icode: LinkedHashSet[icodes.IClass] = new LinkedHashSet
 
+    /** the content of the compilation unit in tree form */
+    var body: Tree = EmptyTree
+
     def echo(pos: Position, msg: String) =
       reporter.echo(pos, msg)
 
@@ -144,7 +208,7 @@ trait CompilationUnits { self: Global =>
       reporter.comment(pos, msg)
 
     /** Is this about a .java source file? */
-    lazy val isJava = source.file.name.endsWith(".java")
+    def isJava = source.file.name endsWith ".java"
 
     override def toString() = source.toString()
   }
