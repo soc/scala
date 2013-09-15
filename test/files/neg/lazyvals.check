@@ -1,6 +1,3 @@
-lazyvals.scala:6: error: lazy values may not be abstract
-  lazy val t: Int
-           ^
 lazyvals.scala:9: error: lazy not allowed here. Only vals can be lazy
   lazy var p: Int = 100
        ^
@@ -22,4 +19,4 @@ lazyvals.scala:22: error: lazy not allowed here. Only vals can be lazy
 lazyvals.scala:25: error: lazy modifier not allowed here. Use call-by-name parameters instead
   class A(lazy val obj: Object) {}
                ^
-8 errors found
+7 errors found

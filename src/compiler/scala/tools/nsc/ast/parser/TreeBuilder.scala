@@ -503,7 +503,7 @@ abstract class TreeBuilder {
                      tmp, TypeTree(), matchExpr)
             }
           var cnt = 0
-          val restDefs = for ((vname, tpt, pos) <- vars) yield atPos(pos) {
+          val restDefs = for ((vname, tpt, pos) <- vars) yield atPos(pos.focus) {
             cnt += 1
             ValDef(mods, vname.toTermName, tpt, Select(Ident(tmp), newTermName("_" + cnt)))
           }

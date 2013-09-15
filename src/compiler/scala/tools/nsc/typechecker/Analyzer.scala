@@ -100,7 +100,10 @@ trait Analyzer extends AnyRef
         try {
           val typer = newTyper(rootContext(unit))
           unit.body = typer.typed(unit.body)
-          if (global.settings.Yrangepos && !global.reporter.hasErrors) global.validatePositions(unit.body)
+          if (global.settings.Yrangepos && !global.reporter.hasErrors) {
+            global.validatePositions(unit.body)
+            TreePosAnalyzer(global)(unit)
+          }
           for (workItem <- unit.toCheck) workItem()
           if (settings.lint)
             typer checkUnused unit

@@ -303,6 +303,9 @@ self =>
     def o2p(offset: Int): Position
     def r2p(start: Int, mid: Int, end: Int): Position
 
+    def closeRange(start: Int, point: Int): Position = r2p(start, point, in.lastOffset)
+    def closeRange(start: Int): Position             = closeRange(start, point = start)
+
     /** whether a non-continuable syntax error has been seen */
     private var lastErrorOffset : Int = -1
 
@@ -703,8 +706,8 @@ self =>
 
 /* ---------- TREE CONSTRUCTION ------------------------------------------- */
 
-    def atPos[T <: Tree](offset: Int)(t: T): T                      = atPos(r2p(offset, offset, in.lastOffset max offset))(t)
-    def atPos[T <: Tree](start: Int, point: Int)(t: T): T           = atPos(r2p(start, point, in.lastOffset max start))(t)
+    def atPos[T <: Tree](start: Int)(t: T): T                       = atPos[T](start, start)(t)
+    def atPos[T <: Tree](start: Int, point: Int)(t: T): T           = atPos[T](start, point, in.lastOffset max start)(t)
     def atPos[T <: Tree](start: Int, point: Int, end: Int)(t: T): T = atPos(r2p(start, point, end))(t)
     def atPos[T <: Tree](pos: Position)(t: T): T                    = global.atPos(pos)(t)
 
@@ -1545,32 +1548,28 @@ self =>
      *  }}}
      */
     def simpleExpr(): Tree = {
-      var canApply = true
-      val t =
-        if (isLiteral) literal()
-        else in.token match {
-          case XMLSTART =>
-            xmlLiteral()
-          case IDENTIFIER | BACKQUOTED_IDENT | THIS | SUPER =>
-            path(thisOK = true, typeOK = false)
-          case USCORE =>
-            freshPlaceholder()
-          case LPAREN =>
-            atPos(in.offset)(makeParens(commaSeparated(expr())))
-          case LBRACE =>
-            canApply = false
-            blockExpr()
-          case NEW =>
-            canApply = false
-            val nstart = in.skipToken()
-            val npos = r2p(nstart, nstart, in.lastOffset)
-            val tstart = in.offset
-            val (parents, self, stats) = template()
-            val cpos = r2p(tstart, tstart, in.lastOffset max tstart)
-            gen.mkNew(parents, self, stats, npos, cpos)
-          case _ =>
-            syntaxErrorOrIncompleteAnd("illegal start of simple expression", skipIt = true)(errorTermTree)
-        }
+      val canApply = in.token match {
+        case LBRACE | NEW => false
+        case _            => true
+      }
+      def mkNew(): Tree = {
+        val npos                   = closeRange(in.skipToken())
+        val tstart                 = in.offset
+        val (parents, self, stats) = template()
+        val cpos                   = closeRange(tstart)
+
+        gen.mkNew(parents, self, stats, npos, cpos)
+      }
+      val t = in.token match {
+        case _ if isLiteral                               => literal()
+        case XMLSTART                                     => xmlLiteral()
+        case IDENTIFIER | BACKQUOTED_IDENT | THIS | SUPER => path(thisOK = true, typeOK = false)
+        case USCORE                                       => freshPlaceholder()
+        case LPAREN                                       => atPos(in.offset)(makeParens(commaSeparated(expr())))
+        case LBRACE                                       => blockExpr()
+        case NEW                                          => mkNew()
+        case _                                            => syntaxErrorOrIncompleteAnd("illegal start of simple expression", skipIt = true)(errorTermTree)
+      }
       simpleExprRest(t, canApply = canApply)
     }
 
@@ -2442,43 +2441,60 @@ self =>
     def patDefOrDcl(pos : Int, mods: Modifiers): List[Tree] = {
       var newmods = mods
       in.nextToken()
-      val lhs = commaSeparated(stripParens(noSeq.pattern2()))
-      val tp = typedOpt()
-      val rhs =
-        if (tp.isEmpty || in.token == EQUALS) {
-          accept(EQUALS)
-          if (!tp.isEmpty && newmods.isMutable &&
-              (lhs.toList forall (_.isInstanceOf[Ident])) && in.token == USCORE) {
-            in.nextToken()
-            newmods = newmods | Flags.DEFAULTINIT
-            EmptyTree
-          } else {
-            expr()
-          }
-        } else {
-          newmods = newmods | Flags.DEFERRED
-          EmptyTree
+      val start            = in.offset
+      val lhsOthers :+ lhs = commaSeparated(stripParens(noSeq.pattern2()))
+      val tp               = typedOpt()
+      val typedLhs         = if (tp.isEmpty) lhs else atPos(lhs.pos union tp.pos)(Typed(lhs, tp))
+      val hasBody          = tp.isEmpty || in.token == EQUALS
+
+      if (hasBody)
+        accept(EQUALS)
+      else
+        newmods |= Flags.DEFERRED
+
+      def lhsAllIdents   = lhs :: lhsOthers forall (_.isInstanceOf[Ident])
+      def hasDefaultInit = (
+           !tp.isEmpty
+        && newmods.isMutable
+        && in.token == USCORE
+        && lhsAllIdents
+        && { in.nextToken() ; newmods |= Flags.DEFAULTINIT ; true }
+      )
+      val rhs                  = if (hasBody && !hasDefaultInit) expr() else EmptyTree
+      def cloneTpt(decl: Tree) = if (tp.isEmpty) decl else Typed(decl, tp.duplicate setPos tp.pos.focus) setPos decl.pos.focus
+
+      def cloneValDef(decl: Tree): List[Tree] = {
+        val tpt   = if (tp.isEmpty) decl else Typed(decl, tp.duplicate setPos tp.pos.focus) setPos decl.pos.focus
+        makePatDef(newmods, tpt, rhs.duplicate setPos rhs.pos.focus) match {
+          case tree :: Nil => (tree setPos decl.pos) :: Nil
+          case trees       => trees map (_ setPos decl.pos.focus)
         }
-      def mkDefs(p: Tree, tp: Tree, rhs: Tree): List[Tree] = {
-        //Console.println("DEBUG: p = "+p.toString()); // DEBUG
-        val trees =
-          makePatDef(newmods,
-                     if (tp.isEmpty) p
-                     else Typed(p, tp) setPos (p.pos union tp.pos),
-                     rhs)
-        if (newmods.isDeferred) {
-          trees match {
-            case List(ValDef(_, _, _, EmptyTree)) =>
-              if (mods.isLazy) syntaxError(p.pos, "lazy values may not be abstract", skipIt = false)
-            case _ => syntaxError(p.pos, "pattern definition may not be abstract", skipIt = false)
-          }
-        }
-        trees
       }
-      val trees = (lhs.toList.init flatMap (mkDefs(_, tp.duplicate, rhs.duplicate))) ::: mkDefs(lhs.last, tp, rhs)
-      val hd = trees.head
-      hd setPos hd.pos.withStart(pos)
-      ensureNonOverlapping(hd, trees.tail)
+
+      // if (newmods.isDeferred) {
+      //   trees match {
+      //     case List(ValDef(_, _, _, EmptyTree)) =>
+      //       if (mods.isLazy) syntaxError(p.pos, "lazy values may not be abstract", skipIt = false)
+      //     case _ => syntaxError(p.pos, "pattern definition may not be abstract", skipIt = false)
+      //   }
+      // }
+
+      // val lhs1 = atPos(r2p(start, lhs.pos.point, in.lastOffset))(
+
+      val lhsLast = makePatDef(newmods, typedLhs, rhs) //map (t => t setPos r2p(lhs.pos.start, lhs.pos.start, in.lastOffset))
+      val trees   = (lhsOthers flatMap cloneValDef) ::: lhsLast
+      ensureNonOverlapping(trees.last, trees.init)
+
+      // val trees = (lhs.toList.init flatMap (mkDefs(_, tp.duplicate setPos tp.pos.focus, rhs.duplicate setPos rhs.pos.focus))) ::: mkDefs(lhs.last, tp, rhs)
+      // trees foreach { t =>
+      //   println("t = " + t)
+      //   println("pos = " + t.pos.show)
+      // }
+      // trees.head setPos trees.map(_.pos).reduceLeft(_ union _)
+      // trees.tail foreach (t => t setPos t.pos.focus)
+      // val hd = trees.head
+      // hd setPos hd.pos.withStart(pos)
+      // ensureNonOverlapping(hd, trees.tail)
       trees
     }
 

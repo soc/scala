@@ -540,7 +540,7 @@ abstract class Erasure extends AddInterfaces
         val ldef = deriveLabelDef(tree)(box1)
         ldef setType ldef.rhs.tpe
       case _ =>
-        val tree1 = tree.tpe match {
+        typedPos(tree.pos)(tree.tpe match {
           case ErasedValueType(tref) =>
             val clazz = tref.sym
             New(clazz, cast(tree, underlyingOfValueClass(clazz)))
@@ -565,9 +565,8 @@ abstract class Erasure extends AddInterfaces
               case _ =>
                 (REF(boxMethod(x)) APPLY tree) setPos (tree.pos) setType ObjectTpe
             }
-            }
-        }
-        typedPos(tree.pos)(tree1)
+          }
+        })
     }
 
     private def unbox(tree: Tree, pt: Type): Tree = {

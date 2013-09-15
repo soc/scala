@@ -155,10 +155,11 @@ class BatchSourceFile(val file : AbstractFile, val content0: Array[Char]) extend
    */
   def offsetToLine(offset: Int): Int = {
     val lines = lineIndices
-    def findLine(lo: Int, hi: Int, mid: Int): Int =
+    def findLine(lo: Int, hi: Int, mid: Int): Int = {
       if (offset < lines(mid)) findLine(lo, mid - 1, (lo + mid - 1) / 2)
       else if (offset >= lines(mid + 1)) findLine(mid + 1, hi, (mid + 1 + hi) / 2)
       else mid
+    }
     lastLine = findLine(0, lines.length, lastLine)
     lastLine
   }

@@ -226,7 +226,7 @@ trait MarkupParsers {
       val toAppend = ch match {
         case '!'    => nextch() ; if (ch =='[') xCharData else xComment // CDATA or Comment
         case '?'    => nextch() ; xProcInstr                            // PI
-        case _      => element                                        // child node
+        case _      => element                                          // child node
       }
 
       ts append toAppend
