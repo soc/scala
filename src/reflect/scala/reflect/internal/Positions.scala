@@ -40,9 +40,14 @@ trait Positions extends api.Positions { self: SymbolTable =>
   def wrappingPos(default: Position, trees: List[Tree]): Position = wrappingPos(default, trees, focus = true)
   def wrappingPos(default: Position, trees: List[Tree], focus: Boolean): Position = {
     if (useOffsetPositions) default else {
-      val ranged = trees filter (_.pos.isRange)
-      if (ranged.isEmpty) if (focus) default.focus else default
-      else new RangePosition(default.source, (ranged map (_.pos.start)).min, default.point, (ranged map (_.pos.end)).max)
+      val poses = trees collect { case t if t.pos.isRange => t.pos }
+      if (poses.isEmpty) if (focus) default.focus else default
+      else {
+        val start = (default.point :: (poses map (_.start))).min
+        val end   = (default.point :: (poses map (_.end))).max
+
+        Position.range(default.source, start, default.point, end)
+      }
     }
   }
 
@@ -62,14 +67,15 @@ trait Positions extends api.Positions { self: SymbolTable =>
    *  shortening the range, assigning TransparentPositions
    *  to some of the nodes in `tree` or focusing on the position.
    */
-  def ensureNonOverlapping(tree: Tree, others: List[Tree]){ ensureNonOverlapping(tree, others, focus = true) }
-  def ensureNonOverlapping(tree: Tree, others: List[Tree], focus: Boolean) {
-    if (useOffsetPositions) return
+  def ensureNonOverlapping(tree: Tree, others: List[Tree], focus: Boolean): List[Tree] = {
+    def result = tree :: others
+    if (useOffsetPositions)
+      return result
+
     if (settings.Yposdebug)
       log(s"ensureNonOverlapping(${tree.pos.show}, ${others.map(_.pos.show)}, $focus)")
 
-    def isOverlapping(pos: Position) =
-      pos.isRange && (others exists (pos overlaps _.pos))
+    def isOverlapping(pos: Position) = pos.isRange && (others exists (pos overlaps _.pos))
 
     if (isOverlapping(tree.pos)) {
       val children = tree.children
@@ -79,6 +85,12 @@ trait Positions extends api.Positions { self: SymbolTable =>
         tree setPos (if (isOverlapping(wpos)) tree.pos.makeTransparent else wpos)
       }
     }
+    result
+  }
+  def ensureNonOverlapping(tree: Tree, others: List[Tree]): List[Tree] = ensureNonOverlapping(tree, others, focus = true)
+  def ensureNonOverlapping(trees: List[Tree]): List[Tree] = trees match {
+    case Nil     => Nil
+    case t :: ts => ensureNonOverlapping(t, ts)
   }
 
   def rangePos(source: SourceFile, start: Int, point: Int, end: Int): Position =

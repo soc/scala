@@ -40,6 +40,7 @@ trait Trees extends api.Trees { self: SymbolTable =>
 
     final override def pos: Position = rawatt.pos
     def makeTransparent: this.type = this setPos pos.makeTransparent
+    def makeFocused: this.type = this setPos pos.focus
 
     private[this] var rawtpe: Type = _
     final def tpe = rawtpe
@@ -1052,9 +1053,10 @@ trait Trees extends api.Trees { self: SymbolTable =>
     tparams: List[TypeDef]       = sym.typeParams map TypeDef,
     vparamss: List[List[ValDef]] = mapParamss(sym)(ValDef),
     tpt: Tree                    = TypeTree(sym)
-  ): DefDef = (
+  ): DefDef = {
+    ensureNonOverlapping(tparams ::: vparamss.flatten ::: List(tpt, rhs))
     atPos(sym.pos)(DefDef(mods, name, tparams, vparamss, tpt, rhs)) setSymbol sym
-  )
+  }
 
   def newTypeDef(sym: Symbol, rhs: Tree)(
     mods: Modifiers        = Modifiers(sym.flags),

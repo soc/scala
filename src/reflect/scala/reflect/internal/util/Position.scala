@@ -78,8 +78,13 @@ object Position {
   val tabInc = 8
 
   private def validate[T <: Position](pos: T): T = {
-    if (pos.isRange)
+    if (pos.isRange) {
       assert(pos.start <= pos.end, s"bad position: ${pos.show}")
+      if (pos.isOpaqueRange && (pos.point < pos.start || pos.end < pos.point)) {
+        println(s"Badly pointed position:\n${pos.show}")
+        (new Throwable).printStackTrace
+      }
+    }
 
     pos
   }

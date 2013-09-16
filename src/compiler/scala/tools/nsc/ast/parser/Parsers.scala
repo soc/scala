@@ -2200,6 +2200,7 @@ self =>
           case _          => syntaxError(start, "auxiliary constructor needs non-implicit parameter list", skipIt = false)
         }
       }
+
       addEvidenceParams(owner, result, contextBounds)
     }
 
@@ -2256,14 +2257,13 @@ self =>
         }
         if (contextBoundBuf ne null) {
           while (in.token == VIEWBOUND) {
-            contextBoundBuf += atPos(in.skipToken()) {
-              makeFunctionTypeTree(List(Ident(pname)), typ())
-            }
+            contextBoundBuf += atPos(in.skipToken())(makeFunctionTypeTree(List(Ident(pname)), typ()))
           }
           while (in.token == COLON) {
-            contextBoundBuf += atPos(in.skipToken()) {
-              AppliedTypeTree(typ(), List(Ident(pname)))
-            }
+            val start   = in.skipToken()
+            val tycon   = typ()
+            val applied = atPos(tycon.pos withStart start)(AppliedTypeTree(tycon, Ident(pname) :: Nil))
+            contextBoundBuf += applied
           }
         }
         param
@@ -2539,12 +2539,15 @@ self =>
       in.nextToken()
       if (in.token == THIS) {
         atPos(start, in.skipToken()) {
-          val vparamss = paramClauses(nme.CONSTRUCTOR, classContextBounds map (_.duplicate), ofCaseClass = false)
+          val cbounds = classContextBounds map (_.duplicate)
+          println("cbounds: " + cbounds + "\n  " + cbounds.map(_.pos.show))
+          val vparamss = paramClauses(nme.CONSTRUCTOR, cbounds, ofCaseClass = false)
           newLineOptWhenFollowedBy(LBRACE)
           val rhs = in.token match {
             case LBRACE   => atPos(in.offset) { constrBlock(vparamss) }
             case _        => accept(EQUALS) ; atPos(in.offset) { constrExpr(vparamss) }
           }
+          ensureNonOverlapping(vparamss.flatten :+ rhs)
           DefDef(mods, nme.CONSTRUCTOR, List(), vparamss, TypeTree(), rhs)
         }
       }
@@ -2563,7 +2566,9 @@ self =>
         // i.e. (B[T] or T => B)
         val contextBoundBuf = new ListBuffer[Tree]
         val tparams = typeParamClauseOpt(name, contextBoundBuf)
-        val vparamss = paramClauses(name, contextBoundBuf.toList, ofCaseClass = false)
+        val cbounds = contextBoundBuf.toList
+        println("cbounds: " + cbounds + "\n  " + cbounds.map(_.pos.show))
+        val vparamss = paramClauses(name, cbounds, ofCaseClass = false)
         newLineOptWhenFollowedBy(LBRACE)
         var restype = fromWithinReturnType(typedOpt())
         val rhs =
@@ -2586,6 +2591,8 @@ self =>
             }
             expr()
           }
+
+        ensureNonOverlapping(tparams ::: vparamss.flatten ::: List(restype, rhs))
         DefDef(newmods, name.toTermName, tparams, vparamss, restype, rhs)
       }
       signalParseProgress(result.pos)
@@ -2723,8 +2730,9 @@ self =>
           val result = gen.mkClassDef(mods1, name, tparams, template)
           // Context bounds generate implicit parameters (part of the template) with types
           // from tparams: we need to ensure these don't overlap
-          if (!classContextBounds.isEmpty)
+          if (classContextBounds.nonEmpty)
             ensureNonOverlapping(template, tparams)
+
           result
         }
       }

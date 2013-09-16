@@ -516,18 +516,18 @@ abstract class TreeBuilder {
 
   /** Append implicit parameter section if `contextBounds` nonempty */
   def addEvidenceParams(owner: Name, vparamss: List[List[ValDef]], contextBounds: List[Tree]): List[List[ValDef]] = {
-    if (contextBounds.isEmpty) vparamss
-    else {
-      val mods = Modifiers(if (owner.isTypeName) PARAMACCESSOR | LOCAL | PRIVATE else PARAM)
-      def makeEvidenceParam(tpt: Tree) = ValDef(mods | IMPLICIT | SYNTHETIC, freshTermName(nme.EVIDENCE_PARAM_PREFIX), tpt, EmptyTree)
-      val evidenceParams = contextBounds map makeEvidenceParam
-
-      val vparamssLast = if(vparamss.nonEmpty) vparamss.last else Nil
-      if(vparamssLast.nonEmpty && vparamssLast.head.mods.hasFlag(IMPLICIT))
-        vparamss.init ::: List(evidenceParams ::: vparamssLast)
-      else
-        vparamss ::: List(evidenceParams)
+    def modFlags       = if (owner.isTypeName) PARAMACCESSOR | LOCAL | PRIVATE else PARAM
+    def mods           = Modifiers(modFlags) | IMPLICIT | SYNTHETIC
+    def name           = freshTermName(nme.EVIDENCE_PARAM_PREFIX)
+    def evidenceParams = contextBounds map (tpt => atPos(tpt.pos)(ValDef(mods, name, tpt, EmptyTree)))
+    def hasImplicitList = vparamss match {
+      case _ :+ (hd :: _) => hd.mods.isImplicit
+      case _              => false
     }
+
+    if (contextBounds.isEmpty) vparamss
+    else if (hasImplicitList) vparamss.init :+ (evidenceParams ::: vparamss.last)
+    else vparamss :+ evidenceParams
   }
 }
 
