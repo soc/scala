@@ -1348,11 +1348,7 @@ self =>
         def parseWhile = {
           val cond = atPos(in.skipToken())(condExpr())
           newLinesOpt()
-          // println("1351 offset = " + in.offset + " last = " + in.lastOffset)
           val body = expr()
-          // println("cond: " + cond + " " + cond.pos.show)
-          // println("body: " + body + " " + body.pos.show)
-          // ensureNonOverlapping(cond :: body :: Nil)
           makeWhile(cond, body)
         }
         parseWhile
@@ -2541,7 +2537,6 @@ self =>
       if (in.token == THIS) {
         atPos(start, in.skipToken()) {
           val cbounds = classContextBounds map (_.duplicate)
-          println("cbounds: " + cbounds + "\n  " + cbounds.map(_.pos.show))
           val vparamss = paramClauses(nme.CONSTRUCTOR, cbounds, ofCaseClass = false)
           newLineOptWhenFollowedBy(LBRACE)
           val rhs = in.token match {
@@ -2568,7 +2563,6 @@ self =>
         val contextBoundBuf = new ListBuffer[Tree]
         val tparams = typeParamClauseOpt(name, contextBoundBuf)
         val cbounds = contextBoundBuf.toList
-        println("cbounds: " + cbounds + "\n  " + cbounds.map(_.pos.show))
         val vparamss = paramClauses(name, cbounds, ofCaseClass = false)
         newLineOptWhenFollowedBy(LBRACE)
         var restype = fromWithinReturnType(typedOpt())
