@@ -437,7 +437,7 @@ abstract class TreeBuilder {
         Throw(Ident(binder))
       )
     ))
-    makeCaseDef(pat, EmptyTree, body)
+    atPos(catchExpr.pos)(makeCaseDef(pat, EmptyTree, body))
   }
 
   /** Create tree for pattern definition <val pat0 = rhs> */
