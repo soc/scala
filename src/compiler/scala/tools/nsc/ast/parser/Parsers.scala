@@ -1346,13 +1346,14 @@ self =>
         parseTry
       case WHILE =>
         def parseWhile = {
-          val start = in.offset
-          atPos(in.skipToken()) {
-            val cond = condExpr()
-            newLinesOpt()
-            val body = expr()
-            makeWhile(start, cond, body)
-          }
+          val cond = atPos(in.skipToken())(condExpr())
+          newLinesOpt()
+          // println("1351 offset = " + in.offset + " last = " + in.lastOffset)
+          val body = expr()
+          // println("cond: " + cond + " " + cond.pos.show)
+          // println("body: " + body + " " + body.pos.show)
+          // ensureNonOverlapping(cond :: body :: Nil)
+          makeWhile(cond, body)
         }
         parseWhile
       case DO =>

@@ -206,22 +206,21 @@ abstract class TreeBuilder {
   }
 
   /** Create tree representing a while loop */
-  def makeWhile(startPos: Int, cond: Tree, body: Tree): Tree = {
-    val lname = freshTermName(nme.WHILE_PREFIX)
-    def default = wrappingPos(List(cond, body)) match {
-      case p if p.isDefined => p.endOrPoint
-      case _                => startPos
-    }
-    val continu = atPos(o2p(body.pos pointOrElse default)) { Apply(Ident(lname), Nil) }
-    val rhs = If(cond, Block(List(body), continu), Literal(Constant(())))
-    LabelDef(lname, Nil, rhs)
+  def makeWhile(cond: Tree, body: Tree): Tree = {
+    val lname   = freshTermName(nme.WHILE_PREFIX)
+    val continu = atPos(cond.pos.focus)(Apply(Ident(lname), Nil))
+    val rhs     = atPos(cond.pos union body.pos)(If(cond, atPos(body.pos)(Block(body :: Nil, continu)), Literal(Constant(()))))
+
+    atPos(rhs.pos)(LabelDef(lname, Nil, rhs))
   }
 
   /** Create tree representing a do-while loop */
   def makeDoWhile(lname: TermName, body: Tree, cond: Tree): Tree = {
-    val continu = Apply(Ident(lname), Nil)
-    val rhs = Block(List(body), If(cond, continu, Literal(Constant(()))))
-    LabelDef(lname, Nil, rhs)
+    val continu   = atPos(cond.pos.focus)(Apply(Ident(lname), Nil))
+    val condition = atPos(cond.pos)(If(cond, continu, Literal(Constant(()))))
+    val rhs       = atPos(cond.pos union body.pos)(Block(body :: Nil, condition))
+
+    atPos(rhs.pos)(LabelDef(lname, Nil, rhs))
   }
 
   /** Create block of statements `stats`  */
