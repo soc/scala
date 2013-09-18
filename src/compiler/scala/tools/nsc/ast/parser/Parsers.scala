@@ -11,9 +11,9 @@ package ast.parser
 
 import scala.collection.{ mutable, immutable }
 import mutable.{ ListBuffer, StringBuilder }
-import scala.reflect.internal.{ ModifierFlags => Flags }
+import scala.reflect.internal.{ Precedence, ModifierFlags => Flags }
 import scala.reflect.internal.Chars.{ isScalaLetter }
-import scala.reflect.internal.util.{ SourceFile, OffsetPosition }
+import scala.reflect.internal.util.{ SourceFile, Position, OffsetPosition }
 import Tokens._
 import util.FreshNameCreator
 
@@ -137,7 +137,18 @@ self =>
   val global: Global
   import global._
 
-  case class OpInfo(operand: Tree, operator: Name, offset: Offset)
+  case class OpInfo(source: SourceFile, lhs: Tree, operator: TermName, offset: Offset) {
+    def precedence           = Precedence(operator.toString)
+    def operatorPos          = Position.range(source, offset, offset, offset + operator.length)
+    def finishPos(rhs: Tree) = lhs.pos union rhs.pos union operatorPos withPoint offset
+
+    override def toString = s"""
+      |OpInfo($source, $lhs, $operator, $offset) {
+      |   precedence = $precedence
+      |       lhsPos = ${lhs.pos.show}
+      |  operatorPos = ${operatorPos.show}
+      |}""".stripMargin.trim
+  }
 
   class SourceFileParser(val source: SourceFile) extends Parser {
 
@@ -667,14 +678,17 @@ self =>
       case PACKAGE | IMPORT | AT => true
       case _                     => isTemplateIntro || isModifier
     }
-
     def isNumericLit: Boolean = in.token match {
       case INTLIT | LONGLIT | FLOATLIT | DOUBLELIT => true
       case _ => false
     }
+
+    def isIdentExcept(except: Name) = isIdent && in.name != except
+    def isIdentOf(name: Name)       = isIdent && in.name == name
+
     def isUnaryOp = isIdent && raw.isUnary(in.name)
-    def isRawStar = isIdent && in.name == raw.STAR
-    def isRawBar  = isIdent && in.name == raw.BAR
+    def isRawStar = isIdentOf(raw.STAR)
+    def isRawBar  = isIdentOf(raw.BAR)
 
     def isIdent = in.token == IDENTIFIER || in.token == BACKQUOTED_IDENT
 
@@ -790,50 +804,52 @@ self =>
     }
 
     var opstack: List[OpInfo] = Nil
+    private def opHead = opstack.head
+    private def headPrecedence = opHead.precedence
+    private def popOpInfo(): OpInfo = try opHead finally opstack = opstack.tail
+    private def pushOpInfo(top: Tree) {
+      val opinfo = OpInfo(unit.source, top, in.name, in.offset)
+      opstack ::= opinfo
+      ident()
+    }
 
-    def precedence(operator: Name): Int =
-      if (operator eq nme.ERROR) -1
-      else {
-        val firstCh = operator.startChar
-        if (isScalaLetter(firstCh)) 1
-        else if (nme.isOpAssignmentName(operator)) 0
-        else firstCh match {
-          case '|'             => 2
-          case '^'             => 3
-          case '&'             => 4
-          case '=' | '!'       => 5
-          case '<' | '>'       => 6
-          case ':'             => 7
-          case '+' | '-'       => 8
-          case '*' | '/' | '%' => 9
-          case _               => 10
-        }
-      }
-
-    def checkAssoc(offset: Int, op: Name, leftAssoc: Boolean) =
+    def checkHeadAssoc(leftAssoc: Boolean) { checkAssoc(opHead.offset, opHead.operator, leftAssoc) }
+    def checkAssoc(offset: Int, op: Name, leftAssoc: Boolean) {
       if (treeInfo.isLeftAssoc(op) != leftAssoc)
-        syntaxError(
-          offset, "left- and right-associative operators with same precedence may not be mixed", skipIt = false)
+        syntaxError(offset, "left- and right-associative operators with same precedence may not be mixed", skipIt = false)
+    }
 
-    def reduceStack(isExpr: Boolean, base: List[OpInfo], top0: Tree, prec: Int, leftAssoc: Boolean): Tree = {
-      var top = top0
-      if (opstack != base && precedence(opstack.head.operator) == prec)
-        checkAssoc(opstack.head.offset, opstack.head.operator, leftAssoc)
-      while (opstack != base &&
-             (prec < precedence(opstack.head.operator) ||
-              leftAssoc && prec == precedence(opstack.head.operator))) {
-        val opinfo = opstack.head
-        opstack = opstack.tail
-        val opPos = r2p(opinfo.offset, opinfo.offset, opinfo.offset+opinfo.operator.length)
-        val lPos = opinfo.operand.pos
-        val start = if (lPos.isDefined) lPos.startOrPoint else  opPos.startOrPoint
-        val rPos = top.pos
-        val end = if (rPos.isDefined) rPos.endOrPoint else opPos.endOrPoint
-        top = atPos(start, opinfo.offset, end) {
-          makeBinop(isExpr, opinfo.operand, opinfo.operator.toTermName, top, opPos)
-        }
-      }
-      top
+    def finishPostfixOp(start: Int, base: List[OpInfo], opinfo: OpInfo): Tree = {
+      val od = stripParens(reduceExprStack(base, opinfo.lhs))
+      makePostfixSelect(start, opinfo.offset, od, opinfo.operator)
+    }
+
+    def finishBinaryOp(isExpr: Boolean, opinfo: OpInfo, rhs: Tree): Tree =
+      atPos(opinfo finishPos rhs)(makeBinop(isExpr, opinfo.lhs, opinfo.operator, rhs, opinfo.operatorPos))
+
+    def reduceExprStack(base: List[OpInfo], top: Tree): Tree    = reduceStack(isExpr = true, base, top)
+    def reducePatternStack(base: List[OpInfo], top: Tree): Tree = reduceStack(isExpr = false, base, top)
+
+    def reduceStack(isExpr: Boolean, base: List[OpInfo], top: Tree): Tree = {
+      val opPrecedence = if (isIdent) Precedence(in.name.toString) else Precedence(0)
+      val leftAssoc    = !isIdent || (treeInfo isLeftAssoc in.name)
+
+      reduceStack(isExpr, base, top, opPrecedence, leftAssoc)
+    }
+
+    def reduceStack(isExpr: Boolean, base: List[OpInfo], top: Tree, opPrecedence: Precedence, leftAssoc: Boolean): Tree = {
+      def isDone          = opstack == base
+      def lowerPrecedence = !isDone && (opPrecedence < headPrecedence)
+      def samePrecedence  = !isDone && (opPrecedence == headPrecedence)
+      def canReduce       = lowerPrecedence || leftAssoc && samePrecedence
+
+      if (samePrecedence)
+        checkHeadAssoc(leftAssoc)
+
+      def loop(top: Tree): Tree =
+        if (canReduce) loop(finishBinaryOp(isExpr, popOpInfo(), top)) else top
+
+      loop(top)
     }
 
 /* -------- IDENTIFIERS AND LITERALS ------------------------------------------- */
@@ -979,7 +995,7 @@ self =>
       }
 
       def infixTypeRest(t: Tree, mode: InfixMode.Value): Tree = {
-        if (isIdent && in.name != nme.STAR) {
+        if (isIdentExcept(nme.STAR)) {
           val opOffset = in.offset
           val leftAssoc = treeInfo.isLeftAssoc(in.name)
           if (mode != InfixMode.FirstOp) checkAssoc(opOffset, in.name, leftAssoc = mode == InfixMode.LeftOp)
@@ -1118,7 +1134,7 @@ self =>
     }
     /** Calls `qualId()` and manages some package state. */
     private def pkgQualId() = {
-      if (in.token == IDENTIFIER && in.name.encode == nme.scala_)
+      if (isIdentOf(nme.scala_))
         inScalaPackage = true
 
       val pkg = qualId()
@@ -1177,10 +1193,8 @@ self =>
 
     /** Consume a USCORE and create a fresh synthetic placeholder param. */
     private def freshPlaceholder(): Tree = {
-      val start = in.offset
       val pname = freshName("x$")
-      accept(USCORE)
-      val id = atPos(start)(Ident(pname))
+      val id = atPos(accept(USCORE))(Ident(pname))
       val param = atPos(id.pos.focus)(gen.mkSyntheticParam(pname.toTermName))
       placeholderParams ::= param
       id
@@ -1411,7 +1425,7 @@ self =>
             if (in.token == USCORE) {
               //todo: need to handle case where USCORE is a wildcard in a type
               val uscorePos = in.skipToken()
-              if (isIdent && in.name == nme.STAR) {
+              if (isIdentOf(nme.STAR)) {
                 in.nextToken()
                 t = atPos(t.pos.startOrPoint, colonPos) {
                   Typed(t, atPos(uscorePos) { Ident(tpnme.WILDCARD_STAR) })
@@ -1487,28 +1501,19 @@ self =>
     def postfixExpr(): Tree = {
       val start = in.offset
       val base  = opstack
-      var top   = prefixExpr()
 
-      while (isIdent) {
-        top = reduceStack(isExpr = true, base, top, precedence(in.name), leftAssoc = treeInfo.isLeftAssoc(in.name))
-        val op = in.name
-        opstack = OpInfo(top, op, in.offset) :: opstack
-        ident()
+      def loop(top: Tree): Tree = if (!isIdent) top else {
+        pushOpInfo(reduceExprStack(base, top))
         newLineOptWhenFollowing(isExprIntroToken)
-        if (isExprIntro) {
-          val next = prefixExpr()
-          if (next == EmptyTree)
-            return reduceStack(isExpr = true, base, top, 0, leftAssoc = true)
-          top = next
-        } else {
-          // postfix expression
-          val topinfo = opstack.head
-          opstack = opstack.tail
-          val od = stripParens(reduceStack(isExpr = true, base, topinfo.operand, 0, leftAssoc = true))
-          return makePostfixSelect(start, topinfo.offset, od, topinfo.operator)
-        }
+        if (isExprIntro)
+          prefixExpr() match {
+            case EmptyTree => reduceExprStack(base, top)
+            case next      => loop(next)
+          }
+        else finishPostfixOp(start, base, popOpInfo())
       }
-      reduceStack(isExpr = true, base, top, 0, leftAssoc = true)
+
+      reduceExprStack(base, loop(prefixExpr()))
     }
 
     /** {{{
@@ -1801,19 +1806,10 @@ self =>
        *                |   SeqPattern3
        *  }}}
        */
-      def pattern2(): Tree = {
-        val p = pattern3()
-
-        if (in.token != AT) p
-        else p match {
-          case Ident(nme.WILDCARD) =>
-            in.nextToken()
-            pattern3()
-          case Ident(name) if treeInfo.isVarPattern(p) =>
-            in.nextToken()
-            atPos(p.pos.startOrPoint) { Bind(name, pattern3()) }
-          case _ => p
-        }
+      def pattern2(): Tree = pattern3() match {
+        case Ident(nme.WILDCARD) if in.token == AT                          => in.nextToken() ; pattern3()
+        case p @ Ident(name) if in.token == AT && (treeInfo isVarPattern p) => in.nextToken() ; atPos(p.pos.start)(Bind(name, pattern3()))
+        case p                                                              => p
       }
 
       /** {{{
@@ -1822,61 +1818,55 @@ self =>
        *  }}}
        */
       def pattern3(): Tree = {
-        var top = simplePattern(badPattern3)
-        // after peekahead
-        def acceptWildStar() = atPos(top.pos.startOrPoint, in.prev.offset)(Star(stripParens(top)))
+        val top = simplePattern(badPattern3)
+        val base = opstack
         // See SI-3189, SI-4832 for motivation. Cf SI-3480 for counter-motivation.
         // TODO: dredge out the remnants of regexp patterns.
-        // /{/ peek for _*) or _*} (for xml escape)
-        if (isSequenceOK) {
-          top match {
-            case Ident(nme.WILDCARD) if (isRawStar) =>
-              peekahead()
-              in.token match {
-                case RBRACE if (isXML) => return acceptWildStar()
-                case RPAREN if (!isXML) => return acceptWildStar()
-                case _ => pushback()
-              }
-            case _ =>
+        def peekaheadDelim(): Boolean = {
+          peekahead()
+          val result = in.token match {
+            case RBRACE => isXML
+            case RPAREN => !isXML
+            case _      => false
           }
+          result || { pushback() ; false }
         }
-        val base = opstack
-        while (isIdent && in.name != raw.BAR) {
-          top = reduceStack(isExpr = false, base, top, precedence(in.name), leftAssoc = treeInfo.isLeftAssoc(in.name))
-          val op = in.name
-          opstack = OpInfo(top, op, in.offset) :: opstack
-          ident()
-          top = simplePattern(badPattern3)
+        def isWildStar = top match {
+          case Ident(nme.WILDCARD) if isRawStar => peekaheadDelim()
+          case _                                => false
         }
-        stripParens(reduceStack(isExpr = false, base, top, 0, leftAssoc = true))
+        def loop(top: Tree): Tree = reducePatternStack(base, top) match {
+          case next if isIdentExcept(raw.BAR) => pushOpInfo(next) ; loop(simplePattern(badPattern3))
+          case next                           => next
+        }
+        if (isSequenceOK && isWildStar)
+          atPos(top.pos.startOrPoint, in.prev.offset)(Star(stripParens(top)))
+        else
+          stripParens(loop(top))
       }
+
       def badPattern3(): Tree = {
-        def isComma = in.token == COMMA
-        def isAnyBrace = in.token == RPAREN || in.token == RBRACE
-        val badStart = "illegal start of simple pattern"
+        def isComma                = in.token == COMMA
+        def isDelimeter            = in.token == RPAREN || in.token == RBRACE
+        def isCommaOrDelimeter     = isComma || isDelimeter
+        val (isUnderscore, isStar) = opstack match {
+          case OpInfo(_, Ident(nme.WILDCARD), nme.STAR, _) :: _ => (true,   true)
+          case OpInfo(_, _, nme.STAR, _) :: _                   => (false,  true)
+          case _                                                => (false, false)
+        }
+        def isSeqPatternClose = isUnderscore && isStar && isSequenceOK && isDelimeter
+        val msg = (isUnderscore, isStar, isSequenceOK) match {
+          case (true, true, true) if isComma             => "bad use of _* (a sequence pattern must be the last pattern)"
+          case (true, true, true) if isDelimeter         => "bad brace or paren after _*"
+          case (true, true, false) if isDelimeter        => "bad use of _* (sequence pattern not allowed)"
+          case (false, true, true) if isDelimeter        => "use _* to match a sequence"
+          case (false, true, true) if isCommaOrDelimeter => "trailing * is not a valid pattern"
+          case _                                         => "illegal start of simple pattern"
+        }
         // better recovery if don't skip delims of patterns
-        var skip = !(isComma || isAnyBrace)
-        val msg = if (!opstack.isEmpty && opstack.head.operator == nme.STAR) {
-            opstack.head.operand match {
-              case Ident(nme.WILDCARD) =>
-                if (isSequenceOK && isComma)
-                  "bad use of _* (a sequence pattern must be the last pattern)"
-                else if (isSequenceOK && isAnyBrace) {
-                  skip = true  // do skip bad paren; scanner may skip bad brace already
-                  "bad brace or paren after _*"
-                } else if (!isSequenceOK && isAnyBrace)
-                  "bad use of _* (sequence pattern not allowed)"
-                else badStart
-              case _ =>
-                if (isSequenceOK && isAnyBrace)
-                  "use _* to match a sequence"
-                else if (isComma || isAnyBrace)
-                  "trailing * is not a valid pattern"
-                else badStart
-            }
-          } else {
-            badStart
-          }
+        val skip = !isCommaOrDelimeter || isSeqPatternClose
+
+        // println(s"badPattern3: in=${in.token} skip=$skip")
         syntaxErrorOrIncompleteAnd(msg, skip)(errorPatternTree)
       }
 
@@ -1920,8 +1910,9 @@ self =>
               case _        => typeAppliedTree
             }
           case USCORE =>
-            in.nextToken()
-            atPos(start, start) { Ident(nme.WILDCARD) }
+            // in.nextToken()
+            // atPos(start, start) { Ident(nme.WILDCARD) }
+            atPos(in.skipToken())(Ident(nme.WILDCARD))
           case CHARLIT | INTLIT | LONGLIT | FLOATLIT | DOUBLELIT |
                STRINGLIT | INTERPOLATIONID | SYMBOLLIT | TRUE | FALSE | NULL =>
             literal(inPattern = true)
@@ -1991,7 +1982,7 @@ self =>
     }
 
     private def tokenRange(token: TokenData) =
-      r2p(token.offset, token.offset, token.offset + token.name.length - 1)
+      r2p(token.offset, token.offset, token.offset + token.name.length)
 
     /** {{{
      *  AccessQualifier ::= `[' (Id | this) `]'
@@ -2346,7 +2337,7 @@ self =>
       selectors
     }
 
-    def wildcardOrIdent() = if (acceptIfPresent(USCORE)) nme.WILDCARD else ident()
+    def wildcardOrIdent(): Name = if (acceptIfPresent(USCORE)) nme.WILDCARD else ident()
 
     /** {{{
      *  ImportSelector ::= Id [`=>' Id | `=>' `_']
@@ -2547,7 +2538,7 @@ self =>
           } else {
             if (in.token == EQUALS) {
               in.nextTokenAllow(nme.MACROkw)
-              if (in.token == IDENTIFIER && in.name == nme.MACROkw) {
+              if (isIdentOf(nme.MACROkw)) {
                 in.nextToken()
                 newmods |= Flags.MACRO
               }

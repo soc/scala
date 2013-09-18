@@ -359,7 +359,8 @@ trait Scanners extends ScannersCommon {
           next copyFrom this
           this copyFrom prev
         }
-      } else if (token == SEMI) {
+      }
+      else if (token == SEMI) {
         prev copyFrom this
         fetchToken()
         if (token != ELSE) {
@@ -367,8 +368,6 @@ trait Scanners extends ScannersCommon {
           this copyFrom prev
         }
       }
-
-//      print("["+this+"]")
     }
 
     /** Is current token first one after a newline? */

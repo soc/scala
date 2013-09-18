@@ -1,0 +1,16 @@
+[[syntax trees at end of                    patmat]] // newSource1.scala
+[0:116]package [8:9]s {
+  [11:116]sealed abstract protected[s] class A extends [48:116][116]scala.AnyRef {
+    [116]def <init>(): [48]s.A = [116]{
+      [116][116][116]A.super.<init>();
+      [48]()
+    };
+    [52:81]implicit protected def f: [75]Int;
+    [93]lazy private[this] var g: [93]List[Nothing] = _;
+    [84:114]<stable> <accessor> lazy def g: [93]List[Nothing] = [97:114]{
+      [97:114][93][93]A.this.g = [97:114][97:114][97:110][97:110][97:107][97:107][97:103][97:103]<97:100>immutable.this.Nil.++[[101]Nothing, [101]List[Nothing]]([104:107]<104:107>immutable.this.Nil)([101][101][101]immutable.this.List.canBuildFrom[[101]Nothing]).++[[108]Nothing, [108]List[Nothing]]([111:114]<111:114>immutable.this.Nil)([108][108][108]immutable.this.List.canBuildFrom[[108]Nothing]);
+      [93][93]A.this.g
+    }
+  }
+}
+
