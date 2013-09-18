@@ -1841,6 +1841,7 @@ trait Typers extends Adaptations with Tags with TypersTracking with PatternTyper
     /** <!-- 2 --> Check that inner classes do not inherit from Annotation
      */
     def typedTemplate(templ: Template, parents1: List[Tree]): Template = {
+      def firstParent = parents1.head
       val clazz = context.owner
       clazz.annotations.map(_.completeInfo())
       if (templ.symbol == NoSymbol)
@@ -1871,10 +1872,11 @@ trait Typers extends Adaptations with Tags with TypersTracking with PatternTyper
       enterSyms(context.outer.make(templ, clazz, clazz.info.decls), templ.body)
       if (!templ.isErrorTyped) // if `parentTypes` has invalidated the template, don't validate it anymore
       validateParentClasses(parents1, selfType)
+
       if (clazz.isCase)
         validateNoCaseAncestor(clazz)
-      if (clazz.isTrait && hasSuperArgs(parents1.head))
-        ConstrArgsInParentOfTraitError(parents1.head, clazz)
+      if (clazz.isTrait && hasSuperArgs(firstParent))
+        ConstrArgsInParentOfTraitError(firstParent, clazz)
 
       if ((clazz isSubClass ClassfileAnnotationClass) && !clazz.isTopLevel)
         unit.error(clazz.pos, "inner classes cannot be classfile annotations")
@@ -2668,9 +2670,10 @@ trait Typers extends Adaptations with Tags with TypersTracking with PatternTyper
       members foreach (m => anonClass.info.decls enter m.symbol)
 
       val typedBlock = typedPos(tree.pos, mode, pt) {
-        Block(ClassDef(anonClass, NoMods, ListOfNil, members, tree.pos.focus), atPos(tree.pos.focus)(
-          Apply(Select(New(Ident(anonClass.name).setSymbol(anonClass)), nme.CONSTRUCTOR), List())
-        ))
+        Block(
+          ClassDef(anonClass, NoMods, ListOfNil, members, tree.pos.focus),
+          atPos(tree.pos.focus)(ApplyConstructor(Ident(anonClass.name) setSymbol anonClass, Nil))
+        )
       }
 
       if (typedBlock.isErrorTyped) typedBlock

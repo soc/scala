@@ -135,7 +135,7 @@ abstract class UnCurry extends InfoTransform
      *  todo: maybe clone a pre-existing exception instead?
      *  (but what to do about exceptions that miss their targets?)
      */
-    private def nonLocalReturnThrow(expr: Tree, meth: Symbol) = localTyper typed {
+    private def nonLocalReturnThrow(expr: Tree, meth: Symbol) = localTyper.typedPos(expr.pos) {
       Throw(
         nonLocalReturnExceptionType(expr.tpe.widen),
         Ident(nonLocalReturnKey(meth)),
