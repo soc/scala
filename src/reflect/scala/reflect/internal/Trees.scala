@@ -941,7 +941,15 @@ trait Trees extends api.Trees { self: SymbolTable =>
                        privateWithin: Name,
                        annotations: List[Tree]) extends ModifiersApi with HasFlags {
 
+    // It's a map from Long => Position. Long what? Well, at least
+    // Tokens and Flags, which of course collide: though there are
+    // 2^64 possible keys, flags hit all the powers of 2 and tokens
+    // hit approximately 1 to 100, so we collide at 1, 2, 4, 8, 16,
+    // 32, 64.
+    // approximately 1 to 100. Oh my.
     var positions: Map[Long, Position] = Map()
+
+    def pos = positions.values.foldLeft(NoPosition: Position)(_ union _)
 
     def setPositions(poss: Map[Long, Position]): this.type = {
       positions = poss; this
@@ -983,7 +991,10 @@ trait Trees extends api.Trees { self: SymbolTable =>
       if (annots.isEmpty) this
       else copy(annotations = annotations ::: annots) setPositions positions
 
-    def withPosition(flag: Long, position: Position) =
+    def withPosition(pos: (Int, Position)): Modifiers =
+      withPosition(pos._1, pos._2)
+
+    def withPosition(flag: Long, position: Position): Modifiers =
       copy() setPositions positions + (flag -> position)
 
     override def mapAnnotations(f: List[Tree] => List[Tree]): Modifiers = {

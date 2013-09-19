@@ -87,6 +87,7 @@ class ModifierFlags {
   final val FINAL         = 1 << 5    // May not be overridden. Note that java final implies much more than scala final.
   final val PRIVATE       = 1 << 2
   final val PROTECTED     = 1 << 0
+  final val MODULE        = 1 << 8        // symbol is module or class implementing a module
 
   final val SEALED        = 1 << 10
   final val OVERRIDE      = 1 << 1
@@ -145,7 +146,6 @@ object ModifierFlags extends ModifierFlags
 /** All flags and associated operatins */
 class Flags extends ModifierFlags {
   final val METHOD        = 1 << 6        // a method
-  final val MODULE        = 1 << 8        // symbol is module or class implementing a module
   final val PACKAGE       = 1 << 14       // symbol is a java package
 
   final val CAPTURED      = 1 << 16       // variable is accessed from nested function.  Set by LambdaLift.

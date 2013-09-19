@@ -1,5 +1,5 @@
 [[syntax trees at end of                    parser]] // newSource1.scala
-[6]package [6]<empty> {
+[0:6]package [0]<empty> {
   [6]class C extends [8][91]scala.AnyRef {
     [8]def <init>() = [8]{
       [X][X][X]super.<init>();

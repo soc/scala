@@ -169,10 +169,16 @@ private[util] trait InternalPositionImpl {
   def focus: Position      = if (this.isRange) asOffset(point) else this
   def focusEnd: Position   = if (this.isRange) asOffset(end) else this
 
+  def union(offset: Int): Position = (
+    if (!isDefined) Position.offset(NoSourceFile, offset)
+    else if (offset < start) this withStart offset
+    else if (end < offset) this withEnd offset
+    else this
+  )
   def union(pos: Position): Position = (
-    if (!pos.isRange) this
-    else if (this.isRange) copyRange(start = start min pos.start, end = end max pos.end)
-    else pos
+    if (!pos.isDefined) this
+    else if (!isDefined) pos
+    else copyRange(start = start min pos.start, end = end max pos.end)
   )
 
   def includes(pos: Position): Boolean         = isRange && pos.isDefined && start <= pos.start && pos.end <= end

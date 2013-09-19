@@ -10,10 +10,10 @@ lazyvals.scala:12: error: lazy not allowed here. Only vals can be lazy
 lazyvals.scala:15: error: lazy values may not be abstract
     lazy val t;
              ^
-lazyvals.scala:20: error: lazy not allowed here. Only vals can be lazy
+lazyvals.scala:20: error: classes cannot be lazy
   lazy trait T {}
        ^
-lazyvals.scala:21: error: lazy not allowed here. Only vals can be lazy
+lazyvals.scala:21: error: classes cannot be lazy
   lazy class C {}
        ^
 lazyvals.scala:22: error: lazy not allowed here. Only vals can be lazy
