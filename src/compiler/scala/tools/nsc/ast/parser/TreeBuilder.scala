@@ -148,8 +148,7 @@ abstract class TreeBuilder {
     case _ => t
   }
 
-  def makeAnnotated(t: Tree, annot: Tree): Tree =
-    atPos(annot.pos union t.pos)(Annotated(annot, t))
+  def makeAnnotated(t: Tree, annot: Tree): Tree = atChildrenUnionPos(Annotated(annot, t))
 
   def makeSelfDef(name: TermName, tpt: Tree): ValDef =
     ValDef(Modifiers(PRIVATE), name, tpt, EmptyTree)
@@ -179,12 +178,12 @@ abstract class TreeBuilder {
     }
     if (isExpr) {
       if (treeInfo.isLeftAssoc(op)) {
-        Apply(atPos(opPos union left.pos) { Select(stripParens(left), op.encode) }, arguments)
+        Apply(atUnionPos(opPos, left) { Select(stripParens(left), op.encode) }, arguments)
       } else {
         val x = freshTermName()
         Block(
           List(ValDef(Modifiers(SYNTHETIC | ARTIFACT), x, TypeTree(), stripParens(left))),
-          Apply(atPos(opPos union right.pos) { Select(stripParens(right), op.encode) }, List(Ident(x))))
+          Apply(atUnionPos(opPos, right) { Select(stripParens(right), op.encode) }, List(Ident(x))))
       }
     } else {
       Apply(Ident(op.encode), stripParens(left) :: arguments)
@@ -209,7 +208,7 @@ abstract class TreeBuilder {
   def makeWhile(cond: Tree, body: Tree): Tree = {
     val lname   = freshTermName(nme.WHILE_PREFIX)
     val continu = atPos(cond.pos.focus)(Apply(Ident(lname), Nil))
-    val rhs     = atPos(cond.pos union body.pos)(If(cond, atPos(body.pos)(Block(body :: Nil, continu)), Literal(Constant(()))))
+    val rhs     = atUnionPos(cond, body)(If(cond, atPos(body.pos)(Block(body :: Nil, continu)), Literal(Constant(()))))
 
     atPos(rhs.pos)(LabelDef(lname, Nil, rhs))
   }
@@ -218,7 +217,7 @@ abstract class TreeBuilder {
   def makeDoWhile(lname: TermName, body: Tree, cond: Tree): Tree = {
     val continu   = atPos(cond.pos.focus)(Apply(Ident(lname), Nil))
     val condition = atPos(cond.pos)(If(cond, continu, Literal(Constant(()))))
-    val rhs       = atPos(cond.pos union body.pos)(Block(body :: Nil, condition))
+    val rhs       = atUnionPos(cond, body)(Block(body :: Nil, condition))
 
     atPos(rhs.pos)(LabelDef(lname, Nil, rhs))
   }
@@ -313,7 +312,7 @@ abstract class TreeBuilder {
      * the limits given by pat and body.
      */
     def makeClosure(pos: Position, pat: Tree, body: Tree): Tree =
-      atPos((pos union pat.pos union body.pos).makeTransparent) {
+      atPos(unionPos(pos, pat, body).makeTransparent) {
         matchVarPattern(pat) match {
           case Some((name, tpt)) => Function(atPos(pat.pos)(ValDef(Modifiers(PARAM), name.toTermName, tpt, EmptyTree)) :: Nil, body)
           case None              => makeVisitor(CaseDef(pat, body) :: Nil, checkExhaustive = false)
@@ -354,7 +353,7 @@ abstract class TreeBuilder {
                         makeFor(mapName, flatMapName, rest, body))
       case ValFrom(pos, pat, rhs) :: Filter(_, test) :: rest =>
         makeFor(mapName, flatMapName,
-                ValFrom(pos, pat, makeCombination(rhs.pos union test.pos, nme.withFilter, rhs, pat.duplicate, test)) :: rest,
+                ValFrom(pos, pat, makeCombination(unionPos(rhs, test), nme.withFilter, rhs, pat.duplicate, test)) :: rest,
                 body)
       case ValFrom(pos, pat, rhs) :: rest =>
         val valeqs = rest.take(definitions.MaxTupleArity - 1).takeWhile(_.isInstanceOf[ValEq])
@@ -441,9 +440,7 @@ abstract class TreeBuilder {
   /** Create tree for pattern definition <mods val pat0 = rhs> */
   def makePatDef(mods: Modifiers, pat: Tree, rhs: Tree): List[Tree] = matchVarPattern(pat) match {
     case Some((name, tpt)) =>
-      List(atPos(pat.pos union rhs.pos) {
-        ValDef(mods, name.toTermName, tpt, rhs)
-      })
+      atUnionPos(pat, rhs)(ValDef(mods, name.toTermName, tpt, rhs)) :: Nil
 
     case None =>
       //  in case there is exactly one variable x_1 in pattern
@@ -468,13 +465,13 @@ abstract class TreeBuilder {
         case Typed(expr, tpt) if !expr.isInstanceOf[Ident] =>
           val rhsTypedUnchecked =
             if (tpt.isEmpty) rhsUnchecked
-            else Typed(rhsUnchecked, tpt) setPos (rhs.pos union tpt.pos)
+            else atUnionPos(rhs, tpt)(Typed(rhsUnchecked, tpt))
           (expr, rhsTypedUnchecked)
         case ok =>
           (ok, rhsUnchecked)
       }
       val vars = getVariables(pat1)
-      val matchExpr = atPos((pat1.pos union rhs.pos).makeTransparent) {
+      val matchExpr = atPos(unionPos(pat1, rhs).makeTransparent) {
         Match(
           rhs1,
           List(
@@ -485,9 +482,7 @@ abstract class TreeBuilder {
       }
       vars match {
         case List((vname, tpt, pos)) =>
-          List(atPos(pat.pos union pos union rhs.pos) {
-            ValDef(mods, vname.toTermName, tpt, matchExpr)
-          })
+          atUnionPos(pos, pat, rhs)(ValDef(mods, vname.toTermName, tpt, matchExpr)) :: Nil
         case _ =>
           val tmp = freshTermName()
           val firstDef =

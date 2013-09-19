@@ -62,12 +62,15 @@ trait Positions extends api.Positions { self: SymbolTable =>
    *  shortening the range, assigning TransparentPositions
    *  to some of the nodes in `tree` or focusing on the position.
    */
-  def ensureNonOverlapping(tree: Tree, others: List[Tree]){ ensureNonOverlapping(tree, others, focus = true) }
-  def ensureNonOverlapping(tree: Tree, others: List[Tree], focus: Boolean) {
-    if (useOffsetPositions) return
+  def ensureNonOverlapping(tree: Tree, others: List[Tree], focus: Boolean): List[Tree] = {
+    def result = tree :: others
+    if (useOffsetPositions)
+      return result
 
-    def isOverlapping(pos: Position) =
-      pos.isRange && (others exists (pos overlaps _.pos))
+    if (settings.Yposdebug)
+      log(s"ensureNonOverlapping(${tree.pos.show}, ${others.map(_.pos.show)}, $focus)")
+
+    def isOverlapping(pos: Position) = pos.isRange && (others exists (pos overlaps _.pos))
 
     if (isOverlapping(tree.pos)) {
       val children = tree.children
@@ -77,7 +80,17 @@ trait Positions extends api.Positions { self: SymbolTable =>
         tree setPos (if (isOverlapping(wpos)) tree.pos.makeTransparent else wpos)
       }
     }
+    result
   }
+  def ensureNonOverlapping(tree: Tree, others: List[Tree]): List[Tree] = ensureNonOverlapping(tree, others, focus = true)
+  def ensureNonOverlapping(trees: List[Tree]): List[Tree] = trees match {
+    case Nil     => Nil
+    case t :: ts => ensureNonOverlapping(t, ts)
+  }
+
+  def unionPosition(poses: Position*): Position       = if (poses.isEmpty) NoPosition else poses reduceLeft (_ union _)
+  def unionPos(pos: Position, trees: Tree*): Position = unionPosition(pos +: trees.map(_.pos) : _*)
+  def unionPos(tree: Tree, trees: Tree*): Position    = unionPosition(tree +: trees map (_.pos) : _*)
 
   def rangePos(source: SourceFile, start: Int, point: Int, end: Int): Position =
     if (useOffsetPositions) new OffsetPosition(source, point)
@@ -102,7 +115,10 @@ trait Positions extends api.Positions { self: SymbolTable =>
       inform("\nChildren:")
       tree.children map (t => "  " + treeStatus(t, tree)) foreach inform
       inform("=======")
-      throw new ValidateException(msg)
+
+      // Let's issue a helpful warning rather than crashing the compiler.
+      // The recipient is more likely to be grateful.
+      warning(msg)
     }
 
     def validate(tree: Tree, encltree: Tree): Unit = {
@@ -207,31 +223,25 @@ trait Positions extends api.Positions { self: SymbolTable =>
   /** Set position of all children of a node
    *  @param  pos   A target position.
    *                Uses the point of the position as the point of all positions it assigns.
-   *                Uses the start of this position as an Offset position for unpositioed trees
+   *                Uses the start of this position as an Offset position for unpositioned trees
    *                without children.
    *  @param  trees  The children to position. All children must be positionable.
    */
   private def setChildrenPos(pos: Position, trees: List[Tree]): Unit = try {
-    for (tree <- trees) {
-      if (!tree.isEmpty && tree.canHaveAttrs && tree.pos == NoPosition) {
-        val children = tree.children
-        if (children.isEmpty) {
-          tree setPos pos.focus
-        } else {
-          setChildrenPos(pos, children)
-          tree setPos wrappingPos(pos, children)
-        }
+    trees filter (t => t.canHaveAttrs && t.pos == NoPosition) foreach (t =>
+      t.children match {
+        case Nil => t setPos pos.focus
+        case cs  => setChildrenPos(pos, cs) ; t setPos wrappingPos(pos, cs)
       }
-    }
+    )
   } catch {
     case ex: Exception =>
-      println("error while set children pos "+pos+" of "+trees)
+      def trees_s = trees map (t => t.shortClass + "/" + t.pos.show) mkString ", "
+      Console.err.println(s"$ex during setChildrenPos(\n    pos=${pos.show}\n  trees=$trees_s\n)\n")
       throw ex
   }
 
-
   class ValidateException(msg : String) extends Exception(msg)
-
 
   /** A locator for trees with given positions.
    *  Given a position `pos`, locator.apply returns
@@ -296,6 +306,17 @@ trait Positions extends api.Positions { self: SymbolTable =>
       }
     }
   }
+
+  def atChildrenUnionPos[T <: Tree](t: T): T = t.children.toList match {
+    case c :: cs => atUnionPos[T](c, cs: _*)(t)
+    case _       => t
+  }
+
+  def atUnionPos[T <: Tree](default: Position, trees: Tree*)(t: T): T =
+    atPos[T](unionPos(default, trees: _*))(t)
+
+  def atUnionPos[T <: Tree](tree: Tree, trees: Tree*)(t: T): T =
+    atPos[T](unionPos(tree, trees: _*))(t)
 
   /** Position a tree.
    *  This means: Set position of a node and position all its unpositioned children.

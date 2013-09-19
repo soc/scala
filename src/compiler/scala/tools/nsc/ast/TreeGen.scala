@@ -208,8 +208,8 @@ abstract class TreeGen extends scala.reflect.internal.TreeGen with TreeDSL {
     else {
       val (valDef, identFn) = mkPackedValDef(expr, owner, unit.freshTermName("ev$"))
       val containing = within(identFn)
-      ensureNonOverlapping(containing, List(expr))
-      Block(List(valDef), containing) setPos (containing.pos union expr.pos)
+      ensureNonOverlapping(containing, expr :: Nil)
+      atUnionPos(containing, expr)(Block(valDef :: Nil, containing))
     }
   }
 
@@ -236,7 +236,7 @@ abstract class TreeGen extends scala.reflect.internal.TreeGen with TreeDSL {
     val containing = within(exprs1.toList)
     ensureNonOverlapping(containing, exprs)
     if (prefix.isEmpty) containing
-    else Block(prefix, containing) setPos (prefix.head.pos union containing.pos)
+    else atChildrenUnionPos(Block(prefix, containing))
   }
 
   /** Return the synchronized part of the double-checked locking idiom around the syncBody tree. It guards with `cond` and

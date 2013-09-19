@@ -1285,7 +1285,7 @@ self =>
       val pname = freshTypeName("_$")
       val t = atPos(start)(Ident(pname))
       val bounds = typeBounds()
-      val param = atPos(t.pos union bounds.pos) { makeSyntheticTypeParam(pname, bounds) }
+      val param = atUnionPos(t, bounds) { makeSyntheticTypeParam(pname, bounds) }
       placeholderTypes = param :: placeholderTypes
       t
     }
@@ -2439,7 +2439,7 @@ self =>
       val lhses        = commaSeparated(stripParens(noSeq.pattern2()))
       val lhs          = lhses.last
       val tpt          = typedOpt()
-      val ascriptedLhs = if (tpt.isEmpty) lhs else atPos(lhs.pos union tpt.pos)(Typed(lhs, tpt))
+      val ascriptedLhs = if (tpt.isEmpty) lhs else atUnionPos(lhs, tpt)(Typed(lhs, tpt))
       val hasEq        = acceptIfPresent(EQUALS)
       // SI-7854 an underscore following the equals doesn't necessarily mean default initialization.
       val isDefaultInit = hasEq && in.token == USCORE && {
@@ -2930,11 +2930,11 @@ self =>
         if (in.token == ARROW) {
           first match {
             case Typed(tree @ This(tpnme.EMPTY), tpt) =>
-              self = atPos(tree.pos union tpt.pos) { makeSelfDef(nme.WILDCARD, tpt) }
+              self = atUnionPos(tree, tpt) { makeSelfDef(nme.WILDCARD, tpt) }
             case _ =>
               convertToParam(first) match {
                 case tree @ ValDef(_, name, tpt, EmptyTree) if (name != nme.ERROR) =>
-                  self = atPos(tree.pos union tpt.pos) { makeSelfDef(name, tpt) }
+                  self = atUnionPos(tree, tpt) { makeSelfDef(name, tpt) }
                 case _ =>
               }
           }

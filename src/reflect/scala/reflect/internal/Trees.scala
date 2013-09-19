@@ -40,6 +40,10 @@ trait Trees extends api.Trees { self: SymbolTable =>
 
     final override def pos: Position = rawatt.pos
 
+    def makeTransparent: this.type            = this setPos pos.makeTransparent
+    def makeFocused: this.type                = this setPos pos.focus
+    def unionPos(newpos: Position): this.type = this setPos (newpos union pos)
+
     private[this] var rawtpe: Type = _
     final def tpe = rawtpe
     @deprecated("Use setType", "2.11.0") def tpe_=(t: Type): Unit = setType(t)
@@ -457,14 +461,15 @@ trait Trees extends api.Trees { self: SymbolTable =>
   // copying trees will all too easily forget to distinguish subclasses
   class ApplyImplicitView(fun: Tree, args: List[Tree]) extends Apply(fun, args)
 
-  def ApplyConstructor(tpt: Tree, args: List[Tree]) = Apply(Select(New(tpt), nme.CONSTRUCTOR), args)
+  def SelectConstructor(tpt: Tree): Tree                  = Select(New(tpt), nme.CONSTRUCTOR).makeTransparent
+  def ApplyConstructor(tpt: Tree, args: List[Tree]): Tree = Apply(SelectConstructor(tpt), args)
 
   // Creates a constructor call from the constructor symbol.  This is
   // to avoid winding up with an OverloadedType for the constructor call.
   def NewFromConstructor(constructor: Symbol, args: Tree*) = {
     assert(constructor.isConstructor, constructor)
     val instance = New(TypeTree(constructor.owner.tpe))
-    val init     = Select(instance, nme.CONSTRUCTOR) setSymbol constructor
+    val init     = Select(instance, nme.CONSTRUCTOR).makeTransparent setSymbol constructor
 
     Apply(init, args.toList)
   }
