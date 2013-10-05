@@ -7,6 +7,7 @@
 \*                                                                      */
 
 package scala
+package foo
 
 import scala.collection.{ mutable, immutable }
 import java.{ lang => jl }
@@ -43,18 +44,68 @@ object PrimitiveCompanion extends immutable.IndexedSeq[PrimitiveCompanion] {
   )
   def apply(idx: Int) = companions(idx)
   def length          = companions.length
-  def iterator        = companions.iterator
 }
 
 object Boolean extends PrimitiveCompanion {
   type Unboxed             = Boolean
   type Boxed               = jl.Boolean
   def zero                 = false
-  def box(x: Boolean)      = Boolean.valueOf(x)
+  def box(x: Boolean)      = jl.Boolean.valueOf(x)
   def unbox(x: jl.Boolean) = x.booleanValue
 }
 
+object Byte extends PrimitiveCompanion {
+  type Unboxed          = Byte
+  type Boxed            = jl.Byte
+  def zero              = (0: Byte)
+  def box(x: Byte)      = jl.Byte.valueOf(x)
+  def unbox(x: jl.Byte) = x.byteValue
+}
 
+object Short extends PrimitiveCompanion {
+  type Unboxed          = Short
+  type Boxed            = jl.Short
+  def zero              = (0: Short)
+  def box(x: Short)      = jl.Short.valueOf(x)
+  def unbox(x: jl.Short) = x.shortValue
+}
 
+object Char extends PrimitiveCompanion {
+  type Unboxed               = Char
+  type Boxed                 = jl.Character
+  def zero                   = (0: Char)
+  def box(x: Char)           = jl.Character.valueOf(x)
+  def unbox(x: jl.Character) = x.charValue
+}
 
+object Int extends PrimitiveCompanion {
+  type Unboxed             = Int
+  type Boxed               = jl.Integer
+  def zero                 = 0
+  def box(x: Int)          = jl.Integer.valueOf(x)
+  def unbox(x: jl.Integer) = x.intValue
+}
 
+object Long extends PrimitiveCompanion {
+  type Unboxed          = Long
+  type Boxed            = jl.Long
+  def zero              = (0: Long)
+  def box(x: Long)      = jl.Long.valueOf(x)
+  def unbox(x: jl.Long) = x.longValue
+}
+
+object Float extends PrimitiveCompanion {
+  type Unboxed          = Float
+  type Boxed            = jl.Float
+  def zero              = (0: Float)
+  def box(x: Float)      = jl.Float.valueOf(x)
+  def unbox(x: jl.Float) = x.floatValue
+}
+
+object Double extends PrimitiveCompanion {
+  type Unboxed          = Double
+  type Boxed            = jl.Double
+  def zero              = (0: Double)
+  def box(x: Double)      = jl.Double.valueOf(x)
+  def unbox(x: jl.Double) = x.doubleValue
+}
