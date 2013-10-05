@@ -137,7 +137,6 @@ trait Types
     // the following operations + those in RewrappingTypeProxy are all operations
     // in class Type that are overridden in some subclass
     // Important to keep this up-to-date when new operations are added!
-    override def isTrivial = underlying.isTrivial
     override def isHigherKinded: Boolean = underlying.isHigherKinded
     override def typeConstructor: Type = underlying.typeConstructor
     override def isError = underlying.isError
@@ -263,7 +262,11 @@ trait Types
     /** Types for which asSeenFrom always is the identity, no matter what
      *  prefix or owner.
      */
-    def isTrivial: Boolean = false
+    // def isTrivial: Boolean = false
+    final def isTrivial = this match {
+      case x: CachedIsTrivial => x.cachedIsTrivial
+      case _                  => isTrivialType(this)
+    }
 
     /** Is this type higher-kinded, i.e., is it a type constructor @M */
     def isHigherKinded: Boolean = false
@@ -1220,7 +1223,6 @@ trait Types
    */
   abstract class SingletonType extends SubType with SimpleTypeProxy {
     def supertype = underlying
-    override def isTrivial = false
     override def isStable = true
     override def isVolatile = underlying.isVolatile
     override def widen: Type = underlying.widen
@@ -1292,14 +1294,12 @@ trait Types
 
   /** An object representing a non-existing type */
   case object NoType extends Type {
-    override def isTrivial: Boolean = true
     override def safeToString: String = "<notype>"
     override def kind = "NoType"
   }
 
   /** An object representing a non-existing prefix */
   case object NoPrefix extends Type {
-    override def isTrivial: Boolean = true
     override def isStable: Boolean = true
     override def prefixString = ""
     override def safeToString: String = "<noprefix>"
@@ -1315,7 +1315,6 @@ trait Types
       abort(s"ThisType($sym) for sym which is not a class")
     }
 
-    override def isTrivial: Boolean = sym.isPackageClass
     override def typeSymbol = sym
     override def underlying: Type = sym.typeOfThis
     override def isVolatile = false
@@ -1343,15 +1342,18 @@ trait Types
     )
   }
 
+  trait CachedIsTrivial extends Type {
+    private var trivial: ThreeValue = UNKNOWN
+    def cachedIsTrivial = {
+      if (trivial == UNKNOWN) trivial = fromBoolean(isTrivialType(this))
+      toBoolean(trivial)
+    }
+  }
+
   /** A class for singleton types of the form `<prefix>.<sym.name>.type`.
    *  Cannot be created directly; one should always use `singleType` for creation.
    */
-  abstract case class SingleType(pre: Type, sym: Symbol) extends SingletonType with SingleTypeApi {
-    private var trivial: ThreeValue = UNKNOWN
-    override def isTrivial: Boolean = {
-      if (trivial == UNKNOWN) trivial = fromBoolean(pre.isTrivial)
-      toBoolean(trivial)
-    }
+  abstract case class SingleType(pre: Type, sym: Symbol) extends SingletonType with SingleTypeApi with CachedIsTrivial {
     override def isGround = sym.isPackageClass || pre.isGround
 
     private[reflect] var underlyingCache: Type = NoType
@@ -1414,12 +1416,7 @@ trait Types
     }
   }
 
-  abstract case class SuperType(thistpe: Type, supertpe: Type) extends SingletonType with SuperTypeApi {
-    private var trivial: ThreeValue = UNKNOWN
-    override def isTrivial: Boolean = {
-      if (trivial == UNKNOWN) trivial = fromBoolean(thistpe.isTrivial && supertpe.isTrivial)
-      toBoolean(trivial)
-    }
+  abstract case class SuperType(thistpe: Type, supertpe: Type) extends SingletonType with SuperTypeApi with CachedIsTrivial {
     override def typeSymbol = thistpe.typeSymbol
     override def underlying = supertpe
     override def prefix: Type = supertpe.prefix
@@ -1441,7 +1438,6 @@ trait Types
    */
   abstract case class TypeBounds(lo: Type, hi: Type) extends SubType with TypeBoundsApi {
     def supertype = hi
-    override def isTrivial: Boolean = lo.isTrivial && hi.isTrivial
     override def bounds: TypeBounds = this
     def containsType(that: Type) = that match {
       case TypeBounds(_, _) => that <:< this
@@ -1979,7 +1975,6 @@ trait Types
   abstract case class ConstantType(value: Constant) extends SingletonType with ConstantTypeApi {
     override def underlying: Type = value.tpe
     assert(underlying.typeSymbol != UnitClass)
-    override def isTrivial: Boolean = true
     override def deconst: Type = underlying.deconst
     override def safeToString: String =
       underlying.toString + "(" + value.escapedStringValue + ")"
@@ -2255,13 +2250,7 @@ trait Types
    *
    * @M: a higher-kinded type is represented as a TypeRef with sym.typeParams.nonEmpty, but args.isEmpty
    */
-  abstract case class TypeRef(pre: Type, sym: Symbol, args: List[Type]) extends UniqueType with TypeRefApi {
-    private var trivial: ThreeValue = UNKNOWN
-    override def isTrivial: Boolean = {
-      if (trivial == UNKNOWN)
-        trivial = fromBoolean(!sym.isTypeParameter && pre.isTrivial && areTrivialTypes(args))
-      toBoolean(trivial)
-    }
+  abstract case class TypeRef(pre: Type, sym: Symbol, args: List[Type]) extends UniqueType with TypeRefApi with CachedIsTrivial {
     private[reflect] var parentsCache: List[Type]      = _
     private[reflect] var parentsPeriod                 = NoPeriod
     private[reflect] var baseTypeSeqCache: BaseTypeSeq = _
@@ -2510,24 +2499,7 @@ trait Types
    *    def m: Int          NullaryMethodType(Int)
    */
   case class MethodType(override val params: List[Symbol],
-                        override val resultType: Type) extends Type with MethodTypeApi {
-
-    private var trivial: ThreeValue = UNKNOWN
-    override def isTrivial: Boolean = {
-      if (trivial == UNKNOWN) trivial = fromBoolean(isTrivialResult && areTrivialParams(params))
-      toBoolean(trivial)
-    }
-
-    private def isTrivialResult =
-      resultType.isTrivial && (resultType eq resultType.withoutAnnotations)
-
-    private def areTrivialParams(ps: List[Symbol]): Boolean = ps match {
-      case p :: rest =>
-        p.tpe.isTrivial && !typesContain(paramTypes, p) && !(resultType contains p) &&
-        areTrivialParams(rest)
-      case _ =>
-        true
-    }
+                        override val resultType: Type) extends Type with MethodTypeApi with CachedIsTrivial {
 
     def isImplicit = params.nonEmpty && params.head.isImplicit
     def isJava = false // can we do something like for implicits? I.e. do Java methods without parameters need to be recognized?
@@ -2583,7 +2555,6 @@ trait Types
   }
 
   case class NullaryMethodType(override val resultType: Type) extends Type with NullaryMethodTypeApi {
-    override def isTrivial = resultType.isTrivial && (resultType eq resultType.withoutAnnotations)
     override def prefix: Type = resultType.prefix
     override def narrow: Type = resultType.narrow
     override def termSymbol: Symbol = resultType.termSymbol
@@ -2678,7 +2649,6 @@ trait Types
   {
     override protected def rewrap(newtp: Type) = existentialAbstraction(quantified, newtp)
 
-    override def isTrivial = false
     override def isStable: Boolean = false
     override def bounds = TypeBounds(maybeRewrap(underlying.bounds.lo), maybeRewrap(underlying.bounds.hi))
     override def parents = underlying.parents map maybeRewrap
@@ -3297,8 +3267,6 @@ trait Types
     assert(!annotations.isEmpty, "" + underlying)
 
     override protected def rewrap(tp: Type) = copy(underlying = tp)
-
-    override def isTrivial: Boolean = underlying.isTrivial && annotations.forall(_.isTrivial)
 
     override def safeToString = annotations.mkString(underlying + " @", " @", "")
 
@@ -4145,6 +4113,41 @@ trait Types
     )
 
     corresponds3(tps1, tps2, tparams map (_.variance))(isSubArg)
+  }
+
+  def isTrivialType(tp: Type): Boolean = {
+    def isTrivialTypes(tps: List[Type]): Boolean = tps match {
+      case tp :: rest => isTrivialType(tp) && isTrivialTypes(rest)
+      case _          => true
+    }
+    def isTrivialResultType(tp: Type) = isTrivialType(tp) && (tp eq tp.withoutAnnotations)
+    def isTrivialMethodType(mt: MethodType): Boolean = {
+      import mt._
+      def isTrivialParams(ps: List[Symbol]): Boolean = ps match {
+        case p :: rest => isTrivialType(p.tpe) && !typesContain(paramTypes, p) && !(resultType contains p) && isTrivialParams(rest)
+        case _         => true
+      }
+      isTrivialResultType(mt.resultType) && isTrivialParams(mt.params)
+    }
+
+    /** Note the first four cases all have to come before SingletonType,
+     *  which in turn has to come before SimpleTypeProxy.
+     */
+    tp match {
+      case SingleType(pre, _)                   => isTrivialType(pre)
+      case SuperType(thistpe, supertpe)         => isTrivialType(thistpe) && isTrivialType(supertpe)
+      case TypeRef(pre, sym, args)              => !sym.isTypeParameter && isTrivialType(pre) && isTrivialTypes(args)
+      case mt @ MethodType(_, _)                => isTrivialMethodType(mt)
+      case ThisType(sym)                        => sym.isPackageClass
+      case NoType | NoPrefix | ConstantType(_)  => true
+      case _: ExistentialType                   => false
+      case NullaryMethodType(restpe)            => isTrivialResultType(restpe)
+      case TypeBounds(lo, hi)                   => isTrivialType(lo) && isTrivialType(hi)
+      case AnnotatedType(annots, underlying, _) => isTrivialType(underlying) && (annots forall (_.isTrivial))
+      case _: SingletonType                     => false
+      case tp: SimpleTypeProxy                  => isTrivialType(tp.underlying)
+      case _                                    => false
+    }
   }
 
   def specializesSym(tp: Type, sym: Symbol, depth: Depth): Boolean = {
