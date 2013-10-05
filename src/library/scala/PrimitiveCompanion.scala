@@ -23,7 +23,7 @@ import java.{ lang => jl }
  *  }}}
  */
 trait PrimitiveCompanion extends Specializable {
-  type Unboxed
+  type Unboxed <: AnyVal
   type Boxed <: AnyRef
 
   def isNumeric: Boolean
@@ -32,6 +32,7 @@ trait PrimitiveCompanion extends Specializable {
   def box(x: Unboxed): Boxed
   def unbox(x: Boxed): Unboxed
   def zero: Unboxed
+  override def toString = "scala." + unboxedClass.getName.capitalize
 }
 
 object PrimitiveCompanion extends immutable.IndexedSeq[PrimitiveCompanion] {
@@ -53,8 +54,8 @@ object Boolean extends PrimitiveCompanion {
   type Unboxed             = Boolean
   type Boxed               = jl.Boolean
   def isNumeric            = false
-  def unboxedClass         = classOf[jl.Boolean]
-  def boxedClass           = classOf[Boolean]
+  def unboxedClass         = classOf[Boolean]
+  def boxedClass           = classOf[jl.Boolean]
   def zero                 = false
   def box(x: Boolean)      = jl.Boolean.valueOf(x)
   def unbox(x: jl.Boolean) = x.booleanValue
