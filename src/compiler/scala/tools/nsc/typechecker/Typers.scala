@@ -4334,17 +4334,17 @@ trait Typers extends Adaptations with Tags with TypersTracking with PatternTyper
 
         def mkUpdate(table: Tree, indices: List[Tree]) = {
           gen.evalOnceAll(table :: indices, context.owner, context.unit) {
-            case tab :: is =>
-              def mkCall(name: Name, extraArgs: Tree*) = (
-                Apply(
-                  Select(tab(), name) setPos table.pos,
-                  is.map(i => i()) ++ extraArgs
-                ) setPos tree.pos
-              )
-              mkCall(
-                nme.update,
-                Apply(Select(mkCall(nme.apply), prefix) setPos fun.pos, args) setPos tree.pos
-              )
+            case table :: indices =>
+              def mkCall(name: Name, extraArgs: Tree*): Apply = {
+                val qual = table()
+                val fn   = atPos(qual.pos)(Select(qual, name))
+                val args = indices.map(i => i()) ++ extraArgs
+
+                atPos(tree.pos)(Apply(fn, args))
+              }
+              val qual = mkCall(nme.apply)
+              val fn   = atPos(qual.pos)(Select(qual, prefix))
+              mkCall(nme.update, Apply(fn, args))
             case _ => EmptyTree
           }
         }
