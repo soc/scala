@@ -80,6 +80,16 @@ trait Analyzer extends AnyRef
     val phaseName = "typer"
     val runsAfter = List[String]()
     val runsRightAfter = Some("packageobjects")
+    def dumpUnit(unit: CompilationUnit) {
+      unit.body foreach { t =>
+        if ((t ne EmptyTree) && !t.pos.isTransparent) {
+          println(s"""
+            |  tree: ${t.pos} ${t.shortClass} $t
+            |  code: ${t.pos.sourceCode}
+            """.stripMargin.trim + "\n")
+        }
+      }
+    }
     def newPhase(_prev: Phase): StdPhase = new StdPhase(_prev) {
       override def keepsTypeParams = false
       resetTyper()
@@ -93,6 +103,8 @@ trait Analyzer extends AnyRef
         for (unit <- currentRun.units) {
           applyPhase(unit)
           undoLog.clear()
+          if (sys.props contains "dump")
+            dumpUnit(unit)
         }
         if (Statistics.canEnable) Statistics.stopTimer(typerNanos, start)
       }

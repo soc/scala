@@ -15,7 +15,7 @@ import scala.collection.{ mutable, immutable }
 import io.{ SourceReader, AbstractFile, Path }
 import reporters.{ Reporter, ConsoleReporter }
 import util.{ ClassPath, MergedClassPath, StatisticsInfo, returning, stackTraceString }
-import scala.reflect.internal.util.{ OffsetPosition, SourceFile, NoSourceFile, BatchSourceFile, ScriptSourceFile }
+import scala.reflect.internal.util.{ OffsetPosition, SourceFile, NoSourceFile, BatchSourceFile, ScriptSourceFile, RangePosition }
 import scala.reflect.internal.pickling.{ PickleBuffer, PickleFormat }
 import scala.reflect.io.VirtualFile
 import symtab.{ Flags, SymbolTable, SymbolLoaders, SymbolTrackers }
@@ -382,13 +382,129 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
 
   val phaseWithId: Array[Phase] = Array.fill(MaxPhases)(NoPhase)
 
+  private val fmt    = "%15s %-10s %-15s %-15s %-10s %-10s"
+  private val header = println(fmt.format("After phase", "Positions", "Range", "Start=Point", "Distinct", "NoPos"))
+
   abstract class GlobalPhase(prev: Phase) extends Phase(prev) {
     phaseWithId(id) = this
 
     def run() {
       echoPhaseSummary(this)
       currentRun.units foreach applyPhase
+
+      def positions() = {
+        val distinct = new java.util.IdentityHashMap[AnyRef, Int]
+        // mutable.Set[AnyRef]()
+        var nullpos = 0
+        var nopos = 0
+        var offset = 0
+        var range = 0
+        var start = 0
+
+        currentRun.units foreach { unit =>
+          unit.body foreach { t =>
+            if (t.pos == null)
+              nullpos += 1
+            else if (t.pos == NoPosition)
+              nopos += 1
+            else {
+              if (distinct containsKey t.pos)
+                distinct.put(t.pos, distinct.get(t.pos) + 1)
+              else
+                distinct.put(t.pos, 1)
+
+              // distinct get t.pos match {
+              //   case null   => distinct.put(t.pos, 1)
+              //   case n: Int => distinct.put(t.pos, n + 1)
+              // }
+              t.pos match {
+                case p: RangePosition =>
+                  range += 1
+                  if (p.start == p.point) start += 1
+                case p: OffsetPosition =>
+                  offset += 1
+                case _                =>
+              }
+            }
+          }
+        }
+
+        val total = offset + range
+        def pct(x1: Int, x2: Int): String = "%.1f%%" format (x1 * 100d / x2)
+
+        // val rpct = pct(range, total)
+        // val start_pct = pct(start, total)
+        // val nopos_pct = pct(nopos, total)
+
+        // val fmt    = "%15s %10s %10s %10s %10s %10s %10s %10s"
+        // val header = fmt.format("After phase", "Positions", "Range", "Distinct", "NoPos", "NoPoint")
+        val start1 = start + offset
+        fmt.format(name, total, range + "/" + pct(range, total), start1 + "/" + pct(start1, total), distinct.size, nopos)
+
+        // val rpct = "%.1f%%  of %8s positions".format((range * 100d) / total, total)
+        // val nopointPct = "%.1f%% of rangepos".format(start * 100d / range)
+        // val others = "%6s distinct, %6s null, %6s NoPosition".format(distinct.size, nullpos, nopos)
+
+
+        // f"$name%15s: $total%8d rangepos ($rpct), $others, nopoint in $nopointPct"
+
+        // "%15s: %8s range positions (%.1f%% of %8s positions), %8s distinct, start=point in %.1f%% of range positions".format(
+        //   name, range, (range * 100d) / total, total, distinct.size, start * 100d / range
+        // )
+        // "%s range positions after %s, %s offset, %s range where start=point".format(count, this, offset, start)
+      }
+
+      println(positions)
+      return
+      if (name != "packageobjects") return
+
+      currentRun.units foreach { unit =>
+        unit.body foreach { t =>
+          t.pos match {
+            case p: RangePosition =>
+              def bits(n: Int) = 32 - java.lang.Integer.numberOfLeadingZeros(n)
+
+              val point_diff = p.point - p.start
+              val point_s = (
+                if (point_diff == 0) "S"
+                else if (point_diff > 0) "+" + point_diff
+                else "" + point_diff
+              )
+              val code_s = (
+                if (point_diff > 20) ""
+                else if (point_diff < 0) " " + p.source.content.slice(p.point, p.start).mkString("") + " [MINUS!]"
+                else " " + p.source.content.slice(p.start, p.point).mkString("")
+              )
+
+              println("%-20s  %-4s%s".format(t.shortClass, point_s, code_s))
+
+              // val b1 = bits(p.start)
+              // val b2 = bits(math.abs(p.point - p.start))
+              // val b3 = bits(p.end - p.start)
+              // val bsum = b1 + b2 + b3
+
+              // println("bits    %20s  %2s (%s)".format(t.shortClass, bsum, s"$b1/$b2/$b3"))
+              // println("chars   %20s  %6s  %6s  %6s".format(t.shortClass, p.start, p.point, p.end))
+
+              // val total = bits(p.start) + bits(p.point - p.start), bits(p.end - p.start)))
+
+              // println("%s %s %s %s".format(t.shortClass, bits(p.start), bits(p.point - p.start), bits(p.end - p.start)))
+            case _                =>
+          }
+        }
+      }
     }
+
+
+    //       if ((t ne EmptyTree) && !t.pos.isTransparent) {
+    //         println(s"""
+    //           |  tree: ${t.pos} ${t.shortClass} $t
+    //           |  code: ${t.pos.sourceCode}
+    //           """.stripMargin.trim + "\n")
+    //       }
+    //     }
+    //   }
+    // }
 
     def apply(unit: CompilationUnit): Unit
 
