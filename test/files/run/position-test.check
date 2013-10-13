@@ -1,0 +1,36 @@
+[[syntax trees at end of                    parser]] // newSource1.scala
+[1:107]package [1:1]<empty> {
+  [1:84]object A extends [10:84][86]scala.AnyRef {
+    [10]def <init>() = [10]{
+      [NoPosition][NoPosition][NoPosition]super.<init>();
+      [10]()
+    };
+    [14:52]def update([25:31]x: [28:31]Int, [33:40]y: [36:40]Long): [43:47]Unit = [50:52]();
+    [55:82]def apply([65:71]x: [68:71]Int): [74:78]Long = [81:82]x
+  };
+  [86:107]abstract trait B extends [94:107][107]scala.AnyRef {
+    [94]def $init$() = [94]{
+      [94]()
+    };
+    [96:105][96:103][96:100][96:97]A([98:99]0).$amp$eq([104:105]5)
+  }
+}
+
+[[syntax trees at end of                     typer]] // newSource1.scala
+[1:107]package [1:1]<empty> {
+  [1:84]object A extends [10:84][86]scala.AnyRef {
+    [86]def <init>(): [10]A.type = [86]{
+      [86][86][86]A.super.<init>();
+      [10]()
+    };
+    [14:52]def update([25:31]x: [28:31]<type: [28:31]scala.Int>, [33:40]y: [36:40]<type: [36:40]scala.Long>): [18]Unit = [50:52]();
+    [55:82]def apply([65:71]x: [68:71]<type: [68:71]scala.Int>): [59]Long = [81:82]x.toLong
+  };
+  [86:107]abstract trait B extends [94:107][107]scala.AnyRef {
+    [94]def /*B*/$init$(): [94]Unit = [94]{
+      [94]()
+    };
+    <96:105><96:97>A.update([98]0, <96:105><96:103><96:105><96:97>A.apply([98]0).&([104:105]5))
+  }
+}
+
