@@ -13,14 +13,9 @@ object SourceTokens {
   final case class Literal(value: Any) extends SourceToken
 
   final case class TreeId(value: Int) extends AnyVal
+  final case class Depth(value: Int) extends AnyVal
   final case class Offset(value: Int) extends AnyVal
   final case class Length(value: Int) extends AnyVal
-
-  final case class Chunk(offset: Offset, length: Length) {
-    def start   = offset.value
-    def end     = start + length.value
-    def indices = start until end
-  }
 
   final case class TokenInfo(start: Offset, token: SourceToken)
 

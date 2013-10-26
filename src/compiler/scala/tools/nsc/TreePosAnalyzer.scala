@@ -14,15 +14,59 @@ class TreePosAnalyzer[U <: Global](val u: U) {
   import u._
   import syntaxAnalyzer._
 
+  private def codeFor(t: Tree, maxlen: Int): String = (
+    if (t.pos.isOpaqueRange)
+      cleanup(t.pos.source.content.slice(t.pos.start, t.pos.end).mkString, maxlen)
+    else
+      cleanup("" + t, maxlen)
+  )
+  private def cleanup(s: String, maxlen: Int): String = {
+    val lines = s.lines.toVector
+    val str0 = (
+      if (lines.size == 1) lines.head
+      else {
+        val braceIndices = (lines.indices filter (idx => (lines(idx).trim endsWith "{") || (lines(idx).trim endsWith "}"))).toSet
+        lines.zipWithIndex map { case (l, i) => if (braceIndices(i)) l + " " else l + "; " } mkString ""
+      }
+    )
+    val str = str0.replaceAll("""[;]+""", ";")
+    if (str.length <= maxlen) str
+    else {
+      val half = (maxlen - 5) / 2
+      (str take half) + " ... " + (str takeRight half)
+    }
+  }
+
   object treeCoverage extends TreeCoverage {
     type Tree = u.Tree
 
+    def EmptyTree                         = u.EmptyTree
     def childrenOf(tree: Tree): Seq[Tree] = tree.children
     def positionOf(tree: Tree): Position  = tree.pos
     def identOf(tree: Tree): Int          = tree.id
+    def isIndentingTree(tree: Tree)       = tree match {
+      case _: MemberDef | _: Block => true
+      case _                       => false
+    }
   }
 
-  def chunkUnit(unit: CompilationUnit) = treeCoverage.analyze(unit.source.content.mkString, unit.body)
+  def chunkUnit(unit: CompilationUnit): String = {
+    val code     = unit.source.content.mkString
+    val chunks   = treeCoverage.analyze(code, unit.body) filterNot (_.tree == EmptyTree)
+    val snippets = chunks map (c => cleanup(code.slice(c.start, c.end).mkString, 50))
+    val lines    = (snippets, chunks).zipped map ((s, c) => "[%5s]  %-70s // #%-5s %s".format(c.start, ("  " * c.depth.value) + s, c.tree.id, c.tree.shortClass))
+
+    lines.mkString(unit.source.file.name + "\n", "\n", "\n")
+  }
+
+     // chunks map (c => "%-50s // %s".format(codeOf(c), shortClassOfInstance(coverage(c.offset)))) mkString "\n"
+
+  // case class ChunkedSource(sourceCode: String, chunks: Vector[Chunk]) {
+  //   def codeOf(chunk: Chunk): String = sourceCode.slice(chunk.start, chunk.end).mkString
+
+  //   override def toString = chunks map (c => "%-50s // %s".format(codeOf(c), shortClassOfInstance(coverage(c.offset)))) mkString "\n"
+  // }
+
 
   class TreeData(val unit: CompilationUnit) {
     val treeParents  = mutable.Map[Tree, Tree]() withDefaultValue EmptyTree
@@ -230,29 +274,6 @@ class TreePosAnalyzer[U <: Global](val u: U) {
     def analyze(): Unit = (new DisplayTraverser).display()
   }
 
-  private def codeFor(t: Tree, maxlen: Int): String = (
-    if (t.pos.isOpaqueRange)
-      cleanup(t.pos.source.content.slice(t.pos.start, t.pos.end).mkString, maxlen)
-    else
-      cleanup("" + t, maxlen)
-  )
-  private def cleanup(s: String, maxlen: Int): String = {
-    val lines = s.lines.toVector
-    val str0 = (
-      if (lines.size == 1) lines.head
-      else {
-        val braceIndices = (lines.indices filter (idx => (lines(idx).trim endsWith "{") || (lines(idx).trim endsWith "}"))).toSet
-        lines.zipWithIndex map { case (l, i) => if (braceIndices(i)) l + " " else l + "; " } mkString ""
-      }
-    )
-    val str = str0.replaceAll("""[;]+""", ";")
-    if (str.length <= maxlen) str
-    else {
-      val half = (maxlen - 5) / 2
-      (str take half) + " ... " + (str takeRight half)
-    }
-  }
-
   def validate(unit: CompilationUnit) {
     val analysis = new TreeAnalysis(unit)
     analysis.analyze()
@@ -262,7 +283,10 @@ class TreePosAnalyzer[U <: Global](val u: U) {
 object TreePosAnalyzer {
   def isAnalyze = sys.props contains "analyze"
   def apply(u: Global)(unit: u.CompilationUnit) {
-    if (isAnalyze)
-      new TreePosAnalyzer[u.type](u) validate unit
+    if (isAnalyze) {
+      val analyzer = new TreePosAnalyzer[u.type](u)
+      println(analyzer chunkUnit unit)
+      // analyzer validate unit
+    }
   }
 }

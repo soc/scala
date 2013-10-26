@@ -8,59 +8,84 @@ import scala.collection.mutable
 import SourceTokens._
 
 trait TreeCoverage {
-  type Tree
+  type Tree <: AnyRef
 
+  def EmptyTree: Tree
   def childrenOf(tree: Tree): Seq[Tree]
   def positionOf(tree: Tree): Position
   def identOf(tree: Tree): Int
+  def isIndentingTree(tree: Tree): Boolean
 
-  case class ChunkedSource(sourceCode: String, chunks: Vector[Chunk], coverage: Map[Offset, TreeId]) {
-    def codeOf(chunk: Chunk): String = sourceCode.slice(chunk.start, chunk.end).mkString
+  // final case class Chunk(tree: Tree, depth: Depth, offset: Offset, length: Length) {
+  final case class Chunk(tree: Tree, offset: Offset, length: Length, own: Vector[Offset]) {
+    def treePos = positionOf(tree)
+    def start   = offset.value
+    def end     = start + length.value
+    def indices = start until end
   }
 
-  def analyze(code: String, tree: Tree): ChunkedSource = {
-    val len         = code.length
-    val coverage    = new Array[Int](len) // tree id of innermost tree which covers each source code offset
-    val buf         = Vector.newBuilder[Chunk]
-    def offsetPairs = 0 until len map (k => Offset(k) -> TreeId(coverage(k)))
+  // case class ChunkedSource(sourceCode: String, chunks: Vector[Chunk]) {
+  //   def codeOf(chunk: Chunk): String = sourceCode.slice(chunk.start, chunk.end).mkString
+
+  //   override def toString = chunks map (c => "%-50s // %s".format(codeOf(c), shortClassOfInstance(coverage(c.offset)))) mkString "\n"
+  // }
+
+  def reverseTreeMap(tree: Tree): Map[Tree, Tree] = {
+    val parents = mutable.Map[Tree, Tree]()
+    def loop(t: Tree): Unit = childrenOf(t) foreach { c =>
+      parents(c) = t
+      loop(c)
+    }
+    loop(tree)
+    parents.toMap
+  }
+
+  def analyze(code: String, tree: Tree): Vector[Chunk] = {
+    val parentMap = reverseTreeMap(tree)
+    val len       = code.length
+    val coverage  = new Array[Int](len) // tree id of innermost tree which covers each source code offset
+    val buf       = Vector.newBuilder[Chunk]
+    val trees     = mutable.Map[Int, Tree]() withDefaultValue EmptyTree
+    // val depths    = mutable.Map[Int, Depth]() withDefaultValue Depth(0)
+
+    def offsetMap = Map(0 until len map (k => Offset(k) -> trees(coverage(k))): _*)
+
+    def parentChain(t: Tree): List[Tree] = parentMap get t match {
+      case Some(p) => p :: parentChain(p)
+      case _       => Nil
+    }
+    def parentDepth(t: Tree) = Depth((parentChain(t) filter isIndentingTree).length)
 
     def traverse(t: Tree): Unit = {
-      val pos = positionOf(t)
       val tid = identOf(t)
+      val pos = positionOf(t)
 
-      pos.indices foreach (i => coverage(i) = tid)
-      childrenOf(t) foreach traverse
+      trees(tid) = t
+      // depths(tid) = depth
+
+      if (pos.isOpaqueRange) {
+        pos.indices foreach (i => coverage(i) = tid)
+        childrenOf(t) foreach traverse
+        // (c => traverse(c, Depth(depth.value + 1)))
+      }
     }
     def loop(start: Int): Unit = {
       if (start < len) {
         val spanId   = coverage(start)
+        val node     = trees(spanId)
         val end      = coverage.indexWhere(_ != spanId, start) match {
           case -1  => len
           case idx => idx
         }
-        buf += Chunk(Offset(start), Length(end - start))
-        loop(end)
+        buf += Chunk(node, parentDepth(node), Offset(start), Length(end - start))
+        var nextStart = end
+        while (nextStart < len && code.charAt(nextStart).isWhitespace) nextStart += 1
+        loop(nextStart)
       }
     }
 
     traverse(tree)
     loop(0)
-    ChunkedSource(code, buf.result(), offsetPairs.toMap)
+    buf.result()
   }
 }
-
-//   def analyze(unit: CompilationUnit): Unit = {
-//     val source  = unit.source
-//     val offsets = new Array[Int](source.length)
-
-//     def traverse(t: Tree): Unit = {
-//       val pos = positionOf(t)
-//       val tid = identOf(t)
-
-//       pos.indices foreach (i => offsets(i) = tid)
-//       childrenOf(t) foreach traverse
-//     }
-
-//     traverse(unit.body)
-//   }
-// }
