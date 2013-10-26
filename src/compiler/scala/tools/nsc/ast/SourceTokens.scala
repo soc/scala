@@ -3,33 +3,36 @@ package tools
 package nsc
 package ast
 
-import scala.reflect.internal.util._
-import scala.reflect.internal.Chars._
 import scala.tools.nsc.ast.parser.Tokens._
-import scala.collection.{ mutable, immutable }
-import scala.annotation.{ switch, tailrec }
 
 object SourceTokens {
-  def inRed(s: String) = Console.RED ++ Console.BOLD + s + Console.RESET
+  def identifier(name: String): Ident = Ident(name)
+  def keyword(token: Int): Keyword    = Keyword(token)
 
-  sealed abstract class SourceToken {
-    def stringValue: String
-    def color: String
-    override def toString = color + Console.BOLD + stringValue + Console.RESET
-  }
-  case class Keyword(token: Int, stringValue: String) extends SourceToken {
-    def color = Console.WHITE
-  }
-  case class Ident(stringValue: String) extends SourceToken {
-    def color = Console.CYAN
-  }
-  case class Literal(value: Any) extends SourceToken {
-    def color = Console.GREEN
-    def stringValue = "" + value
-  }
+  sealed trait SourceToken { override def toString = tokenString(this) }
+  final case class Keyword(token: Int) extends SourceToken
+  final case class Ident(name: String) extends SourceToken
+  final case class Literal(value: Any) extends SourceToken
+
   final case class Offset(val offset: Int) extends AnyVal
+  final case class TokenInfo(start: Offset, token: SourceToken)
 
-  case class TokenInfo(start: Offset, token: SourceToken)
+  def inColor(color: String)(value: Any): String = color + Console.BOLD + value + Console.RESET
+  def inRed(value: Any): String                  = inColor(Console.RED)(value)
+
+  private def colorOf(token: SourceToken): String = token match {
+    case _: Keyword => Console.WHITE
+    case _: Ident   => Console.CYAN
+    case _: Literal => Console.GREEN
+  }
+
+  def tokenString(token: SourceToken): String = inColor(colorOf(token)) {
+    token match {
+      case Keyword(token) => keywordString(token)
+      case Ident(name)    => name
+      case Literal(value) => value
+    }
+  }
 
   def keywordString(token: Int): String = token match {
     case ABSTRACT   => "abstract"
@@ -100,9 +103,6 @@ object SourceTokens {
     case WHITESPACE => "<ws>"
     case WITH       => "with"
     case YIELD      => "yield"
-    case _          => s"<token=$token>"
+    case _          => s"<$token>"
   }
-
-  def identifier(name: String): Ident              = Ident(name)
-  def keyword(token: Int, string: String): Keyword = Keyword(token, string)
 }

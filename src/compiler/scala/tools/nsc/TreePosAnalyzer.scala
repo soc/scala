@@ -2,12 +2,13 @@ package scala
 package tools
 package nsc
 
+import ast.SourceTokens
+import SourceTokens._
 import scala.reflect.internal.util._
 import scala.reflect.internal.Chars._
 import scala.tools.nsc.ast.parser.Tokens._
 import scala.collection.{ mutable, immutable }
 import scala.annotation.{ switch, tailrec }
-import SourceTokens._
 
 class TreePosAnalyzer[U <: Global](val u: U) {
   import u._
@@ -132,13 +133,13 @@ class TreePosAnalyzer[U <: Global](val u: U) {
       class SFS extends SourceFileScanner(source) {
         init()
         def token2source(token: Int): SourceToken = (token: @switch) match {
-          case IDENTIFIER | BACKQUOTED_IDENT            => identifier(name.decoded)
+          case IDENTIFIER | BACKQUOTED_IDENT            => SourceTokens.Ident(name.decoded)
           case CHARLIT                                  => SourceTokens.Literal(charVal)
           case INTLIT | LONGLIT                         => SourceTokens.Literal(intVal)
           case FLOATLIT | DOUBLELIT                     => SourceTokens.Literal(floatVal)
           case STRINGLIT | STRINGPART | INTERPOLATIONID => SourceTokens.Literal(strVal)
           case SYMBOLLIT                                => SourceTokens.Literal(scala.Symbol(strVal))
-          case _                                        => keyword(token, keywordString(token))
+          case _                                        => SourceTokens.Keyword(token)
         }
       }
       val s = new SFS
@@ -219,40 +220,6 @@ class TreePosAnalyzer[U <: Global](val u: U) {
     def analyze(): Unit = (new DisplayTraverser).display()
   }
 
-  //     // def loop[T](chunks: Vector[Chunk[T]], remaining: Seq[T]): Vector[Chunk[T]] = {
-  //     //   if (remaining.isEmpty)
-  //     //     return chunks
-
-  //     //   val headValue = remaining.head
-  //     //   val startIndex = if (chunks.isEmpty) 0 else chunks.last.end
-  //     //   val (hd, tl) = remaining span (_ == headValue)
-  //     //   val chunk = Chunk(startIndex, hd.length, headValue)
-  //     //   loop(chunks :+ chunk, tl)
-  //     // }
-  //     // val chunks          = loop[Vector[Tree]](Vector(), covered.toVector)
-  //     // val open            = mutable.Map[Tree, OpenCondition]()
-
-  //     val opened = mutable.Map[Tree, Int]()
-  //     val displayedChunks = mutable.Set[Int]()
-  //     val fmt             = "%-3s%6s%1s%-6s  %-40s  // %s"
-
-  //     // def chunk          = chunks(chunkIndex)
-  //     // def openDepth      = open.size
-  //     // def enclosingTrees = open.keys.toList.sorted
-  //     // def enclosingTrees = (currentTrees flatMap properParentChain).distinct
-  //     // def currentTrees   = chunk.value.sorted
-  //     // def ongoingTrees   = currentTrees filter isEnclosing
-  //     // def newTrees       = currentTrees filterNot isEnclosing
-  //     // def deadTrees      = enclosingTrees filterNot isLive
-  //     def marker         = ""
-
-  //     // def isEnclosing(t: Tree) = enclosingTrees contains t
-  //     // def isLive(t: Tree)      = currentTrees contains t
-
-  //     val opened = mutable.Map[Tree, Int]()
-  //   }
-  // }
-
   private def codeFor(t: Tree, maxlen: Int): String = (
     if (t.pos.isOpaqueRange)
       cleanup(t.pos.source.content.slice(t.pos.start, t.pos.end).mkString, maxlen)
@@ -276,46 +243,10 @@ class TreePosAnalyzer[U <: Global](val u: U) {
     }
   }
 
-  // def rangeString(pos: Position): String = {
-  //   val ldelim = if (pos.isTransparent) "<" else "["
-  //   val rdelim = if (pos.isTransparent) ">" else "]"
-
-  //   ldelim + ("%5s%-6s".format(pos.start, if (pos.start == pos.end) "" else "-" + pos.end)) + rdelim
-  // }
-
-  // def makeLine(t: Tree, depth: Int): String = {
-  //   def what = if (t.pos.isOpaqueRange) "src" else "ast"
-  //   def tstr = codeFor(t, 65)
-  //   val lhs  = "%-15s %s %s".format(rangeString(t.pos), "  " * depth, t.shortClass)
-  //   val rhs  = s"[$what]  $tstr"
-
-  //   "%-40s  // %s".format(lhs, rhs)
-  // }
-
   def validate(unit: CompilationUnit) {
     val analysis = new TreeAnalysis(unit)
     analysis.analyze()
-
-    // setSources(unit)
-    // if (TreePosAnalyzer.isAnalyze)
-    //   validate(unit.body)
   }
-
-  // def validate(t: Tree) {
-  //   def show(t: Tree, depth: Int) {
-  //     println(makeLine(t, depth))
-  //     if (t.pos.isTransparent)
-  //       t.children.toList foreach (c => show(c, depth + 1))
-  //   }
-  //   def opaque = opaqueChildren(t)
-
-  //   if (opaque.nonEmpty) {
-  //     println(makeLine(t, 0))
-  //     t.children.toList filter (_.pos.isDefined) foreach (k => show(k, 1))
-  //     println("")
-  //     opaque foreach validate
-  //   }
-  // }
 }
 
 object TreePosAnalyzer {
@@ -325,160 +256,3 @@ object TreePosAnalyzer {
       new TreePosAnalyzer[u.type](u) validate unit
   }
 }
-
-
-
-  // chunks foreach { chunk =>
-  //   chunkIndex += 1
-
-
-    // { d =>
-    //   println(fmt.format(marker, "", "", "", "", (" | " * openDepth) + " \\-|"))
-    // }
-
-    // // val deadTrees             = enclosingTrees filterNot isLive
-    // // val (openTrees, newTrees) = currentTrees partition isOpen
-
-    // deadTrees foreach { d =>
-    //   open -= d
-    //   println(fmt.format(marker, "", "", "", "", (" | " * openDepth) + " \\-|"))
-    // }
-    // newTrees foreach (t => openNewTree(c, chunkIndex, t))
-
-    // val overlaps = newTrees exists (t1 =>
-    //   openTrees exists (t2 =>
-    //     (t1.pos overlapsBadly t2.pos) && {
-    //       println(t1.pos.show + " overlaps " + t2.pos.show)
-    //       true
-    //     }
-    //   )
-    // )
-    // val overlapping = {
-    //   newTrees flatMap { t1 =>
-    //     val kids = opaqueChildren(t1).toList
-    //     val siblings = (
-    //       for (c1 <- kids ; c2 <- kids ; if c1.pos < c2.pos && (c1.pos overlaps c2.pos)) yield {
-    //         val xs      = c1.pos.indices intersect c2.pos.indices
-    //         val len     = xs.max - xs.min + 1
-    //         val message = "%s+%s".format(xs.min, len)
-    //         val parentMessage = kids map (t => if (t == c1 || t == c2) inRed(t.pos.showNoPoint) else t.pos.showNoPoint) mkString (" ", " ~ ", " ")
-
-    //         badChildren(t1) = parentMessage
-    //         badChildren(c1) = message
-    //         badChildren(c2) = message
-    //         // println("badIndices = " + badIndices)
-    //         // badChildren ++= List(c1, c2)
-    //         c1 -> c2
-    //       }
-    //     )
-
-    //     val parentChild = (
-    //       for (p1 <- open.keys.toList ; if !(p1.pos includes t1.pos)) yield {
-    //         badChildren(t1) = s"child #${t1.id} not contained in enclosing ${p1.shortClass}"
-    //         t1 -> p1
-    //       }
-    //     )
-
-    //     siblings ++ parentChild
-    //   }
-    // }
-    // val marker = if (overlaps) "o!" else if (overlapping.nonEmpty) "c!" else ""
-
-    // val includesOk = {
-    //   (currentTrees.length < 2) || (currentTrees sliding 2 forall { xs =>
-    //     val t1 :: t2 :: Nil = xs.toList
-    //     t1.pos includes t2.pos
-    //   })
-    // }
-    // (deadTrees map open map (_.depth)).sorted.reverse foreach { d =>
-    //   println(fmt.format("", "", "", "", (" | " * d) + "--"))
-    // }
-
-    // newTrees.zipWithIndex foreach { (t, idx) =>
-    //   val indent = "  " * (depth - newTrees.size + idx)
-
-    // }
-
-    // val indent = "  " * (depth - newTrees.length)
-    // val treeString = newTrees map (t => s"%s[%s]".format(t.shortClass, t.pos.length)) mkString (indent, " / ", "")
-    // val str = poses map ("%-15s" format _.show) mkString " / "
-    // val skip = newTrees.isEmpty //&& (c.indices forall (i => content(i).isWhitespace))
-
-
-    // def show(newTree: Tree, isFirst: Boolean) {
-    //   val indent = " | " * openDepth
-    //   val message = badChildren get newTree match {
-    //     case Some(message) if message contains Console.RESET => "[" + message + "]"
-    //     case Some(message)                                   => inRed("[" + message + "]")
-    //     case _                                               => ""
-    //   }
-    //   val str    = s"%s%s[%s]%s".format(indent, newTree.shortClass, newTree.pos.length, message)
-    //   if (isFirst)
-    //     println(fmt.format(marker, c.start, "+", c.length, cleanup(c.code, 40), str))
-    //   else
-    //     println(fmt.format(marker, "  ...", "", "", "", str))
-
-    //   if (newTree.pos.end > c.end)
-    //     open(newTree) = OpenCondition(chunkIndex, openDepth)
-    // }
-
-    // newTrees.toList match {
-    //   case Nil     =>
-    //   case x :: xs =>
-    //     show(x, isFirst = true)
-    //     xs foreach (x => show(x, isFirst = false))
-    // }
-//   }
-
-//   ""
-// }
-
-// private def setSources(unit: CompilationUnit) {
-//   source = unit.source
-//   content = unit.source.content
-//   val buf = mutable.ListBuffer[TokenInfo]()
-//   val len = content.length
-
-//   class SFS extends SourceFileScanner(source) {
-//     init()
-//     def token2source(token: Int): SourceToken = (token: @switch) match {
-//       case IDENTIFIER | BACKQUOTED_IDENT            => identifier(name.decoded)
-//       case CHARLIT                                  => SourceTokens.Literal(charVal)
-//       case INTLIT | LONGLIT                         => SourceTokens.Literal(intVal)
-//       case FLOATLIT | DOUBLELIT                     => SourceTokens.Literal(floatVal)
-//       case STRINGLIT | STRINGPART | INTERPOLATIONID => SourceTokens.Literal(strVal)
-//       case SYMBOLLIT                                => SourceTokens.Literal(scala.Symbol(strVal))
-//       case _                                        => keyword(token, keywordString(token))
-//     }
-//   }
-//   val s = new SFS
-
-//   @tailrec def loop() {
-//     val off   = new SourceTokens.Offset(s.charOffset)
-//     val token = TokenInfo(off, s.token2source(s.token))
-//     buf += token
-//     s.nextToken()
-//     if (s.charOffset < len)
-//       loop()
-//   }
-
-//   loop()
-//   tokens = buf.toVector
-//   val rate = "%.2f" format len.toDouble / tokens.size
-//   val path = {
-//     val segments = source.path.toString split '/'
-//     segments indexWhere (_ == "scala") match {
-//       case -1  => segments takeRight 3 mkString "/"
-//       case idx => segments drop idx mkString "/"
-//     }
-//   }
-//   println(f"$len%5sc ${tokens.size}%5st $rate%6s c/t  $path")
-
-//   analyzePositions(units)
-
-//   // println(s"$source is $len chars, ${tokens.size} tokens, $rate chars/token")
-//   // for ((TokenInfo(Offset(off), token), idx) <- tokens.zipWithIndex) {
-//   //   println(f"$idx%3d  +$off%-5d  $token")
-//   // }
-// }
-
