@@ -5,6 +5,7 @@ package ast
 
 import scala.tools.nsc.ast.parser.Tokens._
 import scala.annotation.{ switch, tailrec }
+import scala.io.AnsiColor._
 
 object SourceTokens {
   sealed trait SourceToken { override def toString = tokenString(this) }

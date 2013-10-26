@@ -9,6 +9,7 @@ import scala.reflect.internal.Chars._
 import scala.tools.nsc.ast.parser.Tokens._
 import scala.collection.{ mutable, immutable }
 import scala.annotation.{ switch, tailrec }
+import scala.io.AnsiColor._
 
 case class CString(str: String)(color: String) {
   // def + (that: CStr

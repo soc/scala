@@ -1,13 +1,13 @@
-// package scala
-// package tools
-// package nsc
-// package ast
+package scala
+package tools
+package nsc
+package ast
 
 // import scala.reflect.internal.util._
 // import scala.collection.mutable
 // import SourceTokens._
 
-// trait TreeCoverage {
+trait TreeCoverage { }
 //   type Tree <: AnyRef
 
 //   def EmptyTree: Tree
