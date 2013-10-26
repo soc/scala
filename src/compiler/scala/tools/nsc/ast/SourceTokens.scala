@@ -21,6 +21,7 @@ object SourceTokens {
 
   def inColor(color: String)(value: Any): String = color + Console.BOLD + value + Console.RESET
   def inRed(value: Any): String                  = inColor(Console.RED)(value)
+  def inGreen(value: Any): String                = inColor(Console.GREEN)(value)
 
   private def colorOf(token: SourceToken): String = token match {
     case _: Keyword => Console.WHITE

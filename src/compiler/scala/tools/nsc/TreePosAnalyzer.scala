@@ -10,6 +10,70 @@ import scala.tools.nsc.ast.parser.Tokens._
 import scala.collection.{ mutable, immutable }
 import scala.annotation.{ switch, tailrec }
 
+case class CString(str: String)(color: String) {
+  // def + (that: CStr
+  def length = str.length
+  override def toString = if (color == "") str else inColor(color)(str)
+}
+
+final class IntRange private (val bits: Long) extends AnyVal {
+  def start: Int       = (bits >>> 32).toInt
+  def end: Int         = (bits & 0xFFFFFFFF).toInt
+  def indices          = start to end
+  def apply(x: Int)    = this contains x
+  def contains(x: Int) = indices contains x
+  def toVector         = indices.toVector
+  def length           = end - start
+
+  override def toString = s"[$start,$end)"
+}
+object IntRange {
+  def apply(start: Int, end: Int): IntRange = {
+    require(start <= end, s"$start > $end")
+    new IntRange((start.toLong << 32) | end.toLong)
+  }
+}
+object IntRanges {
+  def apply(elems: Iterable[Int]): Vector[IntRange] = (
+    if (elems.isEmpty) Vector() else {
+      val start = elems.head
+      val len   = elems.iterator.zipWithIndex count { case (x, i) => x == start + i }
+      IntRange(start, start + len) +: apply(elems drop len)
+    }
+  )
+}
+
+trait Node[T <: Node[_]] {
+  def range: IntRange
+  def children: Seq[T]
+  def hasChild(p: T => Boolean) = children exists p
+
+  def covers(index: Int)                  = range contains index
+  def owns(index: Int)                    = covers(index) && !hasChild(_ covers index)
+  def ownIndices                          = range.indices filter owns
+  def childIndices                        = range.indices filterNot owns
+  def allRanges: Seq[(IntRange, Boolean)] = IntRanges(ownIndices).map(_ -> true) ++ IntRanges(childIndices).map(_ -> false) sortBy (_._1.start)
+}
+
+// abstract class AssignCoverage[T](root: T) {
+//   def rangeOf(node: T): IntRange
+//   def childrenOf(node: T): Seq[T]
+
+//   def nodeList(node: T): Seq[T] = node :: (childrenOf(node) flatMap nodeList)
+//   def nodeMap[U](node: T)(f: T => U): Seq[U] = nodeList(node) map f
+
+//   def hasChildWhich(node: T)(p: T => Boolean) = childrenOf(node) exists p
+//   def covers(node: T, index: Int) = rangeOf(node) contains index
+//   def owns(node: T, index: Int)     = contains(node, index) && !hasChildWhich(node)(contains(c, _))
+
+//   def ownsDirectly(node: T, index: Int) = (rangeOf(node) contains index) && !(childrenOf(node) exists (c => rangeOf(c) contains index))
+
+//   val nodes       = nodeList(root)
+//   val overlapping = nodes map rangeOf
+//   val boundaries  = overlapping.flatMap(r => r.start :: r.end :: Nil).distinct.sorted
+//   val disjoint    =
+// }
+
 class TreePosAnalyzer[U <: Global](val u: U) {
   import u._
   import syntaxAnalyzer._
@@ -37,27 +101,93 @@ class TreePosAnalyzer[U <: Global](val u: U) {
     }
   }
 
-  object treeCoverage extends TreeCoverage {
-    type Tree = u.Tree
+  class AssignCoverage(unit: CompilationUnit) {
+    val sourceCode = unit.source.content.mkString
+    def codeSlice(range: IntRange): String = sourceCode.slice(range.start, range.end).mkString
 
-    def EmptyTree                         = u.EmptyTree
-    def childrenOf(tree: Tree): Seq[Tree] = tree.children
-    def positionOf(tree: Tree): Position  = tree.pos
-    def identOf(tree: Tree): Int          = tree.id
-    def isIndentingTree(tree: Tree)       = tree match {
-      case _: MemberDef | _: Block => true
-      case _                       => false
+    def getCode(node: WNode): String = {
+      val chunks = node.allRanges map { case (range, own) => CString(cleanup(codeSlice(range), 50))(if (own) Console.GREEN else "") }
+      val totalLen = chunks.map(_.length).sum
+
+      if (totalLen <= 50) chunks mkString ""
+      else if (chunks.size == 1) cleanup(chunks.head.toString, 50)
+      else chunks.head + " ... " + chunks.last
     }
+
+    // def colored = IntRanges(n.ownIndices)
+
+    val root     = WNode(unit.body)
+    val nodes    = nodeList(root)
+    val indexMap = immutable.IntMap(nodes.flatMap(n => n.ownIndices.map(idx => idx -> n)): _*)
+    // val code  = cleanup(code.slice(c.start, c.end).mkString, 50))
+    val lines    = nodes map (n => "[%5s]  %-70s // #%-5s %-20s %s".format(n.pos.start, getCode(n), n.tree.id, n.tree.shortClass, IntRanges(n.ownIndices).mkString("~")))
+
+    //   lines.mkString(unit.source.file.name + "\n", "\n", "\n")
+
+    def apply(index: Int): WNode = indexMap(index)
+
+    private def nodeList(node: WNode): Seq[WNode] = node +: (node.children flatMap nodeList)
+
+    override def toString = lines.mkString(unit.source.file.name + "\n", "\n", "\n")
+  }
+
+  case class WNode(tree: Tree) extends Node[WNode] {
+    def pos      = tree.pos
+    def range    = IntRange(pos.start, pos.end)
+    def children = tree.children filter (_.pos.isOpaqueRange) map WNode
   }
 
   def chunkUnit(unit: CompilationUnit): String = {
-    val code     = unit.source.content.mkString
-    val chunks   = treeCoverage.analyze(code, unit.body) filterNot (_.tree == EmptyTree)
-    val snippets = chunks map (c => cleanup(code.slice(c.start, c.end).mkString, 50))
-    val lines    = (snippets, chunks).zipped map ((s, c) => "[%5s]  %-70s // #%-5s %s".format(c.start, ("  " * c.depth.value) + s, c.tree.id, c.tree.shortClass))
-
-    lines.mkString(unit.source.file.name + "\n", "\n", "\n")
+    new AssignCoverage(unit).toString
   }
+
+
+  // object treeCoverage extends TreeCoverage {
+  //   type Tree = u.Tree
+
+  //   def EmptyTree                         = u.EmptyTree
+  //   def childrenOf(tree: Tree): Seq[Tree] = tree.children
+  //   def positionOf(tree: Tree): Position  = tree.pos
+  //   def identOf(tree: Tree): Int          = tree.id
+  //   def isIndentingTree(tree: Tree)       = tree match {
+  //     case _: MemberDef | _: Block => true
+  //     case _                       => false
+  //   }
+  // }
+
+  // def ownOffsets(tree: Tree): Vector[Offset] = {
+  //   val exclude = (tree.children map positionOf filter (_.isOpaqueRange) flatMap (_.indices)).toSet
+  //   (positionOf(tree).indices filterNot exclude).toVector
+  // }
+  // def sortedTrees(tree: Tree): Seq[Tree] = {
+  //   tree filter (_.pos.isOpaqueRange) sortBy (_.pos)
+  // }
+  // def getCode(t: Tree): String = {
+  //   val childIndices = t.children map positionOf filter (_.isOpaqueRange) flatMap (_.indices)
+  //   val ownIndices   = t.pos.indices filterNot childIndices.toSet
+
+  //   def chunks(indices: Vector[Int]): Vector[String] = {
+
+  //   }
+
+  // }
+
+  // def chunkUnit(unit: CompilationUnit): String = {
+  //   val code       = unit.source.content.mkString
+  //   val trees      = sortedTrees(unit.body)
+  //   val boundaries = trees.flatMap(t => t.pos.start :: t.pos.end :: Nil).distinct.sorted
+  //   val coverage   = trees map (t => t.
+
+  //   val boundaryMap = boundaries map (idx =>
+
+  //   val snippets = trees map (t => cleanup(code.slice(t.pos.start, t.pos.end).mkString, 50))
+
+  //   val chunks   = treeCoverage.analyze(code, unit.body) filterNot (_.tree == EmptyTree)
+  //   val snippets = chunks map (c => cleanup(code.slice(c.start, c.end).mkString, 50))
+  //   val lines    = (snippets, chunks).zipped map ((s, c) => "[%5s]  %-70s // #%-5s %s".format(c.start, s, c.tree.id, c.tree.shortClass))
+
+  //   lines.mkString(unit.source.file.name + "\n", "\n", "\n")
+  // }
 
      // chunks map (c => "%-50s // %s".format(codeOf(c), shortClassOfInstance(coverage(c.offset)))) mkString "\n"
 
