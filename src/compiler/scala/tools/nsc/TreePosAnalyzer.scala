@@ -2,7 +2,7 @@ package scala
 package tools
 package nsc
 
-import ast.SourceTokens
+import ast.{ SourceTokens, TreeCoverage }
 import SourceTokens._
 import scala.reflect.internal.util._
 import scala.reflect.internal.Chars._
@@ -13,6 +13,16 @@ import scala.annotation.{ switch, tailrec }
 class TreePosAnalyzer[U <: Global](val u: U) {
   import u._
   import syntaxAnalyzer._
+
+  object treeCoverage extends TreeCoverage {
+    type Tree = u.Tree
+
+    def childrenOf(tree: Tree): Seq[Tree] = tree.children
+    def positionOf(tree: Tree): Position  = tree.pos
+    def identOf(tree: Tree): Int          = tree.id
+  }
+
+  def chunkUnit(unit: CompilationUnit) = treeCoverage.analyze(unit.source.content.mkString, unit.body)
 
   class TreeData(val unit: CompilationUnit) {
     val treeParents  = mutable.Map[Tree, Tree]() withDefaultValue EmptyTree

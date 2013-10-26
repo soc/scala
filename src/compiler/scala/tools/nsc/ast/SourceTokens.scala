@@ -4,17 +4,24 @@ package nsc
 package ast
 
 import scala.tools.nsc.ast.parser.Tokens._
+import scala.annotation.{ switch, tailrec }
 
 object SourceTokens {
-  def identifier(name: String): Ident = Ident(name)
-  def keyword(token: Int): Keyword    = Keyword(token)
-
   sealed trait SourceToken { override def toString = tokenString(this) }
   final case class Keyword(token: Int) extends SourceToken
   final case class Ident(name: String) extends SourceToken
   final case class Literal(value: Any) extends SourceToken
 
-  final case class Offset(val offset: Int) extends AnyVal
+  final case class TreeId(value: Int) extends AnyVal
+  final case class Offset(value: Int) extends AnyVal
+  final case class Length(value: Int) extends AnyVal
+
+  final case class Chunk(offset: Offset, length: Length) {
+    def start   = offset.value
+    def end     = start + length.value
+    def indices = start until end
+  }
+
   final case class TokenInfo(start: Offset, token: SourceToken)
 
   def inColor(color: String)(value: Any): String = color + Console.BOLD + value + Console.RESET
@@ -34,7 +41,7 @@ object SourceTokens {
     }
   }
 
-  def keywordString(token: Int): String = token match {
+  def keywordString(token: Int): String = (token: @switch) match {
     case ABSTRACT   => "abstract"
     case ARROW      => "=>"
     case AT         => "@"
