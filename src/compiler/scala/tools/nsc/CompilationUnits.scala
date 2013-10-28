@@ -15,56 +15,6 @@ trait CompilationUnits { global: Global =>
 
   def NoCompilationUnit = CompilationUnit.None
 
-  // private val perPhaseNodes = mutable.Map[Phase, Int]() withDefaultValue 0
-
-  def sourceStats(): String = {
-    def surviving(unit: CompilationUnit) = (unit.body filter (_ => true) map (_.id)).distinct.size
-
-    val units          = global.currentRun.units.toList
-    val ids            = units map (_.sourceId)
-    val totalSurviving = (units map surviving).sum
-    val totalCreated   = (ids map sources.treeIdsCreated).sum
-
-    val hd = s"${units.size} units where $totalSurviving/$totalCreated ast nodes survived to the finish.\n"
-    val tl = units map { unit =>
-      val id        = unit.sourceId
-      val source    = sources(id)
-      val created   = sources.treeIdsCreated(id)
-      f"${surviving(unit)}%5s/$created%-5s  ${source.name}%s"
-    }
-    (hd :: tl) mkString ("\n", "\n", "\n")
-    // val sources    = ids map sources
-    // val createds   = ids map sources.treeIdsCreated
-    // val survivings = units map (unit => (unit.body filter (_ => true) map (_.id)).distinct.size)
-
-    // val strs = self.currentRun.units.toList map { unit =>
-    //   val id        = unit.sourceId
-    //   val source    = sources(id)
-    //   val created   = sources.treeIdsCreated(id)
-    //   val surviving = unit.body filter (_ => true) map (_.id)
-
-    //   f"${source.name}%-35s  created: $created%-5s  surviving: ${surviving.distinct.size}\n"
-    // }
-    // strs.mkString("")
-  }
-
-  override lazy val perPhaseNodes = mutable.Map[Phase, mutable.Map[String, Int]]()
-
-  if (Sources.dump) scala.sys addShutdownHook {
-    global.phaseDescriptors map (_.ownPhase) filter perPhaseNodes.contains foreach { p =>
-      val pairs = perPhaseNodes(p).toList sortBy (-_._2)
-      val total = perPhaseNodes(p).values.sum
-      println(f"$total%5s nodes created during $p")
-      for ((what, count) <- pairs)
-        println(f"$count%5s  $what%-20s")
-
-      println("")
-    }
-  }
-
-  if (Sources.stats)
-    scala.sys addShutdownHook Console.err.println(sourceStats())
-
   object CompilationUnit {
     /** An object representing a missing compilation unit.
      */
@@ -73,9 +23,8 @@ trait CompilationUnits { global: Global =>
       override def exists   = false
       override def toString = "NoCompilationUnit"
     }
-    def apply(source: SourceFile): CompilationUnit = {
-      new CompilationUnit(sources add Source(source), source)
-    }
+    def apply(source: SourceFile): CompilationUnit                        = new CompilationUnit(source)
+    def apply(source: SourceFile, altReporter: Reporter): CompilationUnit = new CompilationUnit(source) { override def reporter = altReporter }
   }
 
   /** One unit of compilation that has been submitted to the compiler.
@@ -84,7 +33,6 @@ trait CompilationUnits { global: Global =>
   class CompilationUnit private (val sourceId: SourceId, val source: SourceFile) extends CompilationUnitContextApi {
     self =>
 
-    // println(s"new CompilationUnit($sourceId, $source)")
     def this(source: SourceFile) = this(sources add Source(source), source)
 
     /** the fresh name creator */

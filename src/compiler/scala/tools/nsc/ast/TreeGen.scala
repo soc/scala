@@ -19,20 +19,10 @@ abstract class TreeGen extends scala.reflect.internal.TreeGen with TreeDSL {
   import global._
   import definitions._
 
-  private val wildcardImportCache = perRunCaches.newMap[Symbol, Import]()
-
   /** Builds a fully attributed, synthetic wildcard import node.
    */
-  def mkWildcardImport(sym: Symbol): Import = {
-    def create() = mkImportFromSelector(sym, ImportSelector.wildList)
-    if (!canCache(sym)) create()
-    else if (wildcardImportCache contains sym) wildcardImportCache(sym)
-    else {
-      val res = create()
-      wildcardImportCache(sym) = res
-      res
-    }
-  }
+  def mkWildcardImport(pkg: Symbol): Import =
+    mkImportFromSelector(pkg, ImportSelector.wildList)
 
   /** Builds a fully attributed, synthetic import node.
     * import `qualSym`.{`name` => `toName`}
@@ -40,7 +30,9 @@ abstract class TreeGen extends scala.reflect.internal.TreeGen with TreeDSL {
   def mkImport(qualSym: Symbol, name: Name, toName: Name): Import =
     mkImportFromSelector(qualSym, ImportSelector(name, 0, toName, 0) :: Nil)
 
-  private def mkImportFromStableQualifier(qual: Tree, selector: List[ImportSelector]): Import = {
+  private def mkImportFromSelector(qualSym: Symbol, selector: List[ImportSelector]): Import = {
+    assert(qualSym ne null, this)
+    val qual = gen.mkAttributedStableRef(qualSym)
     val importSym = (
       NoSymbol
         newImport NoPosition
@@ -53,10 +45,6 @@ abstract class TreeGen extends scala.reflect.internal.TreeGen with TreeDSL {
           setType NoType
     )
     importTree
-  }
-  private def mkImportFromSelector(qualSym: Symbol, selector: List[ImportSelector]): Import = {
-    assert(qualSym ne null, this)
-    mkImportFromStableQualifier(gen.mkAttributedStableRef(qualSym), selector)
   }
 
   // wrap the given expression in a SoftReference so it can be gc-ed

@@ -2,9 +2,7 @@ package scala
 package reflect
 package api
 
-abstract class UniverseSources {
-  val sources = new scala.reflect.position.Sources
-}
+import scala.reflect.position.Sources
 
 /**
  * <span class="badge badge-red" style="float: right;">EXPERIMENTAL</span>
@@ -61,8 +59,8 @@ abstract class UniverseSources {
  *
  *  @contentDiagram hideNodes "*Api"
  */
-abstract class Universe extends UniverseSources
-                           with Symbols
+abstract class Universe(val sources: Sources)
+                        extends Symbols
                            with Types
                            with FlagSets
                            with Scopes
@@ -84,6 +82,7 @@ abstract class Universe extends UniverseSources
                            with Importers
                            with Quasiquotes
 {
+  def this() = this(new Sources)
   /** Use `refiy` to produce the abstract syntax tree representing a given Scala expression.
    *
    * For example:

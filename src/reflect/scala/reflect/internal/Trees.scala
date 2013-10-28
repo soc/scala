@@ -10,14 +10,12 @@ package internal
 import Flags._
 import pickling.PickleFormat._
 import scala.collection.{ mutable, immutable }
-import scala.collection.mutable.ListBuffer
 import util.Statistics
-import scala.reflect.position._
 
 trait Trees extends api.Trees {
   self: SymbolTable =>
 
-  // private[scala] var nodeCount = 0
+  private[scala] var nodeCount = 0
 
   protected def treeLine(t: Tree): String =
     if (t.pos.isDefined && t.pos.isRange) t.pos.lineContent.drop(t.pos.column - 1).take(t.pos.end - t.pos.start + 1)
@@ -36,27 +34,9 @@ trait Trees extends api.Trees {
     )
   }
 
-  def perPhaseNodes: mutable.Map[Phase, mutable.Map[String, Int]] = mutable.Map()
-  def recordNode(what: String): Unit = if ((phase ne null) && (perPhaseNodes ne null)) {
-    val map = perPhaseNodes.getOrElseUpdate(phase, mutable.Map[String, Int]() withDefaultValue 0)
-    map(what) += 1
-  }
-
   abstract class Tree extends TreeContextApiImpl with Attachable with Product {
-    val id: TreeId = if (canHaveAttrs) sources.getTreeId() else sources.getSourcelessTreeId()
-
-    recordNode(shortClass)
-
-    private def safeString = this match {
-      case Literal(c)                                     => "  " + c.escapedStringValue
-      case t: RefTree                                     => "  " + t.name.decoded
-      case t: MemberDef                                   => "  " + t.name.decoded
-      case t @ Import(Select(thiz @ This(qual), name), _) => "  " + t + s" where selection is $qual.$name and pos=${thiz.pos.show} sym=${thiz.symbol.id} tpe=${thiz.tpe.##}"
-      // case t @ Import(expr, selectors)                    => "  " + t + " expr: " + expr.shortClass + " " + expr + " " + expr.##
-      case _                                              => ""
-    }
-    if (Sources.dump)
-      Console.err.println(f"$phase%15s  $shortClass%-25s  $id%-15s$safeString")
+    val id = nodeCount // TODO: add to attachment?
+    nodeCount += 1
 
     if (Statistics.canEnable) Statistics.incCounter(TreesStats.nodeByType, getClass)
 
@@ -357,9 +337,8 @@ trait Trees extends api.Trees {
     val wildList = List(wild) // OPT This list is shared for performance.
   }
 
-  case class Import(expr: Tree, selectors: List[ImportSelector]) extends SymTree with ImportApi {
-    // (new Throwable).getStackTrace take 10 foreach (e => println(f"$phase%-15s $e"))
-  }
+  case class Import(expr: Tree, selectors: List[ImportSelector])
+       extends SymTree with ImportApi
   object Import extends ImportExtractor
 
   case class Template(parents: List[Tree], self: ValDef, body: List[Tree])
@@ -497,9 +476,8 @@ trait Trees extends api.Trees {
   }
   object Super extends SuperExtractor
 
-  case class This(qual: TypeName) extends SymTree with TermTree with ThisApi {
-    // (new Throwable).getStackTrace take 10 foreach (e => println(f"$phase%-15s $e"))
-  }
+  case class This(qual: TypeName)
+        extends SymTree with TermTree with ThisApi
   object This extends ThisExtractor
 
   case class Select(qualifier: Tree, name: Name)
@@ -1863,7 +1841,7 @@ trait Trees extends api.Trees {
   implicit val ValDefTag              = ClassTag[ValDef](classOf[ValDef])
   implicit val ValOrDefDefTag         = ClassTag[ValOrDefDef](classOf[ValOrDefDef])
 
-  val treeNodeCount = Statistics.newView("#created tree nodes")(sources.nodeCount)
+  val treeNodeCount = Statistics.newView("#created tree nodes")(nodeCount)
 }
 
 object TreesStats {

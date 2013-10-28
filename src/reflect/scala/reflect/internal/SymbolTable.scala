@@ -388,9 +388,6 @@ abstract class SymbolTable extends macros.Universe
   def currentFreshNameCreator: FreshNameCreator
   def freshTermName(prefix: String = "x$")(implicit creator: FreshNameCreator): TermName = newTermName(creator.newName(prefix))
   def freshTypeName(prefix: String)(implicit creator: FreshNameCreator): TypeName        = newTypeName(creator.newName(prefix))
-
-  val moduleRefCache  = perRunCaches.newMap[Symbol, RefTree]()
-  val moduleThisCache = perRunCaches.newMap[Symbol, This]()
 }
 
 object SymbolTableStats {

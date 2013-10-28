@@ -4,15 +4,12 @@ package internal
 
 import Flags._
 import util._
-import scala.reflect.position._
 
 abstract class TreeGen extends macros.TreeBuilder {
   val global: SymbolTable
 
   import global._
   import definitions._
-
-  final def canCache(sym: Symbol) = Sources.cache && sym.isStaticOwner
 
   def rootId(name: Name)             = Select(Ident(nme.ROOTPKG), name)
   def rootScalaDot(name: Name)       = Select(rootId(nme.scala_) setSymbol ScalaPackage, name)
@@ -131,10 +128,9 @@ abstract class TreeGen extends macros.TreeBuilder {
   }
 
   /** Builds a reference to given symbol. */
-  def mkAttributedRef(sym: Symbol): RefTree = (
+  def mkAttributedRef(sym: Symbol): RefTree =
     if (sym.owner.isClass) mkAttributedRef(sym.owner.thisType, sym)
     else mkAttributedIdent(sym)
-  )
 
   def mkUnattributedRef(sym: Symbol): RefTree = mkUnattributedRef(sym.fullNameAsName('.'))
 
@@ -167,27 +163,11 @@ abstract class TreeGen extends macros.TreeBuilder {
   def mkAttributedStableRef(sym: Symbol): Tree =
     stabilize(mkAttributedRef(sym))
 
-  def mkAttributedThis(sym: Symbol): This = {
-    def create() = This(sym.name.toTypeName) setSymbol sym setType sym.thisType
-    if (!canCache(sym)) create()
-    else if (moduleThisCache contains sym) moduleThisCache(sym)
-    else {
-      val res = create()
-      moduleThisCache(sym) = res
-      res
-    }
-  }
+  def mkAttributedThis(sym: Symbol): This =
+    This(sym.name.toTypeName) setSymbol sym setType sym.thisType
 
-  def mkAttributedIdent(sym: Symbol): RefTree = {
-    def create() = Ident(sym.name) setSymbol sym setType sym.tpeHK
-    if (!canCache(sym)) create()
-    else if (moduleRefCache contains sym) moduleRefCache(sym)
-    else {
-      val res = create()
-      moduleRefCache(sym) = res
-      res
-    }
-  }
+  def mkAttributedIdent(sym: Symbol): RefTree =
+    Ident(sym.name) setSymbol sym setType sym.tpeHK
 
   def mkAttributedSelect(qual: Tree, sym: Symbol): RefTree = {
     // Tests involving the repl fail without the .isEmptyPackage condition.
