@@ -2,6 +2,10 @@ package scala
 package reflect
 package api
 
+abstract class UniverseSources {
+  val sources = new scala.reflect.position.Sources
+}
+
 /**
  * <span class="badge badge-red" style="float: right;">EXPERIMENTAL</span>
  *
@@ -57,7 +61,8 @@ package api
  *
  *  @contentDiagram hideNodes "*Api"
  */
-abstract class Universe extends Symbols
+abstract class Universe extends UniverseSources
+                           with Symbols
                            with Types
                            with FlagSets
                            with Scopes

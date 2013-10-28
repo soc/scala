@@ -243,7 +243,7 @@ abstract class ToolBoxFactory[U <: JavaUniverse](val u: U) { factorySelf =>
 
         val mdef = wrap(expr)
         val pdef = PackageDef(Ident(mdef.name), List(mdef))
-        val unit = new CompilationUnit(NoSourceFile)
+        val unit = CompilationUnit(NoSourceFile)
         unit.body = pdef
 
         val run = new Run

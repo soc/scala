@@ -159,7 +159,7 @@ trait ScratchPadMaker { self: Global =>
     val token = new ArrayBuffer[Int]
     val startOffset = new ArrayBuffer[Int]
     val endOffset = new ArrayBuffer[Int]
-    private val scanner = new syntaxAnalyzer.UnitScanner(new CompilationUnit(source))
+    private val scanner = new syntaxAnalyzer.UnitScanner(CompilationUnit(source))
     scanner.init()
     while (scanner.token != EOF) {
       startOffset += scanner.offset

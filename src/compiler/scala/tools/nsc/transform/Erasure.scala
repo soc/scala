@@ -972,6 +972,10 @@ abstract class Erasure extends AddInterfaces
         def preEraseAsInstanceOf = {
           (fn: @unchecked) match {
             case TypeApply(Select(qual, _), List(targ)) =>
+              if (qual.tpe == null || targ.tpe == null) {
+                Console.err.println(s"Oops: TypeApply(Select($qual, _), $targ :: Nil) / ${qual.tpe} / ${targ.tpe}")
+              }
+
               if (qual.tpe <:< targ.tpe)
                 atPos(tree.pos) { Typed(qual, TypeTree(targ.tpe)) }
               else if (isNumericValueClass(qual.tpe.typeSymbol) && isNumericValueClass(targ.tpe.typeSymbol))
