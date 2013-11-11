@@ -17,7 +17,7 @@ import scala.collection.{ mutable, immutable }
 import mutable.{ LinkedHashMap, ListBuffer }
 import scala.util.matching.Regex
 import symtab.Flags._
-import scala.reflect.internal.util.Statistics
+import scala.reflect.internal.util.{TriState, Statistics}
 import scala.language.implicitConversions
 
 /** This trait provides methods to find various kinds of implicits.
@@ -78,7 +78,11 @@ trait Implicits {
       })
       debuglog("update buffer: " + implicitSearchContext.reportBuffer.errors)
     }
-    context.undetparams = context.undetparams filterNot result.subst.from.contains
+    // SI-7944 undetermined type parameters that result from inference within typedImplicit land in
+    //         `implicitSearchContext.undetparams`, *not* in `context.undetparams`
+    //         Here, we copy them up to parent context (analogously to the way the errors are copied above),
+    //         and then filter out any which *were* inferred and are part of the substitutor in the implicit search result.
+    context.undetparams = ((context.undetparams ++ implicitSearchContext.undetparams) filterNot result.subst.from.contains).distinct
 
     if (Statistics.canEnable) Statistics.stopTimer(implicitNanos, start)
     if (Statistics.canEnable) Statistics.stopCounter(rawTypeImpl, rawTypeStart)
@@ -194,6 +198,7 @@ trait Implicits {
    */
   class ImplicitInfo(val name: Name, val pre: Type, val sym: Symbol) {
     private var tpeCache: Type = null
+    private var isCyclicOrErroneousCache: TriState = TriState.Unknown
 
     /** Computes member type of implicit from prefix `pre` (cached). */
     def tpe: Type = {
@@ -201,7 +206,12 @@ trait Implicits {
       tpeCache
     }
 
-    def isCyclicOrErroneous =
+    def isCyclicOrErroneous: Boolean = {
+      if (!isCyclicOrErroneousCache.isKnown) isCyclicOrErroneousCache = computeIsCyclicOrErroneous
+      isCyclicOrErroneousCache.booleanValue
+    }
+
+    private[this] final def computeIsCyclicOrErroneous =
       try sym.hasFlag(LOCKED) || containsError(tpe)
       catch { case _: CyclicReference => true }
 
@@ -326,6 +336,9 @@ trait Implicits {
     /** The type parameters to instantiate */
     val undetParams = if (isView) Nil else context.outer.undetparams
     val wildPt = approximate(pt)
+
+    private val runDefintions = currentRun.runDefinitions
+    import runDefintions._
 
     def undet_s = if (undetParams.isEmpty) "" else undetParams.mkString(" inferring ", ", ", "")
     def tree_s = typeDebug ptTree tree
@@ -560,7 +573,7 @@ trait Implicits {
       // side is a class, else we may not know enough.
       case tr1 @ TypeRef(_, sym1, _) if sym1.isClass =>
         tp2.dealiasWiden match {
-          case TypeRef(_, sym2, _)         => sym2.isClass && !(sym1 isWeakSubClass sym2)
+          case TypeRef(_, sym2, _)         => ((sym1 eq ByNameParamClass) != (sym2 eq ByNameParamClass)) || (sym2.isClass && !(sym1 isWeakSubClass sym2))
           case RefinedType(parents, decls) => decls.nonEmpty && tr1.member(decls.head.name) == NoSymbol
           case _                           => false
         }
@@ -796,7 +809,7 @@ trait Implicits {
 
       private def isIneligible(info: ImplicitInfo) = (
            info.isCyclicOrErroneous
-        || isView && isPredefMemberNamed(info.sym, nme.conforms)
+        || isView && (info.sym eq Predef_conforms)
         || shadower.isShadowed(info.name)
         || (!context.macrosEnabled && info.sym.isTermMacro)
       )
@@ -1095,13 +1108,6 @@ trait Implicits {
       }
     }
 
-    private def TagSymbols =  TagMaterializers.keySet
-    private val TagMaterializers = Map[Symbol, Symbol](
-      ClassTagClass    -> materializeClassTag,
-      WeakTypeTagClass -> materializeWeakTypeTag,
-      TypeTagClass     -> materializeTypeTag
-    )
-
     /** Creates a tree will produce a tag of the requested flavor.
       * An EmptyTree is returned if materialization fails.
       */
@@ -1162,8 +1168,6 @@ trait Implicits {
       // this is ugly but temporary, since all this code will be removed once I fix implicit macros
       else SearchFailure
     }
-
-    private val ManifestSymbols = Set[Symbol](PartialManifestClass, FullManifestClass, OptManifestClass)
 
     /** Creates a tree that calls the relevant factory method in object
       * scala.reflect.Manifest for type 'tp'. An EmptyTree is returned if
