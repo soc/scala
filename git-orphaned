@@ -1,0 +1,5 @@
+#!/bin/sh
+#
+# git-orphaned
+
+git log orphaned --not --remotes=origin "$@"
