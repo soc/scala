@@ -317,6 +317,9 @@ sealed abstract class List[+A] extends AbstractSeq[A]
   override def foldRight[B](z: B)(op: (A, B) => B): B =
     reverse.foldLeft(z)((right, left) => op(left, right))
 
+  override def reduceRight[B >: A](op: (A, B) => B): B =
+    reverse.reduceLeft((right, left) => op(left, right))
+
   override def stringPrefix = "List"
 
   override def toStream : Stream[A] =
