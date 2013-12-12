@@ -659,8 +659,18 @@ abstract class Constructors extends Transform with ast.TreeDSL {
           }
           defBuf += deriveValDef(stat)(_ => EmptyTree)
         }
-      case ClassDef(_, _, _, _) =>
+      case cd @ ClassDef(mods, name, tparams, impl) =>
         // classes are treated recursively, and left in the template
+        val constructors = impl.filter(tree => tree.symbol.isConstructor)
+        def virtualInitMethod(constructorMethod: DefDef, className: String, vparamss: List[List[ValDef]], tparams: List[TypeDef]) =
+          copyDefDef(constructorMethod)(
+            mods = constructorMethod.mods | Flag.SYNTHETIC,
+            name = TermName("virtualInit$"+className),
+            tparams = tparams,
+            vparamss = vparamss,
+            tpt = Ident(className),
+            rhs = ???
+          )
         defBuf += new ConstructorTransformer(unit).transform(stat)
       case _ =>
         // all other statements go into the constructor

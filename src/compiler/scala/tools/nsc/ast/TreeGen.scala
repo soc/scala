@@ -119,7 +119,7 @@ abstract class TreeGen extends scala.reflect.internal.TreeGen with TreeDSL {
     if (isRepeatedParam) wildcardStar(arg) else arg
 
   /** Make forwarder to method `target`, passing all parameters in `params` */
-  def mkForwarder(target: Tree, vparamss: List[List[Symbol]]) =
+  def mkForwarder(target: Tree, vparamss: List[List[Symbol]]): Tree =
     (target /: vparamss)((fn, vparams) => Apply(fn, vparams map paramToArg))
 
   /** Applies a wrapArray call to an array, making it a WrappedArray.
