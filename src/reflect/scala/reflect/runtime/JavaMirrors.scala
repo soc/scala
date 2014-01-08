@@ -300,7 +300,7 @@ private[scala] trait JavaMirrors extends internal.SymbolTable with api.JavaUnive
     lazy val bytecodefulObjectMethods = Set[Symbol](Object_clone, Object_equals, Object_finalize, Object_hashCode, Object_toString,
                                         Object_notify, Object_notifyAll) ++ ObjectClass.info.member(nme.wait_).asTerm.alternatives.map(_.asMethod)
     private def isBytecodelessMethod(meth: MethodSymbol): Boolean = {
-      if (isGetClass(meth) || isStringConcat(meth) || meth.owner.isPrimitiveValueClass || meth == runDefinitions.Predef_classOf || meth.isMacro) return true
+      if (isGetClass(meth) || isStringConcat(meth) || meth.owner.isPrimitiveValueClass || meth.isMacro) return true
       bytecodelessMethodOwners(meth.owner) && !bytecodefulObjectMethods(meth)
     }
 
@@ -492,7 +492,6 @@ private[scala] trait JavaMirrors extends internal.SymbolTable with api.JavaUnive
           case Array_clone                            => ScalaRunTime.array_clone(objReceiver)
           case sym if isStringConcat(sym)             => receiver.toString + objArg0
           case sym if sym.owner.isPrimitiveValueClass => invokePrimitiveMethod
-          case sym if sym == Predef_classOf           => fail("Predef.classOf is a compile-time function")
           case sym if sym.isMacro                     => fail(s"${symbol.fullName} is a macro, i.e. a compile-time function")
           case _                                      => abort(s"unsupported symbol $symbol when invoking $this")
         }

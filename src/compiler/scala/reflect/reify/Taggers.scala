@@ -31,7 +31,7 @@ abstract class Taggers {
   def materializeClassTag(tpe: Type): Tree = {
     val tagModule = ClassTagModule
     materializeTag(EmptyTree, tpe, tagModule, {
-      val erasure = c.reifyRuntimeClass(tpe, concrete = true)
+      val erasure = c.reifyRuntimeClass(tpe, concrete = false)
       val factory = TypeApply(Select(Ident(tagModule), nme.apply), List(TypeTree(tpe)))
       Apply(factory, List(erasure))
     })
@@ -79,6 +79,7 @@ abstract class Taggers {
     try materializer
     catch {
       case ReificationException(pos, msg) =>
+        Thread.dumpStack()
         c.abort(pos.asInstanceOf[c.Position], msg) // this cast is a very small price for the sanity of exception handling
       case UnexpectedReificationException(pos, err, cause) if cause != null =>
         throw cause

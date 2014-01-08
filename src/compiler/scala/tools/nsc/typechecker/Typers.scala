@@ -253,6 +253,12 @@ trait Typers extends Adaptations with Tags with TypersTracking with PatternTyper
     private def errorNotClass(tpt: Tree, found: Type)  = { ClassTypeRequiredError(tpt, found); false }
     private def errorNotStable(tpt: Tree, found: Type) = { TypeNotAStablePrefixError(tpt, found); false }
 
+     /** Check that `tpt` refers to a non-refinement class type */
+    def isClassType(tpt: Tree): Boolean = {
+      val tpe = unwrapToClass(tpt.tpe)
+      isNonRefinementClassType(tpe)
+    }
+
     /** Check that `tpt` refers to a non-refinement class type */
     def checkClassType(tpt: Tree): Boolean = {
       val tpe = unwrapToClass(tpt.tpe)
@@ -3631,7 +3637,8 @@ trait Typers extends Adaptations with Tags with TypersTracking with PatternTyper
       val annType = annTpt.tpe
 
       finish(
-        if (typedFun.isErroneous)
+        // `annType` can be null when an annotation like `@throws(classOf[T])` refers to a non-existing type T.
+        if (typedFun.isErroneous || annType == null)
           ErroneousAnnotation
         else if (annType.typeSymbol isNonBottomSubClass ClassfileAnnotationClass) {
           // annotation to be saved as java classfile annotation
@@ -3836,9 +3843,15 @@ trait Typers extends Adaptations with Tags with TypersTracking with PatternTyper
       packSymbols(localSyms.toList, dealiasedType)
     }
 
-    def typedClassOf(tree: Tree, tpt: Tree, noGen: Boolean = false) =
-      if (!checkClassType(tpt) && noGen) tpt
-      else atPos(tree.pos)(gen.mkClassOf(tpt.tpe))
+    def typedClassOf(tree: Tree, tpt: Tree, noGen: Boolean = false): Tree = {
+      val tpe = tpt.tpe
+
+      if (!isClassType(tpt) && noGen) resolveClassTag(tree.pos, tpe) match {
+        case EmptyTree => warning(s"No ClassTag for $tpe!"); MissingClassTagError(tree, tpe)
+        case tag => warning(s"$tpe at $tree has $tag"); atPos(tree.pos)(Select(tag, nme.runtimeClass))
+      } else
+        atPos(tree.pos)(gen.mkClassOf(tpe))
+    }
 
     protected def typedExistentialTypeTree(tree: ExistentialTypeTree, mode: Mode): Tree = {
       for (wc <- tree.whereClauses)
@@ -3898,27 +3911,22 @@ trait Typers extends Adaptations with Tags with TypersTracking with PatternTyper
         if (sameLength(tparams, args)) {
           val targs = mapList(args)(treeTpe)
           checkBounds(tree, NoPrefix, NoSymbol, tparams, targs, "")
-          if (isPredefClassOf(fun.symbol))
-            typedClassOf(tree, args.head, noGen = true)
-          else {
-            if (!isPastTyper && fun.symbol == Any_isInstanceOf && targs.nonEmpty) {
-              val scrutineeType = fun match {
-                case Select(qual, _) => qual.tpe
-                case _               => AnyTpe
-              }
-              checkCheckable(tree, targs.head, scrutineeType, inPattern = false)
+          if (!isPastTyper && fun.symbol == Any_isInstanceOf && targs.nonEmpty) {
+            val scrutineeType = fun match {
+              case Select(qual, _) => qual.tpe
+              case _               => AnyTpe
             }
-            val resultpe = restpe.instantiateTypeParams(tparams, targs)
-            //@M substitution in instantiateParams needs to be careful!
-            //@M example: class Foo[a] { def foo[m[x]]: m[a] = error("") } (new Foo[Int]).foo[List] : List[Int]
-            //@M    --> first, m[a] gets changed to m[Int], then m gets substituted for List,
-            //          this must preserve m's type argument, so that we end up with List[Int], and not List[a]
-            //@M related bug: #1438
-            //println("instantiating type params "+restpe+" "+tparams+" "+targs+" = "+resultpe)
-            treeCopy.TypeApply(tree, fun, args) setType resultpe
+            checkCheckable(tree, targs.head, scrutineeType, inPattern = false)
           }
-        }
-        else {
+          val resultpe = restpe.instantiateTypeParams(tparams, targs)
+          //@M substitution in instantiateParams needs to be careful!
+          //@M example: class Foo[a] { def foo[m[x]]: m[a] = error("") } (new Foo[Int]).foo[List] : List[Int]
+          //@M    --> first, m[a] gets changed to m[Int], then m gets substituted for List,
+          //          this must preserve m's type argument, so that we end up with List[Int], and not List[a]
+          //@M related bug: #1438
+          //println("instantiating type params "+restpe+" "+tparams+" "+targs+" = "+resultpe)
+          treeCopy.TypeApply(tree, fun, args) setType resultpe
+        } else {
           TypedApplyWrongNumberOfTpeParametersError(tree, fun)
         }
       case ErrorType =>
@@ -4844,11 +4852,7 @@ trait Typers extends Adaptations with Tags with TypersTracking with PatternTyper
             (// this -> Foo.this
             if (sym.isThisSym)
               typed1(This(sym.owner) setPos tree.pos, mode, pt)
-          // Inferring classOf type parameter from expected type.  Otherwise an
-          // actual call to the stubbed classOf method is generated, returning null.
-            else if (isPredefClassOf(sym) && pt.typeSymbol == ClassClass && pt.typeArgs.nonEmpty)
-            typedClassOf(tree, TypeTree(pt.typeArgs.head))
-          else {
+            else {
               val pre1  = if (sym.isTopLevel) sym.owner.thisType else if (qual == EmptyTree) NoPrefix else qual.tpe
               val tree1 = if (qual == EmptyTree) tree else atPos(tree.pos)(Select(atPos(tree.pos.focusStart)(qual), name))
               val (tree2, pre2) = makeAccessible(tree1, sym, pre1, qual)
@@ -5406,12 +5410,9 @@ trait Typers extends Adaptations with Tags with TypersTracking with PatternTyper
     def atOwner(tree: Tree, owner: Symbol): Typer =
       newTyper(context.make(tree, owner))
 
-    /** Types expression or definition `tree`.
-     */
-    def typed(tree: Tree): Tree = {
-      val ret = typed(tree, context.defaultModeForTyped, WildcardType)
-      ret
-    }
+    /** Types expression or definition `tree`. */
+    def typed(tree: Tree): Tree =
+      typed(tree, context.defaultModeForTyped, WildcardType)
 
     def typedByValueExpr(tree: Tree, pt: Type = WildcardType): Tree = typed(tree, EXPRmode | BYVALmode, pt)
 
