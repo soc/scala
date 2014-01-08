@@ -64,10 +64,11 @@ package object reify {
       case TypeRef(_, ArrayClass, componentTpe :: Nil) =>
         val componentErasure = reifyRuntimeClass(global)(typer0, componentTpe, concrete)
         gen.mkMethodCall(currentRun.runDefinitions.arrayClassMethod, List(componentErasure))
-      case _ =>
+      case what =>
         var erasure = tpe.erasure
+        warning(s"tpe is $tpe of ${what.getClass}, erasure is $erasure")
         if (tpe.typeSymbol.isDerivedValueClass && global.phase.id < global.currentRun.erasurePhase.id) erasure = tpe
-        gen.mkNullaryCall(currentRun.runDefinitions.Predef_classOf, List(erasure))
+        gen.mkClassOf(erasure)
     }
   }
 

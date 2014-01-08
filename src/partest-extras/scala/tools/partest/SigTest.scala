@@ -19,7 +19,9 @@ trait SigTest {
   )
   def fstr(f: JField) = "  (f) %s".format(f.toGenericString)
 
-  def isObjectMethodName(name: String) = classOf[Object].getMethods exists (_.getName == name)
+  // !!! `(new Object).getClass` is a temporary workaround until a new partest versions has been built.
+  // !!! After that, replace it with `classOf[Object]` again.
+  def isObjectMethodName(name: String) = (new Object).getClass.getMethods exists (_.getName == name)
 
   def fields[T: ClassTag](p: JField => Boolean) = {
     val cl = classTag[T].runtimeClass

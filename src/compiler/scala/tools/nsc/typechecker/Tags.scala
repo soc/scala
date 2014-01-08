@@ -13,6 +13,7 @@ trait Tags {
     private val runDefinitions = currentRun.runDefinitions
 
     private def resolveTag(pos: Position, taggedTp: Type, allowMaterialization: Boolean) = enteringTyper {
+      warning(s"resolveTag: Looking for $taggedTp at position $pos")
       def wrapper (tree: => Tree): Tree = if (allowMaterialization) (context.withMacrosEnabled[Tree](tree)) else (context.withMacrosDisabled[Tree](tree))
       wrapper(inferImplicit(
         EmptyTree,
