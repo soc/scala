@@ -944,6 +944,11 @@ trait Namers extends MethodSynthesis {
     }
 
     private def classSig(cdef: ClassDef): Type = {
+      // Handle the absence of the ValueType annotation gracefully
+      def addValueTypeAttr(clazz: Symbol): Unit =
+        if (ValueTypeAttr != NoSymbol)
+          clazz.addAnnotation(AnnotationInfo(ValueTypeAttr.tpe, Nil, Nil))
+
       val clazz = cdef.symbol
       val ClassDef(_, _, tparams, impl) = cdef
       val tparams0   = typer.reenterTypeParams(tparams)
@@ -958,6 +963,7 @@ trait Namers extends MethodSynthesis {
       if (clazz.isDerivedValueClass) {
         log("Ensuring companion for derived value class " + cdef.name + " at " + cdef.pos.show)
         clazz setFlag FINAL
+        addValueTypeAttr(clazz)
         // Don't force the owner's info lest we create cycles as in SI-6357.
         enclosingNamerWithScope(clazz.owner.rawInfo.decls).ensureCompanionObject(cdef)
       }

@@ -411,6 +411,7 @@ trait JavaUniverseForce { self: runtime.JavaUniverse  =>
     definitions.UncheckedClass
     definitions.UncheckedBoundsClass
     definitions.UnspecializedClass
+    definitions.ValueTypeAttr
     definitions.VolatileAttr
     definitions.BeanGetterTargetClass
     definitions.BeanSetterTargetClass
