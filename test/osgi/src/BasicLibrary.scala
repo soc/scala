@@ -1,9 +1,9 @@
 package tools.test.osgi
 package libonly
- 
+
 import org.junit.Assert._
 import org.ops4j.pax.exam.CoreOptions._
- 
+
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.ops4j.pax.exam
@@ -13,7 +13,7 @@ import org.ops4j.pax.exam.junit.{
   JUnit4TestRunner
 }
 import org.ops4j.pax.exam.spi.reactors.AllConfinedStagedReactorFactory
-import org.ops4j.pax.swissbox.framework.ServiceLookup
+import org.ops4j.pax.swissbox.tracker.ServiceLookup
 import org.osgi.framework.BundleContext
 
 
@@ -24,7 +24,7 @@ class BasicLibraryTest extends ScalaOsgiHelper {
   @Configuration
   def config(): Array[exam.Option] =
     justCoreLibraryOptions
- 
+
   @Test
   def everythingLoads(): Unit = {
      // Note - This tests sun.misc usage.
