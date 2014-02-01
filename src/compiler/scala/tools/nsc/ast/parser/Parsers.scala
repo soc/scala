@@ -107,13 +107,13 @@ trait ParsersCommon extends ScannersCommon { self =>
  *        <b>val</b> x: T = e  ==>  <b>val</b> x: T = e</pre>
  *
  *      if there are no variables in pattern<pre>
- *        <b>val</b> p = e  ==>  e match (case p => ())</pre>
+ *        <b>val</b> p = e  ==>  e match {case p => ()}</pre>
  *
  *      if there is exactly one variable in pattern<pre>
- *        <b>val</b> x_1 = e <b>match</b> (case p => (x_1))</pre>
+ *        <b>val</b> x_1 = e <b>match</b> {case p => (x_1)}</pre>
  *
  *      if there is more than one variable in pattern<pre>
- *        <b>val</b> p = e  ==>  <b>private synthetic val</b> t$ = e <b>match</b> (case p => (x_1, ..., x_N))
+ *        <b>val</b> p = e  ==>  <b>private synthetic val</b> t$ = e <b>match</b> {case p => (x_1, ..., x_N)})
  *                        <b>val</b> x_1 = t$._1
  *                        ...
  *                        <b>val</b> x_N = t$._N</pre>
@@ -585,6 +585,7 @@ self =>
     def accept(token: Token): Offset = {
       val offset = in.offset
       if (in.token != token) {
+        Thread.dumpStack()
         syntaxErrorOrIncomplete(expectedMsg(token), skipIt = false)
         if ((token == RPAREN || token == RBRACE || token == RBRACKET))
           if (in.parenBalance(token) + assumedClosingParens(token) < 0)
@@ -674,7 +675,7 @@ self =>
     def isExprIntroToken(token: Token): Boolean = isLiteralToken(token) || (token match {
       case IDENTIFIER | BACKQUOTED_IDENT |
            THIS | SUPER | IF | FOR | NEW | USCORE | TRY | WHILE |
-           DO | RETURN | THROW | LPAREN | LBRACE | XMLSTART => true
+           DO | RETURN | THROW | LPAREN | LBRACE | CASE | XMLSTART => true
       case _ => false
     })
 
@@ -1444,6 +1445,12 @@ self =>
         parseThrow
       case IMPLICIT =>
         implicitClosure(in.skipToken(), location)
+      case CASE =>
+        def parseCase =
+          atPos(in.skipToken()) {
+            Match(EmptyTree, List(caseClause()))
+          }
+        parseCase
       case _ =>
         def parseOther = {
           var t = postfixExpr()
@@ -1691,9 +1698,6 @@ self =>
      */
     def block(): Tree = makeBlock(blockStatSeq())
 
-    def caseClause(): CaseDef =
-      atPos(in.offset)(makeCaseDef(pattern(), guard(), caseBlock()))
-
     /** {{{
      *  CaseClauses ::= CaseClause {CaseClause}
      *  CaseClause  ::= case Pattern [Guard] `=>' Block
@@ -1703,8 +1707,11 @@ self =>
       val cases = caseSeparated { caseClause() }
       if (cases.isEmpty)  // trigger error if there are no cases
         accept(CASE)
-
       cases
+    }
+
+    def caseClause(): CaseDef = {
+      atPos(in.offset)(makeCaseDef(pattern(), guard(), caseBlock()))
     }
 
     // IDE HOOK (so we can memoize case blocks) // needed?
@@ -3094,34 +3101,36 @@ self =>
      */
     def blockStatSeq(): List[Tree] = checkNoEscapingPlaceholders {
       val stats = new ListBuffer[Tree]
-      while (!isStatSeqEnd && !isCaseDefEnd) {
-        if (in.token == IMPORT) {
-          stats ++= importClause()
-          acceptStatSepOpt()
-        }
-        else if (isExprIntro) {
-          stats += statement(InBlock)
-          if (!isCaseDefEnd) acceptStatSep()
-        }
-        else if (isDefIntro || isLocalModifier || isAnnotation) {
-          if (in.token == IMPLICIT) {
-            val start = in.skipToken()
-            if (isIdent) stats += implicitClosure(start, InBlock)
-            else stats ++= localDef(Flags.IMPLICIT)
-          } else {
-            stats ++= localDef(0)
-          }
-          acceptStatSepOpt()
-        }
-        else if (isStatSep) {
-          in.nextToken()
-        }
-        else {
-          val addendum = if (isModifier) " (no modifiers allowed here)" else ""
-          syntaxErrorOrIncomplete("illegal start of statement" + addendum, skipIt = true)
-        }
+      warning(in.offset, token2string(in.token))
+      while (!isStatSeqEnd && !isCaseDefEnd && !(in.token == COMMA)) {
+        blockStat(stats)
       }
       stats.toList
+    }
+
+    def blockStat(stats: ListBuffer[Tree]): Unit = {
+      if (in.token == IMPORT) {
+        stats ++= importClause()
+        acceptStatSepOpt()
+      } else if (isExprIntro) {
+        warning(in.offset, "In blockStat: " + token2string(in.token))
+        stats += statement(InBlock)
+        if (!isCaseDefEnd) acceptStatSep()
+      } else if (isDefIntro || isLocalModifier || isAnnotation) {
+        if (in.token == IMPLICIT) {
+          val start = in.skipToken()
+          if (isIdent) stats += implicitClosure(start, InBlock)
+          else stats ++= localDef(Flags.IMPLICIT)
+        } else {
+          stats ++= localDef(0)
+        }
+        acceptStatSepOpt()
+      } else if (isStatSep) {
+        in.nextToken()
+      } else {
+        val addendum = if (isModifier) " (no modifiers allowed here)" else ""
+        syntaxErrorOrIncomplete("illegal start of statement" + addendum, skipIt = true)
+      }
     }
 
     /** {{{
