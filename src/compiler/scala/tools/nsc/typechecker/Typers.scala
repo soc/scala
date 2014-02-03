@@ -1666,7 +1666,7 @@ trait Typers extends Adaptations with Tags with TypersTracking with PatternTyper
           if (psym != superclazz) {
             if (psym.isTrait) {
               val ps = psym.info.parents
-              if (!ps.isEmpty && !superclazz.isSubClass(ps.head.typeSymbol))
+              if (!ps.isEmpty && !superclazz.isSubClass(ps.head.typeSymbol) && !((superclazz == AnyValClass) && psym.isJavaInterface))
                 pending += ParentSuperSubclassError(parent, superclazz, ps.head.typeSymbol, psym)
             } else {
               pending += ParentNotATraitMixinError(parent, psym)
