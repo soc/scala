@@ -207,6 +207,7 @@ trait Macros extends FastTrack with MacroRuntimes with Traces with Helpers {
         override def transform(tree: Tree) = {
           tree match {
             case Literal(const @ Constant(x)) if tree.tpe == null => tree setType ConstantType(const)
+            case Typed(literal @ Literal(const @ Constant(x)), _) if tree.tpe == null => tree setType ConstantType(const)
             case _ if tree.tpe == null => tree setType NoType
             case _ => ;
           }

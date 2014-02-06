@@ -242,8 +242,12 @@ abstract class TreeGen {
    *  !!! See deconstMap in Erasure for one bug this encoding has induced:
    *  I would be very surprised if there aren't more.
    */
-  def mkClassOf(tp: Type): Tree =
+  def mkClassOf(tp: Type): Tree = {
+    val stable = tp.isStable
+    val clz = unwrapToClass(tp)
+    warning(s"$clz stable: $stable")
     Literal(Constant(tp)) setType ConstantType(Constant(tp))
+  }
 
   /** Builds a list with given head and tail. */
   def mkNil: Tree = mkAttributedRef(NilModule)

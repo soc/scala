@@ -23,7 +23,7 @@ abstract class ConstantFolder {
   def apply(tree: Tree): Tree = fold(tree, tree match {
     case Apply(Select(Literal(x), op), List(Literal(y))) => foldBinop(op, x, y)
     case Select(Literal(x), op) => foldUnop(op, x)
-    case _ => null
+    case _ => warning("In ConstantFolder#apply: " + showRaw(tree)); null
   })
 
   /** If tree is a constant value that can be converted to type `pt`, perform

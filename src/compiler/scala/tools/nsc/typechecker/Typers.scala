@@ -3512,11 +3512,12 @@ trait Typers extends Adaptations with Tags with TypersTracking with PatternTyper
           case Typed(literal @ Literal(c), _) if !literal.isErroneous => c
           case tree => tree.tpe match {
             case ConstantType(c)  => c
-            case tpe              => context.warning(tree.pos, showRaw(tree)); null
+            case tpe              => warning("Typers#tryConst: " + showRaw(tree)); null
           }
         }
 
         if (const == null) {
+          Thread.dumpStack()
           reportAnnotationError(AnnotationNotAConstantError(ttree)); None
         } else if (const.value == null) {
           reportAnnotationError(AnnotationArgNullError(tr)); None
@@ -3565,6 +3566,7 @@ trait Typers extends Adaptations with Tags with TypersTracking with PatternTyper
           tree2ConstArg(t, pt)
 
         case tree =>
+          warning("Typers#tree2ConstArg: " + tree)
           tryConst(tree, pt)
       }
       def trees2ConstArg(trees: List[Tree], pt: Type): Option[ArrayAnnotArg] = {
@@ -5326,8 +5328,7 @@ trait Typers extends Adaptations with Tags with TypersTracking with PatternTyper
     def atOwner(tree: Tree, owner: Symbol): Typer =
       newTyper(context.make(tree, owner))
 
-    /** Types expression or definition `tree`.
-     */
+    /** Types expression or definition `tree`. */
     def typed(tree: Tree): Tree =
       typed(tree, context.defaultModeForTyped, WildcardType)
 
