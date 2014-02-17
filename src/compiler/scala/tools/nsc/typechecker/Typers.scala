@@ -4286,8 +4286,14 @@ trait Typers extends Adaptations with Tags with TypersTracking with PatternTyper
                   || phase.erasedTypes
                   )) {
           DoesNotConformToSelfTypeError(tree, sym, tp.typeOfThis)
-        } else
+        } else if (sym.annotationsString contains "irtual") {
+          warning(s"$sym has virtual stuff!")
+          warning(s"$tree") // new Foo
+          warning(s"$tpt1") // Foo
+          treeCopy.Apply(tree, tpt1, Nil).setType(tp)
+        } else {
           treeCopy.New(tree, tpt1).setType(tp)
+        }
       }
 
       def functionTypeWildcard(tree: Tree, arity: Int): Type = {
