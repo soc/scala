@@ -132,8 +132,6 @@ trait Tasks {
 
 }
 
-
-
 /** This trait implements scheduling by employing
  *  an adaptive work stealing technique.
  */
@@ -207,142 +205,6 @@ trait AdaptiveWorkStealingTasks extends Tasks {
   // specialize ctor
   protected def newWrappedTask[R, Tp](b: Task[R, Tp]): WrappedTask[R, Tp]
 
-}
-
-
-/** An implementation of tasks objects based on the Java thread pooling API. */
-@deprecated("Use `ForkJoinTasks` instead.", "2.11.0")
-trait ThreadPoolTasks extends Tasks {
-  import java.util.concurrent._
-
-  trait WrappedTask[R, +Tp] extends Runnable with super.WrappedTask[R, Tp] {
-    // initially, this is null
-    // once the task is started, this future is set and used for `sync`
-    // utb: var future: Future[_] = null
-    @volatile var owned = false
-    @volatile var completed = false
-
-    def start() = synchronized {
-      // debuglog("Starting " + body)
-      // utb: future = executor.submit(this)
-      executor.synchronized {
-        incrTasks()
-        executor.submit(this)
-      }
-    }
-    def sync() = synchronized {
-      // debuglog("Syncing on " + body)
-      // utb: future.get()
-      executor.synchronized {
-        val coresize = executor.getCorePoolSize
-        if (coresize < totaltasks) {
-          executor.setCorePoolSize(coresize + 1)
-          //assert(executor.getCorePoolSize == (coresize + 1))
-        }
-      }
-      while (!completed) this.wait
-    }
-    def tryCancel() = synchronized {
-      // utb: future.cancel(false)
-      if (!owned) {
-        // debuglog("Cancelling " + body)
-        owned = true
-        true
-      } else false
-    }
-    def run() = {
-      // utb: compute
-      var isOkToRun = false
-      synchronized {
-        if (!owned) {
-          owned = true
-          isOkToRun = true
-        }
-      }
-      if (isOkToRun) {
-        // debuglog("Running body of " + body)
-        compute()
-      } else {
-        // just skip
-        // debuglog("skipping body of " + body)
-      }
-    }
-    override def release() = synchronized {
-      //println("releasing: " + this + ", body: " + this.body)
-      completed = true
-      executor.synchronized {
-        decrTasks()
-      }
-      this.notifyAll
-    }
-  }
-
-  protected def newWrappedTask[R, Tp](b: Task[R, Tp]): WrappedTask[R, Tp]
-
-  val environment: ThreadPoolExecutor
-  def executor = environment.asInstanceOf[ThreadPoolExecutor]
-  def queue = executor.getQueue.asInstanceOf[LinkedBlockingQueue[Runnable]]
-  @volatile var totaltasks = 0
-
-  private def incrTasks() = synchronized {
-    totaltasks += 1
-  }
-
-  private def decrTasks() = synchronized {
-    totaltasks -= 1
-  }
-
-  def execute[R, Tp](task: Task[R, Tp]): () => R = {
-    val t = newWrappedTask(task)
-
-    // debuglog("-----------> Executing without wait: " + task)
-    t.start()
-
-    () => {
-      t.sync()
-      t.body.forwardThrowable()
-      t.body.result
-    }
-  }
-
-  def executeAndWaitResult[R, Tp](task: Task[R, Tp]): R = {
-    val t = newWrappedTask(task)
-
-    // debuglog("-----------> Executing with wait: " + task)
-    t.start()
-
-    t.sync()
-    t.body.forwardThrowable()
-    t.body.result
-  }
-
-  def parallelismLevel = ThreadPoolTasks.numCores
-
-}
-
-@deprecated("Use `ForkJoinTasks` instead.", "2.11.0")
-object ThreadPoolTasks {
-  import java.util.concurrent._
-
-  val numCores = Runtime.getRuntime.availableProcessors
-
-  val tcount = new atomic.AtomicLong(0L)
-
-  val defaultThreadPool = new ThreadPoolExecutor(
-    numCores,
-    Int.MaxValue,
-    60L, TimeUnit.MILLISECONDS,
-    new LinkedBlockingQueue[Runnable],
-    new ThreadFactory {
-      def newThread(r: Runnable) = {
-        val t = new Thread(r)
-        t.setName("pc-thread-" + tcount.incrementAndGet)
-        t.setDaemon(true)
-        t
-      }
-    },
-    new ThreadPoolExecutor.CallerRunsPolicy
-  )
 }
 
 object FutureThreadPoolTasks {
@@ -448,17 +310,6 @@ trait AdaptiveWorkStealingForkJoinTasks extends ForkJoinTasks with AdaptiveWorkS
   def newWrappedTask[R, Tp](b: Task[R, Tp]) = new WrappedTask[R, Tp](b)
 }
 
-@deprecated("Use `AdaptiveWorkStealingForkJoinTasks` instead.", "2.11.0")
-trait AdaptiveWorkStealingThreadPoolTasks extends ThreadPoolTasks with AdaptiveWorkStealingTasks {
-
-  class WrappedTask[R, Tp](val body: Task[R, Tp])
-  extends super[ThreadPoolTasks].WrappedTask[R, Tp] with super[AdaptiveWorkStealingTasks].WrappedTask[R, Tp] {
-    def split = body.split.map(b => newWrappedTask(b))
-  }
-
-  def newWrappedTask[R, Tp](b: Task[R, Tp]) = new WrappedTask[R, Tp](b)
-}
-
 /** An implementation of the `Tasks` that uses Scala `Future`s to compute
  *  the work encapsulated in each task.
  */
@@ -526,7 +377,7 @@ private[parallel] final class FutureTasks(executor: ExecutionContext) extends Ta
 }
 
 /** This tasks implementation uses execution contexts to spawn a parallel computation.
- *  
+ *
  *  As an optimization, it internally checks whether the execution context is the
  *  standard implementation based on fork/join pools, and if it is, creates a
  *  `ForkJoinTaskSupport` that shares the same pool to forward its request to it.
@@ -540,7 +391,7 @@ trait ExecutionContextTasks extends Tasks {
   val environment: ExecutionContext
 
   /** A driver serves as a target for this proxy `Tasks` object.
-   *  
+   *
    *  If the execution context has the standard implementation and uses fork/join pools,
    *  the driver is `ForkJoinTaskSupport` with the same pool, as an optimization.
    *  Otherwise, the driver will be a Scala `Future`-based implementation.

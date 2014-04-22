@@ -98,7 +98,7 @@ package parallel {
       }
     }
   }
-  
+
   trait FactoryOps[From, Elem, To] {
     trait Otherwise[R] {
       def otherwise(notbody: => R): R
@@ -122,12 +122,6 @@ package parallel {
     def ifParSeq[R](isbody: ParSeq[T] => R): Otherwise[R]
   }
 
-  @deprecated("This trait will be removed.", "2.11.0")
-  trait ThrowableOps {
-    @deprecated("This method will be removed.", "2.11.0")
-    def alongWith(that: Throwable): Throwable
-  }
-
   /* classes */
 
   trait CombinerFactory[U, Repr] {
@@ -141,14 +135,6 @@ package parallel {
      */
     def doesShareCombiners: Boolean
   }
-
-  /** Composite throwable - thrown when multiple exceptions are thrown at the same time. */
-  @deprecated("This class will be removed.", "2.11.0")
-  final case class CompositeThrowable(throwables: Set[Throwable]) extends Exception(
-    "Multiple exceptions thrown during a parallel computation: " +
-      throwables.map(t => t + "\n" + t.getStackTrace.take(10).++("...").mkString("\n")).mkString("\n\n")
-  )
-
 
   /** A helper iterator for iterating very small array buffers.
    *  Automatically forwards the signal delegate when splitting.
