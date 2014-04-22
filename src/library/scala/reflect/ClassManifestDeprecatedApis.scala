@@ -12,130 +12,6 @@ package reflect
 import scala.collection.mutable.{ WrappedArray, ArrayBuilder }
 import java.lang.{ Class => jClass }
 
-@deprecated("Use scala.reflect.ClassTag instead", "2.10.0")
-trait ClassManifestDeprecatedApis[T] extends OptManifest[T] {
-  self: ClassManifest[T] =>
-
-  // Still in use in target test.junit.comp.
-  @deprecated("Use runtimeClass instead", "2.10.0")
-  def erasure: jClass[_] = runtimeClass
-
-  private def subtype(sub: jClass[_], sup: jClass[_]): Boolean = {
-    def loop(left: Set[jClass[_]], seen: Set[jClass[_]]): Boolean = {
-      left.nonEmpty && {
-        val next = left.head
-        val supers = next.getInterfaces.toSet ++ Option(next.getSuperclass)
-        supers(sup) || {
-          val xs = left ++ supers filterNot seen
-          loop(xs - next, seen + next)
-        }
-      }
-    }
-    loop(Set(sub), Set())
-  }
-
-  private def subargs(args1: List[OptManifest[_]], args2: List[OptManifest[_]]) = (args1 corresponds args2) {
-    // !!! [Martin] this is wrong, need to take variance into account
-    case (x: ClassManifest[_], y: ClassManifest[_]) => x <:< y
-    case (x, y)                                     => (x eq NoManifest) && (y eq NoManifest)
-  }
-
-  /** Tests whether the type represented by this manifest is a subtype
-    * of the type represented by `that` manifest, subject to the limitations
-    * described in the header.
-    */
-  @deprecated("Use scala.reflect.runtime.universe.TypeTag for subtype checking instead", "2.10.0")
-  def <:<(that: ClassManifest[_]): Boolean = {
-    // All types which could conform to these types will override <:<.
-    def cannotMatch = {
-      import Manifest._
-      that.isInstanceOf[AnyValManifest[_]] || (that eq AnyVal) || (that eq Nothing) || (that eq Null)
-    }
-
-    // This is wrong, and I don't know how it can be made right
-    // without more development of Manifests, due to arity-defying
-    // relationships like:
-    //
-    //   List[String] <: AnyRef
-    //   Map[Int, Int] <: Iterable[(Int, Int)]
-    //
-    // Given the manifest for Map[A, B] how do I determine that a
-    // supertype has single type argument (A, B) ? I don't see how we
-    // can say whether X <:< Y when type arguments are involved except
-    // when the erasure is the same, even before considering variance.
-    !cannotMatch && {
-      // this part is wrong for not considering variance
-      if (this.runtimeClass == that.runtimeClass)
-        subargs(this.typeArguments, that.typeArguments)
-      // this part is wrong for punting unless the rhs has no type
-      // arguments, but it's better than a blindfolded pinata swing.
-      else
-        that.typeArguments.isEmpty && subtype(this.runtimeClass, that.runtimeClass)
-    }
-  }
-
-  /** Tests whether the type represented by this manifest is a supertype
-    * of the type represented by `that` manifest, subject to the limitations
-    * described in the header.
-    */
-  @deprecated("Use scala.reflect.runtime.universe.TypeTag for subtype checking instead", "2.10.0")
-  def >:>(that: ClassManifest[_]): Boolean =
-    that <:< this
-
-  override def canEqual(other: Any) = other match {
-    case _: ClassManifest[_] => true
-    case _                   => false
-  }
-
-  protected def arrayClass[T](tp: jClass[_]): jClass[Array[T]] =
-    java.lang.reflect.Array.newInstance(tp, 0).getClass.asInstanceOf[jClass[Array[T]]]
-
-  @deprecated("Use wrap instead", "2.10.0")
-  def arrayManifest: ClassManifest[Array[T]] =
-    ClassManifest.classType[Array[T]](arrayClass[T](runtimeClass), this)
-
-  override def newArray(len: Int): Array[T] =
-    java.lang.reflect.Array.newInstance(runtimeClass, len).asInstanceOf[Array[T]]
-
-  @deprecated("Use wrap.newArray instead", "2.10.0")
-  def newArray2(len: Int): Array[Array[T]] =
-    java.lang.reflect.Array.newInstance(arrayClass[T](runtimeClass), len)
-      .asInstanceOf[Array[Array[T]]]
-
-  @deprecated("Use wrap.wrap.newArray instead", "2.10.0")
-  def newArray3(len: Int): Array[Array[Array[T]]] =
-    java.lang.reflect.Array.newInstance(arrayClass[Array[T]](arrayClass[T](runtimeClass)), len)
-      .asInstanceOf[Array[Array[Array[T]]]]
-
-  @deprecated("Use wrap.wrap.wrap.newArray instead", "2.10.0")
-  def newArray4(len: Int): Array[Array[Array[Array[T]]]] =
-    java.lang.reflect.Array.newInstance(arrayClass[Array[Array[T]]](arrayClass[Array[T]](arrayClass[T](runtimeClass))), len)
-      .asInstanceOf[Array[Array[Array[Array[T]]]]]
-
-  @deprecated("Use wrap.wrap.wrap.wrap.newArray instead", "2.10.0")
-  def newArray5(len: Int): Array[Array[Array[Array[Array[T]]]]] =
-    java.lang.reflect.Array.newInstance(arrayClass[Array[Array[Array[T]]]](arrayClass[Array[Array[T]]](arrayClass[Array[T]](arrayClass[T](runtimeClass)))), len)
-      .asInstanceOf[Array[Array[Array[Array[Array[T]]]]]]
-
-  @deprecated("Create WrappedArray directly instead", "2.10.0")
-  def newWrappedArray(len: Int): WrappedArray[T] =
-    // it's safe to assume T <: AnyRef here because the method is overridden for all value type manifests
-    new WrappedArray.ofRef[T with AnyRef](newArray(len).asInstanceOf[Array[T with AnyRef]]).asInstanceOf[WrappedArray[T]]
-
-  @deprecated("Use ArrayBuilder.make(this) instead", "2.10.0")
-  def newArrayBuilder(): ArrayBuilder[T] =
-    // it's safe to assume T <: AnyRef here because the method is overridden for all value type manifests
-    new ArrayBuilder.ofRef[T with AnyRef]()(this.asInstanceOf[ClassManifest[T with AnyRef]]).asInstanceOf[ArrayBuilder[T]]
-
-  @deprecated("Use scala.reflect.runtime.universe.TypeTag to capture type structure instead", "2.10.0")
-  def typeArguments: List[OptManifest[_]] = List()
-
-  protected def argString =
-    if (typeArguments.nonEmpty) typeArguments.mkString("[", ", ", "]")
-    else if (runtimeClass.isArray) "["+ClassManifest.fromClass(runtimeClass.getComponentType)+"]"
-    else ""
-}
-
 /** `ClassManifestFactory` defines factory methods for manifests.
  *  It is intended for use by the compiler and should not be used in client code.
  *
@@ -181,7 +57,7 @@ object ClassManifestFactory {
 
   /** ClassManifest for the class type `clazz`, where `clazz` is
     * a top-level or static class.
-    * @note This no-prefix, no-arguments case is separate because we
+    * @note This no-prefix, no-arguments case is separate because
     *       it's called from ScalaRunTime.boxArray itself. If we
     *       pass varargs as arrays into this, we get an infinitely recursive call
     *       to boxArray. (Besides, having a separate case is more efficient)
@@ -226,17 +102,4 @@ object ClassManifestFactory {
       override val typeArguments = args.toList
       override def toString = prefix.toString+"#"+name+argString
     }
-}
-
-/** Manifest for the class type `clazz[args]`, where `clazz` is
-  * a top-level or static class */
-private class ClassTypeManifest[T](
-  prefix: Option[OptManifest[_]],
-  val runtimeClass: jClass[_],
-  override val typeArguments: List[OptManifest[_]]) extends ClassManifest[T]
-{
-  override def toString =
-    (if (prefix.isEmpty) "" else prefix.get.toString+"#") +
-    (if (runtimeClass.isArray) "Array" else runtimeClass.getName) +
-    argString
 }

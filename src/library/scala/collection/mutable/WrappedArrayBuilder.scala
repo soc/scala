@@ -24,9 +24,6 @@ import scala.runtime.ScalaRunTime._
  */
 class WrappedArrayBuilder[A](tag: ClassTag[A]) extends Builder[A, WrappedArray[A]] {
 
-  @deprecated("use tag instead", "2.10.0")
-  val manifest: ClassTag[A] = tag
-
   private var elems: WrappedArray[A] = _
   private var capacity: Int = 0
   private var size: Int = 0

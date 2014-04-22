@@ -40,8 +40,7 @@ import scala.collection.mutable.{ ArrayBuilder, WrappedArray }
  *
  */
 @scala.annotation.implicitNotFound(msg = "No Manifest available for ${T}.")
-// TODO undeprecated until Scala reflection becomes non-experimental
-// @deprecated("Use scala.reflect.ClassTag (to capture erasures) or scala.reflect.runtime.universe.TypeTag (to capture types) or both instead", "2.10.0")
+@deprecated("Use scala.reflect.ClassTag (to capture erasures) or scala.reflect.runtime.universe.TypeTag (to capture types) or both instead", "2.11.0")
 trait Manifest[T] extends ClassManifest[T] with Equals {
   override def typeArguments: List[Manifest[_]] = Nil
 
