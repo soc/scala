@@ -67,7 +67,7 @@ import scala.io.StdIn
  *  Short value to a Long value as required, and to add additional higher-order
  *  functions to Array values. These are described in more detail in the documentation of [[scala.Array]].
  */
-object Predef extends LowPriorityImplicits with DeprecatedPredef {
+object Predef extends LowPriorityImplicits {
   /**
    * Retrieve the runtime representation of a class type. `classOf[T]` is equivalent to
    * the class literal `T.class` in Java.
@@ -224,24 +224,6 @@ object Predef extends LowPriorityImplicits with DeprecatedPredef {
    */
   def ??? : Nothing = throw new NotImplementedError
 
-  // tupling ------------------------------------------------------------
-
-  @deprecated("Use built-in tuple syntax or Tuple2 instead", "2.11.0")
-  type Pair[+A, +B] = Tuple2[A, B]
-  @deprecated("Use built-in tuple syntax or Tuple2 instead", "2.11.0")
-  object Pair {
-    def apply[A, B](x: A, y: B) = Tuple2(x, y)
-    def unapply[A, B](x: Tuple2[A, B]): Option[Tuple2[A, B]] = Some(x)
-  }
-
-  @deprecated("Use built-in tuple syntax or Tuple3 instead", "2.11.0")
-  type Triple[+A, +B, +C] = Tuple3[A, B, C]
-  @deprecated("Use built-in tuple syntax or Tuple3 instead", "2.11.0")
-  object Triple {
-    def apply[A, B, C](x: A, y: B, z: C) = Tuple3(x, y, z)
-    def unapply[A, B, C](x: Tuple3[A, B, C]): Option[Tuple3[A, B, C]] = Some(x)
-  }
-
   // implicit classes -----------------------------------------------------
 
   implicit final class ArrowAssoc[A](private val self: A) extends AnyVal {
@@ -274,11 +256,6 @@ object Predef extends LowPriorityImplicits with DeprecatedPredef {
   // SI-8229 retaining the pre 2.11 name for source compatibility in shadowing this implicit
   implicit final class any2stringadd[A](private val self: A) extends AnyVal {
     def +(other: String): String = String.valueOf(self) + other
-  }
-
-  implicit final class RichException(private val self: Throwable) extends AnyVal {
-    import scala.compat.Platform.EOL
-    @deprecated("Use Throwable#getStackTrace", "2.11.0") def getStackTraceString = self.getStackTrace().mkString("", EOL, EOL)
   }
 
   implicit final class SeqCharSequence(val __sequenceOfChars: scala.collection.IndexedSeq[Char]) extends CharSequence {
@@ -387,9 +364,6 @@ object Predef extends LowPriorityImplicits with DeprecatedPredef {
   // The collections rely on this method.
   implicit def $conforms[A]: A <:< A = singleton_<:<.asInstanceOf[A <:< A]
 
-  @deprecated("Use `implicitly[T <:< U]` or `identity` instead.", "2.11.0")
-  def conforms[A]: A <:< A = $conforms[A]
-
   /** An instance of `A =:= B` witnesses that the types `A` and `B` are equal.
    *
    * @see `<:<` for expressing subtyping constraints
@@ -413,33 +387,6 @@ object Predef extends LowPriorityImplicits with DeprecatedPredef {
      */
     implicit def dummyImplicit: DummyImplicit = new DummyImplicit
   }
-}
-
-private[scala] trait DeprecatedPredef {
-  self: Predef.type =>
-
-  // Deprecated stubs for any who may have been calling these methods directly.
-  @deprecated("Use `ArrowAssoc`", "2.11.0") def any2ArrowAssoc[A](x: A): ArrowAssoc[A]                                      = new ArrowAssoc(x)
-  @deprecated("Use `Ensuring`", "2.11.0") def any2Ensuring[A](x: A): Ensuring[A]                                            = new Ensuring(x)
-  @deprecated("Use `StringFormat`", "2.11.0") def any2stringfmt(x: Any): StringFormat[Any]                                  = new StringFormat(x)
-  @deprecated("Use `Throwable` directly", "2.11.0") def exceptionWrapper(exc: Throwable)                                    = new RichException(exc)
-  @deprecated("Use `SeqCharSequence`", "2.11.0") def seqToCharSequence(xs: scala.collection.IndexedSeq[Char]): CharSequence = new SeqCharSequence(xs)
-  @deprecated("Use `ArrayCharSequence`", "2.11.0") def arrayToCharSequence(xs: Array[Char]): CharSequence                   = new ArrayCharSequence(xs)
-
-  @deprecated("Use the method in `scala.io.StdIn`", "2.11.0") def readLine(): String                 = StdIn.readLine()
-  @deprecated("Use the method in `scala.io.StdIn`", "2.11.0") def readLine(text: String, args: Any*) = StdIn.readLine(text, args: _*)
-  @deprecated("Use the method in `scala.io.StdIn`", "2.11.0") def readBoolean()                      = StdIn.readBoolean()
-  @deprecated("Use the method in `scala.io.StdIn`", "2.11.0") def readByte()                         = StdIn.readByte()
-  @deprecated("Use the method in `scala.io.StdIn`", "2.11.0") def readShort()                        = StdIn.readShort()
-  @deprecated("Use the method in `scala.io.StdIn`", "2.11.0") def readChar()                         = StdIn.readChar()
-  @deprecated("Use the method in `scala.io.StdIn`", "2.11.0") def readInt()                          = StdIn.readInt()
-  @deprecated("Use the method in `scala.io.StdIn`", "2.11.0") def readLong()                         = StdIn.readLong()
-  @deprecated("Use the method in `scala.io.StdIn`", "2.11.0") def readFloat()                        = StdIn.readFloat()
-  @deprecated("Use the method in `scala.io.StdIn`", "2.11.0") def readDouble()                       = StdIn.readDouble()
-  @deprecated("Use the method in `scala.io.StdIn`", "2.11.0") def readf(format: String)              = StdIn.readf(format)
-  @deprecated("Use the method in `scala.io.StdIn`", "2.11.0") def readf1(format: String)             = StdIn.readf1(format)
-  @deprecated("Use the method in `scala.io.StdIn`", "2.11.0") def readf2(format: String)             = StdIn.readf2(format)
-  @deprecated("Use the method in `scala.io.StdIn`", "2.11.0") def readf3(format: String)             = StdIn.readf3(format)
 }
 
 /** The `LowPriorityImplicits` class provides implicit values that

@@ -40,13 +40,11 @@ trait App extends DelayedInit {
 
   /** The time when the execution of this program started, in milliseconds since 1
     * January 1970 UTC. */
-  @deprecatedOverriding("executionStart should not be overridden", "2.11.0")
-  val executionStart: Long = currentTime
+  final val executionStart: Long = currentTime
 
   /** The command line arguments passed to the application's `main` method.
    */
-  @deprecatedOverriding("args should not be overridden", "2.11.0")
-  protected def args: Array[String] = _args
+  protected final def args: Array[String] = _args
 
   private var _args: Array[String] = _
 
@@ -70,8 +68,7 @@ trait App extends DelayedInit {
    *  they were passed to `delayedInit`.
    *  @param args the arguments passed to the main method
    */
-  @deprecatedOverriding("main should not be overridden", "2.11.0")
-  def main(args: Array[String]) = {
+  final def main(args: Array[String]) = {
     this._args = args
     for (proc <- initCode) proc()
     if (util.Properties.propIsSet("scala.time")) {
