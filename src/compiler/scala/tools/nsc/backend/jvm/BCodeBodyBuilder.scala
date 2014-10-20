@@ -1001,7 +1001,7 @@ abstract class BCodeBodyBuilder extends BCodeSkelBuilder {
 
       def needsInterfaceCall(sym: Symbol) = (
            sym.isInterface
-        || sym.isJavaDefined && sym.isNonBottomSubClass(definitions.ClassfileAnnotationClass)
+        || sym.isNonBottomSubClass(definitions.ClassfileAnnotationClass)
       )
 
       // whether to reference the type of the receiver or

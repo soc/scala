@@ -141,8 +141,8 @@ final class BCodeAsmCommon[G <: Global](val global: G) {
     * .initialize: if 'annot' is read from pickle, atp might be un-initialized
     */
   def shouldEmitAnnotation(annot: AnnotationInfo) = {
-    annot.symbol.initialize.isJavaDefined &&
-      annot.matches(ClassfileAnnotationClass) &&
+    annot.symbol.initialize;
+    annot.matches(ClassfileAnnotationClass) &&
       retentionPolicyOf(annot) != AnnotationRetentionPolicySourceValue &&
       annot.args.isEmpty
   }

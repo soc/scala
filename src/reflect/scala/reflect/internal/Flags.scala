@@ -64,7 +64,7 @@ import scala.collection.{ mutable, immutable }
 // 46:        ARTIFACT
 // 47: DEFAULTMETHOD/M
 // 48:            ENUM
-// 49:
+// 49:      ANNOTATION
 // 50:
 // 51:    lateDEFERRED
 // 52:       lateFINAL
@@ -120,7 +120,9 @@ class ModifierFlags {
   final val ARTIFACT      = 1L << 46      // symbol should be ignored when typechecking; will be marked ACC_SYNTHETIC in bytecode
                                           // to see which symbols are marked as ARTIFACT, see scaladocs for FlagValues.ARTIFACT
   final val DEFAULTMETHOD = 1L << 47      // symbol is a java default method
-  final val ENUM          = 1L << 48      // symbol is an enum
+  final val ENUM          = 1L << 48      // symbol is a platform enum
+  final val ANNOTATION    = 1L << 49      // symbol is a platform annotation
+
 
   // Overridden.
   def flagToString(flag: Long): String = ""
@@ -176,7 +178,7 @@ class Flags extends ModifierFlags {
   final val InitialFlags  = 0x0001FFFFFFFFFFFFL // flags that are enabled from phase 1.
   final val LateFlags     = 0x00FE000000000000L // flags that override flags in 0x1FC.
   final val AntiFlags     = 0x7F00000000000000L // flags that cancel flags in 0x07F
-  final val LateShift     = 47L
+  final val LateShift     = 47L // ???
   final val AntiShift     = 56L
 
   // Flags which sketchily share the same slot
@@ -242,7 +244,7 @@ class Flags extends ModifierFlags {
    *  when printing a normal message.)
    */
   final val ExplicitFlags =
-    PRIVATE | PROTECTED | ABSTRACT | FINAL | SEALED |
+    PRIVATE | PROTECTED | ABSTRACT | FINAL | SEALED | ENUM |
     OVERRIDE | CASE | IMPLICIT | ABSOVERRIDE | LAZY | DEFAULTMETHOD
 
   /** The two bridge flags */
@@ -436,7 +438,7 @@ class Flags extends ModifierFlags {
     case            ARTIFACT => "<artifact>"                          // (1L << 46)
     case       DEFAULTMETHOD => "<defaultmethod>"                     // (1L << 47)
     case                ENUM => "<enum>"                              // (1L << 48)
-    case    0x2000000000000L => ""                                    // (1L << 49)
+    case          ANNOTATION => "<annotation>"                        // (1L << 49)
     case    0x4000000000000L => ""                                    // (1L << 50)
     case      `lateDEFERRED` => "<latedeferred>"                      // (1L << 51)
     case         `lateFINAL` => "<latefinal>"                         // (1L << 52)
