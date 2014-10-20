@@ -1061,10 +1061,8 @@ abstract class BCodeBodyBuilder extends BCodeSkelBuilder {
       val receiverBType = classBTypeFromSymbol(receiverClass)
       val receiverName = receiverBType.internalName
 
-      def needsInterfaceCall(sym: Symbol) = {
-        sym.isTraitOrInterface ||
-          sym.isJavaDefined && sym.isNonBottomSubClass(definitions.ClassfileAnnotationClass)
-      }
+      def needsInterfaceCall(sym: Symbol) =
+        sym.isTraitOrInterface || sym.isNonBottomSubClass(definitions.PlatformAnnotationClass)
 
       val jname  = method.javaSimpleName.toString
       val bmType = methodBTypeFromSymbol(method)

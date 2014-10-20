@@ -3,9 +3,8 @@ package <empty> {
   object MyAnnotation extends  {
     def <init>()
   };
-  class MyAnnotation extends scala.annotation.Annotation with _root_.java.lang.annotation.Annotation with scala.annotation.ClassfileAnnotation {
+  class MyAnnotation extends scala.annotation.Annotation with _root_.java.lang.annotation.Annotation with scala.annotation.PlatformAnnotation {
     def <init>();
     def value(): String
   }
 }
-
