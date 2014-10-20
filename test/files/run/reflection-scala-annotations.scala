@@ -11,6 +11,6 @@ class S
 class J
 
 object Test extends App {
-  println(symbolOf[S].annotations.head.tree)
+  println(symbolOf[S].annotations.head.tree) // <--- annotations is empty!
   println(symbolOf[J].annotations.head.tree)
 }

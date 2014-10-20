@@ -641,31 +641,21 @@ abstract class BCodeHelpers extends BCodeIdiomatic with BytecodeWriters {
   } // end of trait BCInnerClassGen
 
   trait BCAnnotGen extends BCInnerClassGen {
-    private lazy val AnnotationRetentionPolicyModule       = AnnotationRetentionPolicyAttr.companionModule
-    private lazy val AnnotationRetentionPolicySourceValue  = AnnotationRetentionPolicyModule.tpe.member(TermName("SOURCE"))
-    private lazy val AnnotationRetentionPolicyClassValue   = AnnotationRetentionPolicyModule.tpe.member(TermName("CLASS"))
-    private lazy val AnnotationRetentionPolicyRuntimeValue = AnnotationRetentionPolicyModule.tpe.member(TermName("RUNTIME"))
 
-    /** Whether an annotation should be emitted as a Java annotation
+    /** Whether an annotation usage should be emitted as a Java annotation usage
       * .initialize: if 'annot' is read from pickle, atp might be uninitialized
       */
-    private def shouldEmitAnnotation(annot: AnnotationInfo) = {
-      annot.symbol.initialize.isJavaDefined &&
-        annot.matches(ClassfileAnnotationClass) &&
+    private def shouldEmitAnnotation(annot: AnnotationInfo): Boolean = {
+      annot.symbol.initialize
+      annot.matches(PlatformAnnotationClass) &&
         retentionPolicyOf(annot) != AnnotationRetentionPolicySourceValue &&
         annot.args.isEmpty
     }
 
-    private def isRuntimeVisible(annot: AnnotationInfo): Boolean = {
-      annot.atp.typeSymbol.getAnnotation(AnnotationRetentionAttr) match {
-        case Some(retentionAnnot) =>
-          retentionAnnot.assocs.contains(nme.value -> LiteralAnnotArg(Constant(AnnotationRetentionPolicyRuntimeValue)))
-        case _ =>
-          // SI-8926: if the annotation class symbol doesn't have a @RetentionPolicy annotation, the
-          // annotation is emitted with visibility `RUNTIME`
-          true
-      }
-    }
+    private def isRuntimeVisible(annot: AnnotationInfo): Boolean =
+      annot.matches(RuntimeAnnotationClass) ||
+      annot.atp.typeSymbol.getAnnotation(AnnotationRetentionAttr)
+        .exists(_.assocs.contains((nme.value -> LiteralAnnotArg(Constant(AnnotationRetentionPolicyRuntimeValue)))))
 
     private def retentionPolicyOf(annot: AnnotationInfo): Symbol =
       annot.atp.typeSymbol.getAnnotation(AnnotationRetentionAttr).map(_.assocs).flatMap(assoc =>
@@ -781,7 +771,7 @@ abstract class BCodeHelpers extends BCodeIdiomatic with BytecodeWriters {
     /*
      * In general,
      *   must-single-thread
-     * but not  necessarily always.
+     * but not necessarily always.
      */
     def emitAssocs(av: asm.AnnotationVisitor, assocs: List[(Name, ClassfileAnnotArg)]) {
       for ((name, value) <- assocs) {

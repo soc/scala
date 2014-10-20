@@ -10,7 +10,6 @@ package jvm
 
 import scala.collection.{ mutable, immutable }
 import scala.tools.nsc.symtab._
-
 import scala.tools.asm
 import GenBCode._
 import BackendReporting._
@@ -99,21 +98,25 @@ abstract class BCodeSkelBuilder extends BCodeHelpers {
 
       initJClass(cnode)
 
-      val hasStaticCtor = methodSymbols(cd) exists (_.isStaticConstructor)
-      if (!hasStaticCtor) {
-        // but needs one ...
-        if (isCZStaticModule || isCZParcelable) {
+      if (isCZStaticModule || isCZParcelable) {
+        val hasStaticCtor = methodSymbols(cd) exists (_.isStaticConstructor)
+        if (!hasStaticCtor) {
+          // but needs one ...
           fabricateStaticInit()
         }
       }
 
       val optSerial: Option[Long] = serialVUID(claszSymbol)
-      if (optSerial.isDefined) { addSerialVUID(optSerial.get, cnode)}
+      if (optSerial.isDefined) addSerialVUID(optSerial.get, cnode)
 
-      addClassFields()
-
-      gen(cd.impl)
-
+      if (cd.symbol.hasJavaAnnotationFlag) {
+        val attachment = cd.attachments.get[analyzer.AnnotationDefaultsAttachment]
+        cd.impl.collect({case tree: DefDef if !tree.symbol.isConstructor && tree.symbol.name != TermName("annotationType") => tree})
+               .foreach(dd => genDefDef(dd, attachment.flatMap(a => a.defaults.find(d => d._1 == dd.name))))
+      } else {
+        addClassFields()
+        gen(cd.impl)
+      }
 
       val shouldAddLambdaDeserialize = (
         settings.target.value == "jvm-1.8"
@@ -493,26 +496,21 @@ abstract class BCodeSkelBuilder extends BCodeHelpers {
 
     /* ---------------- top-down traversal invoking ASM Tree API along the way ---------------- */
 
-    def gen(tree: Tree) {
+    def gen(tree: Tree): Unit = {
       tree match {
-        case EmptyTree => ()
-
-        case _: ModuleDef => abort(s"Modules should have been eliminated by refchecks: $tree")
-
+        case EmptyTree                    => ()
+        case _: ModuleDef                 => abort(s"Modules should have been eliminated by refchecks: $tree")
         case ValDef(mods, name, tpt, rhs) => () // fields are added in `genPlainClass()`, via `addClassFields()`
-
-        case dd : DefDef => genDefDef(dd)
-
-        case Template(_, _, body) => body foreach gen
-
-        case _ => abort(s"Illegal tree in gen: $tree")
+        case dd: DefDef                   => genDefDef(dd)
+        case Template(_, _, body)         => body foreach gen
+        case _                            => abort(s"Illegal tree in gen: $tree")
       }
     }
 
     /*
      * must-single-thread
      */
-    def initJMethod(flags: Int, paramAnnotations: List[List[AnnotationInfo]]) {
+    def initJMethod(flags: Int, paramAnnotations: List[List[AnnotationInfo]], annotationDefaultValue: Option[(Name, ClassfileAnnotArg)] = None) {
 
       val jgensig = getGenericSignature(methSymbol, claszSymbol)
       addRemoteExceptionAnnot(isCZRemote, hasPublicBitSet(flags), methSymbol)
@@ -535,12 +533,14 @@ abstract class BCodeSkelBuilder extends BCodeHelpers {
       // TODO param names: (m.params map (p => javaName(p.sym)))
 
       emitAnnotations(mnode, others)
+      if (annotationDefaultValue.isDefined)
+        emitAssocs(mnode.visitAnnotationDefault(), annotationDefaultValue.toList)
       emitParamAnnotations(mnode, paramAnnotations)
 
     } // end of method initJMethod
 
 
-    def genDefDef(dd: DefDef) {
+    def genDefDef(dd: DefDef, annotationDefaultValue: Option[(Name, ClassfileAnnotArg)] = None): Unit = {
       // the only method whose implementation is not emitted: getClass()
       if (definitions.isGetClass(dd.symbol)) { return }
       assert(mnode == null, "GenBCode detected nested method.")
@@ -575,7 +575,7 @@ abstract class BCodeSkelBuilder extends BCodeHelpers {
       )
 
       // TODO needed? for(ann <- m.symbol.annotations) { ann.symbol.initialize }
-      initJMethod(flags, params.map(p => p.symbol.annotations))
+      initJMethod(flags, params.map(p => p.symbol.annotations), annotationDefaultValue)
 
       /* Add method-local vars for LabelDef-params.
        *

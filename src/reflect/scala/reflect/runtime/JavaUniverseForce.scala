@@ -362,11 +362,19 @@ trait JavaUniverseForce { self: runtime.JavaUniverse  =>
     definitions.BoxedDoubleClass
     definitions.BoxedUnitClass
     definitions.BoxedUnitModule
+    definitions.JavaAnnotationClass
     definitions.AnnotationClass
+    definitions.ConstantAnnotationClass
+    definitions.PlatformAnnotationClass
     definitions.ClassfileAnnotationClass
+    definitions.RuntimeAnnotationClass
     definitions.StaticAnnotationClass
     definitions.AnnotationRetentionAttr
     definitions.AnnotationRetentionPolicyAttr
+    definitions.AnnotationRetentionPolicyModule
+    definitions.AnnotationRetentionPolicySourceValue
+    definitions.AnnotationRetentionPolicyClassValue
+    definitions.AnnotationRetentionPolicyRuntimeValue
     definitions.BridgeClass
     definitions.ElidableMethodClass
     definitions.ImplicitNotFoundClass
@@ -400,6 +408,7 @@ trait JavaUniverseForce { self: runtime.JavaUniverse  =>
     definitions.VolatileAttr
     definitions.BeanGetterTargetClass
     definitions.BeanSetterTargetClass
+    definitions.ConstructorTargetClass
     definitions.FieldTargetClass
     definitions.GetterTargetClass
     definitions.ParamTargetClass

@@ -8,5 +8,6 @@ class Bean {
 
 object Test extends App {
   println(cm.staticClass("Bean").isCaseClass)
-  println(typeOf[Bean].decl(TermName("value")).annotations)
+  println(typeOf[Bean].decl(TermName("value")).annotations)  // <--- annotations is empty!
+  println(classOf[Bean].getMethod("value").getAnnotations.toList)
 }
