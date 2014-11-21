@@ -241,6 +241,22 @@ trait JavaParsers extends ast.parser.ParsersCommon with JavaScanners {
       t
     }
 
+    def qualIdOrClassLiteral(): Tree = {
+      var t: RefTree = atPos(in.currentPos) { Ident(ident()) }
+      while (in.token == DOT) {
+        in.nextToken()
+        val curPos = in.currentPos
+        if (in.token == CLASS) {
+          in.nextToken()
+          return TypeApply(Select(scalaDot(nme.Predef), nme.classOf), List(t)) // List(convertToTypeId(t))?
+        } else {
+          val id = ident()
+          t = atPos(curPos) { Select(t, id) }
+        }
+      }
+      t
+    }
+
     def optArrayBrackets(tpt: Tree): Tree =
       if (in.token == LBRACKET) {
         val tpt1 = atPos(in.pos) { arrayOf(tpt) }
@@ -365,20 +381,41 @@ trait JavaParsers extends ast.parser.ParsersCommon with JavaScanners {
     def elementValuePair(): Tree = {
       val elementName = Ident(ident())
       accept(EQUALS)
-      val elementValue = qualId()
+      val elementValue = qualIdOrClassLiteral()
       AssignOrNamedArg(elementName, elementValue)
     }
 
-    def elementValue(): Tree = {
-      if (in.token == AT) annotation()
-      else if (in.token == LBRACE) elementValueArray()
-      else if (in.token == IDENTIFIER) qualId()
-      else EmptyTree // ignore
+    def elementValue(): Tree = in.token match {
+      case AT =>                       annotation()
+      case LBRACE =>                   elementValueArray()
+      case IDENTIFIER =>               qualIdOrClassLiteral()
+      case _ if isLiteral(in.token) => literal()
+    }
+
+    def literal(): Literal = {
+      val constant: Any =
+        in.token match {
+          case STRINGLIT =>
+            val str = in.cbuf.toString()
+            in.cbuf.clear()
+            str
+          case INTLIT =>
+            in.intVal.toInt
+          case LONGLIT =>
+            in.intVal
+          case DOUBLELIT =>
+            in.floatVal
+          case FLOATLIT =>
+            in.floatVal.toFloat
+          case CHARLIT =>
+            in.intVal.toChar
+      }
+      Literal(Constant(constant))
     }
 
     def elementValueArray(): Tree = {
       accept(LBRACE)
-      val array = Apply(ArrayModule_overloadedApply, repsep(qualId, COMMA): _*)
+      val array = Apply(Ident(ArrayModule), repsep(qualId, COMMA))
       accept(RBRACE)
       array
     }
