@@ -321,35 +321,80 @@ trait JavaParsers extends ast.parser.ParsersCommon with JavaScanners {
       } else t
     }
 
+    /** Annotations ::= Annotation* */
     def annotations(): List[Tree] = {
-      //var annots = new ListBuffer[Tree]
+      val annots = new ListBuffer[Tree]
       while (in.token == AT) {
         in.nextToken()
-        annotation()
+        annots += annotation()
       }
-      List() // don't pass on annotations for now
+      annots.toList
     }
 
-    /** Annotation ::= TypeName [`(` AnnotationArgument {`,` AnnotationArgument} `)`]
+    /** Annotation              ::= `@` (NormalAnnotation | MarkerAnnotation | SingleElementAnnotation)
+     *  NormalAnnotation        ::= Ident `(` ElementValuePair* `)`
+     *  MarkerAnnotation        ::= Ident
+     *  SingleElementAnnotation ::= Ident `(` ElementValue `)`
+     *
+     *  ElementValuePair        ::= Ident `=` ElementValue
+     *  ElementValue            ::= ConditionalExpression | Annotation | ElementValueArray
+     *  ConditionalExpression   ::=
+     *  ElementValueArray       ::= `{` (ElementValue `,`)* `,`?  }
      */
-    def annotation() {
-      qualId()
-      if (in.token == LPAREN) { skipAhead(); accept(RPAREN) }
-      else if (in.token == LBRACE) { skipAhead(); accept(RBRACE) }
+    def annotation(): Tree = {
+      val t = convertToTypeId(qualId())
+      val args: ListBuffer[List[Tree]] = ListBuffer.empty
+      if (in.token == LPAREN) { // NormalAnnotation
+        in.nextToken()
+        if (in.token == RPAREN) { // NormalAnnotation without any ElementValuePair, e. g. @Foo()
+          // Nothing to do
+        } else if (in.token == LBRACE) { // SingleElementAnnotation where the element is an array, e. g. @Foo({1,2,3})
+          args += List(elementValueArray)
+        } else if (in.token == IDENTIFIER && in.lookaheadToken == EQUALS) { // NormalAnnotation with ElementValuePairs, e. g. @Foo(bar = BAZ, ber = BEZ)
+          args ++= repsep(elementValuePair, COMMA).map(annot => List(annot))
+        } else { // SingleElementAnnotation
+          args += List(elementValue())
+        }
+        accept(RPAREN)
+      } else { // MarkerAnnotation, e. g. @Foo
+        // Nothing to do
+      }
+      New(t, args.toList: List[List[Tree]])
+    }
+
+    def elementValuePair(): Tree = {
+      val elementName = Ident(ident())
+      accept(EQUALS)
+      val elementValue = qualId()
+      AssignOrNamedArg(elementName, elementValue)
+    }
+
+    def elementValue(): Tree = {
+      if (in.token == AT) annotation()
+      else if (in.token == LBRACE) elementValueArray()
+      else if (in.token == IDENTIFIER) qualId()
+      else EmptyTree // ignore
+    }
+
+    def elementValueArray(): Tree = {
+      accept(LBRACE)
+      val array = Apply(ArrayModule_overloadedApply, repsep(qualId, COMMA): _*)
+      accept(RBRACE)
+      array
     }
 
     def modifiers(inInterface: Boolean): Modifiers = {
       var flags: Long = Flags.JAVA
       // assumed true unless we see public/private/protected
       var isPackageAccess = true
-      var annots: List[Tree] = Nil
-      def addAnnot(sym: Symbol) = annots :+= New(sym.tpe)
+      val annots: ListBuffer[Tree] = ListBuffer.empty
+      def addAnnot(sym: Symbol) = annots += New(sym.tpe)
 
       while (true) {
         in.token match {
           case AT if (in.lookaheadToken != INTERFACE) =>
             in.nextToken()
-            annotation()
+            annots += annotation()
           case PUBLIC =>
             isPackageAccess = false
             in.nextToken()
@@ -388,7 +433,7 @@ trait JavaParsers extends ast.parser.ParsersCommon with JavaScanners {
               if (isPackageAccess && !inInterface) thisPackageName
               else tpnme.EMPTY
 
-            return Modifiers(flags, privateWithin) withAnnotations annots
+            return Modifiers(flags, privateWithin) withAnnotations annots.toList
         }
       }
       abort("should not be here")
@@ -430,7 +475,7 @@ trait JavaParsers extends ast.parser.ParsersCommon with JavaScanners {
 
     def formalParam(): ValDef = {
       if (in.token == FINAL) in.nextToken()
-      annotations()
+      annotations() //TODO
       var t = typ()
       if (in.token == DOTDOTDOT) {
         in.nextToken()
@@ -800,7 +845,7 @@ trait JavaParsers extends ast.parser.ParsersCommon with JavaScanners {
     }
 
     def enumConst(enumType: Tree) = {
-      annotations()
+      annotations() //TODO
       atPos(in.currentPos) {
         val name = ident()
         if (in.token == LPAREN) {
@@ -831,7 +876,7 @@ trait JavaParsers extends ast.parser.ParsersCommon with JavaScanners {
       var pos = in.currentPos
       val pkg: RefTree =
         if (in.token == AT || in.token == PACKAGE) {
-          annotations()
+          annotations() //TODO
           pos = in.currentPos
           accept(PACKAGE)
           val pkg = qualId()
