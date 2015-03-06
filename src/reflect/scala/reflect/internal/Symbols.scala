@@ -1189,6 +1189,7 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
     }
 
     def ownerChain: List[Symbol] = this :: owner.ownerChain
+    def rawOwnerChain: List[Symbol]      = this :: rawowner.rawOwnerChain
 
     // Non-classes skip self and return rest of owner chain; overridden in ClassSymbol.
     def enclClassChain: List[Symbol] = owner.enclClassChain
@@ -2880,7 +2881,7 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
       if (Statistics.hotEnabled) Statistics.incCounter(nameCount)
       if (!isMethod && needsFlatClasses) {
         if (flatname eq null)
-          flatname = nme.flattenedName(rawowner.name, rawname)
+          flatname = nme.flattenedName(rawowner.javaSimpleName,rawname)
 
         flatname
       }
@@ -3292,7 +3293,7 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
       if (Statistics.canEnable) Statistics.incCounter(nameCount)
       if (needsFlatClasses) {
         if (flatname eq null)
-          flatname = tpnme.flattenedName(rawowner.name, rawname)
+          flatname = tpnme.flattenedName(rawowner.javaSimpleName, rawname)
 
         flatname
       }
@@ -3523,6 +3524,7 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
       this
     }
     override def ownerChain: List[Symbol] = Nil
+    override def rawOwnerChain = Nil
     override def ownersIterator: Iterator[Symbol] = Iterator.empty
     override def alternatives: List[Symbol] = List()
     override def reset(completer: Type): this.type = this

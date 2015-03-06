@@ -193,25 +193,20 @@ abstract class SuperAccessors extends transform.Transform with transform.TypingT
 
         case ClassDef(_, _, _, _) =>
           def transformClassDef = {
-          checkCompanionNameClashes(sym)
-          val decls = sym.info.decls
-          for (s <- decls) {
-            if (s.privateWithin.isClass && !s.isProtected && !s.privateWithin.isModuleClass &&
-                !s.hasFlag(EXPANDEDNAME) && !s.isConstructor) {
-              val savedName = s.name
-              decls.unlink(s)
-              s.expandName(s.privateWithin)
-              decls.enter(s)
-              log("Expanded '%s' to '%s' in %s".format(savedName, s.name, sym))
+            val decls = sym.info.decls
+            for (s <- decls) {
+              if (s.privateWithin.isClass && !s.isProtected && !s.privateWithin.isModuleClass &&
+                  !s.hasFlag(EXPANDEDNAME) && !s.isConstructor) {
+                val savedName = s.name
+                decls.unlink(s)
+                s.expandName(s.privateWithin)
+                decls.enter(s)
+                log("Expanded '%s' to '%s' in %s".format(savedName, s.name, sym))
+              }
             }
-          }
-          super.transform(tree)
+            super.transform(tree)
           }
           transformClassDef
-
-        case ModuleDef(_, _, _) =>
-          checkCompanionNameClashes(sym)
-          super.transform(tree)
 
         case Template(_, _, body) =>
           def transformTemplate = {

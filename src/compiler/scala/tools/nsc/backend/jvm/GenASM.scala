@@ -582,28 +582,7 @@ abstract class GenASM extends SubComponent with BytecodeWriters { self =>
      *  cannot exist in the classpath: the type checker will be very confused.
      */
     def javaName(sym: Symbol): String = {
-
-        /*
-         * Checks if given symbol corresponds to inner class/object and add it to innerClassBuffer
-         *
-         * Note: This method is called recursively thus making sure that we add complete chain
-         * of inner class all until root class.
-         */
-        def collectInnerClass(s: Symbol): Unit = {
-          // TODO: some enteringFlatten { ... } which accounts for
-          // being nested in parameterized classes (if we're going to selectively flatten.)
-          val x = innerClassSymbolFor(s)
-          if(x ne NoSymbol) {
-            assert(x.isClass, "not an inner-class symbol")
-            val isInner = !x.rawowner.isPackageClass
-            if (isInner) {
-              innerClassBuffer += x
-              collectInnerClass(x.rawowner)
-            }
-          }
-        }
-
-      collectInnerClass(sym)
+      innerClassBuffer ++= sym.rawOwnerChain takeWhile (s => s.isClass && !s.rawowner.isPackageClass)
 
       val hasInternalName = sym.isClass || sym.isModuleNotMethod
       val cachedJN = javaNameCache.getOrElseUpdate(sym, {
@@ -746,12 +725,12 @@ abstract class GenASM extends SubComponent with BytecodeWriters { self =>
           )
 
           assert(jname != null, "javaName is broken.") // documentation
-          val doAdd = entries.get(jname) match {
+          val doAdd = entries get jname match {
             // TODO is it ok for prevOName to be null? (Someone should really document the invariants of the InnerClasses bytecode attribute)
             case Some(prevOName) =>
               // this occurs e.g. when innerClassBuffer contains both class Thread$State, object Thread$State,
               // i.e. for them it must be the case that oname == java/lang/Thread
-              assert(prevOName == oname, "duplicate")
+              assert(prevOName == oname, s"duplicate: $oname")
               false
             case None => true
           }
@@ -2252,7 +2231,7 @@ abstract class GenASM extends SubComponent with BytecodeWriters { self =>
               } else {
                 jmethod.visitFieldInsn(
                   Opcodes.GETSTATIC,
-                  javaName(module) /* + "$" */ ,
+                  javaName(module) /* + "$" */,
                   strMODULE_INSTANCE_FIELD,
                   descriptor(module))
               }
