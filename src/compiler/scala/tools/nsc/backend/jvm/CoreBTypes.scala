@@ -107,7 +107,9 @@ class CoreBTypes[BTFS <: BTypesFromSymbols[_ <: Global]](val bTypes: BTFS) {
   lazy val objArrayReference : ArrayBType = ArrayBType(ObjectReference)
 
   lazy val StringReference             : ClassBType = classBTypeFromSymbol(StringClass)
-  lazy val StringBuilderReference      : ClassBType = classBTypeFromSymbol(StringBuilderClass)
+  lazy val JavaStringBuilderReference  : ClassBType = classBTypeFromSymbol(JavaStringBuilderClass)
+  lazy val JavaStringBufferReference   : ClassBType = classBTypeFromSymbol(JavaStringBufferClass)
+  lazy val JavaCharSequenceReference   : ClassBType = classBTypeFromSymbol(JavaCharSequenceClass)
   lazy val ThrowableReference          : ClassBType = classBTypeFromSymbol(ThrowableClass)
   lazy val jlCloneableReference        : ClassBType = classBTypeFromSymbol(JavaCloneableClass)        // java/lang/Cloneable
   lazy val jlNPEReference              : ClassBType = classBTypeFromSymbol(NullPointerExceptionClass) // java/lang/NullPointerException
@@ -253,7 +255,9 @@ final class CoreBTypesProxy[BTFS <: BTypesFromSymbols[_ <: Global]](val bTypes: 
   def objArrayReference : ArrayBType = _coreBTypes.objArrayReference
 
   def StringReference             : ClassBType = _coreBTypes.StringReference
-  def StringBuilderReference      : ClassBType = _coreBTypes.StringBuilderReference
+  def JavaStringBuilderReference  : ClassBType = _coreBTypes.JavaStringBuilderReference
+  def JavaStringBufferReference   : ClassBType = _coreBTypes.JavaStringBufferReference
+  def JavaCharSequenceReference   : ClassBType = _coreBTypes.JavaCharSequenceReference
   def ThrowableReference          : ClassBType = _coreBTypes.ThrowableReference
   def jlCloneableReference        : ClassBType = _coreBTypes.jlCloneableReference
   def jlNPEReference              : ClassBType = _coreBTypes.jlNPEReference
