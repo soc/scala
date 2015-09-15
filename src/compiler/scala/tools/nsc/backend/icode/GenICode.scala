@@ -1263,27 +1263,7 @@ abstract class GenICode extends SubComponent {
       }
     )
 
-    // I wrote it this way before I realized all the primitive types are
-    // boxed at this point, so I'd have to unbox them.  Keeping it around in
-    // case we want to get more precise.
-    //
-    // private def valueOfForType(tp: Type): Symbol = {
-    //   val xs = getMember(StringModule, nme.valueOf) filter (sym =>
-    //     // We always exclude the Array[Char] overload because java throws an NPE if
-    //     // you pass it a null.  It will instead find the Object one, which doesn't.
-    //     sym.info.paramTypes match {
-    //       case List(pt) => pt.typeSymbol != ArrayClass && (tp <:< pt)
-    //       case _        => false
-    //     }
-    //   )
-    //   xs.alternatives match {
-    //     case List(sym)  => sym
-    //     case _          => NoSymbol
-    //   }
-    // }
-
-    /** Generate string concatenation.
-     */
+    /** Generate string concatenation. */
     def genStringConcat(tree: Tree, ctx: Context): Context = {
       liftStringConcat(tree) match {
         // Optimization for expressions of the form "" + x.  We can avoid the StringBuilder.

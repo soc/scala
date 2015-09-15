@@ -213,6 +213,14 @@ abstract class ScalaPrimitives {
 
     // java.lang.String
     addPrimitive(String_+, CONCAT)
+    addPrimitive(String_plus_Long, CONCAT)
+    addPrimitive(String_plus_Double, CONCAT)
+    addPrimitive(String_plus_Int, CONCAT)
+    addPrimitive(String_plus_Float, CONCAT)
+    addPrimitive(String_plus_Short, CONCAT)
+    addPrimitive(String_plus_Char, CONCAT)
+    addPrimitive(String_plus_Byte, CONCAT)
+    addPrimitive(String_plus_Boolean, CONCAT)
 
     // scala.Array
     addPrimitives(ArrayClass, nme.length, LENGTH)

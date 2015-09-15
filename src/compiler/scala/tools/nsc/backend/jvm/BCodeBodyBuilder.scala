@@ -974,31 +974,48 @@ abstract class BCodeBodyBuilder extends BCodeSkelBuilder {
       }
     }
 
+    private def String_valueOf_forType(tp: Type): Symbol = {
+      val xs = getMember(StringModule, nme.valueOf) filter (sym =>
+        // We always exclude the Array[Char] overload because java throws an NPE if
+        // you pass it a null.  It will instead find the Object one, which doesn't.
+        sym.info.paramTypes match {
+          case List(pt) => pt.typeSymbol != ArrayClass && (tp <:< pt)
+          case _        => false
+        }
+      )
+      xs.alternatives match {
+        case List(sym)  => sym
+        case _          => NoSymbol
+      }
+    }
+
     def genStringConcat(tree: Tree): BType = {
+      def genConcat(concatenations: List[Tree]) = {
+        bc.genStartConcat(tree.pos)
+        for (elem <- concatenations) {
+          val kind = tpeTK(elem)
+          genLoad(elem, kind)
+          bc.genStringConcat(kind, elem.pos)
+        }
+        bc.genEndConcat(tree.pos)
+      }
+
       lineNumber(tree)
       liftStringConcat(tree) match {
 
         // Optimization for expressions of the form "" + x.  We can avoid the StringBuilder.
-        case List(Literal(Constant("")), arg) =>
-          genLoad(arg, ObjectReference)
-          genCallMethod(String_valueOf, icodes.opcodes.Static(onInstance = false), arg.pos)
-
-        case concatenations =>
-          bc.genStartConcat(tree.pos)
-          for (elem <- concatenations) {
-            val kind = tpeTK(elem)
-            genLoad(elem, kind)
-            bc.genStringConcat(kind, elem.pos)
-          }
-          bc.genEndConcat(tree.pos)
-
+        case Literal(Constant("")) :: arg :: Nil =>
+          genLoad(arg, tpeTK(arg))
+          genCallMethod(String_valueOf_forType(arg.tpe), icodes.opcodes.Static(onInstance = false), arg.pos)
+        // Drop the first element if it is an empty string
+        case Literal(Constant("")) :: concatenations => genConcat(concatenations)
+        case concatenations => genConcat(concatenations)
       }
 
       StringReference
     }
 
     def genCallMethod(method: Symbol, style: InvokeStyle, pos: Position, hostClass0: Symbol = null) {
-
       val siteSymbol = claszSymbol
       val hostSymbol = if (hostClass0 == null) method.owner else hostClass0
       val methodOwner = method.owner

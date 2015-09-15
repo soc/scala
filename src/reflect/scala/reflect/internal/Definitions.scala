@@ -1061,7 +1061,16 @@ trait Definitions extends api.StandardDefinitions {
     lazy val Object_synchronized = newPolyMethod(1, ObjectClass, nme.synchronized_, FINAL)(tps =>
       (Some(List(tps.head.typeConstructor)), tps.head.typeConstructor)
     )
+
     lazy val String_+ = enterNewMethod(StringClass, nme.raw.PLUS, AnyTpe :: Nil, StringTpe, FINAL)
+    lazy val String_plus_Long = enterNewMethod(StringClass, nme.raw.PLUS, LongTpe :: Nil, StringTpe, FINAL)
+    lazy val String_plus_Int = enterNewMethod(StringClass, nme.raw.PLUS, IntTpe :: Nil, StringTpe, FINAL)
+    lazy val String_plus_Double = enterNewMethod(StringClass, nme.raw.PLUS, DoubleTpe :: Nil, StringTpe, FINAL)
+    lazy val String_plus_Float = enterNewMethod(StringClass, nme.raw.PLUS, FloatTpe :: Nil, StringTpe, FINAL)
+    lazy val String_plus_Short = enterNewMethod(StringClass, nme.raw.PLUS, ShortTpe :: Nil, StringTpe, FINAL)
+    lazy val String_plus_Char = enterNewMethod(StringClass, nme.raw.PLUS, CharTpe :: Nil, StringTpe, FINAL)
+    lazy val String_plus_Byte = enterNewMethod(StringClass, nme.raw.PLUS, ByteTpe :: Nil, StringTpe, FINAL)
+    lazy val String_plus_Boolean = enterNewMethod(StringClass, nme.raw.PLUS, BooleanTpe :: Nil, StringTpe, FINAL)
 
     def Object_getClass  = getMemberMethod(ObjectClass, nme.getClass_)
     def Object_clone     = getMemberMethod(ObjectClass, nme.clone_)
@@ -1421,8 +1430,9 @@ trait Definitions extends api.StandardDefinitions {
     final class RunDefinitions {
       lazy val StringAdd_+ = getMemberMethod(StringAddClass, nme.PLUS)
 
+      private val stringPlusSymbols = Array(String_+, String_plus_Long, String_plus_Int, String_plus_Double, String_plus_Float, String_plus_Short, String_plus_Char, String_plus_Byte, String_plus_Boolean)
       // The given symbol represents either String.+ or StringAdd.+
-      def isStringAddition(sym: Symbol) = sym == String_+ || sym == StringAdd_+
+      def isStringAddition(sym: Symbol) = stringPlusSymbols.contains(sym) || sym == StringAdd_+
 
       lazy val StringContext_f = getMemberMethod(StringContextClass, nme.f)
 
