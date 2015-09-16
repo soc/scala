@@ -1,1 +1,2 @@
--optimize -Ybackend:GenASM
+-Yopt:l:classpath
+
