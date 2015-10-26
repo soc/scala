@@ -899,8 +899,6 @@ abstract class BCodeHelpers extends BCodeIdiomatic with BytecodeWriters {
 
   trait BCJGenSigGen {
 
-    def getCurrentCUnit(): CompilationUnit
-
     // @M don't generate java generics sigs for (members of) implementation
     // classes, as they are monomorphic (TODO: ok?)
     private def needsGenericSignature(sym: Symbol) = !(
@@ -923,14 +921,12 @@ abstract class BCodeHelpers extends BCodeIdiomatic with BytecodeWriters {
      *
      * must-single-thread
      */
-    def getGenericSignature(sym: Symbol, owner: Symbol): String = getGenericSignature(sym, owner, getCurrentCUnit())
-
-    def getGenericSignature(sym: Symbol, owner: Symbol, unit: CompilationUnit): String = {
+    def getGenericSignature(sym: Symbol, owner: Symbol): String = {
       val memberTpe = enteringErasure(owner.thisType.memberInfo(sym))
-      getGenericSignature(sym, owner, memberTpe, unit)
+      getGenericSignature(sym, owner, memberTpe)
     }
 
-    def getGenericSignature(sym: Symbol, owner: Symbol, memberTpe: Type, unit: CompilationUnit): String = {
+    def getGenericSignature(sym: Symbol, owner: Symbol, memberTpe: Type): String = {
       if (!needsGenericSignature(sym)) { return null }
 
       val jsOpt: Option[String] = erasure.javaSig(sym, memberTpe)
@@ -1011,7 +1007,7 @@ abstract class BCodeHelpers extends BCodeIdiomatic with BytecodeWriters {
      * must-single-thread
      */
     private def addForwarder(isRemoteClass: Boolean, jclass: asm.ClassVisitor, module: Symbol, m: Symbol): Unit = {
-      def staticForwarderGenericSignature(sym: Symbol, moduleClass: Symbol, unit: CompilationUnit): String = {
+      def staticForwarderGenericSignature(sym: Symbol, moduleClass: Symbol): String = {
         if (sym.isDeferred) null // only add generic signature if method concrete; bug #1745
         else {
           // SI-3452 Static forwarder generation uses the same erased signature as the method if forwards to.
@@ -1022,7 +1018,7 @@ abstract class BCodeHelpers extends BCodeIdiomatic with BytecodeWriters {
           val memberTpe = enteringErasure(moduleClass.thisType.memberInfo(sym))
           val erasedMemberType = erasure.erasure(sym)(memberTpe)
           if (erasedMemberType =:= sym.info)
-            getGenericSignature(sym, moduleClass, memberTpe, unit)
+            getGenericSignature(sym, moduleClass, memberTpe)
           else null
         }
       }
@@ -1043,7 +1039,7 @@ abstract class BCodeHelpers extends BCodeIdiomatic with BytecodeWriters {
       )
 
       // TODO needed? for(ann <- m.annotations) { ann.symbol.initialize }
-      val jgensig = staticForwarderGenericSignature(m, module, getCurrentCUnit())
+      val jgensig = staticForwarderGenericSignature(m, module)
       addRemoteExceptionAnnot(isRemoteClass, hasPublicBitSet(flags), m)
       val (throws, others) = m.annotations partition (_.symbol == definitions.ThrowsClass)
       val thrownExceptions: List[String] = getExceptions(throws)
@@ -1162,10 +1158,6 @@ abstract class BCodeHelpers extends BCodeIdiomatic with BytecodeWriters {
 
   /* builder of mirror classes */
   class JMirrorBuilder extends JCommonBuilder {
-
-    private var cunit: CompilationUnit = _
-    def getCurrentCUnit(): CompilationUnit = cunit;
-
     /* Generate a mirror class for a top-level module. A mirror class is a class
      *  containing only static methods that forward to the corresponding method
      *  on the MODULE instance of the given Scala object.  It will only be
@@ -1178,7 +1170,6 @@ abstract class BCodeHelpers extends BCodeIdiomatic with BytecodeWriters {
       assert(moduleClass.isModuleClass)
       assert(moduleClass.companionClass == NoSymbol, moduleClass)
       innerClassBufferASM.clear()
-      this.cunit = cunit
 
       val bType = mirrorClassClassBType(moduleClass)
       val mirrorClass = new asm.tree.ClassNode
