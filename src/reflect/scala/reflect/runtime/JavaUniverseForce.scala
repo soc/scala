@@ -408,7 +408,6 @@ trait JavaUniverseForce { self: runtime.JavaUniverse  =>
     definitions.VolatileAttr
     definitions.BeanGetterTargetClass
     definitions.BeanSetterTargetClass
-    definitions.ConstructorTargetClass
     definitions.FieldTargetClass
     definitions.GetterTargetClass
     definitions.ParamTargetClass

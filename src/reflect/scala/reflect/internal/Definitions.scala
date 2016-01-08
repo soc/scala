@@ -1148,7 +1148,6 @@ trait Definitions extends api.StandardDefinitions {
     // Meta-annotations
     lazy val BeanGetterTargetClass      = requiredClass[meta.beanGetter]
     lazy val BeanSetterTargetClass      = requiredClass[meta.beanSetter]
-    lazy val ConstructorTargetClass     = requiredClass[meta.constructor]
     lazy val FieldTargetClass           = requiredClass[meta.field]
     lazy val GetterTargetClass          = requiredClass[meta.getter]
     lazy val ParamTargetClass           = requiredClass[meta.param]
