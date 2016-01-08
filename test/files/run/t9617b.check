@@ -1,0 +1,4 @@
+newSource1.scala:4: warning: method bar in object J is deprecated
+  J.bar()
+    ^
+error: No warnings can be incurred under -Xfatal-warnings.

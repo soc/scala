@@ -390,6 +390,7 @@ trait JavaUniverseForce { self: runtime.JavaUniverse  =>
     definitions.BooleanBeanPropertyAttr
     definitions.CompileTimeOnlyAttr
     definitions.DeprecatedAttr
+    definitions.JavaDeprecatedAttr
     definitions.DeprecatedNameAttr
     definitions.DeprecatedInheritanceAttr
     definitions.DeprecatedOverridingAttr
@@ -408,7 +409,6 @@ trait JavaUniverseForce { self: runtime.JavaUniverse  =>
     definitions.VolatileAttr
     definitions.BeanGetterTargetClass
     definitions.BeanSetterTargetClass
-    definitions.ConstructorTargetClass
     definitions.FieldTargetClass
     definitions.GetterTargetClass
     definitions.ParamTargetClass
