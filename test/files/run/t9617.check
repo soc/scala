@@ -1,0 +1,13 @@
+newSource1.scala:3: warning: method foo in object J is deprecated
+  J.foo()
+    ^
+newSource1.scala:4: warning: variable i in object J is deprecated
+  J.bar(J.i)
+          ^
+newSource1.scala:5: warning: constructor J in class J is deprecated
+  val j = new J()
+          ^
+newSource1.scala:6: warning: class JInner in class J is deprecated
+  val inner = new j.JInner()
+                    ^
+error: No warnings can be incurred under -Xfatal-warnings.

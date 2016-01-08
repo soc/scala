@@ -390,6 +390,7 @@ trait JavaUniverseForce { self: runtime.JavaUniverse  =>
     definitions.BooleanBeanPropertyAttr
     definitions.CompileTimeOnlyAttr
     definitions.DeprecatedAttr
+    definitions.JavaDeprecatedAttr
     definitions.DeprecatedNameAttr
     definitions.DeprecatedInheritanceAttr
     definitions.DeprecatedOverridingAttr
