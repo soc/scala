@@ -427,7 +427,10 @@ trait Printers extends api.Printers { self: SymbolTable =>
           print("throw ", expr)
 
         case New(tpe) =>
-          print("new ", tpe)
+          if (tpe.symbol != null && tpe.symbol.isNonBottomSubClass(definitions.AnnotationClass))
+            print(tpe)
+          else
+            print("new ", tpe)
 
         case Typed(expr, tp) =>
           print("(", expr, ": ", tp, ")")
