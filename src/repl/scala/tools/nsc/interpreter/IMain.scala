@@ -836,7 +836,7 @@ class IMain(@BeanProperty val factory: ScriptEngineFactory, initialSettings: Set
           }
           ((pos, msg)) :: loop(filtered)
       }
-      val warnings = loop(run.reporting.allConditionalWarnings)
+      val warnings = loop(run.reporting.allConditionalWarnings.map{case (pos, (msg, since)) => (pos, msg)})
       if (warnings.nonEmpty)
         mostRecentWarnings = warnings
     }
